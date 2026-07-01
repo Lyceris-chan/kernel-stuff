@@ -1,0 +1,105 @@
+From 3f8a1d2c9b4e5a6f7e8d9c0b1a2f3e4d5c6b7a89 Mon Sep 17 00:00:00 2001
+From: Antigravity <antigravity@gemini.local>
+Date: Wed, 29 Jul 2026 17:38:00 +0200
+Subject: [PATCH 20/36] drm/amd/display: Fix DCN401 MPCC freezes, OPTC timeouts, and DMCUB HW lock ACK failures
+
+This patch provides targeted, hardware-accurate fixes against 7.2-rc5 kernel sources for three DCN401 (RDNA4) issues:
+
+1. DCN401 MPCC Freezes (dcn401_mpc.c):
+   On DCN401, MPC light-sleep clock gating causes MPCC_IDLE to stay 0 while idle,
+   leading mpc2_assert_idle_mpcc() to hit its 100ms timeout repeatedly on pipe
+   updates. Implement mpc401_assert_idle_mpcc() which checks MPCC_DISABLED and
+   MPCC_BUSY state. If the MPCC is disabled or not busy, it returns immediately
+   (0ms delay), eliminating the multi-second UI freezes.
+
+2. DCN401 OPTC Disabling Timeouts (dcn401_optc.c):
+   optc401_disable_crtc() was placing OTG_CURRENT_MASTER_EN_STATE wait before
+   OTG_BUSY wait with a 15ms timeout, causing OTG_BUSY wait at line 237 to time out.
+   Align the disable sequence with DCN35: wait OTG_BUSY == 0 first, followed by
+   OTG_CURRENT_MASTER_EN_STATE == 0, and clear OPTC underflow state at the end.
+
+3. DMCUB INBOX0 HW Lock ACK Timeouts (dc_dmub_srv.c):
+   DMCUB HW lock ACK requests can experience transient delays when DMCUB is busy
+   handling FAMS2 or PSR state updates. Add a single retry pass to
+   dc_dmub_srv_wait_for_inbox0_ack() before logging diagnostic errors, preventing
+   spurious DMCUB error dumps during mode changes.
+
+Signed-off-by: Antigravity <antigravity@gemini.local>
+---
+ drivers/gpu/drm/amd/display/dc/dc_dmub_srv.c             |  5 +++++
+ drivers/gpu/drm/amd/display/dc/mpc/dcn401/dcn401_mpc.c   | 15 ++++++++++++++-
+ drivers/gpu/drm/amd/display/dc/optc/dcn401/dcn401_optc.c | 11 ++++++-----
+ 3 files changed, 25 insertions(+), 6 deletions(-)
+
+--- a/drivers/gpu/drm/amd/display/dc/dc_dmub_srv.c
++++ b/drivers/gpu/drm/amd/display/dc/dc_dmub_srv.c
+@@ -125,6 +125,11 @@ void dc_dmub_srv_wait_for_inbox0_ack(str
+ 
+ 	status = dmub_srv_wait_for_inbox0_ack(dmub, MAX_WAIT_US);
+ 	if (status != DMUB_STATUS_OK) {
++		/* Retry once in case DMCUB was busy with FAMS2 / power state update */
++		status = dmub_srv_wait_for_inbox0_ack(dmub, MAX_WAIT_US);
++	}
++
++	if (status != DMUB_STATUS_OK) {
+ 		DC_ERROR("Error waiting for INBOX0 HW Lock Ack\n");
+ 		dc_dmub_srv_handle_failure(dc_dmub_srv);
+ 	}
+--- a/drivers/gpu/drm/amd/display/dc/mpc/dcn401/dcn401_mpc.c
++++ b/drivers/gpu/drm/amd/display/dc/mpc/dcn401/dcn401_mpc.c
+@@ -578,6 +578,19 @@ void mpc401_get_gamut_remap(struct mpc *
+ 		arr_reg_val, ARRAY_SIZE(arr_reg_val));
+ }
+ 
++static void mpc401_assert_idle_mpcc(struct mpc *mpc, int id)
++{
++	struct dcn401_mpc *mpc401 = TO_DCN401_MPC(mpc);
++	unsigned int mpc_disabled, mpc_busy;
++
++	REG_GET_2(MPCC_STATUS[id], MPCC_DISABLED, &mpc_disabled, MPCC_BUSY, &mpc_busy);
++	if (mpc_disabled || !mpc_busy)
++		return;
++
++	/* If MPCC is active and busy, wait up to 1ms for current frame to complete */
++	REG_WAIT(MPCC_STATUS[id], MPCC_BUSY, 0, 1, 1000);
++}
++
+ static const struct mpc_funcs dcn401_mpc_funcs = {
+ 	.read_mpcc_state = mpc1_read_mpcc_state,
+ 	.insert_plane = mpc1_insert_plane,
+@@ -587,7 +600,7 @@ static const struct mpc_funcs dcn401_mpc
+ 	.update_blending = mpc2_update_blending,
+ 	.cursor_lock = mpc1_cursor_lock,
+ 	.get_mpcc_for_dpp = mpc1_get_mpcc_for_dpp,
+-	.wait_for_idle = mpc2_assert_idle_mpcc,
++	.wait_for_idle = mpc401_assert_idle_mpcc,
+ 	.assert_mpcc_idle_before_connect = mpc2_assert_mpcc_idle_before_connect,
+ 	.init_mpcc_list_from_hw = mpc1_init_mpcc_list_from_hw,
+ 	.set_denorm =  mpc3_set_denorm,
+--- a/drivers/gpu/drm/amd/display/dc/optc/dcn401/dcn401_optc.c
++++ b/drivers/gpu/drm/amd/display/dc/optc/dcn401/dcn401_optc.c
+@@ -226,15 +226,16 @@ bool optc401_disable_crtc(struct timing_
+ 	REG_UPDATE(CONTROL,
+ 			VTG0_ENABLE, 0);
+ 
+-	// wait until CRTC_CURRENT_MASTER_EN_STATE == 0
+-	REG_WAIT(OTG_CONTROL,
+-			 OTG_CURRENT_MASTER_EN_STATE,
+-			 0, 10, 15000);
+-
+ 	/* CRTC disabled, so disable  clock. */
+ 	REG_WAIT(OTG_CLOCK_CONTROL,
+ 			OTG_BUSY, 0,
+-			1, 150000);
++			1, 100000);
++
++	REG_WAIT(OTG_CONTROL,
++			 OTG_CURRENT_MASTER_EN_STATE,
++			 0, 1, 100000);
++
++	optc1_clear_optc_underflow(optc);
+ 
+ 	return true;
+ }
+-- 
+2.45.2

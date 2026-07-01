@@ -1,0 +1,149 @@
+From 1d5a9fb3dc8c53432f0180a27583f949343f1a66 Mon Sep 17 00:00:00 2001
+From: Alex Deucher <alexander.deucher@amd.com>
+Date: Mon, 13 Jul 2026 14:27:28 -0400
+Subject: [PATCH 10/16] drm/amdgpu: add core helper to do TLB invalidation via
+ SDMA
+
+Adds a new helper to do TLB invalidation using SDMA.
+
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_gmc.c | 36 +++++++++++++++++++++
+ drivers/gpu/drm/amd/amdgpu/amdgpu_gmc.h |  2 ++
+ drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c | 42 +++++++++++++++++++++++++
+ drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.h |  6 ++++
+ 4 files changed, 86 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_gmc.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_gmc.c
+index 5d6149b..c99417e 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_gmc.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_gmc.c
+@@ -928,6 +928,42 @@ void amdgpu_gmc_fw_reg_write_reg_wait(struct amdgpu_device *adev,
+ 	dev_err(adev->dev, "failed to write reg %x wait reg %x\n", reg0, reg1);
+ }
+ 
++int amdgpu_gmc_flush_gpu_tlb_helper(struct amdgpu_device *adev, uint32_t vmid,
++				    uint32_t vmhub, uint32_t flush_type)
++{
++	struct dma_fence *fence;
++	/* Use register 17 for GART */
++	u32 inst, eng = 17;
++	int r;
++
++	if (AMDGPU_IS_GFXHUB(vmhub) && !adev->gfx.is_poweron)
++		return 0;
++
++	if (vmhub >= AMDGPU_MMHUB0(0))
++		inst = 0;
++	else
++		inst = vmhub;
++
++	/* flush hdp cache */
++	amdgpu_device_flush_hdp(adev, NULL);
++
++	mutex_lock(&adev->mman.default_entity.lock);
++	r = amdgpu_ttm_tlb_inv(adev, vmid, vmhub, eng, flush_type, inst,
++			       &adev->mman.default_entity,
++			       NULL, &fence);
++	if (r)
++		goto exit;
++	r = dma_fence_wait(fence, false);
++	dma_fence_put(fence);
++	if (r)
++		goto exit;
++
++exit:
++	mutex_unlock(&adev->mman.default_entity.lock);
++
++	return r;
++}
++
+ /**
+  * amdgpu_gmc_tmz_set -- check and set if a device supports TMZ
+  * @adev: amdgpu_device pointer
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_gmc.h b/drivers/gpu/drm/amd/amdgpu/amdgpu_gmc.h
+index ddb0d50..7beea10 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_gmc.h
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_gmc.h
+@@ -451,6 +451,8 @@ void amdgpu_gmc_fw_reg_write_reg_wait(struct amdgpu_device *adev,
+ 				      uint32_t reg0, uint32_t reg1,
+ 				      uint32_t ref, uint32_t mask,
+ 				      uint32_t xcc_inst);
++int amdgpu_gmc_flush_gpu_tlb_helper(struct amdgpu_device *adev, uint32_t vmid,
++				    uint32_t vmhub, uint32_t flush_type);
+ 
+ extern void amdgpu_gmc_tmz_set(struct amdgpu_device *adev);
+ extern void amdgpu_gmc_noretry_set(struct amdgpu_device *adev);
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c
+index eb8bbfc..7f6582d 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c
+@@ -2512,6 +2512,48 @@ int amdgpu_copy_buffer(struct amdgpu_device *adev,
+ 	return r;
+ }
+ 
++int amdgpu_ttm_tlb_inv(struct amdgpu_device *adev,
++		       unsigned int vmid, u32 vmhub, u32 eng,
++		       u32 flush_type, u32 xcc_inst,
++		       struct amdgpu_ttm_buffer_entity *entity,
++		       struct dma_resv *resv,
++		       struct dma_fence **fence)
++{
++	struct amdgpu_ring *ring;
++	struct amdgpu_job *job;
++	int r, num_dw;
++
++	if (!adev->mman.buffer_funcs_enabled)
++		return -EINVAL;
++
++	ring = to_amdgpu_ring(adev->mman.buffer_funcs_scheds[0]);
++
++	if (!ring->sched.ready) {
++		dev_err(adev->dev,
++			"Trying to inv tlbs with ring turned off.\n");
++		return -EINVAL;
++	}
++
++	num_dw = ALIGN(adev->mman.buffer_funcs->tlb_inv_num_dw, 8);
++	r = amdgpu_ttm_prepare_job(adev, entity, num_dw,
++				   resv, false, &job,
++				   AMDGPU_KERNEL_JOB_ID_VM_UPDATE);
++	if (r)
++		goto error_free;
++
++	amdgpu_emit_tlb_inv(adev, &job->ibs[0], vmid, vmhub, eng,
++			    flush_type, xcc_inst);
++
++	*fence = amdgpu_ttm_job_submit(adev, entity, job, num_dw);
++
++	return 0;
++
++error_free:
++	amdgpu_job_free(job);
++	dev_err(adev->dev, "Error scheduling IBs (%d)\n", r);
++	return r;
++}
++
+ static int amdgpu_ttm_fill_mem(struct amdgpu_device *adev,
+ 			       struct amdgpu_ttm_buffer_entity *entity,
+ 			       uint32_t src_data,
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.h b/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.h
+index b5d938b..06ccecf 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.h
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.h
+@@ -194,6 +194,12 @@ int amdgpu_copy_buffer(struct amdgpu_device *adev,
+ 		       struct dma_resv *resv,
+ 		       struct dma_fence **fence,
+ 		       bool vm_needs_flush, uint32_t copy_flags);
++int amdgpu_ttm_tlb_inv(struct amdgpu_device *adev,
++		       unsigned int vmid, u32 vmhub, u32 eng,
++		       u32 flush_type, u32 xcc_inst,
++		       struct amdgpu_ttm_buffer_entity *entity,
++		       struct dma_resv *resv,
++		       struct dma_fence **fence);
+ int amdgpu_ttm_clear_buffer(struct amdgpu_ttm_buffer_entity *entity,
+ 			    struct amdgpu_bo *bo,
+ 			    struct dma_resv *resv,
+-- 
+2.55.0
+

@@ -1,0 +1,53 @@
+From 7b5120c066ad98ee433124cca4d98dce07e40507 Mon Sep 17 00:00:00 2001
+From: Alex Deucher <alexander.deucher@amd.com>
+Date: Mon, 13 Jul 2026 14:27:23 -0400
+Subject: [PATCH 05/16] drm/amdgpu: add an buffer funcs callback for TLB
+ invalidation
+
+Use this interface to issue TLB invalidations using
+SDMA.
+
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_sdma.h | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_sdma.h b/drivers/gpu/drm/amd/amdgpu/amdgpu_sdma.h
+index 2bf3656..8be9663 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_sdma.h
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_sdma.h
+@@ -183,6 +183,23 @@ struct amdgpu_buffer_funcs {
+ 				 uint64_t dst_offset,
+ 				 /* number of byte to fill */
+ 				 uint32_t byte_count);
++
++	/* number of dw to reserve per operation */
++	unsigned	tlb_inv_num_dw;
++
++	/* used for buffer clearing */
++	void (*emit_tlb_inv)(struct amdgpu_device *adev,
++			     struct amdgpu_ib *ib,
++			     /* vmid to target */
++			     unsigned int vmid,
++			     /* vmhub to target */
++			     u32 vmhub,
++			     /* inv eng to target */
++			     u32 eng,
++			     /* flush type */
++			     u32 flush_type,
++			     /* XCC to target */
++			     u32 xcc_inst);
+ };
+ 
+ int amdgpu_sdma_reset_engine(struct amdgpu_device *adev, uint32_t instance_id,
+@@ -190,6 +207,7 @@ int amdgpu_sdma_reset_engine(struct amdgpu_device *adev, uint32_t instance_id,
+ 
+ #define amdgpu_emit_copy_buffer(adev, ib, s, d, b, t) (adev)->mman.buffer_funcs->emit_copy_buffer((ib),  (s), (d), (b), (t))
+ #define amdgpu_emit_fill_buffer(adev, ib, s, d, b) (adev)->mman.buffer_funcs->emit_fill_buffer((ib), (s), (d), (b))
++#define amdgpu_emit_tlb_inv(adev, ib, v, h, e, f, x) (adev)->mman.buffer_funcs->emit_tlb_inv((adev), (ib), (v), (h), (e), (f), (x))
+ 
+ struct amdgpu_sdma_instance *
+ amdgpu_sdma_get_instance_from_ring(struct amdgpu_ring *ring);
+-- 
+2.55.0
+

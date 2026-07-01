@@ -1,0 +1,83 @@
+From 748c1927ec4ee7dc4237f1eca05db9625cf444be Mon Sep 17 00:00:00 2001
+From: Alex Deucher <alexander.deucher@amd.com>
+Date: Mon, 13 Jul 2026 14:27:26 -0400
+Subject: [PATCH 08/16] drm/amdgpu/sdma6: add tlb invalidation buffer func
+ callback
+
+Will be used for TLB invalidation.
+
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/sdma_v6_0.c | 49 ++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/sdma_v6_0.c b/drivers/gpu/drm/amd/amdgpu/sdma_v6_0.c
+index d753788..72abca6 100644
+--- a/drivers/gpu/drm/amd/amdgpu/sdma_v6_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/sdma_v6_0.c
+@@ -1875,6 +1875,52 @@ static void sdma_v6_0_emit_fill_buffer(struct amdgpu_ib *ib,
+ 	ib->ptr[ib->length_dw++] = byte_count - 1;
+ }
+ 
++/**
++ * sdma_v6_0_emit_tlb_inv - Invalidate TLB using the sDMA engine
++ *
++ * @adev: amdgpu device structure
++ * @ib: indirect buffer to fill
++ * @vmid: vmid to target
++ * @vmhub: vmhub to target
++ * @eng: invalidation engine to use
++ * @flush_type: type of flush (lightweight, heavyweight)
++ * @xcc_inst: XCC to target
++ *
++ * Invalidate TLB using the DMA engine.
++ */
++static void sdma_v6_0_emit_tlb_inv(struct amdgpu_device *adev,
++				   struct amdgpu_ib *ib,
++				   unsigned int vmid,
++				   u32 vmhub,
++				   u32 eng,
++				   u32 flush_type,
++				   u32 xcc_inst)
++{
++	struct amdgpu_vmhub *hub = &adev->vmhub[vmhub];
++	u32 inv_req = hub->vmhub_funcs->get_invalidate_req(vmid, flush_type);
++	u32 mmhub_eng, gfxhub_eng;
++
++	if (AMDGPU_IS_GFXHUB(vmhub)) {
++		mmhub_eng = 0x1f;
++		gfxhub_eng = eng;
++	} else {
++		mmhub_eng = eng;
++		gfxhub_eng = 0x1f;
++	}
++
++	/* Trigger invalidation. */
++	ib->ptr[ib->length_dw++] =
++		(SDMA_PKT_VM_INVALIDATION_HEADER_OP(SDMA_OP_POLL_REGMEM) |
++		 SDMA_PKT_VM_INVALIDATION_HEADER_SUB_OP(SDMA_SUBOP_VM_INVALIDATION) |
++		 SDMA_PKT_VM_INVALIDATION_HEADER_GFX_ENG_ID(gfxhub_eng) |
++		 SDMA_PKT_VM_INVALIDATION_HEADER_MM_ENG_ID(mmhub_eng));
++	ib->ptr[ib->length_dw++] = inv_req;
++	ib->ptr[ib->length_dw++] = 0xFFFFFFFF;
++	ib->ptr[ib->length_dw++] =
++		(SDMA_PKT_VM_INVALIDATION_ADDRESSRANGEHI_INVALIDATEACK(1 << vmid) |
++		 SDMA_PKT_VM_INVALIDATION_ADDRESSRANGEHI_ADDRESSRANGEHI(0x1F));
++}
++
+ static const struct amdgpu_buffer_funcs sdma_v6_0_buffer_funcs = {
+ 	.copy_max_bytes = 1 << 30,
+ 	.copy_num_dw = 7,
+@@ -1883,6 +1929,9 @@ static const struct amdgpu_buffer_funcs sdma_v6_0_buffer_funcs = {
+ 	.fill_max_bytes = 1 << 30,
+ 	.fill_num_dw = 5,
+ 	.emit_fill_buffer = sdma_v6_0_emit_fill_buffer,
++
++	.tlb_inv_num_dw = 4,
++	.emit_tlb_inv = sdma_v6_0_emit_tlb_inv,
+ };
+ 
+ static void sdma_v6_0_set_buffer_funcs(struct amdgpu_device *adev)
+-- 
+2.55.0
+

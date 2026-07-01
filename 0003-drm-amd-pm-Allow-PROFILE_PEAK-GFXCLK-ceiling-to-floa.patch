@@ -1,0 +1,186 @@
+From 860bc6db0fcbd9c8d6c1ed1deb9c09a6aa85d365 Mon Sep 17 00:00:00 2001
+From: Antigravity <antigravity@gemini.local>
+Date: Wed, 1 Jul 2026 13:00:00 +0200
+Subject: [PATCH 27/36] drm/amd/pm: Allow PROFILE_PEAK GFXCLK ceiling to float
+
+Modifies SMU14 power management to let GFXCLK float in the peak profile.
+Prevents arbitrary frequency caps to maximize hardware performance.
+
+Signed-off-by: Antigravity <antigravity@gemini.local>
+---
+ .../gpu/drm/amd/pm/swsmu/smu14/smu_v14_0.c    | 60 +++++++++++++------
+ 1 file changed, 41 insertions(+), 19 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0.c b/drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0.c
+index 1bdce59fe..6f3bae88e 100644
+--- a/drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0.c
++++ b/drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0.c
+@@ -1098,11 +1098,12 @@ int smu_v14_0_get_dpm_ultimate_freq(struct smu_context *smu, enum smu_clk_type c
+ 	return ret;
+ }
+ 
+-int smu_v14_0_set_soft_freq_limited_range(struct smu_context *smu,
++static int smu_v14_0_set_soft_freq_limited_range_split(struct smu_context *smu,
+ 					  enum smu_clk_type clk_type,
+ 					  uint32_t min,
+ 					  uint32_t max,
+-					  bool automatic)
++					  bool min_automatic,
++					  bool max_automatic)
+ {
+ 	int ret = 0, clk_id = 0;
+ 	uint32_t param;
+@@ -1118,7 +1119,7 @@ int smu_v14_0_set_soft_freq_limited_range(struct smu_context *smu,
+ 
+ 	if (max > 0) {
+ 		max = SMU_V14_SOFT_FREQ_ROUND(max);
+-		if (automatic)
++		if (max_automatic)
+ 			param = (uint32_t)((clk_id << 16) | 0xffff);
+ 		else
+ 			param = (uint32_t)((clk_id << 16) | (max & 0xffff));
+@@ -1129,7 +1130,7 @@ int smu_v14_0_set_soft_freq_limited_range(struct smu_context *smu,
+ 	}
+ 
+ 	if (min > 0) {
+-		if (automatic)
++		if (min_automatic)
+ 			param = (uint32_t)((clk_id << 16) | 0);
+ 		else
+ 			param = (uint32_t)((clk_id << 16) | (min & 0xffff));
+@@ -1143,6 +1144,16 @@ int smu_v14_0_set_soft_freq_limited_range(struct smu_context *smu,
+ 	return ret;
+ }
+ 
++
++int smu_v14_0_set_soft_freq_limited_range(struct smu_context *smu,
++					  enum smu_clk_type clk_type,
++					  uint32_t min,
++					  uint32_t max,
++					  bool automatic)
++{
++	return smu_v14_0_set_soft_freq_limited_range_split(smu, clk_type, min, max, automatic, automatic);
++}
++
+ int smu_v14_0_set_hard_freq_limited_range(struct smu_context *smu,
+ 					  enum smu_clk_type clk_type,
+ 					  uint32_t min,
+@@ -1204,6 +1215,7 @@ int smu_v14_0_set_performance_level(struct smu_context *smu,
+ 	uint32_t fclk_min = 0, fclk_max = 0;
+ 	int ret = 0, i;
+ 	bool auto_level = false;
++	bool sclk_max_auto;
+ 
+ 	switch (level) {
+ 	case AMD_DPM_FORCED_LEVEL_HIGH:
+@@ -1223,6 +1235,8 @@ int smu_v14_0_set_performance_level(struct smu_context *smu,
+ 		fclk_min = fclk_max = SMU_DPM_TABLE_MIN(fclk_table);
+ 		break;
+ 	case AMD_DPM_FORCED_LEVEL_AUTO:
++		if (smu->power_profile_mode != PP_SMC_POWER_PROFILE_COMPUTE)
++			smu_v14_0_deep_sleep_control(smu, true);
+ 		sclk_min = SMU_DPM_TABLE_MIN(gfx_table);
+ 		sclk_max = SMU_DPM_TABLE_MAX(gfx_table);
+ 		mclk_min = SMU_DPM_TABLE_MIN(mem_table);
+@@ -1252,6 +1266,7 @@ int smu_v14_0_set_performance_level(struct smu_context *smu,
+ 		mclk_min = mclk_max = pstate_table->uclk_pstate.min;
+ 		break;
+ 	case AMD_DPM_FORCED_LEVEL_PROFILE_PEAK:
++		smu_v14_0_deep_sleep_control(smu, false);
+ 		sclk_min = sclk_max = pstate_table->gfxclk_pstate.peak;
+ 		mclk_min = mclk_max = pstate_table->uclk_pstate.peak;
+ 		socclk_min = socclk_max = pstate_table->socclk_pstate.peak;
+@@ -1268,11 +1283,13 @@ int smu_v14_0_set_performance_level(struct smu_context *smu,
+ 	}
+ 
+ 	if (sclk_min && sclk_max) {
+-		ret = smu_v14_0_set_soft_freq_limited_range(smu,
++		sclk_max_auto = auto_level || (level == AMD_DPM_FORCED_LEVEL_PROFILE_PEAK);
++		ret = smu_v14_0_set_soft_freq_limited_range_split(smu,
+ 							    SMU_GFXCLK,
+ 							    sclk_min,
+ 							    sclk_max,
+-							    auto_level);
++							    auto_level,
++							    sclk_max_auto);
+ 		if (ret)
+ 			return ret;
+ 
+@@ -1281,10 +1298,11 @@ int smu_v14_0_set_performance_level(struct smu_context *smu,
+ 	}
+ 
+ 	if (mclk_min && mclk_max) {
+-		ret = smu_v14_0_set_soft_freq_limited_range(smu,
++		ret = smu_v14_0_set_soft_freq_limited_range_split(smu,
+ 							    SMU_MCLK,
+ 							    mclk_min,
+ 							    mclk_max,
++							    auto_level,
+ 							    auto_level);
+ 		if (ret)
+ 			return ret;
+@@ -1294,10 +1312,11 @@ int smu_v14_0_set_performance_level(struct smu_context *smu,
+ 	}
+ 
+ 	if (socclk_min && socclk_max) {
+-		ret = smu_v14_0_set_soft_freq_limited_range(smu,
++		ret = smu_v14_0_set_soft_freq_limited_range_split(smu,
+ 							    SMU_SOCCLK,
+ 							    socclk_min,
+ 							    socclk_max,
++							    auto_level,
+ 							    auto_level);
+ 		if (ret)
+ 			return ret;
+@@ -1310,11 +1329,12 @@ int smu_v14_0_set_performance_level(struct smu_context *smu,
+ 		for (i = 0; i < adev->vcn.num_vcn_inst; i++) {
+ 			if (adev->vcn.harvest_config & (1 << i))
+ 				continue;
+-			ret = smu_v14_0_set_soft_freq_limited_range(smu,
+-								    i ? SMU_VCLK1 : SMU_VCLK,
+-								    vclk_min,
+-								    vclk_max,
+-								    auto_level);
++			ret = smu_v14_0_set_soft_freq_limited_range_split(smu,
++							    i ? SMU_VCLK1 : SMU_VCLK,
++							    vclk_min,
++							    vclk_max,
++							    auto_level,
++							    auto_level);
+ 			if (ret)
+ 				return ret;
+ 		}
+@@ -1326,11 +1346,12 @@ int smu_v14_0_set_performance_level(struct smu_context *smu,
+ 		for (i = 0; i < adev->vcn.num_vcn_inst; i++) {
+ 			if (adev->vcn.harvest_config & (1 << i))
+ 				continue;
+-			ret = smu_v14_0_set_soft_freq_limited_range(smu,
+-								    i ? SMU_DCLK1 : SMU_DCLK,
+-								    dclk_min,
+-								    dclk_max,
+-								    auto_level);
++			ret = smu_v14_0_set_soft_freq_limited_range_split(smu,
++							    i ? SMU_DCLK1 : SMU_DCLK,
++							    dclk_min,
++							    dclk_max,
++							    auto_level,
++							    auto_level);
+ 			if (ret)
+ 				return ret;
+ 		}
+@@ -1339,10 +1360,11 @@ int smu_v14_0_set_performance_level(struct smu_context *smu,
+ 	}
+ 
+ 	if (fclk_min && fclk_max) {
+-		ret = smu_v14_0_set_soft_freq_limited_range(smu,
++		ret = smu_v14_0_set_soft_freq_limited_range_split(smu,
+ 							    SMU_FCLK,
+ 							    fclk_min,
+ 							    fclk_max,
++							    auto_level,
+ 							    auto_level);
+ 		if (ret)
+ 			return ret;
+-- 
+2.55.0
+

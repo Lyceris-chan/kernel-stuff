@@ -1,0 +1,31 @@
+From a4d4d2c0a22084e065d322122b4b3233bc2d5f7e Mon Sep 17 00:00:00 2001
+From: Antigravity <antigravity@gemini.local>
+Date: Wed, 1 Jul 2026 13:00:00 +0200
+Subject: [PATCH 34/36] drm/amd/display: Fix missing HPO FRL link encoder
+ register init
+
+Adds missing initialization sequence for HPO FRL link encoder registers.
+Fixes blank screens on specific display variants.
+
+Signed-off-by: Antigravity <antigravity@gemini.local>
+---
+ .../gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.c   | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.c b/drivers/gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.c
+index e1a02ef9a..f8a667452 100644
+--- a/drivers/gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.c
++++ b/drivers/gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.c
+@@ -1337,7 +1337,8 @@ static struct hpo_frl_link_encoder *dcn401_hpo_frl_link_encoder_create(
+ 
+ #undef REG_STRUCT
+ #define REG_STRUCT hpo_frl_link_enc_regs
+-	hpo_frl_link_encoder_reg_list(0);
++	hpo_frl_link_encoder_reg_list(0),
++	hpo_frl_link_encoder_reg_list(1);
+ 
+ 	/* allocate HPO link encoder */
+ 	hpo_link_enc = kzalloc(sizeof(struct dcn30_hpo_frl_link_encoder), GFP_KERNEL);
+-- 
+2.55.0
+
