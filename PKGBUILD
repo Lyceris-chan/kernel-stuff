@@ -277,6 +277,7 @@ source=(
   "1082-zstd-7.2-merge-changes-from-dev-tree.patch"
   "1083-mm-7.2-introduce-LRU-MARIE.patch"
   "1084-7.2-nap-v0.5.0.patch"
+  "2000-drm-amd-display-Exit-idle-optimizations-before-programming.patch"
 )
 
 validpgpkeys=(
@@ -429,10 +430,11 @@ EOF
     done
     
     # causes freezes on rdna4 desktop - 9070xt
+    patch -Np1 -R -i "$srcdir/0020-drm-amd-display-Fix-DCN401-MPCC-OPTC-and-DMCUB-issues.patch"
     patch -Np1 -R -i "$srcdir/1025-drm-amd-display-enable-psr-and-replay-on-dcn4-variant-and-fi.patch"
     patch -Np1 -R -i "$srcdir/1031-drm-amd-display-enable-pstate-for-dcn4-non-emulation-builds.patch"
     patch -Np1 -R -i "$srcdir/1033-drm-amd-display-increase-dcn42b-uclk-value.patch"
-    patch -Np1 -R -i "$srcdir/1064-drm-amdgpu-Switch-order-of-GC-and-Display-IP-blocks.patch"
+    patch -Np1 -i "$srcdir/2000-drm-amd-display-Exit-idle-optimizations-before-programming.patch"
 
     # === CONFIG: Use CachyOS base config, then make olddefconfig to silently resolve new options ===
     echo "Setting config..."
@@ -864,7 +866,8 @@ b2sums=('46bb6126b1f11442b657f31c6d2025a347c44aa9ce5688bbd678264a9ba9d34ba50c758
         '5cce1017a1404ff24b2d45ee5d9d99efd07745b225eb25ee7ddbdc1f742e9ae612adbbac8a5e2d82f013d4c6bf1250c4b804b361e2a4ab0d2b4c30063fd804bc'
         'dc4e862e8f9fa7e8ead895908459757afd1027c24b960ae3d289a7212e29575bce3ce4627d5fd73edf211ee162dfa545e1642c5b16e8156f3dce50af8ef3c256'
         'SKIP'
-        '116ec92181c091e7e57f3c88b159a7080d3f3dfd05ed661da95811dd58209e4b83a69edfc47a57126524c014cdc0bb7b72f9be94294237c24461ac702e2b1206')
+        '116ec92181c091e7e57f3c88b159a7080d3f3dfd05ed661da95811dd58209e4b83a69edfc47a57126524c014cdc0bb7b72f9be94294237c24461ac702e2b1206'
+        'd3f9e4ba02082d133283cc0b90432c33fae70f256c8fc2f469994df95e5ac5beceda8af330ff79c1c5de25412f32d7390cf59f53c0c502335adf9863844c65db')
 
 if [ "$_use_kernel_org_llvm" = "yes" ]; then
     source+=("https://mirrors.edge.kernel.org/pub/tools/llvm/files/${_kernel_org_llvm_tarball}")
