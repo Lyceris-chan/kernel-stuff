@@ -429,10 +429,10 @@ EOF
     done
     
     # causes freezes on rdna4 desktop - 9070xt
-    patch -Np1 -R -i "$srcdir/0020-drm-amd-display-Fix-DCN401-MPCC-OPTC-and-DMCUB-issues.patch"
     patch -Np1 -R -i "$srcdir/1025-drm-amd-display-enable-psr-and-replay-on-dcn4-variant-and-fi.patch"
     patch -Np1 -R -i "$srcdir/1031-drm-amd-display-enable-pstate-for-dcn4-non-emulation-builds.patch"
     patch -Np1 -R -i "$srcdir/1033-drm-amd-display-increase-dcn42b-uclk-value.patch"
+    patch -Np1 -R -i "$srcdir/1064-drm-amdgpu-Switch-order-of-GC-and-Display-IP-blocks.patch"
 
     # === CONFIG: Use CachyOS base config, then make olddefconfig to silently resolve new options ===
     echo "Setting config..."
