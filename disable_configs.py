@@ -94,6 +94,24 @@ configs_to_disable = [
 
     # Mobile-flash filesystem (desktop NVMe uses ext4 / vfat / exfat)
     "F2FS_FS", "F2FS_STAT_FS", "F2FS_FS_XATTR", "F2FS_FS_POSIX_ACL", "F2FS_IOSTAT",
+
+    # Single-NVMe desktop: no NVMe multipath or in-band host authentication
+    "NVME_MULTIPATH", "NVME_HOST_AUTH",
+
+    # Storage / SCSI debug and zoned-device core (not used here)
+    "SCSI_LOGGING",
+
+    # Intel-specific / embedded bus and GPIO helpers (AMD board)
+    "I2C_DESIGNWARE_BAYTRAIL", "PINCTRL_SX150X",
+
+    # I2C / SPI slave mode and SPI dynamic framework (no embedded peripherals)
+    "I2C_SLAVE", "SPI_SLAVE", "SPI_DYNAMIC",
+
+    # Niche IPv6 in-situ OAM lightweight tunnels
+    "IPV6_IOAM6_LWTUNNEL",
+
+    # HDA PC-speaker beep
+    "SND_HDA_INPUT_BEEP",
 ]
 
 try:
