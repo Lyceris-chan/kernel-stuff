@@ -192,15 +192,15 @@ Only `1101` is reverse-applied in `prepare()` (PKGBUILD line 551). If you renumb
 
 ### 1204–1210 — amd-pstate fixes (upstream series 1/7–7/7)
 
-| File | Author | Subject |
-|------|--------|---------|
-| `1204` | Rong Zhang | cpufreq/amd-pstate: Bail out early if !X86_FEATURE_HW_PSTATE |
-| `1205` | Qianheng Peng | cpufreq: amd-pstate-ut: Skip tests when amd-pstate driver is not active |
-| `1206` | Marco Scardovi | cpufreq/amd-pstate: Fix EPP return type and handle errors during initialization |
-| `1207` | Marco Scardovi | cpufreq/amd-pstate: Toggle auto_sel in active mode on shared memory systems |
-| `1208` | Marco Scardovi | cpufreq/amd-pstate: Cache the firmware programmed EPP value |
-| `1209` | EDAMAMEX | cpufreq/amd-pstate: handle missing policy in dynamic EPP callbacks |
-| `1210` | Mario Limonciello | cpufreq/amd-pstate: Loosen requirement on lowest nonlinear frequency != min freq |
+| File | Author | Subject | Source (Message-ID / Link) |
+|------|--------|---------|-----------------------------|
+| `1204` | Rong Zhang | cpufreq/amd-pstate: Bail out early if !X86_FEATURE_HW_PSTATE | `<20260721-amd-pstate-vm-v3-1-8b59574fb714@rong.moe>` |
+| `1205` | Qianheng Peng | cpufreq: amd-pstate-ut: Skip tests when amd-pstate driver is not active | `<1784191899-28957-1-git-send-email-pengqh1@chinatelecom.cn>` |
+| `1206` | Marco Scardovi | cpufreq/amd-pstate: Fix EPP return type and handle errors during initialization | `<20260609073042.81275-2-scardracs@disroot.org>` |
+| `1207` | Marco Scardovi | cpufreq/amd-pstate: Toggle auto_sel in active mode on shared memory systems | `<20260609073042.81275-3-scardracs@disroot.org>` |
+| `1208` | Marco Scardovi | cpufreq/amd-pstate: Cache the firmware programmed EPP value | `<20260609073042.81275-4-scardracs@disroot.org>` |
+| `1209` | EDAMAMEX | cpufreq/amd-pstate: handle missing policy in dynamic EPP callbacks | `<20260520070211.2753183-1-edame8080@gmail.com>` |
+| `1210` | Mario Limonciello | cpufreq/amd-pstate: Loosen requirement on lowest nonlinear frequency != min freq | `<20260715174318.18235-1-mario.limonciello@amd.com>` |
 
 ### 1211–1213 — ACPI CPPC / cpufreq-cppc fixes (backported from post-rc5 mainline, added 2026-08-02)
 
@@ -228,8 +228,8 @@ Source: sirlucjan `7.2-rc/block-patches-sep/`. Formerly numbered `1300`–`1304`
 
 | File | Source | Author | Subject |
 |------|--------|--------|---------|
-| `2100` | `zstd-dev-patches/` | Piotr Gorski | zstd-7.2: merge changes from dev tree (formerly `1400`) |
-| `2101` | `lru-marie-patches-v12/` | Piotr Gorski | mm-7.2: introduce LRU MARIE v12 (formerly `1401`; `vma_flags` fix baked in) |
+| `2100` | `repos/sirlucjan-kernel-patches/7.2-rc/zstd-dev-patches/` | Piotr Gorski | zstd-7.2: merge changes from dev tree (formerly `1400`) |
+| `2101` | `repos/sirlucjan-kernel-patches/7.2-rc/lru-marie-patches-v12/` | Piotr Gorski | mm-7.2: introduce LRU MARIE v12 (formerly `1401`; `vma_flags` fix baked in) |
 
 ## 2200 — CPU idle (NAP governor)
 
