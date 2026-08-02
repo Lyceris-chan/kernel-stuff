@@ -88,7 +88,6 @@ configs_to_disable = [
     # Legacy / niche interfaces
     "SND_OSSEMUL",             # OSS sound emulation
     "SND_SPI",                 # SPI sound cards (embedded boards)
-    "AUTOFS_FS",               # autofs automount (no NFS in this build)
     "RESCTRL_FS",              # Intel RDT cache allocation (server / data-center)
     "SCSI_DH",                 # multipath device handlers (no SAN)
 
