@@ -26,7 +26,7 @@ hardware is unsupported.
 |---|---|---|
 | CPU | AMD Ryzen 9 7950X (Zen 4) | `MZEN4`, `amd-pstate`, `CPPC`, `k10temp` |
 | GPU | AMD Radeon RX 9070 XT (Navi 48, RDNA 4) | `gfx1201`, `DCN401`, `DCN42B`, `SMU14`, `PSP14` |
-| NIC | Realtek RTL8125B 2.5 GbE | Out-of-tree `r8125` driver |
+| NIC | Realtek RTL8125B 2.5 GbE | In-kernel `r8169` driver |
 | NVMe | Phison E16 PCIe 4.0 | `bfq`, `mq-deadline` schedulers |
 | Scheduler | sched-ext BPF schedulers | `CONFIG_SCHED_CLASS_EXT=y` |
 | CPUIdle | NAP governor | `CONFIG_CPU_IDLE_GOV_NAP=y` |
@@ -80,8 +80,7 @@ Here's what `linux-sleepy` gives you on top of each baseline.
 
 - Arch Linux with `makepkg` and `base-devel`
 - `pahole` >= 1.31 (package `dwarves`)
-- Network access to download the kernel source, the LLVM toolchain, and the
-  `r8125` driver
+- Network access to download the kernel source and the LLVM toolchain
 
 You do **not** need Clang, LLD, or LLVM packages; the PKGBUILD downloads a
 pre-built LLVM toolchain from `mirrors.edge.kernel.org/pub/tools/llvm/`.
@@ -101,19 +100,18 @@ The build produces these packages:
 
 - `linux-sleepy-7.2.rc5-1-x86_64.pkg.tar.zst`
 - `linux-sleepy-headers-7.2.rc5-1-x86_64.pkg.tar.zst`
-- `linux-sleepy-r8125-7.2.rc5-1-x86_64.pkg.tar.zst` (Realtek NIC driver)
 
-During the build you are prompted whether to configure the CAKE SQM service;
-in non-interactive environments (CI, piped input) the prompt is skipped.
+During the build you are prompted whether to enable CAKE SQM shaping (via the
+`net-tune` service); in non-interactive environments (CI, piped input) the
+prompt is skipped.
 
 ## Install
 
-Install the kernel, headers, and NIC driver:
+Install the kernel and headers:
 
 ```bash
 sudo pacman -U linux-sleepy-7.2.rc5-1-x86_64.pkg.tar.zst \
-              linux-sleepy-headers-7.2.rc5-1-x86_64.pkg.tar.zst \
-              linux-sleepy-r8125-7.2.rc5-1-x86_64.pkg.tar.zst
+              linux-sleepy-headers-7.2.rc5-1-x86_64.pkg.tar.zst
 ```
 
 Regenerate your bootloader config (for GRUB):
@@ -147,16 +145,22 @@ sudo scx_cake --preset esports
 Or configure `scx_loader` in `/etc/default/scx` with `SCX_SCHED=scx_cake` and
 `SCX_FLAGS="--preset esports"`.
 
-### SQM QoS (optional)
+### net-tune (SQM + latency tuning)
 
-The `sqm-qos/` directory ships a CAKE bufferbloat-mitigation service:
+The `net-tune/` directory ships one service that applies low-latency ethernet
+settings and, optionally, CAKE bufferbloat shaping at boot. The two parts are
+independent — toggle `ENABLE_LATENCY` and `ENABLE_SQM` in `/etc/net-tune.conf`:
 
 ```bash
-sudo systemctl enable --now sqm-qos.service
+sudo systemctl enable --now net-tune.service
 ```
 
-Adjust your line rate by editing `/etc/sqm-qos.conf` and restarting the service.
-BBR3 is the kernel-compiled default TCP controller; the service only applies CAKE.
+The latency part disables Wake-on-LAN, GRO/GSO/TSO/LRO, EEE, and adaptive
+interrupt coalescing; sets static low-latency coalescing and 256-entry ring
+buffers; and enables busy-polling sysctls. The SQM part applies CAKE at the
+bandwidth in the config (set it a few percent under your real sync rate).
+BBR3 is the kernel-compiled default TCP controller; the service only shapes
+CAKE, it does not change the congestion controller.
 
 ### Webcam support (UVC)
 
@@ -356,8 +360,7 @@ provenance (authors, commit hashes, Message-IDs).
 | `config` | Base `.config` (from CachyOS) |
 | `disable_configs.py` | Strips unwanted driver configs before `olddefconfig` |
 | `NNNN-*.patch` | Patch series (see ranges above) |
-| `sqm-qos/` | Optional CAKE SQM systemd service |
-| `r8125/` | RTL8125B out-of-tree driver source |
+| `net-tune/` | Unified CAKE SQM + latency tuning systemd service |
 | `repos/` | Cloned upstream git repos for patch extraction |
 | `GUIDE.md` | End-user guide with build details and PROFILE_PEAK notes |
 | `PATCH_SOURCES.md` | Per-patch provenance ledger |

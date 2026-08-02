@@ -49,12 +49,12 @@ base, with additional upstream and local patches filtered to this hardware.
 | `21xx-*.patch` | Memory management: zstd, LRU-MARIE |
 | `22xx-*.patch` | CPU idle: NAP governor |
 | `90xx-*.patch` | Upstream dev-tree backports from agd5f/linux |
-| `sqm-qos/` | Optional CAKE SQM bufferbloat mitigation service |
+| `net-tune/` | Unified CAKE SQM + latency tuning systemd service |
 | `r8125/` | RTL8125B out-of-tree driver source |
 | `repos/` | Cloned upstream git repos for patch extraction |
 | `src/`, `pkg/` | Build artifacts — never commit |
 
-**Deleted files (do not recreate):** `cake-sqm.sh`, `cake-sqm.service` (replaced by `sqm-qos/`).
+**Deleted files (do not recreate):** `cake-sqm.sh`, `cake-sqm.service`, `sqm-qos/`, `net-latency/` (replaced by the unified `net-tune/` service).
 
 ## Patch numbering
 
@@ -344,18 +344,25 @@ scripts/config -d X86_PLATFORM_DRIVERS_UNIWILL
 
 ---
 
-## SQM QoS service
+## net-tune service (CAKE SQM + latency tuning)
 
-BBR3 is the kernel-compiled default (`CONFIG_DEFAULT_TCP_CONG="bbr3"`). The SQM
-service does **not** set BBR3 via sysctl — it only applies CAKE traffic shaping.
+`net-tune/` ships one systemd service that applies low-latency ethernet
+settings (`ENABLE_LATENCY`) and, optionally, CAKE SQM shaping (`ENABLE_SQM`),
+each independently toggleable in `/etc/net-tune.conf`. BBR3 is the
+kernel-compiled default (`CONFIG_DEFAULT_TCP_CONG="bbr3"`); the SQM part does
+**not** set BBR3 via sysctl — it only applies CAKE traffic shaping.
 
 The PKGBUILD prompts interactively during `prepare()`. When no TTY is attached
-(CI, piped input), it silently skips. To pre-seed non-interactively:
+(CI, piped input), it silently skips. To pre-seed non-interactively (before
+running makepkg, after `mkdir -p src`):
 
 ```bash
-cat > src/sqm-qos.conf << EOF
-DOWNLOAD_MBIT="950"
-UPLOAD_MBIT="950"
+mkdir -p src
+cat > src/net-tune.conf << EOF
+ENABLE_SQM=yes
+DOWNLOAD_MBIT="80"
+UPLOAD_MBIT="85"
+ENABLE_LATENCY=yes
 EOF
 touch src/.enable_sqm
 ```

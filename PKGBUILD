@@ -123,7 +123,9 @@
 
 # Builds the r8125 module and package it into its own package
 # Replaces requirement for r8125-dkms
-: "${_build_r8125:=yes}"
+# NOTE: dropped 2026-08-02 — the in-kernel r8169 driver covers the RTL8125B
+# NIC; no out-of-tree module needed.
+: "${_build_r8125:=no}"
 
 # Build a debug package with non-stripped vmlinux
 : "${_build_debug:=no}"
@@ -440,27 +442,25 @@ prepare() {
 
     echo "Setting version..."
     
-    # Interactive SQM QoS Prompt
+    # Interactive net-tune prompt (CAKE SQM + latency tuning)
     if [ -t 0 ] && [ -z "$AUTO_BUILD" ]; then
-        echo -e "\nWould you like to enable the CAKE SQM network shaping service to eliminate bufferbloat? (y/N)"
+        echo -e "\nEnable CAKE SQM bandwidth shaping (net-tune)? (y/N)"
         read -r enable_sqm || enable_sqm="n"
         if [[ "$enable_sqm" =~ ^[Yy]$ ]]; then
             touch "$startdir/src/.enable_sqm"
-            echo "Enter your true DOWNLOAD speed in Mbit/s (e.g. 950, or press Enter to set in /etc/sqm-qos.conf later):"
+            echo "Enter your true DOWNLOAD speed in Mbit/s (e.g. 950):"
             read -r dl_mbit || dl_mbit=""
-            echo "Enter your true UPLOAD speed in Mbit/s (e.g. 950, or press Enter to set in /etc/sqm-qos.conf later):"
+            echo "Enter your true UPLOAD speed in Mbit/s (e.g. 950):"
             read -r ul_mbit || ul_mbit=""
-            cat > "$startdir/src/sqm-qos.conf" << EOF
+            cat > "$startdir/src/net-tune.conf" << EOF
+ENABLE_SQM=yes
 DOWNLOAD_MBIT="$dl_mbit"
 UPLOAD_MBIT="$ul_mbit"
+ENABLE_LATENCY=yes
 EOF
-            if [ -n "$dl_mbit" ] && [ -n "$ul_mbit" ]; then
-                echo "SQM QoS configured for ${dl_mbit}Mbps down / ${ul_mbit}Mbps up."
-            else
-                echo "SQM QoS service enabled. Please specify DOWNLOAD_MBIT and UPLOAD_MBIT in /etc/sqm-qos.conf before starting."
-            fi
+            echo "net-tune configured: SQM ${dl_mbit}/${ul_mbit} Mbit + latency tuning."
         else
-            echo "Skipping SQM QoS service installation."
+            echo "Skipping CAKE SQM (latency tuning still applies)."
         fi
     fi
     echo "-$pkgrel" > localversion.10-pkgrel
@@ -494,7 +494,7 @@ EOF
     scripts/config -d MEDIA_PLATFORM_SUPPORT -d MEDIA_ANALOG_TV_SUPPORT -d MEDIA_DIGITAL_TV_SUPPORT -d MEDIA_RADIO_SUPPORT -d MEDIA_SDR_SUPPORT -d DVB_CORE
     scripts/config -d IIO -d INFINIBAND -d ISDN -d CAN -d PARPORT -d FIREWIRE -d PCMCIA -d GAMEPORT -d MOST -d GREYBUS -d COMEDI -d ANDROID_BINDER_IPC -d ANDROID_BINDERFS -d ANDROID_BINDER_DEVICES -d F2FS_FS
     scripts/config -d DRM_I915 -d DRM_XE -d DRM_NOUVEAU -d DRM_VGEM -d DRM_VMWGFX -d DRM_GMA500 -d DRM_UDL -d DRM_AST -d DRM_MGAG200 -d DRM_QXL -d DRM_VIRTIO_GPU
-    scripts/config -e LRU_GEN -e LRU_GEN_ENABLED -e LRU_GEN_WALKS_MMU -e LRU_MARIE -e CPU_IDLE_GOV_NAP -e MQ_IOSCHED_ADIOS -e MQ_IOSCHED_KYBER --set-str DEFAULT_IOSCHED "kyber" -m USB_VIDEO_CLASS -m I2C_CHARDEV -d TCP_CONG_BBR -e TCP_CONG_BBR3 -e DEFAULT_BBR3 --set-str DEFAULT_TCP_CONG "bbr3"
+    scripts/config -e LRU_GEN -e LRU_GEN_ENABLED -e LRU_GEN_WALKS_MMU -e LRU_MARIE -e CPU_IDLE_GOV_NAP -e MQ_IOSCHED_ADIOS -e MQ_IOSCHED_KYBER --set-str DEFAULT_IOSCHED "kyber" -m USB_VIDEO_CLASS -m I2C_CHARDEV -m R8169 -d TCP_CONG_BBR -e TCP_CONG_BBR3 -e DEFAULT_BBR3 --set-str DEFAULT_TCP_CONG "bbr3"
     scripts/config -e PCIEASPM_PERFORMANCE -d PCIEASPM_DEFAULT
 
     scripts/config -d GENERIC_CPU -e MZEN4
@@ -637,16 +637,17 @@ _package() {
     # Used by mkinitcpio to name the kernel
     echo "$pkgbase" | install -Dm644 /dev/stdin "$modulesdir/pkgbase"
 
-    if [ -f "$startdir/src/.enable_sqm" ]; then
-        echo "Installing CAKE SQM network shaping service..."
-        install -Dm755 "$startdir/sqm-qos/sqm-qos.sh" -t "$pkgdir/usr/local/bin/"
-        install -Dm644 "$startdir/sqm-qos/sqm-qos.service" -t "$pkgdir/usr/lib/systemd/system/"
-        if [ -f "$startdir/src/sqm-qos.conf" ]; then
-            install -Dm644 "$startdir/src/sqm-qos.conf" -t "$pkgdir/etc/"
-        fi
-        install -d "$pkgdir/etc/systemd/system/multi-user.target.wants"
-        ln -s /usr/lib/systemd/system/sqm-qos.service "$pkgdir/etc/systemd/system/multi-user.target.wants/sqm-qos.service"
+    # net-tune: unified CAKE SQM + low-latency ethernet tuning service.
+    echo "Installing net-tune service (SQM + latency tuning)..."
+    install -Dm755 "$startdir/net-tune/net-tune.sh" -t "$pkgdir/usr/local/bin/"
+    install -Dm644 "$startdir/net-tune/net-tune.service" -t "$pkgdir/usr/lib/systemd/system/"
+    if [ -f "$startdir/src/net-tune.conf" ]; then
+        install -Dm644 "$startdir/src/net-tune.conf" -t "$pkgdir/etc/"
+    else
+        install -Dm644 "$startdir/net-tune/net-tune.conf" -t "$pkgdir/etc/"
     fi
+    install -d "$pkgdir/etc/systemd/system/multi-user.target.wants"
+    ln -s /usr/lib/systemd/system/net-tune.service "$pkgdir/etc/systemd/system/multi-user.target.wants/net-tune.service"
 
     echo "Installing modules..."
     ZSTD_CLEVEL=19 make "${BUILD_FLAGS[@]}" INSTALL_MOD_PATH="$pkgdir/usr" INSTALL_MOD_STRIP=1 \
@@ -944,7 +945,6 @@ b2sums=('46bb6126b1f11442b657f31c6d2025a347c44aa9ce5688bbd678264a9ba9d34ba50c758
         'da08055b309b8ef540bdc449079a26cc6e3ba9b0592cf87de8a5f38f86fc3a297f2c547509973a48f521ade773e55bcc231aac0042027943dadbc9806ff0de72'
         '270c2bb7cb1e3e2540abf29ff51e0babed092c7eebedcea82805a471c145b1e4ed72f34aec076270ee56ad3743fa4fa0c17f85a0e248cc179d3d4706eee7c717'
         'bdc839d1629f22095c5907e62b7a1a4edfcedebe0cf7e430897ae87aa331cbad28e28cef106ae38c05cafa585fa19ddc019579f1b73fcfaa69d8a8bd40ba8111'
-        'SKIP'
         '116ec92181c091e7e57f3c88b159a7080d3f3dfd05ed661da95811dd58209e4b83a69edfc47a57126524c014cdc0bb7b72f9be94294237c24461ac702e2b1206')
 
 if [ "$_use_kernel_org_llvm" = "yes" ]; then
