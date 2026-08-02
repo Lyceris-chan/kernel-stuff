@@ -158,6 +158,22 @@ sudo systemctl enable --now sqm-qos.service
 Adjust your line rate by editing `/etc/sqm-qos.conf` and restarting the service.
 BBR3 is the kernel-compiled default TCP controller; the service only applies CAKE.
 
+### Webcam support (UVC)
+
+The kernel builds the `uvcvideo` module (`CONFIG_USB_VIDEO_CLASS=m`) for USB
+Video Class webcams. This also covers Android phones in native USB-webcam mode:
+the phone presents itself as a UVC gadget and the host reads it with `uvcvideo`
+(no extra kernel module involved). Load it with:
+
+```bash
+sudo modprobe uvcvideo
+```
+
+`v4l2loopback` is an **out-of-tree** module, not part of this kernel. The native
+Android USB-webcam path does not use it. If you route a phone camera into a
+desktop app via DroidCam or `scrcpy --v4l2-sink`, install `v4l2loopback-dkms` or
+`droidcam` from the AUR instead.
+
 ## PROFILE_PEAK behavior
 
 Two local patches (`0003`, `0004`) modify `smu_v14_0.c`:
