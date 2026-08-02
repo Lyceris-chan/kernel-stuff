@@ -108,9 +108,9 @@ ls *_helper.sh extract_*.py sweep_notes.sh 2>/dev/null
 rm -f <scratch-script>   # only files you confirmed are scratch, not repo tooling
 ```
 
-Never delete `disable_configs.py`, `PKGBUILD`, `config`, the `sqm-qos/`,
-`r8125/`, or `repos/` directories. Only build artifacts and your own scratch
-files go.
+Never delete `disable_configs.py`, `PKGBUILD`, `config`, the `net-tune/`,
+`sqm-qos/` (legacy), or `repos/` directories. Only build artifacts and your own
+scratch files go.
 
 ## Step 5 — Final verification (both directions)
 

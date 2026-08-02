@@ -10,7 +10,7 @@ base, with additional upstream and local patches filtered to this hardware.
 |---|---|---|
 | CPU | AMD Ryzen 9 7950X (Zen 4) | `MZEN4`, `amd-pstate`, `CPPC`, `k10temp` |
 | GPU | AMD Radeon RX 9070 XT (Navi 48, RDNA 4) | `gfx1201`, `DCN401`, `DCN42B`, `SMU14`, `PSP14`, `GC 12.0`, `SDMA 7.0`, `VCN 5.0`, `MMHUB 4.1` |
-| NIC | Realtek RTL8125B 2.5 GbE | `r8125` (out-of-tree driver) |
+| NIC | Realtek RTL8125B 2.5 GbE | `r8169` (in-kernel driver, since 7.2) |
 | NVMe | Phison E16 PCIe 4.0 | `bfq`, `mq-deadline` |
 | Scheduler | sched-ext BPF schedulers | `CONFIG_SCHED_CLASS_EXT=y` |
 | CPUIdle | NAP governor | `CONFIG_CPU_IDLE_GOV_NAP=y` |
@@ -50,7 +50,6 @@ base, with additional upstream and local patches filtered to this hardware.
 | `22xx-*.patch` | CPU idle: NAP governor |
 | `90xx-*.patch` | Upstream dev-tree backports from agd5f/linux |
 | `net-tune/` | Unified CAKE SQM + latency tuning systemd service |
-| `r8125/` | RTL8125B out-of-tree driver source |
 | `repos/` | Cloned upstream git repos for patch extraction |
 | `src/`, `pkg/` | Build artifacts — never commit |
 
@@ -408,6 +407,12 @@ The route-detection probe uses Quad9 (`9.9.9.9`), never `8.8.8.8`.
 | DCN401 GPIO lookup table patch (`334cbfa3c`) fails to compile | `drm/amd/display: convert dcn401 GPIO translation to lookup tables` uses `DC_GPIO_GENERIC_A`, `DC_GPIO_HPD_A`, etc. which come from a prerequisite GPIO infrastructure patch not in rc5. | Verify all symbol names used in a patch exist in the tree: `grep -r "DC_GPIO_GENERIC_A" src/linux-*/drivers/gpu/drm/amd/`. If absent, the patch depends on staging prerequisites and must be dropped. |
 | `git apply --check` better than `patch --dry-run` | `patch --dry-run` treats mbox-format patches differently and reports false "corrupt patch" errors. `git apply --check` handles both `git format-patch` and mbox formats correctly. | Use `git apply --check <file>` for dry-run testing. Use `git apply --check -R <file>` to test if a patch is already applied (reverse check). |
 | `.orig`/`.rej` files from `patch` got committed into squashed patches | `patch` leaves `.orig`/`.rej` backup files next to modified sources; `git add -A` swept them into the squashed CachyOS patches as garbage hunks | Always `find . -name '*.orig' -delete; find . -name '*.rej' -delete` before `git add -A` when generating squashed patches |
+| Editing a patch's commit-message body changed its BLAKE2 checksum | Rewriting the 11 handmade patch descriptions (message bodies) invalidated their `b2sums`, so `makepkg` failed the source-validity check | Run `updpkgsums` after ANY change to a `.patch` file — not just `source=()` edits — then re-verify the full series applies |
+| `-m V4L2_LOOPBACK` in `prepare()` did nothing | `v4l2loopback` is an out-of-tree module, not a kernel config symbol; `scripts/config -m V4L2_LOOPBACK` is silently dropped by `olddefconfig` | For UVC webcams (incl. Android USB-webcam mode) enable the in-kernel driver instead: `-m USB_VIDEO_CLASS` (uvcvideo). v4l2loopback is installed via AUR (`v4l2loopback-dkms`) when needed |
+| Dropped the out-of-tree `r8125` module | The custom Realtek module blacklisted `r8169`; after removing it the NIC had no driver because `CONFIG_R8169` was not enabled | The in-kernel `r8169` covers the RTL8125B — when dropping `r8125`, set `_build_r8125=no` AND enable `-m R8169` in `prepare()` |
+| `disable_configs.py` cannot disable symbols that are `select`ed | `RESCTRL_FS` (AMD resctrl) and `SND_INTEL_NHLT` (HDA/audio) came back after `olddefconfig` because another option hard-`select`s them | For `select`-forced symbols, disable the selector (e.g. `X86_RESCTRL`) instead, or accept the tiny bloat; verify the built `.config` after each build |
+| CAKE flow-isolation directions are easy to get backwards | egress (upload) must use `dual-srchost`, ingress (download) `dual-dsthost` (per tc-cake(8)); a first draft had them swapped | Use `tc qdisc replace` and follow tc-cake(8): egress `dual-srchost nat ack-filter`, ingress `dual-dsthost wash nat`, with `rtt regional` and `overhead ethernet` for a direct Ethernet handoff |
+| A clean `git apply --check -R` on a candidate means it is ALREADY in the base tree | Sweeps kept re-proposing `f8ee6447e`, `7e1b4bdb0`, etc. that were already in rc5 | Treat a clean reverse check as "already in rc5" — record it and do not add it; only add candidates where the forward check is clean and the reverse check fails |
 
 ---
 

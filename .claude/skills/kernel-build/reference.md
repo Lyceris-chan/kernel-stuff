@@ -47,18 +47,27 @@ scripts/config --set-str LOCALVERSION ""
 
 Resolves to `uname -r` → `<version>-<pkgrel>-sleepy`.
 
-## SQM QoS / BBR3
+## net-tune (SQM / latency) / BBR3
 
-Interactive prompt during `prepare()` (skipped automatically with no TTY).
-Pre-seed non-interactively:
+The build ships the unified `net-tune` service (CAKE SQM + low-latency ethernet
+tuning), enabled at boot. Interactive prompt during `prepare()` (skipped
+automatically with no TTY). Pre-seed non-interactively — note `src/` must exist
+and is NOT wiped by makepkg (only `src/<kernel>/` is):
 
 ```bash
-cat > .../src/sqm-qos.conf << EOF
-DOWNLOAD_MBIT="950"
-UPLOAD_MBIT="950"
+mkdir -p src
+cat > .../src/net-tune.conf << EOF
+ENABLE_SQM=yes
+DOWNLOAD_MBIT="80"
+UPLOAD_MBIT="85"
+ENABLE_LATENCY=yes
 EOF
 touch .../src/.enable_sqm
 ```
+
+Important: editing ANY `.patch` file (even only its commit-message body) changes
+its BLAKE2 checksum — run `updpkgsums` after any patch-file change or the build
+fails the source-validity check.
 
 Files go in `src/` (after `prepare()` extracts source), not the repo root. The
 route-detection probe uses Quad9 (`9.9.9.9`), never `8.8.8.8`.

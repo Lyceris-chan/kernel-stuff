@@ -15,9 +15,11 @@ makepkg -f -s -c
 sudo pacman -U linux-sleepy-*.pkg.tar.zst
 ```
 
-Expect: kernel 19–25MB, headers 65–75MB, `r8125` 100–150KB. Core kernel >40MB
+Expect: kernel 19–25MB, headers 65–75MB. Core kernel >40MB
 means bloat-removal failed — check that `disable_configs.py` actually ran
-during `prepare()`.
+during `prepare()`. The NIC uses the in-kernel `r8169` (no `r8125` package);
+webcams use `uvcvideo`; the build ships the `net-tune` service (CAKE SQM +
+latency tuning).
 
 Compile flags are fixed: `CC=clang LD=ld.lld LLVM=1 LLVM_IAS=1`. Never
 substitute these (see `reference.md` for why `ld.mold` specifically breaks).
