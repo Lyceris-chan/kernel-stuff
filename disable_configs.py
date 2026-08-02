@@ -77,6 +77,23 @@ configs_to_disable = [
 
     # ThinkPad / Laptop platform drivers that select DRM_PRIVACY_SCREEN
     "THINKPAD_ACPI", "THINKPAD_LMI",
+
+    # Intel-specific audio / thermal (AMD board: no Intel NHLT, DPTF, or silent-stream)
+    "SND_INTEL_NHLT", "ACPI_NHLT", "SND_HDA_INTEL_HDMI_SILENT_STREAM", "ACPI_DPTF",
+
+    # Debug build hooks (release kernels do not need them)
+    "SND_DEBUG", "ACPI_DEBUG", "DM_DEBUG", "PM_DEBUG", "PM_SLEEP_DEBUG",
+    "CRYPTO_DEV_CCP_DEBUGFS",
+
+    # Legacy / niche interfaces
+    "SND_OSSEMUL",             # OSS sound emulation
+    "SND_SPI",                 # SPI sound cards (embedded boards)
+    "AUTOFS_FS",               # autofs automount (no NFS in this build)
+    "RESCTRL_FS",              # Intel RDT cache allocation (server / data-center)
+    "SCSI_DH",                 # multipath device handlers (no SAN)
+
+    # Mobile-flash filesystem (desktop NVMe uses ext4 / vfat / exfat)
+    "F2FS_FS", "F2FS_STAT_FS", "F2FS_FS_XATTR", "F2FS_FS_POSIX_ACL", "F2FS_IOSTAT",
 ]
 
 try:

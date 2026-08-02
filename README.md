@@ -177,7 +177,8 @@ desktop app via DroidCam or `scrcpy --v4l2-sink`, install `v4l2loopback-dkms` or
 ### Disabled subsystems
 
 The build strips subsystems a single AMD desktop does not use: Intel/NVIDIA DRM,
-IIO, InfiniBand, ISDN, CAN, FireWire, PCMCIA, Gameport, and more (see
+IIO, InfiniBand, ISDN, CAN, FireWire, PCMCIA, Gameport, Intel-only audio
+(NHLT/DPTF/silent-stream), kernel debug hooks, and more (see
 `disable_configs.py` and the `scripts/config` calls in `PKGBUILD`). One worth
 knowing about:
 
