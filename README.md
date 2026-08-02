@@ -174,6 +174,18 @@ Android USB-webcam path does not use it. If you route a phone camera into a
 desktop app via DroidCam or `scrcpy --v4l2-sink`, install `v4l2loopback-dkms` or
 `droidcam` from the AUR instead.
 
+### Disabled subsystems
+
+The build strips subsystems a single AMD desktop does not use: Intel/NVIDIA DRM,
+IIO, InfiniBand, ISDN, CAN, FireWire, PCMCIA, Gameport, and more (see
+`disable_configs.py` and the `scripts/config` calls in `PKGBUILD`). One worth
+knowing about:
+
+- **F2FS** (`CONFIG_F2FS_FS`) is disabled. It is a flash/Android-oriented
+  filesystem; this build's NVMe SSD uses ext4 (with `vfat`/`exfat` for
+  removable media). To re-enable it, remove `-d F2FS_FS` from the
+  `scripts/config` bloat line in `PKGBUILD`'s `prepare()` and rebuild.
+
 ## PROFILE_PEAK behavior
 
 Two local patches (`0003`, `0004`) modify `smu_v14_0.c`:
