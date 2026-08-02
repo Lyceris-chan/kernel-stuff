@@ -1,0 +1,44 @@
+From 35f22c56b3f319d39ca925056a3c4e6be3e7c2de Mon Sep 17 00:00:00 2001
+From: squash <squash@local>
+Date: Sun, 2 Aug 2026 20:26:57 +0200
+Subject: [PATCH] cachyos-kbuild: Allow -O3 (kbuild branch)
+
+---
+ Makefile     | 3 +++
+ init/Kconfig | 6 ++++++
+ 2 files changed, 9 insertions(+)
+
+diff --git a/Makefile b/Makefile
+index 2f5bf24e3..ccd21fbe1 100644
+--- a/Makefile
++++ b/Makefile
+@@ -934,6 +934,9 @@ KBUILD_CFLAGS	+= -fno-delete-null-pointer-checks
+ ifdef CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE
+ KBUILD_CFLAGS += -O2
+ KBUILD_RUSTFLAGS += -Copt-level=2
++else ifdef CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3
++KBUILD_CFLAGS += -O3
++KBUILD_RUSTFLAGS += -Copt-level=3
+ else ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
+ KBUILD_CFLAGS += -Os
+ KBUILD_RUSTFLAGS += -Copt-level=s
+diff --git a/init/Kconfig b/init/Kconfig
+index 10f2013b5..c748ed159 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -1616,6 +1616,12 @@ config CC_OPTIMIZE_FOR_PERFORMANCE
+ 	  with the "-O2" compiler flag for best performance and most
+ 	  helpful compile-time warnings.
+ 
++config CC_OPTIMIZE_FOR_PERFORMANCE_O3
++	bool "Optimize more for performance (-O3)"
++	help
++	  Choosing this option will pass "-O3" to your compiler to optimize
++	  the kernel yet more for performance.
++
+ config CC_OPTIMIZE_FOR_SIZE
+ 	bool "Optimize for size (-Os)"
+ 	help
+-- 
+2.55.0
+

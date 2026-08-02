@@ -1,0 +1,426 @@
+From e324cce52b49ea0ce687dfa01a0c6c79b7ed6e3f Mon Sep 17 00:00:00 2001
+From: Dillon Varone <Dillon.Varone@amd.com>
+Date: Fri, 10 Jul 2026 11:28:58 -0400
+Subject: [PATCH] drm/amd/display: Port DCN4+ MCIF ARB programming to new
+ format
+
+[WHY&HOW]
+DML2.1 now outputs MCIF arbiter programming, but using a new
+structure. Change  DCN401 and DCN42 to use this new format.
+
+Reviewed-by: Sridevi Arvindekar <sridevi.arvindekar@amd.com>
+Signed-off-by: Dillon Varone <Dillon.Varone@amd.com>
+Signed-off-by: Fangzhi Zuo <jerry.zuo@amd.com>
+Tested-by: Dan Wheeler <daniel.wheeler@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ .../gpu/drm/amd/display/dc/mmhubbub/Makefile  |  10 ++
+ .../dc/mmhubbub/dcn32/dcn32_mmhubbub.c        |   4 +-
+ .../dc/mmhubbub/dcn32/dcn32_mmhubbub.h        |   5 +
+ .../dc/mmhubbub/dcn401/dcn401_mmhubbub.c      | 135 ++++++++++++++++++
+ .../dc/mmhubbub/dcn401/dcn401_mmhubbub.h      |  40 ++++++
+ .../dc/mmhubbub/dcn42/dcn42_mmhubbub.h        |   1 +
+ .../dc/resource/dcn401/dcn401_resource.c      |  29 ++--
+ .../dc/resource/dcn401/dcn401_resource.h      |   4 +
+ .../dc/resource/dcn42/dcn42_resource.c        |  28 ++--
+ 9 files changed, 227 insertions(+), 29 deletions(-)
+ create mode 100644 drivers/gpu/drm/amd/display/dc/mmhubbub/dcn401/dcn401_mmhubbub.c
+ create mode 100644 drivers/gpu/drm/amd/display/dc/mmhubbub/dcn401/dcn401_mmhubbub.h
+
+diff --git a/drivers/gpu/drm/amd/display/dc/mmhubbub/Makefile b/drivers/gpu/drm/amd/display/dc/mmhubbub/Makefile
+index afc376def..dddf5a9eb 100644
+--- a/drivers/gpu/drm/amd/display/dc/mmhubbub/Makefile
++++ b/drivers/gpu/drm/amd/display/dc/mmhubbub/Makefile
+@@ -50,6 +50,16 @@ MMHUBBUB_DCN35 = dcn35_mmhubbub.o
+ AMD_DAL_MMHUBBUB_DCN35 = $(addprefix $(AMDDALPATH)/dc/mmhubbub/dcn35/,$(MMHUBBUB_DCN35))
+ 
+ AMD_DISPLAY_FILES += $(AMD_DAL_MMHUBBUB_DCN35)
++
++
++###############################################################################
++# DCN401
++###############################################################################
++MMHUBBUB_DCN401 = dcn401_mmhubbub.o
++
++AMD_DAL_MMHUBBUB_DCN401 = $(addprefix $(AMDDALPATH)/dc/mmhubbub/dcn401/,$(MMHUBBUB_DCN401))
++
++AMD_DISPLAY_FILES += $(AMD_DAL_MMHUBBUB_DCN401)
+ endif
+ 
+ ###############################################################################
+diff --git a/drivers/gpu/drm/amd/display/dc/mmhubbub/dcn32/dcn32_mmhubbub.c b/drivers/gpu/drm/amd/display/dc/mmhubbub/dcn32/dcn32_mmhubbub.c
+index 6b6f80a3b..5ce787632 100644
+--- a/drivers/gpu/drm/amd/display/dc/mmhubbub/dcn32/dcn32_mmhubbub.c
++++ b/drivers/gpu/drm/amd/display/dc/mmhubbub/dcn32/dcn32_mmhubbub.c
+@@ -73,7 +73,7 @@
+  *    the bufmgr status can show the progress of write back, can be used for debug purpose
+  */
+ 
+-static void mmhubbub32_warmup_mcif(struct mcif_wb *mcif_wb,
++void mmhubbub32_warmup_mcif(struct mcif_wb *mcif_wb,
+ 		struct mcif_warmup_params *params)
+ {
+ 	struct dcn30_mmhubbub *mcif_wb30 = TO_DCN30_MMHUBBUB(mcif_wb);
+@@ -100,7 +100,7 @@ static void mmhubbub32_warmup_mcif(struct mcif_wb *mcif_wb,
+ 	REG_UPDATE(MMHUBBUB_WARMUP_CONTROL_STATUS, MMHUBBUB_WARMUP_EN, false);
+ }
+ 
+-static void mmhubbub32_config_mcif_buf(struct mcif_wb *mcif_wb,
++void mmhubbub32_config_mcif_buf(struct mcif_wb *mcif_wb,
+ 		struct mcif_buf_params *params,
+ 		unsigned int dest_height)
+ {
+diff --git a/drivers/gpu/drm/amd/display/dc/mmhubbub/dcn32/dcn32_mmhubbub.h b/drivers/gpu/drm/amd/display/dc/mmhubbub/dcn32/dcn32_mmhubbub.h
+index ef15b4f1f..682f3bba6 100644
+--- a/drivers/gpu/drm/amd/display/dc/mmhubbub/dcn32/dcn32_mmhubbub.h
++++ b/drivers/gpu/drm/amd/display/dc/mmhubbub/dcn32/dcn32_mmhubbub.h
+@@ -200,6 +200,11 @@
+ 	SF(MMHUBBUB_WARMUP_CONTROL_STATUS, MMHUBBUB_WARMUP_SW_INT_ACK, mask_sh),\
+ 	SF(MMHUBBUB_WARMUP_CONTROL_STATUS, MMHUBBUB_WARMUP_INC_ADDR, mask_sh)
+ 
++void mmhubbub32_warmup_mcif(struct mcif_wb *mcif_wb,
++		struct mcif_warmup_params *params);
++void mmhubbub32_config_mcif_buf(struct mcif_wb *mcif_wb,
++		struct mcif_buf_params *params,
++		unsigned int dest_height);
+ 
+ void dcn32_mmhubbub_construct(struct dcn30_mmhubbub *mcif_wb30,
+ 	struct dc_context *ctx,
+diff --git a/drivers/gpu/drm/amd/display/dc/mmhubbub/dcn401/dcn401_mmhubbub.c b/drivers/gpu/drm/amd/display/dc/mmhubbub/dcn401/dcn401_mmhubbub.c
+new file mode 100644
+index 000000000..d2845acb7
+--- /dev/null
++++ b/drivers/gpu/drm/amd/display/dc/mmhubbub/dcn401/dcn401_mmhubbub.c
+@@ -0,0 +1,135 @@
++// SPDX-License-Identifier: MIT
++//
++// Copyright 2026 Advanced Micro Devices, Inc.
++
++#include "dcn401_mmhubbub.h"
++#include "reg_helper.h"
++
++#define REG(reg)                                                             \
++	((const struct dcn35_mmhubbub_registers *)(mcif_wb30->mcif_wb_regs)) \
++		->reg
++
++#define CTX mcif_wb30->base.ctx
++
++#undef FN
++#define FN(reg_name, field_name)                                                \
++	((const struct dcn401_mmhubbub_shift *)(mcif_wb30->mcif_wb_shift))       \
++		->field_name,                                                   \
++		((const struct dcn401_mmhubbub_mask *)(mcif_wb30->mcif_wb_mask)) \
++			->field_name
++
++static void mmhubbub401_config_mcif_arb(struct mcif_wb *mcif_wb,
++		struct mcif_arb_params *params)
++{
++	struct dcn30_mmhubbub *mcif_wb30 = TO_DCN30_MMHUBBUB(mcif_wb);
++
++	/* Programmed by the video driver based on the CRTC timing (for DWB) */
++	REG_UPDATE(MCIF_WB_ARBITRATION_CONTROL,
++			MCIF_WB_TIME_PER_PIXEL, params->dcn4x.inst_regs.time_per_pixel);
++
++	/*
++	 * Programming DWB watermark.
++	 * Watermark to generate urgent in MCIF_WB_CLI, value is determined by MCIF_WB_CLI_WATERMARK_MASK.
++	 * Program in ns. A formula will be provided in the pseudo code to calculate the value.
++	 */
++	/* Program urgent_watermarkA */
++	REG_UPDATE_2(MCIF_WB_WATERMARK,
++			MCIF_WB_CLI_WATERMARK_MASK, 0x0,
++			MCIF_WB_CLI_WATERMARK, params->dcn4x.global_regs.wm_regs[0].urgent);
++	/* Program urgent_watermarkB */
++	REG_UPDATE_2(MCIF_WB_WATERMARK,
++			MCIF_WB_CLI_WATERMARK_MASK, 0x1,
++			MCIF_WB_CLI_WATERMARK, params->dcn4x.global_regs.wm_regs[0].urgent);
++	/* Program urgent_watermarkC */
++	REG_UPDATE_2(MCIF_WB_WATERMARK,
++			MCIF_WB_CLI_WATERMARK_MASK, 0x2,
++			MCIF_WB_CLI_WATERMARK, params->dcn4x.global_regs.wm_regs[0].urgent);
++	/* Program urgent_watermarkD */
++	REG_UPDATE_2(MCIF_WB_WATERMARK,
++			MCIF_WB_CLI_WATERMARK_MASK, 0x3,
++			MCIF_WB_CLI_WATERMARK, params->dcn4x.global_regs.wm_regs[0].urgent);
++
++	/* Programming UCLK P-State watermark */
++	/* Program nbp_state_change_watermarkA */
++	REG_UPDATE_3(MCIF_WB_NB_PSTATE_LATENCY_WATERMARK,
++		NB_PSTATE_CHANGE_WATERMARK_MASK, 0x0,
++		NB_PSTATE_CHANGE_WATERMARK_TYPE, 0x0,
++		NB_PSTATE_CHANGE_REFRESH_WATERMARK, params->dcn4x.global_regs.wm_regs[0].uclk_pstate);
++	/* Program nbp_state_change_watermarkB */
++	REG_UPDATE_3(MCIF_WB_NB_PSTATE_LATENCY_WATERMARK,
++		NB_PSTATE_CHANGE_WATERMARK_MASK, 0x1,
++		NB_PSTATE_CHANGE_WATERMARK_TYPE, 0x0,
++		NB_PSTATE_CHANGE_REFRESH_WATERMARK, params->dcn4x.global_regs.wm_regs[0].uclk_pstate);
++	/* Program nbp_state_change_watermarkC */
++	REG_UPDATE_3(MCIF_WB_NB_PSTATE_LATENCY_WATERMARK,
++		NB_PSTATE_CHANGE_WATERMARK_MASK, 0x2,
++		NB_PSTATE_CHANGE_WATERMARK_TYPE, 0x0,
++		NB_PSTATE_CHANGE_REFRESH_WATERMARK, params->dcn4x.global_regs.wm_regs[0].uclk_pstate);
++	/* Program nbp_state_change_watermarkD */
++	REG_UPDATE_3(MCIF_WB_NB_PSTATE_LATENCY_WATERMARK,
++		NB_PSTATE_CHANGE_WATERMARK_MASK, 0x3,
++		NB_PSTATE_CHANGE_WATERMARK_TYPE, 0x0,
++		NB_PSTATE_CHANGE_REFRESH_WATERMARK, params->dcn4x.global_regs.wm_regs[0].uclk_pstate);
++
++	/* Programming FCLK P-State watermark */
++	/* Program nbp_state_change_watermarkA */
++	REG_UPDATE_3(MCIF_WB_NB_PSTATE_LATENCY_WATERMARK,
++		NB_PSTATE_CHANGE_WATERMARK_MASK, 0x0,
++		NB_PSTATE_CHANGE_WATERMARK_TYPE, 0x1,
++		NB_PSTATE_CHANGE_REFRESH_WATERMARK, params->dcn4x.global_regs.wm_regs[0].temp_read_or_ppt);
++	/* Program nbp_state_change_watermarkB */
++	REG_UPDATE_3(MCIF_WB_NB_PSTATE_LATENCY_WATERMARK,
++		NB_PSTATE_CHANGE_WATERMARK_MASK, 0x1,
++		NB_PSTATE_CHANGE_WATERMARK_TYPE, 0x1,
++		NB_PSTATE_CHANGE_REFRESH_WATERMARK, params->dcn4x.global_regs.wm_regs[0].temp_read_or_ppt);
++	/* Program nbp_state_change_watermarkC */
++	REG_UPDATE_3(MCIF_WB_NB_PSTATE_LATENCY_WATERMARK,
++		NB_PSTATE_CHANGE_WATERMARK_MASK, 0x2,
++		NB_PSTATE_CHANGE_WATERMARK_TYPE, 0x1,
++		NB_PSTATE_CHANGE_REFRESH_WATERMARK, params->dcn4x.global_regs.wm_regs[0].fclk_pstate);
++	/* Program nbp_state_change_watermarkD */
++	REG_UPDATE_3(MCIF_WB_NB_PSTATE_LATENCY_WATERMARK,
++		NB_PSTATE_CHANGE_WATERMARK_MASK, 0x3,
++		NB_PSTATE_CHANGE_WATERMARK_TYPE, 0x1,
++		NB_PSTATE_CHANGE_REFRESH_WATERMARK, params->dcn4x.global_regs.wm_regs[0].fclk_pstate);
++
++	/* Program max_scaled_time */
++	REG_UPDATE(MULTI_LEVEL_QOS_CTRL,
++			MAX_SCALED_TIME_TO_URGENT, params->dcn4x.inst_regs.max_scaled_time_ns);
++
++	/* Program slice_lines */
++	REG_UPDATE(MCIF_WB_BUFMGR_VCE_CONTROL,
++			MCIF_WB_BUFMGR_SLICE_SIZE, params->dcn4x.inst_regs.slice_lines);
++
++	/* Set arbitration unit for Luma/Chroma */
++	/* arb_unit=2 should be chosen for more efficiency */
++	/* Arbitration size, 0: 2048 bytes 1: 4096 bytes 2: 8192 Bytes */
++	REG_UPDATE(MCIF_WB_ARBITRATION_CONTROL,
++			MCIF_WB_CLIENT_ARBITRATION_SLICE, params->dcn4x.inst_regs.arbitration_slice);
++}
++
++static const struct mcif_wb_funcs dcn401_mmhubbub_funcs = {
++	.warmup_mcif		= mmhubbub32_warmup_mcif,
++	.enable_mcif		= mmhubbub2_enable_mcif,
++	.disable_mcif		= mmhubbub2_disable_mcif,
++	.config_mcif_buf	= mmhubbub32_config_mcif_buf,
++	.config_mcif_arb	= mmhubbub401_config_mcif_arb,
++	.config_mcif_irq	= mmhubbub2_config_mcif_irq,
++	.dump_frame			= mcifwb2_dump_frame,
++};
++
++void dcn401_mmhubbub_construct(struct dcn30_mmhubbub *mcif_wb30,
++		struct dc_context *ctx,
++		const struct dcn35_mmhubbub_registers *mcif_wb_regs,
++		const struct dcn401_mmhubbub_shift *mcif_wb_shift,
++		const struct dcn401_mmhubbub_mask *mcif_wb_mask,
++		int inst)
++{
++	mcif_wb30->base.ctx = ctx;
++
++	mcif_wb30->base.inst = inst;
++	mcif_wb30->base.funcs = &dcn401_mmhubbub_funcs;
++	mcif_wb30->mcif_wb_regs = (const struct dcn30_mmhubbub_registers *)mcif_wb_regs;
++	mcif_wb30->mcif_wb_shift = (const struct dcn30_mmhubbub_shift *)mcif_wb_shift;
++	mcif_wb30->mcif_wb_mask = (const struct dcn30_mmhubbub_mask *)mcif_wb_mask;
++}
+diff --git a/drivers/gpu/drm/amd/display/dc/mmhubbub/dcn401/dcn401_mmhubbub.h b/drivers/gpu/drm/amd/display/dc/mmhubbub/dcn401/dcn401_mmhubbub.h
+new file mode 100644
+index 000000000..fbc69a210
+--- /dev/null
++++ b/drivers/gpu/drm/amd/display/dc/mmhubbub/dcn401/dcn401_mmhubbub.h
+@@ -0,0 +1,40 @@
++/* SPDX-License-Identifier: MIT */
++/* Copyright 2026 Advanced Micro Devices, Inc. */
++
++
++#ifndef __DCN401_MMHUBBUB_H
++#define __DCN401_MMHUBBUB_H
++
++#include "mcif_wb.h"
++#include "dcn32/dcn32_mmhubbub.h"
++#include "dcn35/dcn35_mmhubbub.h"
++
++#define MCIF_WB_REG_VARIABLE_LIST_DCN4_01  \
++	MCIF_WB_REG_VARIABLE_LIST_DCN3_5;
++
++#define MCIF_WB_COMMON_MASK_SH_LIST_DCN4_01(mask_sh)                            \
++	MCIF_WB_COMMON_MASK_SH_LIST_DCN3_5(mask_sh),                            \
++    SF(MCIF_WB_NB_PSTATE_LATENCY_WATERMARK, NB_PSTATE_CHANGE_WATERMARK_TYPE, mask_sh)
++
++#define MCIF_WB_REG_FIELD_LIST_DCN4_01(type)          \
++	struct {                                     \
++		MCIF_WB_REG_FIELD_LIST_DCN3_5(type); \
++		type NB_PSTATE_CHANGE_WATERMARK_TYPE;          \
++	}
++
++struct dcn401_mmhubbub_mask {
++	MCIF_WB_REG_FIELD_LIST_DCN4_01(uint32_t);
++};
++
++struct dcn401_mmhubbub_shift {
++	MCIF_WB_REG_FIELD_LIST_DCN4_01(uint8_t);
++};
++
++void dcn401_mmhubbub_construct(struct dcn30_mmhubbub *mcif_wb30,
++		struct dc_context *ctx,
++		const struct dcn35_mmhubbub_registers *mcif_wb_regs,
++		const struct dcn401_mmhubbub_shift *mcif_wb_shift,
++		const struct dcn401_mmhubbub_mask *mcif_wb_mask,
++		int inst);
++
++#endif // __DCN401_MMHUBBUB_H
+diff --git a/drivers/gpu/drm/amd/display/dc/mmhubbub/dcn42/dcn42_mmhubbub.h b/drivers/gpu/drm/amd/display/dc/mmhubbub/dcn42/dcn42_mmhubbub.h
+index 0dd1f0d2e..0001903a0 100644
+--- a/drivers/gpu/drm/amd/display/dc/mmhubbub/dcn42/dcn42_mmhubbub.h
++++ b/drivers/gpu/drm/amd/display/dc/mmhubbub/dcn42/dcn42_mmhubbub.h
+@@ -8,6 +8,7 @@
+ #include "mcif_wb.h"
+ #include "dcn32/dcn32_mmhubbub.h"
+ #include "dcn35/dcn35_mmhubbub.h"
++#include "dcn401/dcn401_mmhubbub.h"
+ 
+ void dcn42_mmhubbub_set_fgcg(struct dcn30_mmhubbub *mcif_wb30, bool enabled);
+ #endif // __DCN42_MMHUBBUB_H
+diff --git a/drivers/gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.c b/drivers/gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.c
+index e3ee792fb..f7ba0509e 100644
+--- a/drivers/gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.c
++++ b/drivers/gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.c
+@@ -16,6 +16,7 @@
+ #include "dcn30/dcn30_resource.h"
+ #include "dcn32/dcn32_resource.h"
+ #include "dcn321/dcn321_resource.h"
++#include "dcn35/dcn35_resource.h"
+ 
+ #include "dcn10/dcn10_ipp.h"
+ #include "dcn401/dcn401_hubbub.h"
+@@ -58,7 +59,7 @@
+ #include "dcn31/dcn31_panel_cntl.h"
+ 
+ #include "dcn30/dcn30_dwb.h"
+-#include "dcn32/dcn32_mmhubbub.h"
++#include "dcn401/dcn401_mmhubbub.h"
+ 
+ #include "dcn/dcn_4_1_0_offset.h"
+ #include "dcn/dcn_4_1_0_sh_mask.h"
+@@ -435,17 +436,17 @@ static const struct dcn30_dwbc_mask dwbc401_mask = {
+ };
+ 
+ 
+-#define mcif_wb_regs_dcn3_init(id)\
+-	MCIF_WB_COMMON_REG_LIST_DCN32_RI(id)
++#define mcif_wb_regs_dcn401_init(id) \
++	MCIF_WB_COMMON_REG_LIST_DCN4_01_RI(id)
+ 
+-static struct dcn30_mmhubbub_registers mcif_wb30_regs[1];
++static struct dcn35_mmhubbub_registers mcif_wb401_regs[1];
+ 
+-static const struct dcn30_mmhubbub_shift mcif_wb30_shift = {
+-	MCIF_WB_COMMON_MASK_SH_LIST_DCN32(__SHIFT)
++static const struct dcn401_mmhubbub_shift mcif_wb401_shift = {
++	MCIF_WB_COMMON_MASK_SH_LIST_DCN4_01(__SHIFT)
+ };
+ 
+-static const struct dcn30_mmhubbub_mask mcif_wb30_mask = {
+-	MCIF_WB_COMMON_MASK_SH_LIST_DCN32(_MASK)
++static const struct dcn401_mmhubbub_mask mcif_wb401_mask = {
++	MCIF_WB_COMMON_MASK_SH_LIST_DCN4_01(_MASK)
+ };
+ 
+ #define dsc_regs_init(id)\
+@@ -1704,13 +1705,13 @@ static bool dcn401_mmhubbub_create(struct dc_context *ctx, struct resource_pool
+ 		}
+ 
+ #undef REG_STRUCT
+-#define REG_STRUCT mcif_wb30_regs
+-		mcif_wb_regs_dcn3_init(0);
++#define REG_STRUCT mcif_wb401_regs
++		mcif_wb_regs_dcn401_init(0);
+ 
+-		dcn32_mmhubbub_construct(mcif_wb30, ctx,
+-				&mcif_wb30_regs[i],
+-				&mcif_wb30_shift,
+-				&mcif_wb30_mask,
++		dcn401_mmhubbub_construct(mcif_wb30, ctx,
++				&mcif_wb401_regs[i],
++				&mcif_wb401_shift,
++				&mcif_wb401_mask,
+ 				i);
+ 
+ 		pool->mcif_wb[i] = &mcif_wb30->base;
+diff --git a/drivers/gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.h b/drivers/gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.h
+index ce96fe1dd..42a0986d6 100644
+--- a/drivers/gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.h
++++ b/drivers/gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.h
+@@ -7,6 +7,7 @@
+ 
+ #include "core_types.h"
+ #include "dcn32/dcn32_resource.h"
++#include "dcn35/dcn35_resource.h"
+ #include "dcn401/dcn401_hubp.h"
+ 
+ #define TO_DCN401_RES_POOL(pool)\
+@@ -660,4 +661,7 @@ int dcn401_get_power_profile(const struct dc_state *context);
+ 	SR(SYMCLKC_CLOCK_ENABLE),\
+ 	SR(SYMCLKD_CLOCK_ENABLE)
+ 
++#define MCIF_WB_COMMON_REG_LIST_DCN4_01_RI(inst)  \
++	MCIF_WB_COMMON_REG_LIST_DCN3_5_RI(inst)
++
+ #endif /* _DCN401_RESOURCE_H_ */
+diff --git a/drivers/gpu/drm/amd/display/dc/resource/dcn42/dcn42_resource.c b/drivers/gpu/drm/amd/display/dc/resource/dcn42/dcn42_resource.c
+index 547a0b816..67673a9e5 100644
+--- a/drivers/gpu/drm/amd/display/dc/resource/dcn42/dcn42_resource.c
++++ b/drivers/gpu/drm/amd/display/dc/resource/dcn42/dcn42_resource.c
+@@ -400,16 +400,18 @@ static const struct dcn30_dwbc_shift dwbc401_shift = {
+ static const struct dcn30_dwbc_mask dwbc401_mask = {
+ 	DWBC_COMMON_MASK_SH_LIST_DCN30(_MASK)};
+ 
+-#define mcif_wb_regs_dcn3_init(id) \
+-	MCIF_WB_COMMON_REG_LIST_DCN3_5_RI(id)
++#define mcif_wb_regs_dcn401_init(id) \
++	MCIF_WB_COMMON_REG_LIST_DCN4_01_RI(id)
+ 
+-static struct dcn35_mmhubbub_registers mcif_wb35_regs[1];
++static struct dcn35_mmhubbub_registers mcif_wb401_regs[1];
+ 
+-static const struct dcn35_mmhubbub_shift mcif_wb35_shift = {
+-	MCIF_WB_COMMON_MASK_SH_LIST_DCN3_5(__SHIFT)};
++static const struct dcn401_mmhubbub_shift mcif_wb401_shift = {
++	MCIF_WB_COMMON_MASK_SH_LIST_DCN4_01(__SHIFT)
++};
+ 
+-static const struct dcn35_mmhubbub_mask mcif_wb35_mask = {
+-	MCIF_WB_COMMON_MASK_SH_LIST_DCN3_5(_MASK)};
++static const struct dcn401_mmhubbub_mask mcif_wb401_mask = {
++	MCIF_WB_COMMON_MASK_SH_LIST_DCN4_01(_MASK)
++};
+ 
+ #define dsc_regs_init(id) \
+ 	DSC_REG_LIST_DCN401_RI(id)
+@@ -1768,13 +1770,13 @@ static bool dcn42_mmhubbub_create(struct dc_context *ctx, struct resource_pool *
+ 		}
+ 
+ #undef REG_STRUCT
+-#define REG_STRUCT mcif_wb35_regs
+-		mcif_wb_regs_dcn3_init(0);
++#define REG_STRUCT mcif_wb401_regs
++		mcif_wb_regs_dcn401_init(0);
+ 
+-		dcn35_mmhubbub_construct(mcif_wb30, ctx,
+-					&mcif_wb35_regs[i],
+-					&mcif_wb35_shift,
+-					&mcif_wb35_mask,
++		dcn401_mmhubbub_construct(mcif_wb30, ctx,
++					&mcif_wb401_regs[i],
++					&mcif_wb401_shift,
++					&mcif_wb401_mask,
+ 					i);
+ 
+ 		dcn42_mmhubbub_init(mcif_wb30, ctx);
+-- 
+2.55.0
+

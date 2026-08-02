@@ -1,0 +1,193 @@
+---
+name: patch-cachy-branches
+description: >
+  Refresh the CachyOS per-branch patch set (0101–0109, one squashed patch per
+  branch) from sirlucjan's separated patch directories. Use when the kernel
+  version bumps, when sirlucjan releases updated branch patches, or when a
+  conflict is reported in a CachyOS branch patch. Covers branch auditing,
+  off-target filtering (0106-cachy-drops), squash generation, and the two known
+  conflict sources (0151/0055 and 0053/hdmi).
+---
+
+# CachyOS Per-Branch Patch Refresh
+
+## Source
+
+All patches come from `repos/sirlucjan-kernel-patches/7.2-rc/` (or the
+matching version directory). Never use the monolithic mega-patch approach.
+
+**NAP governor source (learned this session):** the NAP governor is NOT in
+firelzrd's repo. firelzrd's `repos/firelzrd-bore-scheduler` has **no**
+`nap-patches/` directory — its `patches/` contains only `additions/`, `legacy/`,
+`stable/`, `testing/` and is BORE-scheduler only. The NAP source is
+`repos/sirlucjan-kernel-patches/7.2-rc/nap-patches/` (currently
+`0001-7.2-nap-v0.5.0.patch`, used as `2200-7.2-nap-v0.5.0.patch`).
+
+## Step 1 — Update the repo
+
+```bash
+git -C repos/sirlucjan-kernel-patches pull
+```
+
+## Step 2 — Identify latest `-sep` directory for each branch
+
+```bash
+ls repos/sirlucjan-kernel-patches/7.2-rc/ | grep -E "bbr3|cgroup|fixes|hdmi|preempt|vesa|kbuild|cpu-cachy|nap"
+```
+
+For versioned branches choose the highest-numbered version. **Current versions
+to expect (as of the 7.2-rc maintenance session):** `fixes` = `-v10-sep`
+(`cachyos-fixes-patches-v10-sep`), `preempt-ipi` = `-v3-sep`
+(`preempt-ipi-patches-v3-sep`), `lru-marie` = `-v12` (`lru-marie-patches-v12`).
+For all others, the single `-sep` directory is canonical.
+
+## Step 3 — Branch selection table
+
+| Branch | sirlucjan directory | Squash patch | Keep? |
+|--------|---------------------|--------------|-------|
+| `bbr3` | `bbr3-cachyos-patches-sep/` | `0101-cachy-bbr3.patch` | ✅ |
+| `cachy` kbuild | `kbuild-cachyos-patches/` | `0102-cachy-kbuild.patch` | ✅ |
+| `cachy` cpu-isa | `cpu-cachyos-patches/` | `0103-cachy-cpu-isa.patch` | ✅ |
+| `cgroup-vram` | `cgroup-patches-sep/` | `0104-cachy-cgroup-vram.patch` | ✅ |
+| `fixes` (v10) | `cachyos-fixes-patches-v10-sep/` | `0105-cachy-fixes.patch` + `0106-cachy-drops.patch` | ✅ |
+| `hdmi` | `hdmi-patches-sep/` | `0107-cachy-hdmi.patch` (excl. 0151) | ✅ |
+| `preempt-ipi` (v3) | `preempt-ipi-patches-v3-sep/` | `0108-cachy-preempt-ipi.patch` | ✅ |
+| `vesa-dsc-bpp` | `vesa-patches-sep/` | `0109-cachy-vesa-dsc.patch` | ✅ |
+| `nap` | `nap-patches/` (sirlucjan, NOT firelzrd) | 2200 | ✅ |
+| `snd-codecs` | any | — | ❌ laptop audio |
+| `t2` | any | — | ❌ Apple Mac |
+| `adios-iosched-default-on` | any | — | ❌ sched-ext conflict |
+| `gaming-sched` | any | — | ❌ sched-ext conflict |
+| `clang-patches` | any | — | ❌ LLVM Polly risk |
+
+## Step 4 — Off-target filtering for the `fixes` branch
+
+The `fixes` branch is squashed **in full** into `0105-cachy-fixes.patch` (all
+26 patches, including off-target hardware). `0106-cachy-drops.patch` then
+**reverts** the off-target groups below, so the net applied effect is only the
+10 hardware-relevant fixes. Keep the branch whole in `0105` and revert the
+unwanted parts in `0106` — do not try to exclude off-target patches from the
+squash itself.
+
+Off-target groups reverted by `0106-cachy-drops.patch`:
+
+| Patch subject keywords | Reason |
+|------------------------|--------|
+| `drm/i915/rc6` | Intel GPU |
+| `drm/i915/psr`, `intel_frontbuffer`, `intel_psr.h` | Intel display PSR |
+| `bluetooth/btusb`, `Add BT support` | BT dongle IDs not for our hardware |
+| `rtw89` | Realtek PCIe WiFi, not our RTL8125 NIC |
+| `drm/edid.*DisplayID.*adaptive` | eDP OLED panels — we use external monitors |
+| `drm/nouveau` | Nvidia OSS — DRM_NOUVEAU=n in our config |
+| `i2c.*touchpad`, `i2c-core-acpi.*ASUE` | Laptop touchpad |
+| `ALSA.*realtek.*internal speakers.*ASUS` | Laptop internal speakers |
+| `wifi.*iwlwifi` | Intel WiFi |
+| `ASoC.*amd.*acp.*DMI` | ASUS laptop audio DMI overrides |
+| `sof.*Dell`, `sof.*XPS` | Intel SoundOpen Firmware |
+| `usbcore.*quirk.*255` | Generic USB quirk — harmless but unnecessary |
+
+**Kept** (net effect of `0105` + `0106`): `x86/cpu/amd` (RDSEED32),
+`sched/fair`, `sched/idle`, `sched/core`, `USB-core sanitize string`,
+`mm/mglru`, `mm/vmscan`.
+
+## Step 5 — Squash each branch to one patch
+
+Do **not** copy each `-sep` file individually. Apply each branch's patches
+**in order** to the series tree, then emit the cumulative `git diff` as one
+`format-patch`. The squash must be generated against the **actual series
+state** (rc5 + the `0001`–`0058` local/upstream patches), because those
+pre-CachyOS patches touch shared files like `drm_edid.c`.
+
+```bash
+BASE="repos/sirlucjan-kernel-patches/7.2-rc"
+
+# Example: squash the bbr3 branch into 0101-cachy-bbr3.patch
+# (run inside a working tree at the correct series state: rc5 + 0001–0058)
+for f in "$BASE/bbr3-cachyos-patches-sep"/00*.patch; do
+  patch -p1 --forward < "$f" || echo "FAILED: $f"   # apply in order
+done
+find . -name '*.orig' -delete    # patch leaves .orig/.rej backups — never commit them
+find . -name '*.rej' -delete
+git diff --binary > ../../0101-cachy-bbr3.patch      # cumulative diff = the squash
+```
+
+Repeat for each branch with the squash numbers from Step 3. For `fixes`,
+squash the full branch into `0105-cachy-fixes.patch`, then build
+`0106-cachy-drops.patch` as the reverse diff of the off-target groups (Step 4).
+Verify each squash with `git apply --check 01xx-cachy-*.patch` against a clean
+`repos/linux-7.2-rc5` tree.
+
+After regenerating ANY `01xx` squash, re-validate the FULL series in order —
+a changed `01xx` sits mid-series and can shift context for the later `10xx`/
+`11xx`/`12xx`/`2000`+ patches. Run the authoritative check (`prepare()` applies
+everything in order):
+
+```bash
+rm -rf src && makepkg -o
+```
+
+If it fails, hand off to the `kernel-build` skill for `.rej` triage.
+
+## Step 6 — Known conflict checks
+
+### 0151 vs 0055 conflict (applies to the hdmi SQUASH)
+
+If `0055-drm-edid-parse-HDMI-2.1-gaming-ALLM-VRR-caps-from-HF-VSDB.patch` is in
+the series (Fangzhi Zuo 2/4), then the `0151`
+`drm-edid-Parse-more-info-from-HDMI-Forum-vsdb` patch adds identical content.
+**Exclude `0151` from the `0107-cachy-hdmi.patch` squash.** Check with:
+
+```bash
+git -C repos/linux-7.2-rc5 apply --check -R "$BASE/hdmi-patches-sep/0151-...patch" 2>&1
+```
+
+If the reverse check passes, `0151` is already present — drop it from the
+squash input list (do not apply it before running `git diff`).
+
+### 0053 vs hdmi branch conflict
+
+`0053` deletes `dc_edid_parser.h`. The CachyOS hdmi branch (squashed as `0107`)
+still `#includes` it via `amdgpu_dm.c`. When the hdmi squash is in the series,
+**do not include `0053`**.
+
+## Step 7 — Verify patch integrity
+
+Every patch must have a real author (not `Antigravity` / `claude` / AI) and a
+traceable commit or message-ID. Check with:
+
+```bash
+head -1 NNNN-cachy-*.patch   # must be "From <sha1>" or mbox "From: Real Name <email>"
+```
+
+Mbox-format patches (no `sha1` header) are acceptable if the author is a real
+kernel developer with a traceable message-ID on lists.freedesktop.org.
+
+**Squashed `01xx` patches are an exception:** each is the cumulative `git diff`
+of a whole branch wrapped as a single `format-patch`, so it carries one
+generated header rather than the individual upstream authors' `From:` lines.
+Provenance for every squashed hunk is tracked per-patch in `PATCH_SOURCES.md`.
+
+## Step 8 — vma_flags_t compile fix
+
+After adding the `fixes` branch (squashed into `0105-cachy-fixes.patch`; the
+`mm: vmscan: convert folio_referenced() to use vma_flags_t` change is inside
+it) alongside `2101` (LRU-MARIE), the build will fail at `mm/vmscan.c`.
+Fix the one line inside `#ifdef CONFIG_LRU_MARIE`:
+
+```c
+// Change:
+if (referenced_ptes > 0 && (vm_flags & VM_EXEC) && folio_is_file_lru(folio))
+// To:
+if (referenced_ptes > 0 && vma_flags_test(&vma_flags, VMA_EXEC_BIT) && folio_is_file_lru(folio))
+```
+
+This is an in-tree source edit only, not a new patch file.
+
+## Step 9 — Update PKGBUILD and checksums
+
+```bash
+# Update source=() to list only the patches in the correct order
+updpkgsums
+```
+
+Document every change in `PATCH_SOURCES.md` before committing.

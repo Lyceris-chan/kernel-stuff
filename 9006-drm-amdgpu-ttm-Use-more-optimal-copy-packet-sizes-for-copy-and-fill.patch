@@ -1,0 +1,101 @@
+From 58b53f58eb8937b27191b5ef00a106232ee71259 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Timur=20Krist=C3=B3f?= <timur.kristof@gmail.com>
+Date: Sat, 11 Jul 2026 13:50:00 +0200
+Subject: [PATCH] drm/amdgpu/ttm: Use more optimal copy packet sizes for copy
+ and fill
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Currently when amdgpu copies or fills a buffer,
+it uses the maximum byte count supported by the
+copy engine (SDMA). This is problematic when the
+maximum byte count is not aligned to 256 bytes
+because it then can't use all memory channels
+optimally and can cause the SDMA to operate in its
+slower byte mode (as opposed to the faster dword mode).
+
+For example, when copying a 10 MiB buffer on SDMA v2.4,
+we get 5 packets copying 2097151 bytes and 1 packet copying
+the remaining 5 bytes. All 6 packets are misaligned and operate
+in byte mode.
+For this example, the optimal solution would be to have
+5 packets each copying 2096896 bytes and 1 last packet to
+copy the remaining 1280 bytes, in which case all 6 packets
+are aligned to 256 bytes and operate in dword mode.
+
+Let's use the following scheme from now on:
+
+When byte count is dword-aligned and fits a single packet,
+just emit a single packet.
+
+Otherwise, align the copy packet size down to 256 bytes
+for optimal use of memory channels and to ensure the HW
+can use the dword mode.
+
+This assumes that the starting addresses of BOs are always
+dword aligned, which should be the case for every copy
+operation in the kernel, because the kernel always copies
+pages.
+
+Signed-off-by: Timur Kristóf <timur.kristof@gmail.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c | 27 +++++++++++++++++++++++--
+ 1 file changed, 25 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c
+index 03c1e5e3580c..5fe29e4972d8 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c
+@@ -2461,6 +2461,27 @@ static int amdgpu_ttm_prepare_job(struct amdgpu_device *adev,
+ 						   DMA_RESV_USAGE_BOOKKEEP);
+ }
+ 
++static int amdgpu_calc_bytes_per_packet(u32 max_bytes_per_packet,
++					u32 byte_count)
++{
++	/* Byte count is dword-aligned and fits a single packet */
++	if (!(byte_count & 0x3) && byte_count <= max_bytes_per_packet)
++		return max_bytes_per_packet;
++
++	/*
++	 * Align down maximum byte count to 256 bytes so that
++	 * the copy optimally uses all memory channels and
++	 * also to ensure that SDMA can use its dword mode, which
++	 * is faster.
++	 *
++	 * This assumes that the starting addresses of BOs are always
++	 * dword aligned, which should be the case for every copy
++	 * operation in the kernel, because the kernel always copies
++	 * pages.
++	 */
++	return ALIGN_DOWN(max_bytes_per_packet, SZ_256);
++}
++
+ int amdgpu_copy_buffer(struct amdgpu_device *adev,
+ 		       struct amdgpu_ttm_buffer_entity *entity,
+ 		       uint64_t src_offset,
+@@ -2484,7 +2505,8 @@ int amdgpu_copy_buffer(struct amdgpu_device *adev,
+ 		return -EINVAL;
+ 	}
+ 
+-	max_bytes = adev->mman.buffer_funcs->copy_max_bytes;
++	max_bytes = amdgpu_calc_bytes_per_packet(adev->mman.buffer_funcs->copy_max_bytes,
++						 byte_count);
+ 	num_loops = DIV_ROUND_UP(byte_count, max_bytes);
+ 	num_dw = ALIGN(num_loops * adev->mman.buffer_funcs->copy_num_dw, 8);
+ 	r = amdgpu_ttm_prepare_job(adev, entity, num_dw,
+@@ -2528,7 +2550,8 @@ static int amdgpu_ttm_fill_mem(struct amdgpu_device *adev,
+ 	unsigned int i;
+ 	int r;
+ 
+-	max_bytes = adev->mman.buffer_funcs->fill_max_bytes;
++	max_bytes = amdgpu_calc_bytes_per_packet(adev->mman.buffer_funcs->fill_max_bytes,
++						 byte_count);
+ 	num_loops = DIV_ROUND_UP_ULL(byte_count, max_bytes);
+ 	num_dw = ALIGN(num_loops * adev->mman.buffer_funcs->fill_num_dw, 8);
+ 	r = amdgpu_ttm_prepare_job(adev, entity, num_dw, resv,
+-- 
+2.55.0
+

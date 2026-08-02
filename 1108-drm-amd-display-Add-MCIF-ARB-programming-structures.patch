@@ -1,0 +1,75 @@
+From 68e188d91a24fed127bbcf186dbd60056ca18d86 Mon Sep 17 00:00:00 2001
+From: Dillon Varone <Dillon.Varone@amd.com>
+Date: Tue, 16 Jun 2026 18:21:57 -0400
+Subject: [PATCH] drm/amd/display: Add MCIF ARB programming structures
+
+[WHY&HOW]
+Adds required structures to configure MCIF ARB for DWB.
+
+Signed-off-by: Dillon Varone <Dillon.Varone@amd.com>
+Reviewed-by: Wayne Lin <Wayne.Lin@amd.com>
+Tested-by: Dan Wheeler <daniel.wheeler@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ .../dml21/inc/dml_top_dchub_registers.h       | 20 +++++++++++++++++++
+ .../dc/dml2_0/dml21/inc/dml_top_types.h       |  2 ++
+ 2 files changed, 22 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/inc/dml_top_dchub_registers.h b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/inc/dml_top_dchub_registers.h
+index bf57df42d..5669be0a7 100644
+--- a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/inc/dml_top_dchub_registers.h
++++ b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/inc/dml_top_dchub_registers.h
+@@ -153,6 +153,13 @@ struct dml2_dchub_per_pipe_register_set {
+ 	uint32_t det_size;
+ };
+ 
++struct dml2_mcif_per_pipe_register_set {
++	unsigned int time_per_pixel; // U6.6 format
++	unsigned int arbitration_slice;
++	unsigned int slice_lines;
++	unsigned int max_scaled_time_ns;
++};
++
+ struct dml2_dchub_watermark_regs {
+ 	/* watermarks */
+ 	uint32_t urgent;
+@@ -188,4 +195,17 @@ struct dml2_dchub_global_register_set {
+ 	unsigned int num_watermark_sets;
+ };
+ 
++struct dml2_mcif_watermark_regs {
++	/* watermarks */
++	uint32_t urgent; /* (CLI) */
++	uint32_t uclk_pstate;
++	uint32_t fclk_pstate;
++	uint32_t temp_read_or_ppt;
++};
++
++struct dml2_mcif_global_register_set {
++	struct dml2_mcif_watermark_regs wm_regs[DML2_DCHUB_WATERMARK_SET_NUM];
++	unsigned int num_watermark_sets;
++};
++
+ #endif
+diff --git a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/inc/dml_top_types.h b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/inc/dml_top_types.h
+index cdfb5cd09..bd0d7549d 100644
+--- a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/inc/dml_top_types.h
++++ b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/inc/dml_top_types.h
+@@ -436,12 +436,14 @@ struct dml2_display_cfg_programming {
+ 	} z8_stutter;
+ 
+ 	struct dml2_dchub_global_register_set global_regs;
++	struct dml2_mcif_global_register_set mcif_global_regs;
+ 
+ 	struct dml2_per_plane_programming plane_programming[DML2_MAX_PLANES];
+ 	struct dml2_per_stream_programming stream_programming[DML2_MAX_PLANES];
+ 
+ 	// Don't access this structure directly, access it through plane_programming.pipe_regs
+ 	struct dml2_dchub_per_pipe_register_set pipe_regs[DML2_MAX_PLANES];
++	struct dml2_mcif_per_pipe_register_set mcif_regs[DML2_MAX_WRITEBACK];
+ 
+ 	struct {
+ 		struct {
+-- 
+2.55.0
+

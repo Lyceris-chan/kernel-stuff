@@ -1,0 +1,39 @@
+From 7ceb7ab7c86f081cd6f88d3c48cec02333594971 Mon Sep 17 00:00:00 2001
+From: Antigravity <antigravity@gemini.local>
+Date: Wed, 1 Jul 2026 13:00:00 +0200
+Subject: [PATCH 30/36] drm/amd/pm: Remove redundant mutex lock in SMU14 I2C
+ update
+
+smu_v14_0_2_i2c_xfer() takes adev->pm.mutex around the
+smu_cmn_update_table() call. That lock is redundant: the SMU command
+interface the call drives is already serialized by the SMU message
+lock, and the I2C core serializes transfers on the adapter's own bus
+lock. Worse, it is a self-deadlock hazard, because dpm entry points
+such as amdgpu_dpm_force_performance_level() hold adev->pm.mutex and
+can issue I2C transfers on this adapter, which would then block forever
+on the nested acquisition.
+
+Remove the mutex_lock()/mutex_unlock() pair around the table update.
+
+Signed-off-by: Antigravity <antigravity@gemini.local>
+---
+ drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c b/drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c
+index e0ce16fb7..eed4fca09 100644
+--- a/drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c
++++ b/drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c
+@@ -1962,9 +1962,7 @@ static int smu_v14_0_2_i2c_xfer(struct i2c_adapter *i2c_adap,
+ 			}
+ 		}
+ 	}
+-	mutex_lock(&adev->pm.mutex);
+ 	r = smu_cmn_update_table(smu, SMU_TABLE_I2C_COMMANDS, 0, req, true);
+-	mutex_unlock(&adev->pm.mutex);
+ 	if (r)
+ 		goto fail;
+ 
+-- 
+2.55.0
+

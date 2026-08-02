@@ -1,0 +1,26 @@
+# Package build outputs
+*.pkg.tar.zst
+*.pkg.tar.xz
+*.tar.gz
+*.tar.xz
+*.zip
+*.log
+
+# Build directories
+src/
+pkg/
+r8125/
+repos/
+linux-*/
+usr/
+
+# Scratch & log files
+log*.txt
+log.txt
+grep_output*.txt
+*.bak
+
+# Machine-specific generated configs (keep base 'config' tracked)
+config-7.2.*
+# Local tool state
+.kiro/

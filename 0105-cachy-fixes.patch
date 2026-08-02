@@ -1,0 +1,1405 @@
+From 55753c93570a57c684faf8661525448b6862739d Mon Sep 17 00:00:00 2001
+From: squash <squash@local>
+Date: Sun, 2 Aug 2026 20:27:23 +0200
+Subject: [PATCH] cachyos-fixes: hardware-relevant fixes (full 26-patch branch)
+
+---
+ .../admin-guide/kernel-parameters.txt         | 10 +++
+ arch/arm/include/asm/mmu_context.h            |  2 +-
+ arch/riscv/include/asm/sync_core.h            |  2 +-
+ arch/s390/include/asm/mmu_context.h           |  2 +-
+ arch/sparc/include/asm/mmu_context_64.h       |  2 +-
+ arch/x86/include/asm/sync_core.h              |  2 +-
+ arch/x86/kernel/cpu/amd.c                     |  7 +-
+ drivers/bluetooth/btusb.c                     |  4 +
+ drivers/gpu/drm/drm_displayid_internal.h      |  1 +
+ drivers/gpu/drm/drm_edid.c                    | 81 ++++++++++++++++---
+ .../gpu/drm/i915/display/intel_frontbuffer.c  |  1 +
+ drivers/gpu/drm/i915/display/intel_psr.c      | 44 +++++++++-
+ drivers/gpu/drm/i915/display/intel_psr.h      |  1 +
+ drivers/gpu/drm/i915/gt/intel_rc6.c           | 13 ++-
+ drivers/gpu/drm/nouveau/nouveau_ttm.c         |  5 ++
+ drivers/i2c/i2c-core-acpi.c                   |  1 +
+ .../net/wireless/intel/iwlwifi/mld/mac80211.c |  4 +
+ drivers/net/wireless/intel/iwlwifi/mld/tx.c   |  3 +
+ drivers/net/wireless/realtek/rtw89/fw.c       |  4 +-
+ drivers/net/wireless/realtek/rtw89/fw.h       |  1 -
+ drivers/usb/core/config.c                     | 39 +++++++--
+ drivers/usb/core/message.c                    | 19 +++++
+ drivers/usb/core/quirks.c                     |  4 +
+ include/linux/perf_event.h                    |  2 +-
+ include/linux/rmap.h                          |  7 +-
+ include/linux/sched/mm.h                      | 20 ++---
+ include/linux/tick.h                          |  4 +-
+ include/linux/usb/quirks.h                    |  3 +
+ include/linux/vtime.h                         |  8 +-
+ kernel/sched/core.c                           | 15 ++--
+ kernel/sched/fair.c                           |  7 +-
+ kernel/sched/sched.h                          | 24 +++---
+ mm/rmap.c                                     | 19 +++--
+ mm/vmscan.c                                   | 63 +++++++++------
+ sound/hda/codecs/realtek/alc269.c             | 15 ++++
+ sound/soc/amd/acp-config.c                    | 12 +++
+ sound/soc/intel/boards/sof_sdw.c              |  9 +++
+ 37 files changed, 353 insertions(+), 107 deletions(-)
+
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index b5493a7f8..14121458a 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -8169,6 +8169,16 @@ Kernel parameters
+ 				q = USB_QUIRK_FORCE_ONE_CONFIG (Device
+ 					claims zero configurations,
+ 					forcing to 1);
++				r = USB_QUIRK_WINDOWS_CONFIG_REQ_SIZE (Device
++					fails during initialization when asked for
++					9-bytes configuration descriptor request.
++					Ask for 255-bytes request instead to mirror
++					Windows' behavior. This quirk is originally
++					meant to fix some quirky gamepads that refuse
++					to connect in their XInput mode. But it can
++					also potentially fix issues with other USB
++					devices that work on Windows but not on
++					Linux);
+ 			Example: quirks=0781:5580:bk,0a5c:5834:gij
+ 
+ 	usbhid.mousepoll=
+diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
+index db2cb06aa..bebde469f 100644
+--- a/arch/arm/include/asm/mmu_context.h
++++ b/arch/arm/include/asm/mmu_context.h
+@@ -80,7 +80,7 @@ static inline void check_and_switch_context(struct mm_struct *mm,
+ #ifndef MODULE
+ #define finish_arch_post_lock_switch \
+ 	finish_arch_post_lock_switch
+-static inline void finish_arch_post_lock_switch(void)
++static __always_inline void finish_arch_post_lock_switch(void)
+ {
+ 	struct mm_struct *mm = current->mm;
+ 
+diff --git a/arch/riscv/include/asm/sync_core.h b/arch/riscv/include/asm/sync_core.h
+index 9153016da..2fe6b7fe6 100644
+--- a/arch/riscv/include/asm/sync_core.h
++++ b/arch/riscv/include/asm/sync_core.h
+@@ -6,7 +6,7 @@
+  * RISC-V implements return to user-space through an xRET instruction,
+  * which is not core serializing.
+  */
+-static inline void sync_core_before_usermode(void)
++static __always_inline void sync_core_before_usermode(void)
+ {
+ 	asm volatile ("fence.i" ::: "memory");
+ }
+diff --git a/arch/s390/include/asm/mmu_context.h b/arch/s390/include/asm/mmu_context.h
+index bd1ef5e2d..95d03be2c 100644
+--- a/arch/s390/include/asm/mmu_context.h
++++ b/arch/s390/include/asm/mmu_context.h
+@@ -93,7 +93,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
+ }
+ 
+ #define finish_arch_post_lock_switch finish_arch_post_lock_switch
+-static inline void finish_arch_post_lock_switch(void)
++static __always_inline void finish_arch_post_lock_switch(void)
+ {
+ 	struct task_struct *tsk = current;
+ 	struct mm_struct *mm = tsk->mm;
+diff --git a/arch/sparc/include/asm/mmu_context_64.h b/arch/sparc/include/asm/mmu_context_64.h
+index 78bbacc14..d1967214e 100644
+--- a/arch/sparc/include/asm/mmu_context_64.h
++++ b/arch/sparc/include/asm/mmu_context_64.h
+@@ -160,7 +160,7 @@ static inline void arch_start_context_switch(struct task_struct *prev)
+ }
+ 
+ #define finish_arch_post_lock_switch	finish_arch_post_lock_switch
+-static inline void finish_arch_post_lock_switch(void)
++static __always_inline void finish_arch_post_lock_switch(void)
+ {
+ 	/* Restore the state of MCDPER register for the new process
+ 	 * just switched to.
+diff --git a/arch/x86/include/asm/sync_core.h b/arch/x86/include/asm/sync_core.h
+index 96bda4353..4b55fa353 100644
+--- a/arch/x86/include/asm/sync_core.h
++++ b/arch/x86/include/asm/sync_core.h
+@@ -93,7 +93,7 @@ static __always_inline void sync_core(void)
+  * to user-mode. x86 implements return to user-space through sysexit,
+  * sysrel, and sysretq, which are not core serializing.
+  */
+-static inline void sync_core_before_usermode(void)
++static __always_inline void sync_core_before_usermode(void)
+ {
+ 	/* With PTI, we unconditionally serialize before running user code. */
+ 	if (static_cpu_has(X86_FEATURE_PTI))
+diff --git a/arch/x86/kernel/cpu/amd.c b/arch/x86/kernel/cpu/amd.c
+index 487ac147e..12e3f3ed4 100644
+--- a/arch/x86/kernel/cpu/amd.c
++++ b/arch/x86/kernel/cpu/amd.c
+@@ -1040,11 +1040,8 @@ static const struct x86_cpu_id zen5_rdseed_microcode[] = {
+ 
+ static void init_amd_zen5(struct cpuinfo_x86 *c)
+ {
+-	if (!x86_match_min_microcode_rev(zen5_rdseed_microcode)) {
+-		clear_cpu_cap(c, X86_FEATURE_RDSEED);
+-		msr_clear_bit(MSR_AMD64_CPUID_FN_7, 18);
+-		pr_emerg_once("RDSEED32 is broken. Disabling the corresponding CPUID bit.\n");
+-	}
++	if (!x86_match_min_microcode_rev(zen5_rdseed_microcode))
++		pr_emerg_once("RDSEED32 is broken. Please update your firmware.\n");
+ }
+ 
+ static void init_amd(struct cpuinfo_x86 *c)
+diff --git a/drivers/bluetooth/btusb.c b/drivers/bluetooth/btusb.c
+index 8f7ed469c..dda6e87ab 100644
+--- a/drivers/bluetooth/btusb.c
++++ b/drivers/bluetooth/btusb.c
+@@ -566,6 +566,8 @@ static const struct usb_device_id quirks_table[] = {
+ 						     BTUSB_WIDEBAND_SPEECH },
+ 	{ USB_DEVICE(0x13d3, 0x3612), .driver_info = BTUSB_REALTEK |
+ 						     BTUSB_WIDEBAND_SPEECH },
++	{ USB_DEVICE(0x0489, 0xe112), .driver_info = BTUSB_REALTEK |
++						     BTUSB_WIDEBAND_SPEECH },
+ 	{ USB_DEVICE(0x0489, 0xe122), .driver_info = BTUSB_REALTEK |
+ 						     BTUSB_WIDEBAND_SPEECH },
+ 
+@@ -690,6 +692,8 @@ static const struct usb_device_id quirks_table[] = {
+ 	{ USB_DEVICE(0x13d3, 0x3596), .driver_info = BTUSB_MEDIATEK |
+ 						     BTUSB_WIDEBAND_SPEECH },
+ 	/* MediaTek MT7922 Bluetooth devices */
++	{ USB_DEVICE(0x13d3, 0x3625), .driver_info = BTUSB_MEDIATEK |
++						     BTUSB_WIDEBAND_SPEECH },
+ 	{ USB_DEVICE(0x13d3, 0x3585), .driver_info = BTUSB_MEDIATEK |
+ 						     BTUSB_WIDEBAND_SPEECH },
+ 	{ USB_DEVICE(0x13d3, 0x3610), .driver_info = BTUSB_MEDIATEK |
+diff --git a/drivers/gpu/drm/drm_displayid_internal.h b/drivers/gpu/drm/drm_displayid_internal.h
+index 4590d6a3d..dbdc20533 100644
+--- a/drivers/gpu/drm/drm_displayid_internal.h
++++ b/drivers/gpu/drm/drm_displayid_internal.h
+@@ -67,6 +67,7 @@ struct drm_edid;
+ #define DATA_BLOCK_2_TILED_DISPLAY_TOPOLOGY	0x28
+ #define DATA_BLOCK_2_CONTAINER_ID		0x29
+ #define DATA_BLOCK_2_TYPE_10_FORMULA_TIMING	0x2a
++#define DATA_BLOCK_2_ADAPTIVE_SYNC		0x2b
+ #define DATA_BLOCK_2_VENDOR_SPECIFIC		0x7e
+ #define DATA_BLOCK_2_CTA_DISPLAY_ID		0x81
+ 
+diff --git a/drivers/gpu/drm/drm_edid.c b/drivers/gpu/drm/drm_edid.c
+index 2b3bfa311..c853116c1 100644
+--- a/drivers/gpu/drm/drm_edid.c
++++ b/drivers/gpu/drm/drm_edid.c
+@@ -6723,6 +6723,46 @@ static void drm_get_monitor_range(struct drm_connector *connector,
+ 		    info->monitor_range.min_vfreq, info->monitor_range.max_vfreq);
+ }
+ 
++#define DISPLAYID_ADAPTIVE_SYNC_DESC_SIZE 6
++
++static void drm_update_displayid_adaptive_sync_range(struct drm_connector *connector,
++					     const struct displayid_block *block)
++{
++	struct drm_monitor_range_info *range = &connector->display_info.monitor_range;
++	const u8 *data = (const u8 *)(block + 1);
++	u16 best_min = 0, best_max = 0;
++	unsigned int best_span = 0;
++	int i;
++
++	if (block->rev != 0 || block->num_bytes < DISPLAYID_ADAPTIVE_SYNC_DESC_SIZE ||
++	    block->num_bytes % DISPLAYID_ADAPTIVE_SYNC_DESC_SIZE)
++		return;
++
++	for (i = 0; i < block->num_bytes; i += DISPLAYID_ADAPTIVE_SYNC_DESC_SIZE) {
++		const u8 *desc = &data[i];
++		u16 min_vfreq = desc[2];
++		u16 max_vfreq = ((((u16)desc[4]) & 0x3) << 8) | desc[3];
++		unsigned int span;
++
++		max_vfreq += 1;
++		if (!min_vfreq || max_vfreq <= min_vfreq)
++			continue;
++
++		span = max_vfreq - min_vfreq;
++		if (span <= best_span)
++			continue;
++
++		best_min = min_vfreq;
++		best_max = max_vfreq;
++		best_span = span;
++	}
++
++	if (best_span) {
++		range->min_vfreq = best_min;
++		range->max_vfreq = best_max;
++	}
++}
++
+ static void drm_parse_vesa_mso_data(struct drm_connector *connector,
+ 				    const struct displayid_block *block)
+ {
+@@ -6845,26 +6885,41 @@ static void update_displayid_info(struct drm_connector *connector,
+ {
+ 	struct drm_display_info *info = &connector->display_info;
+ 	const struct displayid_block *block;
++	bool displayid_base_logged = false;
+ 	struct displayid_iter iter;
+ 
+ 	displayid_iter_edid_begin(drm_edid, &iter);
+ 	displayid_iter_for_each(block, &iter) {
+-		drm_dbg_kms(connector->dev,
+-			    "[CONNECTOR:%d:%s] DisplayID extension version 0x%02x, primary use 0x%02x\n",
+-			    connector->base.id, connector->name,
+-			    displayid_version(&iter),
+-			    displayid_primary_use(&iter));
+-		if (displayid_version(&iter) == DISPLAY_ID_STRUCTURE_VER_20 &&
+-		    (displayid_primary_use(&iter) == PRIMARY_USE_HEAD_MOUNTED_VR ||
+-		     displayid_primary_use(&iter) == PRIMARY_USE_HEAD_MOUNTED_AR))
+-			info->non_desktop = true;
+-
+ 		/*
+-		 * We're only interested in the base section here, no need to
+-		 * iterate further.
++		 * Primary use is a DisplayID base section property, but later
++		 * blocks may still carry useful metadata like adaptive sync ranges.
+ 		 */
+-		break;
++		if (!displayid_base_logged) {
++			drm_dbg_kms(connector->dev,
++				    "[CONNECTOR:%d:%s] DisplayID extension version 0x%02x, primary use 0x%02x\n",
++				    connector->base.id, connector->name,
++				    displayid_version(&iter),
++				    displayid_primary_use(&iter));
++			if (displayid_version(&iter) == DISPLAY_ID_STRUCTURE_VER_20 &&
++			    (displayid_primary_use(&iter) == PRIMARY_USE_HEAD_MOUNTED_VR ||
++			     displayid_primary_use(&iter) == PRIMARY_USE_HEAD_MOUNTED_AR))
++				info->non_desktop = true;
++
++			displayid_base_logged = true;
++		}
++
++		if (!info->monitor_range.min_vfreq && !info->monitor_range.max_vfreq &&
++		    block->tag == DATA_BLOCK_2_ADAPTIVE_SYNC)
++			drm_update_displayid_adaptive_sync_range(connector, block);
+ 	}
++
++	if (info->monitor_range.min_vfreq && info->monitor_range.max_vfreq)
++		drm_dbg_kms(connector->dev,
++			    "[CONNECTOR:%d:%s] DisplayID adaptive sync refresh rate range is %d Hz - %d Hz\n",
++			    connector->base.id, connector->name,
++			    info->monitor_range.min_vfreq,
++			    info->monitor_range.max_vfreq);
++
+ 	displayid_iter_end(&iter);
+ }
+ 
+diff --git a/drivers/gpu/drm/i915/display/intel_frontbuffer.c b/drivers/gpu/drm/i915/display/intel_frontbuffer.c
+index 705742e11..8bc1a88a1 100644
+--- a/drivers/gpu/drm/i915/display/intel_frontbuffer.c
++++ b/drivers/gpu/drm/i915/display/intel_frontbuffer.c
+@@ -97,6 +97,7 @@ static void frontbuffer_flush(struct intel_display *display,
+ 	might_sleep();
+ 	intel_td_flush(display);
+ 	intel_drrs_flush(display, frontbuffer_bits);
++	intel_psr_panel_replay_exit(display);
+ 	intel_psr_flush(display, frontbuffer_bits, origin);
+ 	intel_fbc_flush(display, frontbuffer_bits, origin);
+ }
+diff --git a/drivers/gpu/drm/i915/display/intel_psr.c b/drivers/gpu/drm/i915/display/intel_psr.c
+index beaa1d626..bc7842e9e 100644
+--- a/drivers/gpu/drm/i915/display/intel_psr.c
++++ b/drivers/gpu/drm/i915/display/intel_psr.c
+@@ -714,8 +714,14 @@ static void _psr_init_dpcd(struct intel_dp *intel_dp, struct intel_connector *co
+ 		 * To support PSR version 02h and PSR version 03h without
+ 		 * Y-coordinate requirement panels we would need to enable
+ 		 * GTC first.
++		 *
++		 * Early Transport (version 04h) implies Y-coordinate
++		 * support. Accept it without explicit Y-coordinate
++		 * requirement bit.
+ 		 */
+-		connector->dp.psr_caps.su_support = y_req &&
++		connector->dp.psr_caps.su_support =
++			(y_req || connector->dp.psr_caps.dpcd[0] ==
++			 DP_PSR2_WITH_Y_COORD_ET_SUPPORTED) &&
+ 			intel_alpm_aux_wake_supported(intel_dp);
+ 		drm_dbg_kms(display->drm, "PSR2 %ssupported\n",
+ 			    connector->dp.psr_caps.su_support ? "" : "not ");
+@@ -1236,6 +1242,8 @@ static void tgl_psr2_disable_dc3co(struct intel_dp *intel_dp)
+ 	psr2_program_idle_frames(intel_dp, psr_compute_idle_frames(intel_dp));
+ }
+ 
++static void intel_psr_activate(struct intel_dp *intel_dp);
++
+ static void tgl_dc3co_disable_work(struct work_struct *work)
+ {
+ 	struct intel_dp *intel_dp =
+@@ -1246,6 +1254,13 @@ static void tgl_dc3co_disable_work(struct work_struct *work)
+ 	if (delayed_work_pending(&intel_dp->psr.dc3co_work))
+ 		goto unlock;
+ 
++	/* Panel Replay ALPM cursor-lag workaround re-activation path. */
++	if (intel_dp->psr.panel_replay_enabled &&
++	    intel_dp->psr.enabled && !intel_dp->psr.active) {
++		intel_psr_activate(intel_dp);
++		goto unlock;
++	}
++
+ 	tgl_psr2_disable_dc3co(intel_dp);
+ unlock:
+ 	mutex_unlock(&intel_dp->psr.lock);
+@@ -4706,3 +4721,30 @@ bool intel_psr_pr_async_video_timing_supported(struct intel_dp *intel_dp)
+ 	return (pr_support & DP_PANEL_REPLAY_SUPPORT) &&
+ 		!(pr_cap & DP_PANEL_REPLAY_ASYNC_VIDEO_TIMING_NOT_SUPPORTED_IN_PR);
+ }
++
++/*
++ * intel_psr_panel_replay_exit - exit Panel Replay during frontbuffer activity
++ *
++ * Exits PR on frontbuffer flush and arms dc3co_work with a 50 ms
++ * delay. Each subsequent flush cancels and rearms the timer. When it
++ * finally fires, tgl_dc3co_disable_work re-activates PR.
++ */
++void intel_psr_panel_replay_exit(struct intel_display *display)
++{
++	struct intel_encoder *encoder;
++
++	for_each_intel_encoder_with_psr(display->drm, encoder) {
++		struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
++
++		mutex_lock(&intel_dp->psr.lock);
++		if (intel_dp->psr.panel_replay_enabled &&
++		    intel_dp->psr.sel_update_enabled) {
++			if (intel_dp->psr.active)
++				intel_psr_exit(intel_dp);
++			mod_delayed_work(display->wq.unordered,
++					 &intel_dp->psr.dc3co_work,
++					 msecs_to_jiffies(50));
++		}
++		mutex_unlock(&intel_dp->psr.lock);
++	}
++}
+diff --git a/drivers/gpu/drm/i915/display/intel_psr.h b/drivers/gpu/drm/i915/display/intel_psr.h
+index 29723e638..12a6b62fd 100644
+--- a/drivers/gpu/drm/i915/display/intel_psr.h
++++ b/drivers/gpu/drm/i915/display/intel_psr.h
+@@ -40,6 +40,7 @@ int intel_psr_debug_set(struct intel_dp *intel_dp, u64 value);
+ void intel_psr_invalidate(struct intel_display *display,
+ 			  unsigned frontbuffer_bits,
+ 			  enum fb_op_origin origin);
++void intel_psr_panel_replay_exit(struct intel_display *display);
+ void intel_psr_flush(struct intel_display *display,
+ 		     unsigned frontbuffer_bits,
+ 		     enum fb_op_origin origin);
+diff --git a/drivers/gpu/drm/i915/gt/intel_rc6.c b/drivers/gpu/drm/i915/gt/intel_rc6.c
+index e91e5cdca..a0361f823 100644
+--- a/drivers/gpu/drm/i915/gt/intel_rc6.c
++++ b/drivers/gpu/drm/i915/gt/intel_rc6.c
+@@ -2,9 +2,9 @@
+ /*
+  * Copyright © 2019 Intel Corporation
+  */
+-
+ #include <linux/pm_runtime.h>
+ #include <linux/string_helpers.h>
++#include <linux/dmi.h>
+ 
+ #include <drm/drm_print.h>
+ #include <drm/intel/intel_pcode_regs.h>
+@@ -499,6 +499,17 @@ static bool rc6_supported(struct intel_rc6 *rc6)
+ 	if (!HAS_RC6(i915))
+ 		return false;
+ 
++	if (dmi_match(DMI_PRODUCT_SKU, "IBP1XI08MK1") ||
++	    dmi_match(DMI_PRODUCT_SKU, "IBP14I08MK2") ||
++	    dmi_match(DMI_PRODUCT_SKU, "IBP1XI08MK2") ||
++	    dmi_match(DMI_PRODUCT_SKU, "IBP16I08MK2") ||
++	    dmi_match(DMI_PRODUCT_SKU, "OMNIA08IMK1") ||
++	    dmi_match(DMI_PRODUCT_SKU, "OMNIA08IMK2")) {
++		drm_notice(&i915->drm,
++			   "RC6 disabled by quirk\n");
++		return false;
++	}
++
+ 	if (intel_vgpu_active(i915))
+ 		return false;
+ 
+diff --git a/drivers/gpu/drm/nouveau/nouveau_ttm.c b/drivers/gpu/drm/nouveau/nouveau_ttm.c
+index ad01f922a..860bca7e3 100644
+--- a/drivers/gpu/drm/nouveau/nouveau_ttm.c
++++ b/drivers/gpu/drm/nouveau/nouveau_ttm.c
+@@ -188,6 +188,11 @@ nouveau_ttm_init_vram(struct nouveau_drm *drm)
+ 
+ 		man->func = &nouveau_vram_manager;
+ 
++		man->cg = drmm_cgroup_register_region(drm->dev, "vram",
++						      drm->gem.vram_available);
++		if (IS_ERR(man->cg))
++			return PTR_ERR(man->cg);
++
+ 		ttm_resource_manager_init(man, &drm->ttm.bdev,
+ 					  drm->gem.vram_available >> PAGE_SHIFT);
+ 		ttm_set_driver_manager(&drm->ttm.bdev, TTM_PL_VRAM, man);
+diff --git a/drivers/i2c/i2c-core-acpi.c b/drivers/i2c/i2c-core-acpi.c
+index e5fddacae..405fa15c8 100644
+--- a/drivers/i2c/i2c-core-acpi.c
++++ b/drivers/i2c/i2c-core-acpi.c
+@@ -373,6 +373,7 @@ static const struct acpi_device_id i2c_acpi_force_100khz_device_ids[] = {
+ 	 * the device works without issues on Windows at what is expected to be
+ 	 * a 400KHz frequency. The root cause of the issue is not known.
+ 	 */
++	{ "ASUE140D", 0 },
+ 	{ "DLL0945", 0 },
+ 	{ "ELAN0678", 0 },
+ 	{ "ELAN06FA", 0 },
+diff --git a/drivers/net/wireless/intel/iwlwifi/mld/mac80211.c b/drivers/net/wireless/intel/iwlwifi/mld/mac80211.c
+index 9ac17be30..3d3e956b6 100644
+--- a/drivers/net/wireless/intel/iwlwifi/mld/mac80211.c
++++ b/drivers/net/wireless/intel/iwlwifi/mld/mac80211.c
+@@ -516,6 +516,10 @@ iwl_mld_mac80211_tx(struct ieee80211_hw *hw,
+ 	u32 link_id = u32_get_bits(info->control.flags,
+ 				   IEEE80211_TX_CTRL_MLO_LINK);
+ 
++	if (unlikely(test_bit(STATUS_FW_ERROR, &mld->trans->status))) {
++		ieee80211_free_txskb(hw, skb);
++		return;
++	}
+ 	/* In AP mode, mgmt frames are sent on the bcast station,
+ 	 * so the FW can't translate the MLD addr to the link addr. Do it here
+ 	 */
+diff --git a/drivers/net/wireless/intel/iwlwifi/mld/tx.c b/drivers/net/wireless/intel/iwlwifi/mld/tx.c
+index 2df6643a5..7db7554ce 100644
+--- a/drivers/net/wireless/intel/iwlwifi/mld/tx.c
++++ b/drivers/net/wireless/intel/iwlwifi/mld/tx.c
+@@ -987,6 +987,9 @@ void iwl_mld_tx_from_txq(struct iwl_mld *mld, struct ieee80211_txq *txq)
+ 	struct sk_buff *skb = NULL;
+ 	u8 zero_addr[ETH_ALEN] = {};
+ 
++	if (unlikely(test_bit(STATUS_FW_ERROR, &mld->trans->status)))
++		return;
++
+ 	/*
+ 	 * Don't transmit during firmware restart. The firmware is dead,
+ 	 * so iwl_trans_tx() would return -EIO for each frame. Avoid the
+diff --git a/drivers/net/wireless/realtek/rtw89/fw.c b/drivers/net/wireless/realtek/rtw89/fw.c
+index d6a594b75..c6f175041 100644
+--- a/drivers/net/wireless/realtek/rtw89/fw.c
++++ b/drivers/net/wireless/realtek/rtw89/fw.c
+@@ -11780,7 +11780,7 @@ static void rtw89_fw_cmd_ofld_write_rf(struct rtw89_dev *rtwdev,
+ static void rtw89_fw_cmd_ofld_udelay(struct rtw89_dev *rtwdev, u32 us)
+ {
+ 	struct rtw89_fw_cmd_ofld_arg cmd = {
+-		.src = RTW89_FW_CMD_OFLD_SRC_OTHER,
++		.src = RTW89_FW_CMD_OFLD_SRC_BB,
+ 		.type = RTW89_FW_CMD_OFLD_DELAY,
+ 		.value = us,
+ 	};
+@@ -11794,7 +11794,7 @@ static void rtw89_fw_cmd_ofld_udelay(struct rtw89_dev *rtwdev, u32 us)
+ static void rtw89_fw_cmd_ofld_mdelay(struct rtw89_dev *rtwdev, u32 ms)
+ {
+ 	struct rtw89_fw_cmd_ofld_arg cmd = {
+-		.src = RTW89_FW_CMD_OFLD_SRC_OTHER,
++		.src = RTW89_FW_CMD_OFLD_SRC_BB,
+ 		.type = RTW89_FW_CMD_OFLD_DELAY,
+ 		.value = ms * 1000,
+ 	};
+diff --git a/drivers/net/wireless/realtek/rtw89/fw.h b/drivers/net/wireless/realtek/rtw89/fw.h
+index 20721d520..3fcb3ac8c 100644
+--- a/drivers/net/wireless/realtek/rtw89/fw.h
++++ b/drivers/net/wireless/realtek/rtw89/fw.h
+@@ -3142,7 +3142,6 @@ enum rtw89_fw_cmd_ofld_arg_src {
+ 	RTW89_FW_CMD_OFLD_SRC_RF,
+ 	RTW89_FW_CMD_OFLD_SRC_MAC,
+ 	RTW89_FW_CMD_OFLD_SRC_RF_DDIE,
+-	RTW89_FW_CMD_OFLD_SRC_OTHER,
+ };
+ 
+ enum rtw89_fw_cmd_ofld_arg_type {
+diff --git a/drivers/usb/core/config.c b/drivers/usb/core/config.c
+index 45e20c6d7..442c15f92 100644
+--- a/drivers/usb/core/config.c
++++ b/drivers/usb/core/config.c
+@@ -912,6 +912,17 @@ int usb_get_configuration(struct usb_device *dev)
+ 	unsigned char *bigbuffer;
+ 	struct usb_config_descriptor *desc;
+ 	int result;
++	size_t usb_config_req_size;
++
++	/*
++	 * Devices with quirky firmware will stall or reset when the initial
++	 * config descriptor request uses wLength=9. If the quirk is set, use
++	 * 255 instead, mirroring the behavior of Windows.
++	 */
++	if (dev->quirks & USB_QUIRK_WINDOWS_CONFIG_REQ_SIZE)
++		usb_config_req_size = 255;
++	else
++		usb_config_req_size = USB_DT_CONFIG_SIZE;
+ 
+ 	if (ncfg > USB_MAXCONFIG) {
+ 		dev_notice(ddev, "too many configurations: %d, "
+@@ -938,15 +949,19 @@ int usb_get_configuration(struct usb_device *dev)
+ 	if (!dev->rawdescriptors)
+ 		return -ENOMEM;
+ 
+-	desc = kmalloc(USB_DT_CONFIG_SIZE, GFP_KERNEL);
++	desc = kmalloc(usb_config_req_size, GFP_KERNEL);
+ 	if (!desc)
+ 		return -ENOMEM;
+ 
+ 	for (cfgno = 0; cfgno < ncfg; cfgno++) {
+-		/* We grab just the first descriptor so we know how long
+-		 * the whole configuration is */
++		/*
++		 * Normally we request only the configuration descriptor header
++		 * so we can determine the total configuration length. For
++		 * devices with USB_QUIRK_WINDOWS_CONFIG_REQ_SIZE set, try to
++		 * grab the full descriptor set instead.
++		 */
+ 		result = usb_get_descriptor(dev, USB_DT_CONFIG, cfgno,
+-		    desc, USB_DT_CONFIG_SIZE);
++		    desc, usb_config_req_size);
+ 		if (result < 0) {
+ 			dev_err(ddev, "unable to read config index %d "
+ 			    "descriptor/%s: %d\n", cfgno, "start", result);
+@@ -956,9 +971,8 @@ int usb_get_configuration(struct usb_device *dev)
+ 			dev->descriptor.bNumConfigurations = cfgno;
+ 			break;
+ 		} else if (result < 4) {
+-			dev_err(ddev, "config index %d descriptor too short "
+-			    "(expected %i, got %i)\n", cfgno,
+-			    USB_DT_CONFIG_SIZE, result);
++			dev_err(ddev, "config index %d descriptor too short (asked for %zu, got %i, need at least %i)\n",
++			    cfgno, usb_config_req_size, result, 4);
+ 			result = -EINVAL;
+ 			goto err;
+ 		}
+@@ -972,6 +986,16 @@ int usb_get_configuration(struct usb_device *dev)
+ 			goto err;
+ 		}
+ 
++		/*
++		 * If the device returns the full configuration descriptor set,
++		 * skip the second read. Otherwise, send a second request
++		 * asking for the full set.
++		 */
++		if (result >= length) {
++			memcpy(bigbuffer, desc, length);
++			goto store_and_parse;
++		}
++
+ 		if (dev->quirks & USB_QUIRK_DELAY_INIT)
+ 			msleep(200);
+ 
+@@ -989,6 +1013,7 @@ int usb_get_configuration(struct usb_device *dev)
+ 			length = result;
+ 		}
+ 
++store_and_parse:
+ 		dev->rawdescriptors[cfgno] = bigbuffer;
+ 
+ 		result = usb_parse_configuration(dev, cfgno,
+diff --git a/drivers/usb/core/message.c b/drivers/usb/core/message.c
+index 75e2bfd74..1d83f8be0 100644
+--- a/drivers/usb/core/message.c
++++ b/drivers/usb/core/message.c
+@@ -1052,6 +1052,25 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
+ 			UTF16_LITTLE_ENDIAN, buf, size);
+ 	buf[err] = 0;
+ 
++	/*
++	 * Some devices report string descriptors with a declared length
++	 * greater than the actual serial, leaving uninitialized firmware
++	 * memory (often including C0 control characters) appended to the
++	 * returned string. Truncate at the first control character so
++	 * callers get a clean, well-formed string.
++	 */
++	{
++		int i;
++		for (i = 0; i < err; i++) {
++			unsigned char c = buf[i];
++			if (c < 0x20 || c == 0x7f) {
++				buf[i] = 0;
++				err = i;
++				break;
++			}
++		}
++	}
++
+ 	if (tbuf[1] != USB_DT_STRING)
+ 		dev_dbg(&dev->dev,
+ 			"wrong descriptor type %02x for string %d (\"%s\")\n",
+diff --git a/drivers/usb/core/quirks.c b/drivers/usb/core/quirks.c
+index 87ee2d938..f5a60ccf2 100644
+--- a/drivers/usb/core/quirks.c
++++ b/drivers/usb/core/quirks.c
+@@ -142,6 +142,10 @@ static int quirks_param_set(const char *value, const struct kernel_param *kp)
+ 				break;
+ 			case 'q':
+ 				flags |= USB_QUIRK_FORCE_ONE_CONFIG;
++				break;
++			case 'r':
++				flags |= USB_QUIRK_WINDOWS_CONFIG_REQ_SIZE;
++				break;
+ 			/* Ignore unrecognized flag characters */
+ 			}
+ 		}
+diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
+index 48d851fbd..7c1dac8da 100644
+--- a/include/linux/perf_event.h
++++ b/include/linux/perf_event.h
+@@ -1632,7 +1632,7 @@ static inline void perf_event_task_migrate(struct task_struct *task)
+ 		task->sched_migrated = 1;
+ }
+ 
+-static inline void perf_event_task_sched_in(struct task_struct *prev,
++static __always_inline void perf_event_task_sched_in(struct task_struct *prev,
+ 					    struct task_struct *task)
+ {
+ 	if (static_branch_unlikely(&perf_sched_events))
+diff --git a/include/linux/rmap.h b/include/linux/rmap.h
+index 8dc0871e5..e090aa098 100644
+--- a/include/linux/rmap.h
++++ b/include/linux/rmap.h
+@@ -843,7 +843,7 @@ static inline int folio_try_share_anon_rmap_pmd(struct folio *folio,
+  * Called from mm/vmscan.c to handle paging out
+  */
+ int folio_referenced(struct folio *, int is_locked,
+-			struct mem_cgroup *memcg, vm_flags_t *vm_flags);
++		struct mem_cgroup *memcg, vma_flags_t *vma_flags);
+ 
+ void try_to_migrate(struct folio *folio, enum ttu_flags flags);
+ void try_to_unmap(struct folio *, enum ttu_flags flags);
+@@ -975,10 +975,9 @@ struct anon_vma *folio_lock_anon_vma_read(const struct folio *folio,
+ #define anon_vma_prepare(vma)	(0)
+ 
+ static inline int folio_referenced(struct folio *folio, int is_locked,
+-				  struct mem_cgroup *memcg,
+-				  vm_flags_t *vm_flags)
++		struct mem_cgroup *memcg, vma_flags_t *vma_flags)
+ {
+-	*vm_flags = 0;
++	vma_flags_clear_all(vma_flags);
+ 	return 0;
+ }
+ 
+diff --git a/include/linux/sched/mm.h b/include/linux/sched/mm.h
+index 95d0040df..a17730d63 100644
+--- a/include/linux/sched/mm.h
++++ b/include/linux/sched/mm.h
+@@ -32,7 +32,7 @@ extern struct mm_struct *mm_alloc(void);
+  * See also <Documentation/mm/active_mm.rst> for an in-depth explanation
+  * of &mm_struct.mm_count vs &mm_struct.mm_users.
+  */
+-static inline void mmgrab(struct mm_struct *mm)
++static __always_inline void mmgrab(struct mm_struct *mm)
+ {
+ 	atomic_inc(&mm->mm_count);
+ }
+@@ -44,7 +44,7 @@ static inline void smp_mb__after_mmgrab(void)
+ 
+ extern void __mmdrop(struct mm_struct *mm);
+ 
+-static inline void mmdrop(struct mm_struct *mm)
++static __always_inline void mmdrop(struct mm_struct *mm)
+ {
+ 	/*
+ 	 * The implicit full barrier implied by atomic_dec_and_test() is
+@@ -71,27 +71,27 @@ static inline void __mmdrop_delayed(struct rcu_head *rhp)
+  * Invoked from finish_task_switch(). Delegates the heavy lifting on RT
+  * kernels via RCU.
+  */
+-static inline void mmdrop_sched(struct mm_struct *mm)
++static __always_inline void mmdrop_sched(struct mm_struct *mm)
+ {
+ 	/* Provides a full memory barrier. See mmdrop() */
+ 	if (atomic_dec_and_test(&mm->mm_count))
+ 		call_rcu(&mm->delayed_drop, __mmdrop_delayed);
+ }
+ #else
+-static inline void mmdrop_sched(struct mm_struct *mm)
++static __always_inline void mmdrop_sched(struct mm_struct *mm)
+ {
+ 	mmdrop(mm);
+ }
+ #endif
+ 
+ /* Helpers for lazy TLB mm refcounting */
+-static inline void mmgrab_lazy_tlb(struct mm_struct *mm)
++static __always_inline void mmgrab_lazy_tlb(struct mm_struct *mm)
+ {
+ 	if (IS_ENABLED(CONFIG_MMU_LAZY_TLB_REFCOUNT))
+ 		mmgrab(mm);
+ }
+ 
+-static inline void mmdrop_lazy_tlb(struct mm_struct *mm)
++static __always_inline void mmdrop_lazy_tlb(struct mm_struct *mm)
+ {
+ 	if (IS_ENABLED(CONFIG_MMU_LAZY_TLB_REFCOUNT)) {
+ 		mmdrop(mm);
+@@ -104,7 +104,7 @@ static inline void mmdrop_lazy_tlb(struct mm_struct *mm)
+ 	}
+ }
+ 
+-static inline void mmdrop_lazy_tlb_sched(struct mm_struct *mm)
++static __always_inline void mmdrop_lazy_tlb_sched(struct mm_struct *mm)
+ {
+ 	if (IS_ENABLED(CONFIG_MMU_LAZY_TLB_REFCOUNT))
+ 		mmdrop_sched(mm);
+@@ -128,12 +128,12 @@ static inline void mmdrop_lazy_tlb_sched(struct mm_struct *mm)
+  * See also <Documentation/mm/active_mm.rst> for an in-depth explanation
+  * of &mm_struct.mm_count vs &mm_struct.mm_users.
+  */
+-static inline void mmget(struct mm_struct *mm)
++static __always_inline void mmget(struct mm_struct *mm)
+ {
+ 	atomic_inc(&mm->mm_users);
+ }
+ 
+-static inline bool mmget_not_zero(struct mm_struct *mm)
++static __always_inline bool mmget_not_zero(struct mm_struct *mm)
+ {
+ 	return atomic_inc_not_zero(&mm->mm_users);
+ }
+@@ -532,7 +532,7 @@ enum {
+ #include <asm/membarrier.h>
+ #endif
+ 
+-static inline void membarrier_mm_sync_core_before_usermode(struct mm_struct *mm)
++static __always_inline void membarrier_mm_sync_core_before_usermode(struct mm_struct *mm)
+ {
+ 	/*
+ 	 * The atomic_read() below prevents CSE. The following should
+diff --git a/include/linux/tick.h b/include/linux/tick.h
+index 1cf4651f0..2f91eccd2 100644
+--- a/include/linux/tick.h
++++ b/include/linux/tick.h
+@@ -173,7 +173,7 @@ extern cpumask_var_t tick_nohz_full_mask;
+ #ifdef CONFIG_NO_HZ_FULL
+ extern bool tick_nohz_full_running;
+ 
+-static inline bool tick_nohz_full_enabled(void)
++static __always_inline bool tick_nohz_full_enabled(void)
+ {
+ 	if (!context_tracking_enabled())
+ 		return false;
+@@ -297,7 +297,7 @@ static inline void __tick_nohz_task_switch(void) { }
+ static inline void tick_nohz_full_setup(cpumask_var_t cpumask) { }
+ #endif
+ 
+-static inline void tick_nohz_task_switch(void)
++static __always_inline void tick_nohz_task_switch(void)
+ {
+ 	if (tick_nohz_full_enabled())
+ 		__tick_nohz_task_switch();
+diff --git a/include/linux/usb/quirks.h b/include/linux/usb/quirks.h
+index b3cc7beab..a4043b33c 100644
+--- a/include/linux/usb/quirks.h
++++ b/include/linux/usb/quirks.h
+@@ -81,4 +81,7 @@
+ /* Device claims zero configurations, forcing to 1 */
+ #define USB_QUIRK_FORCE_ONE_CONFIG		BIT(18)
+ 
++/* Use a 255 bytes config descriptor request mirroring windows behavior */
++#define USB_QUIRK_WINDOWS_CONFIG_REQ_SIZE	BIT(19)
++
+ #endif /* __LINUX_USB_QUIRKS_H */
+diff --git a/include/linux/vtime.h b/include/linux/vtime.h
+index 82825e775..ce83fc743 100644
+--- a/include/linux/vtime.h
++++ b/include/linux/vtime.h
+@@ -89,24 +89,24 @@ static __always_inline void vtime_account_guest_exit(void)
+  * For now vtime state is tied to context tracking. We might want to decouple
+  * those later if necessary.
+  */
+-static inline bool vtime_accounting_enabled(void)
++static __always_inline bool vtime_accounting_enabled(void)
+ {
+ 	return context_tracking_enabled();
+ }
+ 
+-static inline bool vtime_accounting_enabled_cpu(int cpu)
++static __always_inline bool vtime_accounting_enabled_cpu(int cpu)
+ {
+ 	return vtime_generic_enabled_cpu(cpu);
+ }
+ 
+-static inline bool vtime_accounting_enabled_this_cpu(void)
++static __always_inline bool vtime_accounting_enabled_this_cpu(void)
+ {
+ 	return vtime_generic_enabled_this_cpu();
+ }
+ 
+ extern void vtime_task_switch_generic(struct task_struct *prev);
+ 
+-static inline void vtime_task_switch(struct task_struct *prev)
++static __always_inline void vtime_task_switch(struct task_struct *prev)
+ {
+ 	if (vtime_accounting_enabled_this_cpu())
+ 		vtime_task_switch_generic(prev);
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 96226707c..85f215e7d 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -3732,6 +3732,9 @@ static inline void ttwu_do_wakeup(struct task_struct *p)
+ 
+ void update_rq_avg_idle(struct rq *rq)
+ {
++	if (!rq->idle_stamp)
++		return;
++
+ 	u64 delta = rq_clock(rq) - rq->idle_stamp;
+ 	u64 max = 2*rq->max_idle_balance_cost;
+ 
+@@ -5074,7 +5077,7 @@ static inline void prepare_task(struct task_struct *next)
+ 	WRITE_ONCE(next->on_cpu, 1);
+ }
+ 
+-static inline void finish_task(struct task_struct *prev)
++static __always_inline void finish_task(struct task_struct *prev)
+ {
+ 	/*
+ 	 * This must be the very last reference to @prev from this CPU. After
+@@ -5118,7 +5121,7 @@ static void zap_balance_callbacks(struct rq *rq)
+ 	rq->balance_callback = found ? &balance_push_callback : NULL;
+ }
+ 
+-static void do_balance_callbacks(struct rq *rq, struct balance_callback *head)
++static __always_inline void do_balance_callbacks(struct rq *rq, struct balance_callback *head)
+ {
+ 	void (*func)(struct rq *rq);
+ 	struct balance_callback *next;
+@@ -5153,7 +5156,7 @@ struct balance_callback balance_push_callback = {
+ 	.func = balance_push,
+ };
+ 
+-static inline struct balance_callback *
++static __always_inline struct balance_callback *
+ __splice_balance_callbacks(struct rq *rq, bool split)
+ {
+ 	struct balance_callback *head = rq->balance_callback;
+@@ -5227,7 +5230,7 @@ prepare_lock_switch(struct rq *rq, struct task_struct *next, struct rq_flags *rf
+ 	__acquire(__rq_lockp(this_rq()));
+ }
+ 
+-static inline void finish_lock_switch(struct rq *rq)
++static __always_inline void finish_lock_switch(struct rq *rq)
+ 	__releases(__rq_lockp(rq))
+ {
+ 	/*
+@@ -5261,7 +5264,7 @@ static inline void kmap_local_sched_out(void)
+ #endif
+ }
+ 
+-static inline void kmap_local_sched_in(void)
++static __always_inline void kmap_local_sched_in(void)
+ {
+ #ifdef CONFIG_KMAP_LOCAL
+ 	if (unlikely(current->kmap_ctrl.idx))
+@@ -5315,7 +5318,7 @@ prepare_task_switch(struct rq *rq, struct task_struct *prev,
+  * past. 'prev == current' is still correct but we need to recalculate this_rq
+  * because prev may have moved to another CPU.
+  */
+-static struct rq *finish_task_switch(struct task_struct *prev)
++static __always_inline struct rq *finish_task_switch(struct task_struct *prev)
+ 	__releases(__rq_lockp(this_rq()))
+ {
+ 	struct rq *rq = this_rq();
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index d78467ec6..c324882e5 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -13336,12 +13336,15 @@ static int sched_balance_rq(int this_cpu, struct rq *this_rq,
+ 		 * still unbalanced. ld_moved simply stays zero, so it is
+ 		 * correctly treated as an imbalance.
+ 		 */
+-		env.loop_max  = min(sysctl_sched_nr_migrate, busiest->nr_running);
+-
+ more_balance:
+ 		rq_lock_irqsave(busiest, &rf);
+ 		update_rq_clock(busiest);
+ 
++		if (!env.loop_max)
++			env.loop_max  = min(sysctl_sched_nr_migrate, busiest->cfs.h_nr_queued);
++		else
++			env.loop_max  = min(env.loop_max, busiest->cfs.h_nr_queued);
++
+ 		/*
+ 		 * cur_ld_moved - load moved in current iteration
+ 		 * ld_moved     - cumulative load moved across iterations
+diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
+index 56acf502b..c7135879f 100644
+--- a/kernel/sched/sched.h
++++ b/kernel/sched/sched.h
+@@ -1457,12 +1457,12 @@ static inline struct cpumask *sched_group_span(struct sched_group *sg);
+ 
+ DECLARE_STATIC_KEY_FALSE(__sched_core_enabled);
+ 
+-static inline bool sched_core_enabled(struct rq *rq)
++static __always_inline bool sched_core_enabled(struct rq *rq)
+ {
+ 	return static_branch_unlikely(&__sched_core_enabled) && rq->core_enabled;
+ }
+ 
+-static inline bool sched_core_disabled(void)
++static __always_inline bool sched_core_disabled(void)
+ {
+ 	return !static_branch_unlikely(&__sched_core_enabled);
+ }
+@@ -1471,7 +1471,7 @@ static inline bool sched_core_disabled(void)
+  * Be careful with this function; not for general use. The return value isn't
+  * stable unless you actually hold a relevant rq->__lock.
+  */
+-static inline raw_spinlock_t *rq_lockp(struct rq *rq)
++static __always_inline raw_spinlock_t *rq_lockp(struct rq *rq)
+ {
+ 	if (sched_core_enabled(rq))
+ 		return &rq->core->__lock;
+@@ -1479,7 +1479,7 @@ static inline raw_spinlock_t *rq_lockp(struct rq *rq)
+ 	return &rq->__lock;
+ }
+ 
+-static inline raw_spinlock_t *__rq_lockp(struct rq *rq)
++static __always_inline raw_spinlock_t *__rq_lockp(struct rq *rq)
+ 	__returns_ctx_lock(rq_lockp(rq)) /* alias them */
+ {
+ 	if (rq->core_enabled)
+@@ -1582,12 +1582,12 @@ static inline bool sched_core_disabled(void)
+ 	return true;
+ }
+ 
+-static inline raw_spinlock_t *rq_lockp(struct rq *rq)
++static __always_inline raw_spinlock_t *rq_lockp(struct rq *rq)
+ {
+ 	return &rq->__lock;
+ }
+ 
+-static inline raw_spinlock_t *__rq_lockp(struct rq *rq)
++static __always_inline raw_spinlock_t *__rq_lockp(struct rq *rq)
+ 	__returns_ctx_lock(rq_lockp(rq)) /* alias them */
+ {
+ 	return &rq->__lock;
+@@ -1647,33 +1647,33 @@ extern void raw_spin_rq_lock_nested(struct rq *rq, int subclass)
+ extern bool raw_spin_rq_trylock(struct rq *rq)
+ 	__cond_acquires(true, __rq_lockp(rq));
+ 
+-static inline void raw_spin_rq_lock(struct rq *rq)
++static __always_inline void raw_spin_rq_lock(struct rq *rq)
+ 	__acquires(__rq_lockp(rq))
+ {
+ 	raw_spin_rq_lock_nested(rq, 0);
+ }
+ 
+-static inline void raw_spin_rq_unlock(struct rq *rq)
++static __always_inline void raw_spin_rq_unlock(struct rq *rq)
+ 	__releases(__rq_lockp(rq))
+ {
+ 	raw_spin_unlock(rq_lockp(rq));
+ }
+ 
+-static inline void raw_spin_rq_lock_irq(struct rq *rq)
++static __always_inline void raw_spin_rq_lock_irq(struct rq *rq)
+ 	__acquires(__rq_lockp(rq))
+ {
+ 	local_irq_disable();
+ 	raw_spin_rq_lock(rq);
+ }
+ 
+-static inline void raw_spin_rq_unlock_irq(struct rq *rq)
++static __always_inline void raw_spin_rq_unlock_irq(struct rq *rq)
+ 	__releases(__rq_lockp(rq))
+ {
+ 	raw_spin_rq_unlock(rq);
+ 	local_irq_enable();
+ }
+ 
+-static inline unsigned long _raw_spin_rq_lock_irqsave(struct rq *rq)
++static __always_inline unsigned long _raw_spin_rq_lock_irqsave(struct rq *rq)
+ 	__acquires(__rq_lockp(rq))
+ {
+ 	unsigned long flags;
+@@ -1684,7 +1684,7 @@ static inline unsigned long _raw_spin_rq_lock_irqsave(struct rq *rq)
+ 	return flags;
+ }
+ 
+-static inline void raw_spin_rq_unlock_irqrestore(struct rq *rq, unsigned long flags)
++static __always_inline void raw_spin_rq_unlock_irqrestore(struct rq *rq, unsigned long flags)
+ 	__releases(__rq_lockp(rq))
+ {
+ 	raw_spin_rq_unlock(rq);
+diff --git a/mm/rmap.c b/mm/rmap.c
+index 1c77d5dc0..d0d595a35 100644
+--- a/mm/rmap.c
++++ b/mm/rmap.c
+@@ -907,7 +907,7 @@ pmd_t *mm_find_pmd(struct mm_struct *mm, unsigned long address)
+ struct folio_referenced_arg {
+ 	int mapcount;
+ 	int referenced;
+-	vm_flags_t vm_flags;
++	vma_flags_t vma_flags;
+ 	struct mem_cgroup *memcg;
+ };
+ 
+@@ -926,7 +926,7 @@ static bool folio_referenced_one(struct folio *folio,
+ 		address = pvmw.address;
+ 		nr = 1;
+ 
+-		if (vma->vm_flags & VM_LOCKED) {
++		if (vma_test(vma, VMA_LOCKED_BIT)) {
+ 			ptes++;
+ 			pra->mapcount--;
+ 
+@@ -947,7 +947,7 @@ static bool folio_referenced_one(struct folio *folio,
+ 			/* Restore the mlock which got missed */
+ 			mlock_vma_folio(folio, vma);
+ 			page_vma_mapped_walk_done(&pvmw);
+-			pra->vm_flags |= VM_LOCKED;
++			vma_flags_set(&pra->vma_flags, VMA_LOCKED_BIT);
+ 			return false; /* To break the loop */
+ 		}
+ 
+@@ -1015,8 +1015,11 @@ static bool folio_referenced_one(struct folio *folio,
+ 		referenced++;
+ 
+ 	if (referenced) {
++		vma_flags_t vma_flags = vma->flags;
++
+ 		pra->referenced++;
+-		pra->vm_flags |= vma->vm_flags & ~VM_LOCKED;
++		vma_flags_clear(&vma_flags, VMA_LOCKED_BIT);
++		vma_flags_set_mask(&pra->vma_flags, vma_flags);
+ 	}
+ 
+ 	if (!pra->mapcount)
+@@ -1054,7 +1057,7 @@ static bool invalid_folio_referenced_vma(struct vm_area_struct *vma, void *arg)
+  * @folio: The folio to test.
+  * @is_locked: Caller holds lock on the folio.
+  * @memcg: target memory cgroup
+- * @vm_flags: A combination of all the vma->vm_flags which referenced the folio.
++ * @vma_flags: A combination of all the vma->flags which referenced the folio.
+  *
+  * Quick test_and_clear_referenced for all mappings of a folio,
+  *
+@@ -1062,7 +1065,7 @@ static bool invalid_folio_referenced_vma(struct vm_area_struct *vma, void *arg)
+  * the function bailed out due to rmap lock contention.
+  */
+ int folio_referenced(struct folio *folio, int is_locked,
+-		     struct mem_cgroup *memcg, vm_flags_t *vm_flags)
++		struct mem_cgroup *memcg, vma_flags_t *vma_flags)
+ {
+ 	bool we_locked = false;
+ 	struct folio_referenced_arg pra = {
+@@ -1078,7 +1081,7 @@ int folio_referenced(struct folio *folio, int is_locked,
+ 	};
+ 
+ 	VM_WARN_ON_ONCE_FOLIO(folio_is_zone_device(folio), folio);
+-	*vm_flags = 0;
++	vma_flags_clear_all(vma_flags);
+ 	if (!pra.mapcount)
+ 		return 0;
+ 
+@@ -1092,7 +1095,7 @@ int folio_referenced(struct folio *folio, int is_locked,
+ 	}
+ 
+ 	rmap_walk(folio, &rwc);
+-	*vm_flags = pra.vm_flags;
++	vma_flags_set_mask(vma_flags, pra.vma_flags);
+ 
+ 	if (we_locked)
+ 		folio_unlock(folio);
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 35c3bb15a..03ef7f65d 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -267,6 +267,12 @@ static int sc_swappiness(struct scan_control *sc, struct mem_cgroup *memcg)
+ }
+ #endif
+ 
++static inline bool is_exec_file_folio(const struct folio *folio,
++		const vma_flags_t *vma_flags)
++{
++	return vma_flags_test(vma_flags, VMA_EXEC_BIT) && folio_is_file_lru(folio);
++}
++
+ static void set_task_reclaim_state(struct task_struct *task,
+ 				   struct reclaim_state *rs)
+ {
+@@ -835,10 +841,16 @@ enum folio_references {
+  * with PG_active set. In contrast, the aging (page table walk) path uses
+  * folio_update_gen().
+  */
+-static bool lru_gen_set_refs(struct folio *folio)
++static bool lru_gen_set_refs(struct folio *folio, const vma_flags_t *vma_flags)
+ {
+ 	/* see the comment on LRU_REFS_FLAGS */
+ 	if (!folio_test_referenced(folio) && !folio_test_workingset(folio)) {
++		/* Activate file-backed executable folios after first usage. */
++		if (is_exec_file_folio(folio, vma_flags)) {
++			set_mask_bits(&folio->flags.f, LRU_REFS_FLAGS, BIT(PG_workingset));
++			return true;
++		}
++
+ 		set_mask_bits(&folio->flags.f, LRU_REFS_MASK, BIT(PG_referenced));
+ 		return false;
+ 	}
+@@ -851,7 +863,7 @@ static bool lru_gen_set_refs(struct folio *folio)
+ 	return true;
+ }
+ #else
+-static bool lru_gen_set_refs(struct folio *folio)
++static bool lru_gen_set_refs(struct folio *folio, const vma_flags_t *vma_flags)
+ {
+ 	return false;
+ }
+@@ -861,16 +873,16 @@ static enum folio_references folio_check_references(struct folio *folio,
+ 						  struct scan_control *sc)
+ {
+ 	int referenced_ptes, referenced_folio;
+-	vm_flags_t vm_flags;
++	vma_flags_t vma_flags;
+ 
+ 	referenced_ptes = folio_referenced(folio, 1, sc->target_mem_cgroup,
+-					   &vm_flags);
++					   &vma_flags);
+ 
+ 	/*
+ 	 * The supposedly reclaimable folio was found to be in a VM_LOCKED vma.
+ 	 * Let the folio, now marked Mlocked, be moved to the unevictable list.
+ 	 */
+-	if (vm_flags & VM_LOCKED)
++	if (vma_flags_test(&vma_flags, VMA_LOCKED_BIT))
+ 		return FOLIOREF_ACTIVATE;
+ 
+ 	/*
+@@ -886,7 +898,7 @@ static enum folio_references folio_check_references(struct folio *folio,
+ 		if (!referenced_ptes)
+ 			return FOLIOREF_RECLAIM;
+ 
+-		return lru_gen_set_refs(folio) ? FOLIOREF_ACTIVATE : FOLIOREF_KEEP;
++		return lru_gen_set_refs(folio, &vma_flags) ? FOLIOREF_ACTIVATE : FOLIOREF_KEEP;
+ 	}
+ 
+ 	referenced_folio = folio_test_clear_referenced(folio);
+@@ -914,7 +926,7 @@ static enum folio_references folio_check_references(struct folio *folio,
+ 		/*
+ 		 * Activate file-backed executable folios after first usage.
+ 		 */
+-		if ((vm_flags & VM_EXEC) && folio_is_file_lru(folio))
++		if (is_exec_file_folio(folio, &vma_flags))
+ 			return FOLIOREF_ACTIVATE;
+ 
+ 		return FOLIOREF_KEEP;
+@@ -2072,7 +2084,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
+ {
+ 	unsigned long nr_taken;
+ 	unsigned long nr_scanned;
+-	vm_flags_t vm_flags;
++	vma_flags_t vma_flags;
+ 	LIST_HEAD(l_hold);	/* The folios which were snipped off */
+ 	LIST_HEAD(l_active);
+ 	LIST_HEAD(l_inactive);
+@@ -2116,7 +2128,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
+ 
+ 		/* Referenced or rmap lock contention: rotate */
+ 		if (folio_referenced(folio, 0, sc->target_mem_cgroup,
+-				     &vm_flags) != 0) {
++				     &vma_flags) != 0) {
+ 			/*
+ 			 * Identify referenced, file-backed active folios and
+ 			 * give them one more trip around the active list. So
+@@ -2126,7 +2138,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
+ 			 * IO, plus JVM can create lots of anon VM_EXEC folios,
+ 			 * so we ignore them here.
+ 			 */
+-			if ((vm_flags & VM_EXEC) && folio_is_file_lru(folio)) {
++			if (is_exec_file_folio(folio, &vma_flags)) {
+ 				nr_rotated += folio_nr_pages(folio);
+ 				list_add(&folio->lru, &l_active);
+ 				continue;
+@@ -3195,14 +3207,19 @@ static bool positive_ctrl_err(struct ctrl_pos *sp, struct ctrl_pos *pv)
+  ******************************************************************************/
+ 
+ /* promote pages accessed through page tables */
+-static int folio_update_gen(struct folio *folio, int gen)
++static int folio_update_gen(struct folio *folio, int gen, const vma_flags_t *vma_flags)
+ {
+ 	unsigned long new_flags, old_flags = READ_ONCE(folio->flags.f);
+ 
+ 	VM_WARN_ON_ONCE(gen >= MAX_NR_GENS);
+ 
+-	/* see the comment on LRU_REFS_FLAGS */
+-	if (!folio_test_referenced(folio) && !folio_test_workingset(folio)) {
++	/*
++	 * See the comment on LRU_REFS_FLAGS, and activate file-backed
++	 * executable folios after first usage to avoid typical IO
++	 * thrashing from reclaiming.
++	 */
++	if (!folio_test_referenced(folio) && !folio_test_workingset(folio) &&
++	    !is_exec_file_folio(folio, vma_flags)) {
+ 		set_mask_bits(&folio->flags.f, LRU_REFS_MASK, BIT(PG_referenced));
+ 		return -1;
+ 	}
+@@ -3433,8 +3450,8 @@ static bool suitable_to_scan(int total, int young)
+ 	return young * n >= total;
+ }
+ 
+-static void walk_update_folio(struct lru_gen_mm_walk *walk, struct folio *folio,
+-			      int new_gen, bool dirty)
++static void walk_update_folio(struct lru_gen_mm_walk *walk, struct vm_area_struct *vma,
++		struct folio *folio, int new_gen, bool dirty)
+ {
+ 	int old_gen;
+ 
+@@ -3447,10 +3464,10 @@ static void walk_update_folio(struct lru_gen_mm_walk *walk, struct folio *folio,
+ 		folio_mark_dirty(folio);
+ 
+ 	if (walk) {
+-		old_gen = folio_update_gen(folio, new_gen);
++		old_gen = folio_update_gen(folio, new_gen, &vma->flags);
+ 		if (old_gen >= 0 && old_gen != new_gen)
+ 			update_batch_size(walk, folio, old_gen, new_gen);
+-	} else if (lru_gen_set_refs(folio)) {
++	} else if (lru_gen_set_refs(folio, &vma->flags)) {
+ 		old_gen = folio_lru_gen(folio);
+ 		if (old_gen >= 0 && old_gen != new_gen)
+ 			folio_activate(folio);
+@@ -3523,7 +3540,7 @@ static bool walk_pte_range(pmd_t *pmd, unsigned long start, unsigned long end,
+ 			continue;
+ 
+ 		if (last != folio) {
+-			walk_update_folio(walk, last, gen, dirty);
++			walk_update_folio(walk, args->vma, last, gen, dirty);
+ 
+ 			last = folio;
+ 			dirty = false;
+@@ -3536,7 +3553,7 @@ static bool walk_pte_range(pmd_t *pmd, unsigned long start, unsigned long end,
+ 		walk->mm_stats[MM_LEAF_YOUNG] += nr;
+ 	}
+ 
+-	walk_update_folio(walk, last, gen, dirty);
++	walk_update_folio(walk, args->vma, last, gen, dirty);
+ 	last = NULL;
+ 
+ 	if (i < PTRS_PER_PTE && get_next_vma(PMD_MASK, PAGE_SIZE, args, &start, &end))
+@@ -3614,7 +3631,7 @@ static void walk_pmd_range_locked(pud_t *pud, unsigned long addr, struct vm_area
+ 			goto next;
+ 
+ 		if (last != folio) {
+-			walk_update_folio(walk, last, gen, dirty);
++			walk_update_folio(walk, vma, last, gen, dirty);
+ 
+ 			last = folio;
+ 			dirty = false;
+@@ -3628,7 +3645,7 @@ static void walk_pmd_range_locked(pud_t *pud, unsigned long addr, struct vm_area
+ 		i = i > MIN_LRU_BATCH ? 0 : find_next_bit(bitmap, MIN_LRU_BATCH, i) + 1;
+ 	} while (i <= MIN_LRU_BATCH);
+ 
+-	walk_update_folio(walk, last, gen, dirty);
++	walk_update_folio(walk, vma, last, gen, dirty);
+ 
+ 	lazy_mmu_mode_disable();
+ 	spin_unlock(ptl);
+@@ -4266,7 +4283,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw, unsigned int nr)
+ 			continue;
+ 
+ 		if (last != folio) {
+-			walk_update_folio(walk, last, gen, dirty);
++			walk_update_folio(walk, vma, last, gen, dirty);
+ 
+ 			last = folio;
+ 			dirty = false;
+@@ -4278,7 +4295,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw, unsigned int nr)
+ 		young += nr;
+ 	}
+ 
+-	walk_update_folio(walk, last, gen, dirty);
++	walk_update_folio(walk, vma, last, gen, dirty);
+ 
+ 	lazy_mmu_mode_disable();
+ 
+diff --git a/sound/hda/codecs/realtek/alc269.c b/sound/hda/codecs/realtek/alc269.c
+index 379e1458f..01310605b 100644
+--- a/sound/hda/codecs/realtek/alc269.c
++++ b/sound/hda/codecs/realtek/alc269.c
+@@ -4066,6 +4066,7 @@ enum {
+ 	ALC294_FIXUP_ASUS_GU502_VERBS,
+ 	ALC294_FIXUP_ASUS_G513_PINS,
+ 	ALC285_FIXUP_ASUS_G533Z_PINS,
++	ALC285_FIXUP_ASUS_G733Z_VERBS,
+ 	ALC285_FIXUP_HP_GPIO_LED,
+ 	ALC285_FIXUP_HP_MUTE_LED,
+ 	ALC285_FIXUP_HP_SPECTRE_X360_MUTE_LED,
+@@ -6855,6 +6856,19 @@ static const struct hda_fixup alc269_fixups[] = {
+ 		.type = HDA_FIXUP_FUNC,
+ 		.v.func = alc285_fixup_invalidate_dacs,
+ 	},
++	[ALC285_FIXUP_ASUS_G733Z_VERBS] = {
++		.type = HDA_FIXUP_VERBS,
++		.v.verbs = (const struct hda_verb[]) {
++			/* Enables internal speaker */
++			{0x17, AC_VERB_SET_CONNECT_SEL, 0x00},
++			{0x14, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x40},
++			{0x14, AC_VERB_SET_AMP_GAIN_MUTE, 0xb000},
++			{0x1e, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x40},
++			{0x16, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00},
++			{0x1b, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00},
++			{ }
++		}
++	},
+ };
+ 
+ static const struct hda_quirk alc269_fixup_tbl[] = {
+@@ -7484,6 +7498,7 @@ static const struct hda_quirk alc269_fixup_tbl[] = {
+ 	SND_PCI_QUIRK(0x1043, 0x12a3, "Asus N7691ZM", ALC269_FIXUP_ASUS_N7601ZM),
+ 	SND_PCI_QUIRK(0x1043, 0x12af, "ASUS UX582ZS", ALC245_FIXUP_CS35L41_SPI_2),
+ 	SND_PCI_QUIRK(0x1043, 0x12b4, "ASUS B3405CCA / P3405CCA", ALC294_FIXUP_ASUS_CS35L41_SPI_2),
++	SND_PCI_QUIRK(0x1043, 0x12bf, "ASUS ROG Strix G733ZW", ALC285_FIXUP_ASUS_G733Z_VERBS),
+ 	SND_PCI_QUIRK(0x1043, 0x12e0, "ASUS X541SA", ALC256_FIXUP_ASUS_MIC_NO_PRESENCE),
+ 	SND_PCI_QUIRK(0x1043, 0x12f0, "ASUS X541UV", ALC256_FIXUP_ASUS_MIC_NO_PRESENCE),
+ 	SND_PCI_QUIRK(0x1043, 0x1313, "Asus K42JZ", ALC269VB_FIXUP_ASUS_MIC_NO_PRESENCE),
+diff --git a/sound/soc/amd/acp-config.c b/sound/soc/amd/acp-config.c
+index 051946562..d42d4b3aa 100644
+--- a/sound/soc/amd/acp-config.c
++++ b/sound/soc/amd/acp-config.c
+@@ -24,6 +24,12 @@
+ static int acp_quirk_data;
+ 
+ static const struct dmi_system_id acp70_acpi_flag_override_table[] = {
++	{
++		.matches = {
++			DMI_MATCH(DMI_BOARD_VENDOR, "ASUSTeK COMPUTER INC."),
++			DMI_MATCH(DMI_PRODUCT_NAME, "FA401EA"),
++		},
++	},
+ 	{
+ 		.matches = {
+ 			DMI_MATCH(DMI_BOARD_VENDOR, "ASUSTeK COMPUTER INC."),
+@@ -56,6 +62,12 @@ static const struct dmi_system_id acp70_acpi_flag_override_table[] = {
+ 			DMI_MATCH(DMI_PRODUCT_NAME, "Vivobook 18 M1807GA"),
+ 		},
+ 	},
++	{
++		.matches = {
++			DMI_MATCH(DMI_BOARD_VENDOR, "ASUSTeK COMPUTER INC"),
++			DMI_MATCH(DMI_PRODUCT_NAME, "M1807EA"),
++		},
++	},
+ 	{}
+ };
+ 
+diff --git a/sound/soc/intel/boards/sof_sdw.c b/sound/soc/intel/boards/sof_sdw.c
+index c527d575d..454c608d7 100644
+--- a/sound/soc/intel/boards/sof_sdw.c
++++ b/sound/soc/intel/boards/sof_sdw.c
+@@ -845,6 +845,15 @@ static const struct dmi_system_id sof_sdw_quirk_table[] = {
+ 		},
+ 		.driver_data = (void *)(SOC_SDW_PCH_DMIC),
+ 	},
++	{
++		/* Dell XPS 13 DX13260 (Wildcat Lake), CS42L43 + 2x CS35L63 sidecar amps */
++		.callback = sof_sdw_quirk_cb,
++		.matches = {
++			DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc"),
++			DMI_EXACT_MATCH(DMI_PRODUCT_SKU, "0E53")
++		},
++		.driver_data = (void *)(SOC_SDW_SIDECAR_AMPS),
++	},
+ 	{}
+ };
+ 
+-- 
+2.55.0
+

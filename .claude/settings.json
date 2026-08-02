@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bsdtar -tf *)",
+      "Bash(bsdtar -xOf *)",
+      "Bash(b4 dig *)",
+      "Bash(git -C repos/* log *)",
+      "Bash(git -C repos/* diff *)",
+      "Bash(git -C repos/* status *)",
+      "Bash(git -C repos/* show *)",
+      "Bash(git -C repos/* rev-parse *)",
+      "Bash(git -C repos/* describe *)",
+      "Bash(git -C repos/* worktree list *)",
+      "Bash(git -C repos/* worktree list)",
+      "Bash(git -C repos/* apply --check *)",
+      "Bash(git -C repos/* merge-base *)"
+    ]
+  }
+}
