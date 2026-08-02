@@ -12,6 +12,16 @@ CONF="/etc/net-tune.conf"
 : "${ENABLE_SQM:=no}"
 : "${ENABLE_LATENCY:=yes}"
 : "${IFACE:=}"
+# CAKE tuning (per tc-cake(8) and the CAKE bufferbloat guides):
+#   DIFFSERV=besteffort  no DSCP priority tins (single tin, lowest CPU)
+#   DIFFSERV=diffserv4   four tins (Bulk/BestEffort/Video/Voice) — use when
+#                        you mark DSCP (e.g. nftables sets EF/AF4x on game traffic)
+#   RTT=regional        30 ms AQM target; metro=10ms, internet=100ms default
+#   OVERHEAD=ethernet   matches a direct Ethernet handoff to the modem/router;
+#                       use docsis for cable modems, pppoe-ptm for VDSL2
+: "${DIFFSERV:=diffserv4}"
+: "${RTT:=regional}"
+: "${OVERHEAD:=ethernet}"
 
 if [ -z "$IFACE" ]; then
     # Find the default internet interface (with a retry for boot races).
@@ -44,23 +54,18 @@ fi
 
 if [ "$ENABLE_SQM" = "yes" ] && [ -n "$UPLOAD_MBIT" ] && [ -n "$DOWNLOAD_MBIT" ]; then
     echo "net-tune: applying CAKE SQM to $IFACE (${UPLOAD_MBIT}/${DOWNLOAD_MBIT} Mbit)"
-    # Clear existing qdiscs.
-    tc qdisc del dev "$IFACE" root 2>/dev/null
-    tc qdisc del dev "$IFACE" ingress 2>/dev/null
-    tc qdisc del dev ifb4cake root 2>/dev/null
-
-    # Egress (upload): CAKE, dual-dsthost fairness, ack-filter.
-    tc qdisc add dev "$IFACE" root cake bandwidth "${UPLOAD_MBIT}mbit" \
-        diffserv4 dual-dsthost nat ack-filter 2>/dev/null || true
-
-    # Ingress (download): mirror to ifb4cake, then CAKE.
+    # Ingress (download): mirror LAN-facing traffic to ifb4cake, then shape it.
     modprobe ifb numifbs=1 2>/dev/null || true
     ip link set dev ifb4cake up 2>/dev/null || true
-    tc qdisc add dev ifb4cake root cake bandwidth "${DOWNLOAD_MBIT}mbit" \
-        diffserv4 dual-srchost wash ack-filter 2>/dev/null || true
-    tc qdisc add dev "$IFACE" handle ffff: ingress 2>/dev/null || true
-    tc filter add dev "$IFACE" parent ffff: matchall \
+    tc qdisc replace dev ifb4cake root cake bandwidth "${DOWNLOAD_MBIT}mbit" \
+        "${DIFFSERV}" dual-dsthost wash nat "${RTT}" "${OVERHEAD}" 2>/dev/null || true
+    tc qdisc replace dev "$IFACE" handle ffff: ingress 2>/dev/null || true
+    tc filter replace dev "$IFACE" parent ffff: matchall \
         action mirred egress redirect dev ifb4cake 2>/dev/null || true
+
+    # Egress (upload): dual-srchost fairness, ack-filter for asymmetric links.
+    tc qdisc replace dev "$IFACE" root cake bandwidth "${UPLOAD_MBIT}mbit" \
+        "${DIFFSERV}" dual-srchost nat ack-filter "${RTT}" "${OVERHEAD}" 2>/dev/null || true
 fi
 
 exit 0
