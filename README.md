@@ -105,6 +105,29 @@ During the build you are prompted whether to enable CAKE SQM shaping (via the
 `net-tune` service); in non-interactive environments (CI, piped input) the
 prompt is skipped.
 
+### Compiler toolchain (custom LLVM)
+
+`linux-sleepy` is compiled with **ClangBuiltLinux's pre-built LLVM toolchain
+from kernel.org** — the same weekly RC builds the kernel community tests
+against — not with your distro's compiler.
+
+- **Download URL**: `https://mirrors.edge.kernel.org/pub/tools/llvm/files/`
+- **Selection**: the PKGBUILD auto-picks the newest weekly RC build
+  (`_auto_fetch_latest_llvm=yes`; Nathan Chancellor publishes new builds on
+  Wednesdays/Thursdays). The current version and fallback are pinned in
+  `_kernel_org_llvm_tarball`.
+- **Current version**: `llvm-23.1.0-rc2-x86_64.tar.xz` (81 MB download,
+  ~412 MB unpacked) — Clang 23.1.0-rc2 / LLD 23.1.0 from llvm-project commit
+  `561093d94eb7156dea780c1c71a779824ef90e5b`.
+- **Flags**: the toolchain's `bin/` is prepended to `$PATH` and the kernel
+  builds with `CC=clang LD=ld.lld LLVM=1 LLVM_IAS=1`, plus
+  `PAHOLE=/usr/bin/pahole` (from the `dwarves` package) for BTF.
+- **ThinLTO**: `CONFIG_LTO_CLANG_THIN=y` with `-O3` and `-march=znver4`
+  (`_use_llvm_lto=thin`).
+- **Headers**: `linux-sleepy-headers` declares a runtime dependency on
+  `clang llvm lld` so DKMS / out-of-tree modules compiled against its build tree
+  use the same toolchain.
+
 ## Install
 
 Install the kernel and headers:

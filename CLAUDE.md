@@ -23,7 +23,6 @@ base, with additional upstream and local patches filtered to this hardware.
 |---|---|
 | `GUIDE.md` | End-user README: target audience, differences from vanilla, build instructions, PROFILE_PEAK explanation |
 | `PATCH_SOURCES.md` | Per-patch provenance ledger with authors, commit hashes, and source URLs |
-| `AGENT_HANDOFF_GUIDE.md` | Detailed step-by-step guide for LLM agents maintaining this kernel |
 
 ## Repository layout
 

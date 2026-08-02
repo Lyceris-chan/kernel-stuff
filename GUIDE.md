@@ -136,9 +136,9 @@ These patches are applied on top of the CachyOS base, numbered `1xxx` (upstream 
 
 </details>
 
-### Realtek r8125 out-of-tree driver
+### Realtek RTL8125B NIC
 
-The in-kernel `r8169` driver has known issues with RTL8125B 2.5 GbE. This build includes the [Realtek r8125](https://github.com/lwfinger/rtl8125) out-of-tree driver cloned from the vendor repository. The r8125 DKMS package is **not** used; the driver is built directly into the kernel package as `linux-sleepy-r8125`.
+The RTL8125B 2.5 GbE NIC is driven by the in-kernel `r8169` driver (shipped as a module since 7.2). No out-of-tree Realtek driver is needed.
 
 ### Kconfig changes from defconfig
 
@@ -198,7 +198,7 @@ Setting `profile_peak` on RDNA 4 provides full hardware boost clocks (eliminatin
 - Arch Linux with `makepkg`
 - `pahole` >= 1.31 (`dwarves` package)
 - `base-devel`
-- Network access (downloads kernel source, LLVM toolchain, r8125 driver)
+- Network access (downloads kernel source, LLVM toolchain)
 
 No Clang or LLD packages are required. The PKGBUILD downloads a pre-built LLVM toolchain from kernel.org.
 
@@ -207,7 +207,6 @@ No Clang or LLD packages are required. The PKGBUILD downloads a pre-built LLVM t
 ```bash
 makepkg -s
 sudo pacman -U linux-sleepy-*.pkg.tar.zst linux-sleepy-headers-*.pkg.tar.zst
-sudo pacman -U linux-sleepy-r8125-*.pkg.tar.zst
 sudo grub-mkconfig -o /boot/grub/grub.cfg  # or equivalent
 ```
 
