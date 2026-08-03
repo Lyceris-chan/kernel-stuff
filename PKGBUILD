@@ -181,7 +181,7 @@ _minor=
 _rcver=rc6
 pkgver=${_major}.${_rcver}
 _tagrel=1
-pkgrel=1
+pkgrel=2
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}-${_rcver}
@@ -440,10 +440,13 @@ prepare() {
 
     echo "Setting version..."
     
-    # Interactive net-tune prompt (CAKE SQM + latency tuning)
+    # Interactive net-tune prompt (CAKE SQM + latency tuning). Default is now
+    # ENABLE_SQM=yes — the shipped net-tune/net-tune.conf template enables SQM,
+    # so a skipped prompt (no TTY) or Enter installs shaping by default. An
+    # explicit "n" writes a disabled conf so the off path is still honored.
     if [ -t 0 ] && [ -z "$AUTO_BUILD" ]; then
-        echo -e "\nEnable CAKE SQM bandwidth shaping (net-tune)? (y/N)"
-        read -r enable_sqm || enable_sqm="n"
+        echo -e "\nEnable CAKE SQM bandwidth shaping (net-tune)? (Y/n)"
+        read -r enable_sqm || enable_sqm="y"
         if [[ "$enable_sqm" =~ ^[Yy]$ ]]; then
             touch "$startdir/src/.enable_sqm"
             echo "Enter your true DOWNLOAD speed in Mbit/s [90]:"
@@ -460,7 +463,11 @@ ENABLE_LATENCY=yes
 EOF
             echo "net-tune configured: SQM ${dl_mbit}/${ul_mbit} Mbit + latency tuning."
         else
-            echo "Skipping CAKE SQM (latency tuning still applies)."
+            echo "Disabling CAKE SQM (latency tuning still applies)."
+            cat > "$startdir/src/net-tune.conf" << EOF
+ENABLE_SQM=no
+ENABLE_LATENCY=yes
+EOF
         fi
     fi
     echo "-$pkgrel" > localversion.10-pkgrel

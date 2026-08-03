@@ -351,14 +351,18 @@ scripts/config -d X86_PLATFORM_DRIVERS_UNIWILL
 ## net-tune service (CAKE SQM + latency tuning)
 
 `net-tune/` ships one systemd service that applies low-latency ethernet
-settings (`ENABLE_LATENCY`) and, optionally, CAKE SQM shaping (`ENABLE_SQM`),
-each independently toggleable in `/etc/net-tune.conf`. BBR3 is the
+settings (`ENABLE_LATENCY`) and CAKE SQM shaping (`ENABLE_SQM`), each
+independently toggleable in `/etc/net-tune.conf`. The shipped config enables
+SQM by default (`ENABLE_SQM=yes`, 90/90 Mbit) — a non-interactive build or a
+skipped prompt installs shaping, it does not silently disable it. BBR3 is the
 kernel-compiled default (`CONFIG_DEFAULT_TCP_CONG="bbr3"`); the SQM part does
 **not** set BBR3 via sysctl — it only applies CAKE traffic shaping.
 
-The PKGBUILD prompts interactively during `prepare()`. When no TTY is attached
-(CI, piped input), it silently skips. To pre-seed non-interactively (before
-running makepkg, after `mkdir -p src`):
+The PKGBUILD prompts interactively during `prepare()` and defaults to Y. An
+explicit "n" writes a disabled `src/net-tune.conf`; when no TTY is attached
+(CI, piped input), the prompt is skipped and the shipped template (SQM on) is
+installed. To pre-seed custom speeds non-interactively (before running makepkg,
+after `mkdir -p src`):
 
 ```bash
 mkdir -p src
@@ -443,6 +447,8 @@ ingress is no longer silent. To check by hand:
 | A `--since`-window git log sweep can miss patches that moved between staging and drm-next | Staging commits appear in drm-next under *different* SHAs (re-submitted), so hash-based `comm` diffs showed 216 "staging-only" commits that were actually already in drm-next | Diff staging vs drm-next by **subject line**, not SHA; a same-subject commit in drm-next = already reviewed/merged upstream |
 | `modprobe ifb numifbs=1` names its device `ifb0`, not the named `ifb4cake` the net-tune script references | Download CAKE never applied (silently — all errors were `2>/dev/null \|\| true`); bufferbloat test showed clean upload but 102 ms download spikes | Create the named ifb explicitly with `ip link add ifb4cake type ifb` (idempotent) before `ip link set ... up`. All tc/ip errors are suppressed, so `net-tune.sh` now verifies the ingress path (ifb4cake present + mirred filter) and logs an ERROR instead of failing silently |
 | net-tune's download shaping silently never worked: `CONFIG_NET_SCH_INGRESS` was not set in the kernel, and the script used the `matchall` classifier (`CONFIG_NET_CLS_MATCHALL` also not set) | The ingress qdisc (`tc qdisc ... handle ffff: ingress`) cannot exist without NET_SCH_INGRESS, so every subsequent filter/mirred step failed behind `2>/dev/null \|\| true` — uploads shaped, downloads bufferbloated at line rate (102 ms spikes) | PKGBUILD must enable `NET_SCH_INGRESS` (=y) plus `IFB`/`NET_ACT_MIRRED`/`NET_CLS_U32` (=m) for CAKE SQM ingress; the script uses the u32 match-all idiom (`tc filter ... protocol all u32 match u32 0 0 action mirred egress redirect dev ifb4cake`). Verify the running kernel: `zcat /proc/config.gz \| grep NET_SCH_INGRESS`. net-tune.sh now checks for the ingress qdisc and logs a targeted ERROR |
+| `ENABLE_SQM=no` in the shipped `net-tune.conf` → net-tune.service applied latency tuning ONLY; no CAKE anywhere | The 07:52 build's `prepare()` prompt was skipped (no TTY), so `package()` fell back to the repo template, which defaulted `ENABLE_SQM=no`. Service "active (exited)" with status 0, root qdisc stayed `fq` (default), no `ifb4cake`, no ingress filter — bufferbloat test showed 103 ms download spikes with upload looking clean | The shipped template must default `ENABLE_SQM=yes` so an unattended build installs shaping, and the interactive prompt must default to Y (explicit "n" writes a disabled conf). A "successful" service run is not proof of shaping — verify with `tc qdisc show dev <iface>` (root `cake` AND `ingress ffff:`), `ip link show ifb4cake`, and `tc filter show dev <iface> ingress`. Fixed in pkgrel=2 |
+| Installing a pkgrel-bumped kernel over the running one deletes the running kernel's module tree | `pacman -U linux-sleepy-...rc6-2` while `rc6-1` is running upgrades the package and removes the old version's `/usr/lib/modules/7.2.0-rc6-1-sleepy/`. The still-running `-1` kernel then has zero modules, so `modprobe ifb` fails silently and net-tune logged `ERROR - ifb4cake missing` | The `-1`/`-2` vmlinuz and modules are byte-identical, so the reboot is trivial — but it is **required**: the running kernel must match the installed module dir before any `modprobe`. "No reboot needed" only holds when the module tree for the running kernel stays valid; after any pkgrel bump, reboot before exercising module-dependent features |
 
 ---
 
@@ -454,7 +460,7 @@ echo "-${pkgbase#linux-}" > localversion.20-pkgname
 scripts/config --set-str LOCALVERSION ""
 ```
 
-Result: `uname -r` → `7.2.0-rc6-1-sleepy`
+Result: `uname -r` → `7.2.0-rc6-2-sleepy`
 
 ## Local model routing
 

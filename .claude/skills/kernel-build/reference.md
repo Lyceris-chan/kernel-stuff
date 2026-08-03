@@ -50,9 +50,12 @@ Resolves to `uname -r` → `<version>-<pkgrel>-sleepy`.
 ## net-tune (SQM / latency) / BBR3
 
 The build ships the unified `net-tune` service (CAKE SQM + low-latency ethernet
-tuning), enabled at boot. Interactive prompt during `prepare()` (skipped
-automatically with no TTY). Pre-seed non-interactively — note `src/` must exist
-and is NOT wiped by makepkg (only `src/<kernel>/` is):
+tuning), enabled at boot. The shipped template enables SQM by default
+(`ENABLE_SQM=yes`, 90/90 Mbit), so a build that skips the interactive prompt
+(no TTY) installs shaping — it no longer silently ships `ENABLE_SQM=no`. The
+interactive prompt during `prepare()` defaults to Y; an explicit "n" writes a
+disabled conf. Pre-seed non-interactively only when you need custom speeds —
+note `src/` must exist and is NOT wiped by makepkg (only `src/<kernel>/` is):
 
 ```bash
 mkdir -p src
