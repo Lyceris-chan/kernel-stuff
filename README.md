@@ -57,12 +57,15 @@ Here's what `linux-sleepy` gives you on top of each baseline.
 
 - The hardware-relevant subset of CachyOS: BBRv3 TCP, `-O3` + Zen 4 ISA, VRAM
   cgroups, sched-ext preemption, HDMI 2.1 FreeSync/VRR, and EDID DSC BPP.
-- ~50 AMD-specific backports from `drm-next`, `linux-pm`, and `amd-gfx`: SMU14
-  power fixes, DCN401/DCN42B display fixes, `amd-pstate` EPP boost, and GFX12
-  stability work.
-- agd5f staging backports: `BUG()` → `WARN()` conversions for GFX12/PSP14
-  (`9001`–`9003`), the TTM copy-packet-size optimization (`9006`), and
-  `DB_RING_CONTROL` / `TRUNCATE_COORD_MODE` GFX12 fixes (`9007`–`9008`).
+- ~80 AMD-specific backports from `drm-next`, `linux-pm`, `amd-gfx`, and the
+  amd-gfx/dri-devel lists: SMU14 power fixes, DCN401/DCN42B display fixes
+  (incl. PSR/Replay Part 2, IPS/zstate, HDMI clock + DML fixes),
+  `amd-pstate` EPP boost, and GFX12 stability work.
+- agd5f/staging backports: `BUG()` → `WARN()` conversions for GFX12/PSP14/MES/IMU
+  (`9001`–`9003`, `9009`–`9010`), the TTM copy-packet-size optimization (`9006`),
+  `DB_RING_CONTROL` / `TRUNCATE_COORD_MODE` GFX12 fixes (`9007`–`9008`), and the
+  **retry-fault handling v3 series** (`9011`–`9024`, Timur Kristóf) — GFX12.1
+  noretry, IH7.0 retry-CAM, GMC12 NOALLOC fault handling, Navi 4 retry CAM enable.
   The Exit-idle-optimizations series merged upstream into rc6 and was dropped.
 - Local handmade SMU14/DCN401 patches, including the `PROFILE_PEAK` GFXCLK
   ceiling float.
@@ -237,7 +240,7 @@ echo profile_peak | sudo tee /sys/class/drm/card0/device/power_dpm_force_perform
 
 ## Patch series
 
-Per-patch manifest of the full 84-patch series. See `PATCH_SOURCES.md` for full
+Per-patch manifest of the full 120-patch series. See `PATCH_SOURCES.md` for full
 provenance (authors, commit hashes, Message-IDs).
 
 ### Local / upstream SMU14 + DCN401 (0001–0034)
@@ -308,7 +311,7 @@ provenance (authors, commit hashes, Message-IDs).
 | `1020` | Fixes the MMHUB0 check in the gmc12.1 pasid TLB flush (copy-paste typo). | amd-gfx ML |
 | `1021` | Adds a TLB-invalidation semaphore for gmc12.1 (locks the interface). | amd-gfx ML |
 
-### Display (1100–1113)
+### Display (1100–1133)
 
 | Patch | What it does | Source |
 |---|---|---|
@@ -325,6 +328,26 @@ provenance (authors, commit hashes, Message-IDs).
 | `1110` | Ports DCN4+ MCIF ARB programming to the new format. | drm-next |
 | `1111` | Fixes `dc_stream_remove_writeback()` dropping wrong writeback entries. | drm-next |
 | `1113` | Fixes DSC-over-HDMI-FRL mode pruning (compressed FRL cap check dispatch). | drm-next |
+| `1114` | Ensures `dtbclk` clk_src is selected before `hdmistream_clk_en` (DCN42B HDMI clock sequence). | drm-next |
+| `1115` | Fixes a wrong register field in `dccg35_set_hdmistreamclk_src_new` (`HDMISTREAMCLK0_SRC_SEL`). | drm-next |
+| `1116` | Adds the dcn42b SOC/IP translator (DML2 prereq for 1117). | drm-next |
+| `1117` | Fixes `dcn42b_soc_bb.h` (gpuvm_min_page_size 256→4 for 4K pages). | drm-next |
+| `1118` | Adds the replay-residency function (DC/debugfs). | drm-next |
+| `1119` | Fixes the force-FRL-rate debug setting. | drm-next |
+| `1120` | **PSR/Replay Part 2** — actually enables PSR/Replay on DCN42B (completes 1100). | drm-next |
+| `1121` | Enables IPS support for the DCN4 variant. | drm-next |
+| `1122` | Enables zstate support and fixes DCN42B clk-src masks. | drm-next |
+| `1123` | Enables HUBP/DPP driver power gating for DCN42. | drm-next |
+| `1124` | Corrects the `vblank_end` calc for the FAMS cmd packet. | agd5f |
+| `1125` | Fixes rounding errors in `CalculatePrefetchSchedule`. | agd5f |
+| `1126` | Fixes debug-flag assignment in `dmub_replay.c`. | agd5f |
+| `1127` | Adds block-sequence support for bandwidth programming (prereq for 1128/1129). | drm-next |
+| `1128` | Registers DCN as a PMFW DF C-state client on DCN42 (DCN42B boot-hang fix). | drm-next |
+| `1129` | Ensures `dtbclk` is enabled (DCN42). | amd-gfx ML (Roman.Li DC batch) |
+| `1130` | Updates the VRR info packet to support 12-bit refresh rates. | amd-gfx ML (Roman.Li DC batch) |
+| `1131` | Adds missing DCN42B register defines. | amd-gfx ML (Roman.Li DC batch) |
+| `1132` | Adds missing DMUB CACP and PR definitions. | amd-gfx ML (Roman.Li DC batch) |
+| `1133` | Adds FFE level defaults (DCN6 hunks stripped — absent from rc6). | amd-gfx ML (Roman.Li DC batch) |
 
 ### Power management (1200–1209)
 
@@ -365,7 +388,7 @@ provenance (authors, commit hashes, Message-IDs).
 |---|---|---|
 | `2200` | NAP cpuidle governor v0.5.0 for 7.2. | CachyOS (sirlucjan) |
 
-### agd5f staging (9001–9008)
+### agd5f/staging backports (9001–9024)
 
 | Patch | What it does | Source |
 |---|---|---|
@@ -375,6 +398,9 @@ provenance (authors, commit hashes, Message-IDs).
 | `9006` | Uses more optimal copy-packet sizes for copy/fill in TTM. | agd5f staging |
 | `9007` | Programs DB_RING_CONTROL on gfx12. | agd5f staging |
 | `9008` | Reads `TA_CNTL2.TRUNCATE_COORD_MODE` on gfx12 (conformant truncation flag). | amd-gfx ML |
+| `9009` | Drops all `BUG()`s in mes12.1. | drm-next |
+| `9010` | Turns imu12 `BUG()`s into `WARN()`s. | drm-next |
+| `9011`–`9024` | **Retry-fault handling v3** (14 patches, Timur Kristóf): respects `noretry` on GFX12.1, enables retry-fault interrupts, IH soft-ring + `retry_cam_ack`, gmc11/12 `cam_index` passthrough, NOALLOC fault handling, IH6.0/7.0 MMIO ACK, **retry CAM on Navi 3/4 dGPUs**. | amd-gfx ML |
 
 ## Repository layout
 
