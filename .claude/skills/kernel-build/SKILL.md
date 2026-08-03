@@ -26,13 +26,12 @@ substitute these (see `reference.md` for why `ld.mold` specifically breaks).
 
 ## How patches apply (important)
 
-ALL patches — including the `9000` series — apply through the normal
-`patch -Np1 --forward` loop in `prepare()` (PKGBUILD lines ~533–542). There is
-**no** special `git apply` case for `9000` patches anymore (that changed this
-maintenance session). `9000-drm-amd-display-Exit-idle-optimizations-before-programming.patch`
-is a proper `git format-patch` file (v2, commit `8419331e64d9`, Leo Li) and
-flows through the same loop as every other patch. If you see a 9000 patch fail,
-diagnose it exactly like any other patch — do not invent a `git apply` bypass.
+ALL patches — including the `90xx` series (`9001`–`9003`, `9006`–`9008`;
+`9000`/`9004`/`9005` merged upstream into rc6 and were dropped) — apply through
+the normal `patch -Np1 --forward` loop in `prepare()` (PKGBUILD lines ~533–542).
+There is **no** special `git apply` case for `90xx` patches. If you see a `90xx`
+patch fail, diagnose it exactly like any other patch — do not invent a `git apply`
+bypass.
 
 The only special-case reverse-apply in `prepare()` is for `1101`
 (`drm-amd-display-enable-pstate-for-dcn4-non-emulation-builds.patch`), which is

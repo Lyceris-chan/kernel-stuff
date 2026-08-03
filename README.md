@@ -60,8 +60,10 @@ Here's what `linux-sleepy` gives you on top of each baseline.
 - ~50 AMD-specific backports from `drm-next`, `linux-pm`, and `amd-gfx`: SMU14
   power fixes, DCN401/DCN42B display fixes, `amd-pstate` EPP boost, and GFX12
   stability work.
-- agd5f staging backports: the Exit-idle-optimizations v2 series and
-  `BUG()` → `WARN()` conversions for GFX12/PSP14.
+- agd5f staging backports: `BUG()` → `WARN()` conversions for GFX12/PSP14
+  (`9001`–`9003`), the TTM copy-packet-size optimization (`9006`), and
+  `DB_RING_CONTROL` / `TRUNCATE_COORD_MODE` GFX12 fixes (`9007`–`9008`).
+  The Exit-idle-optimizations series merged upstream into rc6 and was dropped.
 - Local handmade SMU14/DCN401 patches, including the `PROFILE_PEAK` GFXCLK
   ceiling float.
 - BFQ/mq-deadline contention fixes, LRU-MARIE page eviction, the zstd 7.2
