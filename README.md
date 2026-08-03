@@ -5,8 +5,8 @@ AMD Zen 4 desktop with an RDNA 4 graphics card. It is based on Linux mainline
 `7.2-rc6` and layers a sanitized [CachyOS](https://github.com/CachyOS/linux-cachyos)
 patchset plus targeted local and upstream patches on top.
 
-**Base version:** `7.2.0-rc6-2-sleepy`
-**Artifact:** `linux-sleepy-7.2.rc6-2-x86_64.pkg.tar.zst`
+**Base version:** `7.2.0-rc6-3-sleepy`
+**Artifact:** `linux-sleepy-7.2.rc6-3-x86_64.pkg.tar.zst`
 
 This is not a general-purpose kernel; the configuration is opinionated for the
 hardware below.
@@ -175,7 +175,7 @@ Or configure `scx_loader` in `/etc/default/scx` with `SCX_SCHED=scx_cake` and
 The `net-tune/` directory ships one service that applies low-latency ethernet
 settings and CAKE bufferbloat shaping at boot. The two parts are independent —
 toggle `ENABLE_LATENCY` and `ENABLE_SQM` in `/etc/net-tune.conf`. CAKE shaping
-is enabled by default (90/90 Mbit) — set `ENABLE_SQM=no` to disable:
+is enabled by default (80/80 Mbit) — set `ENABLE_SQM=no` to disable:
 
 ```bash
 sudo systemctl enable --now net-tune.service

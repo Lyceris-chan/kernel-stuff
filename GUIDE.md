@@ -212,7 +212,7 @@ sudo grub-mkconfig -o /boot/grub/grub.cfg  # or equivalent
 
 The build prompts interactively for your upload/download speeds and defaults to
 enabling CAKE SQM. In non-interactive environments (CI, pipes) the prompt is
-skipped and the shipped config is installed — CAKE shaping enabled at 90/90 Mbit
+skipped and the shipped config is installed — CAKE shaping enabled at 80/80 Mbit
 by default.
 
 ### SQM / bufferbloat mitigation
@@ -220,7 +220,7 @@ by default.
 The `net-tune` service ships one unit (`/usr/lib/systemd/system/net-tune.service`)
 that applies low-latency ethernet tuning (`ENABLE_LATENCY`) and CAKE SQM shaping
 (`ENABLE_SQM`), each independently toggleable in `/etc/net-tune.conf`. The shipped
-config enables SQM by default (90/90 Mbit); answering the build prompt lets you
+config enables SQM by default (80/80 Mbit); answering the build prompt lets you
 enter your own upload/download speeds, and answering `n` (or editing
 `/etc/net-tune.conf` to `ENABLE_SQM=no`) disables shaping while keeping latency
 tuning.

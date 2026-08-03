@@ -181,7 +181,7 @@ _minor=
 _rcver=rc6
 pkgver=${_major}.${_rcver}
 _tagrel=1
-pkgrel=2
+pkgrel=3
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}-${_rcver}
@@ -449,12 +449,12 @@ prepare() {
         read -r enable_sqm || enable_sqm="y"
         if [[ "$enable_sqm" =~ ^[Yy]$ ]]; then
             touch "$startdir/src/.enable_sqm"
-            echo "Enter your true DOWNLOAD speed in Mbit/s [90]:"
+            echo "Enter your true DOWNLOAD speed in Mbit/s [80]:"
             read -r dl_mbit || dl_mbit=""
-            dl_mbit="${dl_mbit:-90}"
-            echo "Enter your true UPLOAD speed in Mbit/s [90]:"
+            dl_mbit="${dl_mbit:-80}"
+            echo "Enter your true UPLOAD speed in Mbit/s [80]:"
             read -r ul_mbit || ul_mbit=""
-            ul_mbit="${ul_mbit:-90}"
+            ul_mbit="${ul_mbit:-80}"
             cat > "$startdir/src/net-tune.conf" << EOF
 ENABLE_SQM=yes
 DOWNLOAD_MBIT="$dl_mbit"

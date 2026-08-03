@@ -31,6 +31,17 @@ Never scrape `lore.kernel.org` — its anti-bot protection blocks agents.
 - **Repository**: `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git`
 - **Location**: `repos/linux-next`
 - **Fetch**: `cd repos/linux-next && git fetch origin`
+- **Before fetching (learned 2026-08-03):** the full `git fetch origin` of
+  linux-next is very slow (many branches, single HTTP connection). First check
+  whether a newer daily snapshot even exists — the tree publishes `next-YYYYMMDD`
+  tags on working days only:
+  ```bash
+  git ls-remote --tags repos/linux-next 'next-*' | awk -F/ '{print $NF}' | grep -v "\^{}" | sort -V | tail -1
+  ```
+  If the latest tag is one you already have locally (compare against
+  `git -C repos/linux-next describe --tags master`), skip the fetch entirely —
+  there is no new content to sweep. Only fetch when a newer snapshot exists.
+  Note `next-*` tags skip weekends (08-01/08-02 were quiet on the 08-03 sweep).
 - **Search Query**:
   ```bash
   git log --oneline --grep="gfx12\|navi48\|dcn4\|smu14\|amd_pstate\|MZEN4\|CPPC" origin/master

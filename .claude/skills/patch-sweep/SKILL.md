@@ -37,8 +37,15 @@ description: >
 ## Step 1 — Fetch all repos in parallel
 
 ```bash
+# Linux-next is huge and slow to fetch. Check first whether a newer daily
+# snapshot (next-YYYYMMDD tag) exists at all; if the latest tag equals what
+# we already have locally, SKIP the linux-next fetch — there is no new content.
+#   git ls-remote --tags repos/linux-next 'next-*' | awk -F/ '{print $NF}' | grep -v "\^{}" | sort -V | tail -1
+#   git -C repos/linux-next describe --tags master   # what we already have
+# Tags are published on working days only — weekends have no new snapshot.
+
 # Git repos (use background processes)
-for repo in repos/drm-next repos/agd5f-linux repos/linux-next repos/linux-pm repos/amd-staging-drm-next; do
+for repo in repos/drm-next repos/agd5f-linux repos/linux-pm repos/amd-staging-drm-next; do
   git -C "$repo" fetch --shallow-since=2026-08-01 origin 2>&1 | tail -3 &
 done
 git -C repos/sirlucjan-kernel-patches pull 2>&1 | tail -3 &

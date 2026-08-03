@@ -51,7 +51,7 @@ Resolves to `uname -r` → `<version>-<pkgrel>-sleepy`.
 
 The build ships the unified `net-tune` service (CAKE SQM + low-latency ethernet
 tuning), enabled at boot. The shipped template enables SQM by default
-(`ENABLE_SQM=yes`, 90/90 Mbit), so a build that skips the interactive prompt
+(`ENABLE_SQM=yes`, 80/80 Mbit), so a build that skips the interactive prompt
 (no TTY) installs shaping — it no longer silently ships `ENABLE_SQM=no`. The
 interactive prompt during `prepare()` defaults to Y; an explicit "n" writes a
 disabled conf. Pre-seed non-interactively only when you need custom speeds —

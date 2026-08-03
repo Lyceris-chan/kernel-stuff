@@ -388,6 +388,36 @@ branch.
 
 ---
 
+## 2026-08-03 third sweep (no new patches; net-tune SQM → 80/80)
+
+**Result: 0 patches added.** All six sources checked; nothing new relevant to
+our hardware is available since the rc6 bump and the post-rc6 second sweep.
+
+| Source | State |
+|--------|-------|
+| `drm-next` | No new commits since 2026-08-01 (HEAD still `82cb10c8b`, the 2026-07-30 xe merge). |
+| `linux-next` | Latest published snapshot is `next-20260731` — byte-identical to the local tree already swept. No `next-2026080N` tags exist (08-01/08-02 weekend; 08-03 not yet cut at sweep time). |
+| `linux-pm` | Now at mainline `7.2-rc6` (`075b74841bd0`). All tracked amd-pstate/CPPC commits already merged in rc6 (see the dropped `1204`/`1210`–`1213` entries). |
+| `agd5f-linux` / `amd-staging-drm-next` | No new hardware-relevant commits since 07-29. The one display candidate, `de665f07aca6` "drm/amd/display: Exit idle optimizations before programming" (Leo Li), is **already in rc6** as `8419331e64d9` — reverse-check confirms `dm_arm_vblank_event_pre_programming()` exists in the rc6 tree. The other staging commits since 07-29 are GFX7-era (off-target). |
+| `sirlucjan` | Up to date (07-31); `7.2-rc/` branch versions unchanged (`fixes` v10, `lru-marie` v12, `preempt-ipi` v3, `nap` v0.5.0). |
+| `firelzrd` | Up to date (07-28); NAP lives in sirlucjan `nap-patches/` regardless. |
+| amd-gfx / dri-devel lists (2026-August) | Thin (8 + 102 msgs). Nothing hardware-relevant. |
+
+**Candidates considered and rejected:**
+
+| Item | Reason |
+|------|--------|
+| `de665f07aca6` / `8419331e64d9` Exit idle optimizations before programming (Leo Li) | Already in rc6 base — nothing to add |
+| `20260802170647.206880-2-cristian.laspina@kernel.srl` drm/edid: read luminance range from DisplayID 2.0 (Cristian La Spina) | **Rejected** — commit body carries `Assisted-by: Claude:claude-opus-5` (AI-assisted, against project rule); targets a Lenovo Yoga 9 laptop OLED panel's DisplayID luminance metadata (off-target hardware); generic EDID parsing unrelated to DCN401/DCN42B/PSR/FreeSync |
+
+**Config change this session (not a patch):** net-tune CAKE SQM default speed
+set 90/90 → **80/80** Mbit. Updated `net-tune/net-tune.conf` (shipped template)
+and the `prepare()` interactive-prompt defaults in `PKGBUILD`. pkgrel bumped
+2 → 3 so the rebuilt package (which ships the new `/etc/net-tune.conf`) is a
+clean upgrade. BBR3 kernel default unchanged.
+
+---
+
 ## Adding new patches
 
 1. Place the patch file in the root of this repository.

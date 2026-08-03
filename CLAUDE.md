@@ -353,7 +353,7 @@ scripts/config -d X86_PLATFORM_DRIVERS_UNIWILL
 `net-tune/` ships one systemd service that applies low-latency ethernet
 settings (`ENABLE_LATENCY`) and CAKE SQM shaping (`ENABLE_SQM`), each
 independently toggleable in `/etc/net-tune.conf`. The shipped config enables
-SQM by default (`ENABLE_SQM=yes`, 90/90 Mbit) — a non-interactive build or a
+SQM by default (`ENABLE_SQM=yes`, 80/80 Mbit) — a non-interactive build or a
 skipped prompt installs shaping, it does not silently disable it. BBR3 is the
 kernel-compiled default (`CONFIG_DEFAULT_TCP_CONG="bbr3"`); the SQM part does
 **not** set BBR3 via sysctl — it only applies CAKE traffic shaping.
@@ -368,8 +368,8 @@ after `mkdir -p src`):
 mkdir -p src
 cat > src/net-tune.conf << EOF
 ENABLE_SQM=yes
-DOWNLOAD_MBIT="90"
-UPLOAD_MBIT="90"
+DOWNLOAD_MBIT="80"
+UPLOAD_MBIT="80"
 ENABLE_LATENCY=yes
 EOF
 touch src/.enable_sqm
@@ -460,7 +460,7 @@ echo "-${pkgbase#linux-}" > localversion.20-pkgname
 scripts/config --set-str LOCALVERSION ""
 ```
 
-Result: `uname -r` → `7.2.0-rc6-2-sleepy`
+Result: `uname -r` → `7.2.0-rc6-3-sleepy`
 
 ## Local model routing
 
