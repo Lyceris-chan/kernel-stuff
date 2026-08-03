@@ -26,9 +26,10 @@ substitute these (see `reference.md` for why `ld.mold` specifically breaks).
 
 ## How patches apply (important)
 
-ALL patches — including the `90xx` series (`9001`–`9003`, `9006`–`9008`;
-`9000`/`9004`/`9005` merged upstream into rc6 and were dropped) — apply through
-the normal `patch -Np1 --forward` loop in `prepare()` (PKGBUILD lines ~533–542).
+ALL patches — including the `90xx` series (`9001`–`9003`, `9006`–`9024`;
+`9000`/`9004`/`9005` merged upstream into rc6 and were dropped; the 14-patch
+retry-fault v3 series lives at `9011`–`9024`) — apply through the normal
+`patch -Np1 --forward` loop in `prepare()` (PKGBUILD lines ~533–542).
 There is **no** special `git apply` case for `90xx` patches. If you see a `90xx`
 patch fail, diagnose it exactly like any other patch — do not invent a `git apply`
 bypass.
@@ -50,8 +51,8 @@ reverse-applied with `patch -Np1 --forward -R` to keep `.pstate_enabled = false`
 - Context lines shifted → regenerate from the source repo (see `patch-audit`).
 - Test a patch independently against the clean tree:
   ```bash
-  git -C repos/linux-7.2-rc5 apply --check <patch>     # forward
-  git -C repos/linux-7.2-rc5 apply --check -R <patch>  # already-applied?
+  git -C repos/linux-7.2-rc6 apply --check <patch>     # forward
+  git -C repos/linux-7.2-rc6 apply --check -R <patch>  # already-applied?
   ```
 
 ### 2. BTF failures (`Failed to generate BTF for vmlinux`)

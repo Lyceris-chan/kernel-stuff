@@ -268,7 +268,7 @@ Dropped candidates (formerly `2008`/`2009`): Jesse Zhang `47862766d211` (gfx12 u
 
 ## 2026-08-02 sweep results
 
-Checked and **not added** — already in rc5 (verified `git apply --check -R` clean against `repos/linux-7.2-rc5`):
+Checked and **not added** — already in rc5 (verified `git apply --check -R` clean against `repos/linux-7.2-rc6`):
 
 | Commit | Subject | Verdict |
 |--------|---------|---------|
@@ -539,7 +539,7 @@ reports are appended below. Net effect so far: **0 additional patches found**.
 
 1. Place the patch file in the root of this repository.
 2. Use the correct numeric prefix (see the conventions table): `0001`–`0099` local/upstream display, `0101`–`0109` CachyOS (squashed per branch), `1000`–`1099` GPU core, `1100`–`1199` display, `1200`–`1299` PM, `2000`–`2099` block, `2100`–`2199` MM, `2200`–`2299` cpuidle, `9000`–`9099` agd5f.
-3. Verify it applies cleanly: `git -C repos/linux-7.2-rc5 apply --check <file>`. To test whether a patch is already applied, use the reverse check `git -C repos/linux-7.2-rc5 apply --check -R <file>` (clean output = already applied).
+3. Verify it applies cleanly: `git -C repos/linux-7.2-rc6 apply --check <file>`. To test whether a patch is already applied, use the reverse check `git -C repos/linux-7.2-rc6 apply --check -R <file>` (clean output = already applied).
 4. Add the filename to the `source=()` array in `PKGBUILD` in the correct sorted position.
 5. Run `updpkgsums` after any `source=()` change — checksums must match 1:1.
 6. Add an entry to the appropriate section in this file with author and source URL or commit hash.

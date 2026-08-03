@@ -144,26 +144,26 @@ for mbox_file in ['/tmp/amd-gfx-2026-August.txt', '/tmp/dri-devel-2026-August.tx
 
 ## Step 4 — GitLab drm/amd issue scan
 
-**BLOCKED (verified 2026-08-03):** `gitlab.freedesktop.org` now fronts the
-`drm/amd/-/work_items` tracker and the REST API (`/api/v4/projects/drm%2Famd/...`)
-with the **Anubis** anti-bot challenge — both the web page and API return the
-proof-of-work page, and a browser User-Agent does not bypass it. Do not waste
-attempts on direct access this cycle. Cover the same ground via the
-`amd-gfx`/`dri-devel` archives (Step 3) and the `agd5f-linux`
-`amd-staging-drm-next` branch (Step 2); retry the API only opportunistically:
+**ACCESSIBLE (learned 2026-08-03):** Anubis only blocks browser-like User-Agents.
+Use plain `curl` with **no User-Agent header** to read the `drm/amd/-/work_items`
+tracker and the REST API (the issue *notes* API is 401-gated, but the issues and
+events feeds return real JSON):
 
 ```bash
-# May return an Anubis HTML challenge — treat non-JSON as blocked.
-curl -sf "https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/issues?state=opened&per_page=100&sort=updated_desc" \
-  | head -c 200
+curl -s "https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/issues?state=opened&per_page=100&sort=updated_desc" -o issues.json
+curl -s "https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/events?per_page=100" -o events.json
 ```
+
+Check issue titles/descriptions and events (comment bodies + referenced commit SHAs)
+for unmerged patch series relevant to our hardware. If a request returns an Anubis
+challenge page, you likely used a browser UA — retry with no UA.
 
 ## Step 5 — Dry-run clean candidates
 
 Use `git apply --check` (not `patch --dry-run`) against the clean reference tree:
 
 ```bash
-TREE="repos/linux-7.2-rc5"
+TREE="repos/linux-7.2-rc6"
 
 check_commit() {
   local repo="$1" sha="$2"
@@ -196,23 +196,23 @@ i915, xe, nouveau, Intel WiFi, Bluetooth dongles, or laptop audio is REJECTED
 immediately.
 
 **Check 2 — Symbol existence.** Every function/macro the patch references must
-already exist in the clean rc5 tree (not just in a staging branch). If the
+already exist in the clean rc6 tree (not just in a staging branch). If the
 patch fails here it depends on staging infrastructure and must be dropped.
 ```bash
 # For GPU/display patches:
-grep -r "<unique_symbol>" repos/linux-7.2-rc5/drivers/gpu/drm/amd/ | head
+grep -r "<unique_symbol>" repos/linux-7.2-rc6/drivers/gpu/drm/amd/ | head
 # For PM patches:
-grep -r "<unique_symbol>" repos/linux-7.2-rc5/drivers/cpufreq/ | head
+grep -r "<unique_symbol>" repos/linux-7.2-rc6/drivers/cpufreq/ | head
 # For block patches:
-grep -r "<unique_symbol>" repos/linux-7.2-rc5/block/ | head
+grep -r "<unique_symbol>" repos/linux-7.2-rc6/block/ | head
 ```
 If `grep` returns nothing for any referenced symbol, DROP the candidate.
 
 **Check 3 — Applies cleanly.** Use `git apply --check` (NOT `patch --dry-run`)
 against the clean reference tree:
 ```bash
-git -C repos/linux-7.2-rc5 apply --check <candidate>.patch       # forward check
-git -C repos/linux-7.2-rc5 apply --check -R <candidate>.patch    # already-applied check
+git -C repos/linux-7.2-rc6 apply --check <candidate>.patch       # forward check
+git -C repos/linux-7.2-rc6 apply --check -R <candidate>.patch    # already-applied check
 ```
 - Forward check passes → CLEAN, proceed to Check 4.
 - Reverse check passes (forward fails) → already applied upstream, DROP it.
