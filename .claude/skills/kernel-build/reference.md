@@ -62,7 +62,7 @@ mkdir -p src
 cat > .../src/net-tune.conf << EOF
 ENABLE_SQM=yes
 DOWNLOAD_MBIT="80"
-UPLOAD_MBIT="85"
+UPLOAD_MBIT="80"
 ENABLE_LATENCY=yes
 EOF
 touch .../src/.enable_sqm
