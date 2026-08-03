@@ -1,0 +1,33 @@
+From d61cb75b632bba62ed5fd16f8c25c8a95b585e78 Mon Sep 17 00:00:00 2001
+From: Robin Chen <robin.chen@amd.com>
+Date: Wed, 8 Jul 2026 21:00:42 +0800
+Subject: [PATCH] drm/amd/display: fix debug flags assignment in dmub_replay.c
+
+[WHY]
+Fix incorrect casting of debug flags to uint16_t, which could
+truncate the value.
+
+Reviewed-by: ChunTao Tso <chuntao.tso@amd.com>
+Signed-off-by: Robin Chen <robin.chen@amd.com>
+Signed-off-by: Wayne Lin <wayne.lin@amd.com>
+Tested-by: Dan Wheeler <daniel.wheeler@amd.com>
+---
+ drivers/gpu/drm/amd/display/dc/dce/dmub_replay.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/display/dc/dce/dmub_replay.c b/drivers/gpu/drm/amd/display/dc/dce/dmub_replay.c
+index 9b50bf1d80fc..eda3a2f1402c 100644
+--- a/drivers/gpu/drm/amd/display/dc/dce/dmub_replay.c
++++ b/drivers/gpu/drm/amd/display/dc/dce/dmub_replay.c
+@@ -165,7 +165,7 @@ static bool dmub_replay_copy_settings(struct dmub_replay *dmub,
+ 	// Misc
+ 	copy_settings_data->line_time_in_ns			= (uint16_t)replay_context->line_time_in_ns;
+ 	copy_settings_data->panel_inst				= (uint16_t)panel_inst;
+-	copy_settings_data->debug.u32All			= (uint16_t)link->replay_settings.config.debug_flags;
++	copy_settings_data->debug.u32All			= link->replay_settings.config.debug_flags;
+ 	copy_settings_data->pixel_deviation_per_line		= link->dpcd_caps.pr_info.pixel_deviation_per_line;
+ 	copy_settings_data->max_deviation_line			= (uint16_t)link->dpcd_caps.pr_info.max_deviation_line;
+ 	copy_settings_data->smu_optimizations_en		= link->replay_settings.replay_smu_opt_enable;
+-- 
+2.55.0
+

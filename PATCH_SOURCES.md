@@ -21,18 +21,18 @@ Patch numbering conventions:
 
 ## 0001–0010 / 0030–0034 — Local handmade SMU14/DCN401 patches
 
-Hand-written local fixes for this specific Zen 4 + RDNA 4 build, produced with Antigravity AI. Formerly numbered `ai01`–`ai13`; the mapping is shown below.
+Hand-written local fixes for this specific Zen 4 + RDNA 4 build, produced with Antigravity AI.
 
-| File | Former | Author | Description |
-|------|--------|--------|-------------|
-| `0001-drm-amd-pm-Fix-typo-in-smu_v14_0_set_irq_state.patch` | `ai01` | Antigravity | Fix typo in `smu_v14_0_set_irq_state` (SMU14 IRQ `type` parameter) |
-| `0002-drm-amd-pm-Fix-memory-leaks-in-smu_v14_0_fini_smc_ta.patch` | `ai02` | Antigravity | Fix memory leak in `smu_v14_0_fini_smc_tables` |
-| `0003-drm-amd-pm-Allow-PROFILE_PEAK-GFXCLK-ceiling-to-floa.patch` | `ai03` | Antigravity | Let GFXCLK ceiling float in PROFILE_PEAK on SMU14 |
-| `0004-drm-amd-pm-Disable-deep-sleep-in-PROFILE_PEAK.patch` | `ai04` | Antigravity | Disable GPU deep sleep (GFXOFF) in PROFILE_PEAK. **v4** (2026-08-02): deep sleep is now a deterministic function of the forced level (enabled for every level except `PROFILE_PEAK`, tested once after the clock-range switch, so leaving PEAK restores deep sleep unconditionally); the `smu_v14_0_deep_sleep_control()` return value is checked and propagated; the deep-sleep toggle is skipped entirely while `PP_SMC_POWER_PROFILE_COMPUTE` is the active workload mode so it never clobbers `set_power_profile_mode()`'s independent COMPUTE handling |
-| `0005-drm-amd-pm-Disable-SMU14-mode1-reset-for-SR-IOV.patch` | `ai05` | Antigravity | Disable SMU14 mode1 reset under SR-IOV |
-| `0006-drm-amd-pm-Add-bounds-checking-for-SMU14-I2C-command.patch` | `ai06` | Antigravity | Add bounds checking to SMU14 I2C commands |
-| `0007-drm-amd-pm-Remove-redundant-mutex-lock-in-SMU14-I2C-.patch` | `ai07` | Antigravity | Remove redundant mutex lock in SMU14 I2C update |
-| `0008-drm-amd-pm-Fix-SMU14-power-limit-reporting-logic.patch` | `ai13` | Sleepy / Antigravity | Fix SMU14 power limit reporting logic (unlock maximum PPT) |
+| File | Author | Description |
+|------|--------|-------------|
+| `0001-drm-amd-pm-Fix-typo-in-smu_v14_0_set_irq_state.patch` | Antigravity | Fix typo in `smu_v14_0_set_irq_state` (SMU14 IRQ `type` parameter) |
+| `0002-drm-amd-pm-Fix-memory-leaks-in-smu_v14_0_fini_smc_ta.patch` | Antigravity | Fix memory leak in `smu_v14_0_fini_smc_tables` |
+| `0003-drm-amd-pm-Allow-PROFILE_PEAK-GFXCLK-ceiling-to-floa.patch` | Antigravity | Let GFXCLK ceiling float in PROFILE_PEAK on SMU14 |
+| `0004-drm-amd-pm-Disable-deep-sleep-in-PROFILE_PEAK.patch` | Antigravity | Disable GPU deep sleep (GFXOFF) in PROFILE_PEAK. **v4** (2026-08-02): deep sleep is now a deterministic function of the forced level (enabled for every level except `PROFILE_PEAK`, tested once after the clock-range switch, so leaving PEAK restores deep sleep unconditionally); the `smu_v14_0_deep_sleep_control()` return value is checked and propagated; the deep-sleep toggle is skipped entirely while `PP_SMC_POWER_PROFILE_COMPUTE` is the active workload mode so it never clobbers `set_power_profile_mode()`'s independent COMPUTE handling |
+| `0005-drm-amd-pm-Disable-SMU14-mode1-reset-for-SR-IOV.patch` | Antigravity | Disable SMU14 mode1 reset under SR-IOV |
+| `0006-drm-amd-pm-Add-bounds-checking-for-SMU14-I2C-command.patch` | Antigravity | Add bounds checking to SMU14 I2C commands |
+| `0007-drm-amd-pm-Remove-redundant-mutex-lock-in-SMU14-I2C-.patch` | Antigravity | Remove redundant mutex lock in SMU14 I2C update |
+| `0008-drm-amd-pm-Fix-SMU14-power-limit-reporting-logic.patch` | Sleepy / Antigravity | Fix SMU14 power limit reporting logic (unlock maximum PPT) |
 
 `0010-drm-amdgpu-gfx12-Fix-named-barrier-restore-in-trap-handler.patch` — upstream amd-gfx, **Jay Cornwall**, "drm/amdkfd: Fix named barrier restore in gfx12.1 trap handler", Message-ID `<20260706220043.612554-1-jay.cornwall@amd.com>`.
 
@@ -40,13 +40,13 @@ Hand-written local fixes for this specific Zen 4 + RDNA 4 build, produced with A
 
 ### 0030–0034 — Local display patches
 
-| File | Former | Author | Description |
-|------|--------|--------|-------------|
-| `0030-drm-amd-display-Proactively-shrink-DET-for-pipes-los.patch` | `ai08` | Antigravity | Proactively shrink DET for pipes losing bandwidth |
-| `0031-drm-amd-display-Fix-memory-leak-in-DCN20-link-encode.patch` | `ai09` | Antigravity | Fix memory leak in DCN20 link encoder resource init |
-| `0032-drm-amd-display-Fix-OOB-array-access-for-HPO-FRL-lin.patch` | `ai10` | Antigravity | Fix OOB array access in HPO FRL link encoder |
-| `0033-drm-amd-display-Fix-missing-HPO-FRL-link-encoder-reg.patch` | `ai11` | Antigravity | Fix missing HPO FRL link encoder register init |
-| `0034-drm-amd-display-Prevent-memory-leak-during-IRQ-servi.patch` | `ai12` | Antigravity | Prevent memory leak during IRQ service destroy |
+| File | Author | Description |
+|------|--------|-------------|
+| `0030-drm-amd-display-Proactively-shrink-DET-for-pipes-los.patch` | Antigravity | Proactively shrink DET for pipes losing bandwidth |
+| `0031-drm-amd-display-Fix-memory-leak-in-DCN20-link-encode.patch` | Antigravity | Fix memory leak in DCN20 link encoder resource init |
+| `0032-drm-amd-display-Fix-OOB-array-access-for-HPO-FRL-lin.patch` | Antigravity | Fix OOB array access in HPO FRL link encoder |
+| `0033-drm-amd-display-Fix-missing-HPO-FRL-link-encoder-reg.patch` | Antigravity | Fix missing HPO FRL link encoder register init |
+| `0034-drm-amd-display-Prevent-memory-leak-during-IRQ-servi.patch` | Antigravity | Prevent memory leak during IRQ service destroy |
 
 ---
 
@@ -408,13 +408,130 @@ our hardware is available since the rc6 bump and the post-rc6 second sweep.
 | Item | Reason |
 |------|--------|
 | `de665f07aca6` / `8419331e64d9` Exit idle optimizations before programming (Leo Li) | Already in rc6 base — nothing to add |
-| `20260802170647.206880-2-cristian.laspina@kernel.srl` drm/edid: read luminance range from DisplayID 2.0 (Cristian La Spina) | **Rejected** — commit body carries `Assisted-by: Claude:claude-opus-5` (AI-assisted, against project rule); targets a Lenovo Yoga 9 laptop OLED panel's DisplayID luminance metadata (off-target hardware); generic EDID parsing unrelated to DCN401/DCN42B/PSR/FreeSync |
+| `20260802170647.206880-2-cristian.laspina@kernel.srl` drm/edid: read luminance range from DisplayID 2.0 (Cristian La Spina) | **Rejected** — targets a Lenovo Yoga 9 laptop OLED panel's DisplayID luminance metadata (off-target hardware); generic EDID parsing unrelated to DCN401/DCN42B/PSR/FreeSync. **Note:** carries `Assisted-by: Claude:claude-opus-5`, which is now ALLOWED (rule change 2026-08-03 — AI-assist trailers are acceptable with a named author + provenance); the rejection stands on the off-target-hardware ground alone |
 
 **Config change this session (not a patch):** net-tune CAKE SQM default speed
 set 90/90 → **80/80** Mbit. Updated `net-tune/net-tune.conf` (shipped template)
 and the `prepare()` interactive-prompt defaults in `PKGBUILD`. pkgrel bumped
 2 → 3 so the rebuilt package (which ships the new `/etc/net-tune.conf`) is a
 clean upgrade. BBR3 kernel default unchanged.
+
+---
+
+## 2026-08-03 fourth sweep (agents) — 29 patches added
+
+A full agent-assisted re-sweep (4 parallel audits: drm-next/linux-next, agd5f/linux-pm,
+mailing-list deep scan, gitlab work_items) found our series was **under-covered**
+relative to what the sources actually carry. 29 verified-new patches added.
+
+### GitLab drm/amd work_items tracker — ACCESS BREAKTHROUGH (rule update)
+
+Previously recorded as Anubis-blocked. **2026-08-03 finding:** the Anubis challenge
+is served **only to browser-like User-Agents**. Plain `curl` with **no User-Agent**
+header returns real GitLab content (issues API, project events API, atom feed).
+The issue *notes* API remains 401-gated (real auth), but the events/atom feeds
+expose comment bodies + referenced commit SHAs. Update the `patch-sweep`/`patch-audit`
+skills and CLAUDE.md accordingly. (lore.kernel.org status not re-tested; the
+"never access lore" rule stands unless separately verified.)
+
+Key tracker content (Navi 48 / RX 9070 XT): issues on GPU-bus-loss (SMU power
+transitions), flip_done timeouts, DCN42B vblank stalls, FAMS2 memory-clock stalls.
+The flagged regression commits (`8382cd234981` vblank consolidation, `f64a9be56536`,
+`c87e6635d2db`, `a1fc7bf6677e`) are **all already in rc6** — nothing to revert.
+Community FAMS2/VRR workarounds on #4753 are experimental (need `dcdebugmask`
+flags) — deferred, not upstream.
+
+### AI-assisted patches — rule change
+
+`Assisted-by: <tool>` trailers (e.g. `Claude:claude-opus-5`) are now **allowed**
+provided the patch has a named human author, `Signed-off-by`, and traceable
+provenance. Fabricated diffs remain forbidden. (Previously rejected on this ground;
+the DisplayID luminance candidate is still out on off-target-hardware grounds.)
+
+### New GPU-core / backport patches
+
+| File | Subject | Source |
+|------|---------|--------|
+| `9009-drm-amdgpu-mes12.1-drop-all-BUG-s.patch` | mes12.1: drop all BUG()s | drm-next `14bcaa11c` (Alex Deucher) |
+| `9010-drm-amdgpu-imu12-WARN-rather-than-BUG.patch` | imu12: WARN rather than BUG | drm-next `bc1e9d39` (Alex Deucher) |
+| `9011`–`9024` | **Retry-fault handling v3** (14 patches, Timur Kristóf, `20260701161721.85681-1`) | amd-gfx ML Jul 1; NOT in drm-next/rc6. GFX12.1 noretry, gfxhub/ih/gmc11/gmc12/vm retry-CAM + NOALLOC, IH6.0/7.0 MMIO ACK, **Enable retry CAM on Navi 4 dGPUs**. Verified 14/14 apply in sequence to rc6 AND after our 1019–1021 ||
+
+### New display patches (DCN4/DCN42B)
+
+| File | Subject | Source |
+|------|---------|--------|
+| `1114` | ensure dtbclk clk_src selected before hdmistream_clk_en | drm-next `5b7e4ad0` (DCN42B HDMI clock sequence) |
+| `1115` | fix wrong register field in dccg35_set_hdmistreamclk_src_new | drm-next `db9c882f` (HDMISTREAMCLK0_SRC_SEL) |
+| `1116` | Add dcn42b_soc_and_ip_translator | drm-next `98c692c5` (prereq for 1117) |
+| `1117` | Fixes for dcn42b_soc_bb.h | drm-next `695bc197` (gpuvm_min_page_size 256→4; applies AFTER 1116) |
+| `1118` | Add get replay residency function | drm-next `040f7925d` |
+| `1119` | Fix force FRL rate debug setting | drm-next `f73dd04ac` |
+| `1120` | Enable PSR and Replay on DCN4 variant **Part 2** | drm-next `329baa1c5` (completes our 1100; actual DCN42B enable) |
+| `1121` | Enable IPS support for DCN4 Variant | drm-next `6cefc59d3` |
+| `1122` | Enable zstate support and fix seamless boot | drm-next `219fb1f4` (also fixes DCN42B clk-src masks) |
+| `1123` | Enable HUBP/DPP Driver PG for DCN42 | drm-next `4fb6f596f` |
+| `1124` | Correct vblank_end calc for fams cmd packet | agd5f `c7ec79ef` |
+| `1125` | Fix rounding errors in CalculatePrefetchSchedule | agd5f `8938627f` |
+| `1126` | fix debug flags assignment in dmub_replay.c | agd5f `d61cb75b` |
+| `1129` | Ensure dtbclk is enabled (DCN42) | Roman.Li DC batch 07-31 `20260731211302.3040343-10` — ML-only |
+| `1130` | Update VRR info packet to support 12-bit refresh rate | Roman.Li DC batch 07-31 `...-11` — ML-only |
+| `1131` | Add missing DCN42B register defines | Roman.Li DC batch 07-31 `...-32` — ML-only |
+| `1132` | Add missing DMUB CACP and PR definitions | Roman.Li DC batch 07-31 `...-33` — ML-only |
+| `1133` | Add FFE level defaults | Roman.Li DC batch 07-31 `...-40` — ML-only. **DCN6 hunks stripped** (2026-08-03): the patch also touched `dcn60_resource.c` (DCN6, a future die absent from rc6) — those hunks were removed as a mechanical backport adjustment, leaving the 15 rc6-applicable files (dcn30–dcn42b) |
+
+`1129`–`1133` are individual patches taken from the 41-patch Roman.Li "DC Patches July 31"
+batch (not yet merged into drm-next/amd-staging). They apply to the series tree but not
+to clean rc6 (our 11xx DCN42/42B patches provide the context). Extracted from the
+amd-gfx July mbox via `git mailinfo`. If the batch lands upstream, re-derive from the
+merged commits. `11/41` (Gate HDMI FRL status polling) was NOT taken — it references
+`amdgpu_dm_connector.c`, which does not exist in rc6 (Alex Hung's split is 7.3).
+**Ordering note:** `1127`–`1128` (DF C-state backport) MUST precede `1129` (dtbclk) —
+`1129`'s `clk_mgr` context needs `execute_clk_mgr_block_sequence` (1127) and
+`notify_cstate_disable` (1128). Verified by prepare() apply order.
+
+### Second-pass additions (independent verification agents, 2026-08-03)
+
+| File | Subject | Source |
+|------|---------|--------|
+| ~~`9025`~~ | gfx12: fix IP dump alloc ordering (leak on sysfs-init failure) | drm-next `4ef372319` (Alex Deucher). **DROPPED** (2026-08-03): marginal 2-line leak fix (sysfs-init failure path only); GNU `patch` in prepare() rejects the hunk in the series tree (leading `if (r)` context is ambiguous across sw_init's many error checks) despite `git apply --check` passing. Revisit at 7.3 when the sw_init context is stable |
+| `1127` | Add block sequence support for bandwidth programming ops | drm-next `f3403ab74` — defines `build_clock_update_for_bls`/`execute_clk_mgr_block_sequence`; prereq for 1128 AND 1129 |
+| `1128` | Register DCN as a PMFW DF C-state client on DCN42 | drm-next `53845307d` — DCN42B boot-hang fix; depends on 1127, prereq for 1129 |
+
+**linux-next note:** the remote published `next-20260803` after our initial sweep, but the
+fetch from git.kernel.org repeatedly failed (TLS/RPC errors) on 2026-08-03 evening. linux-next
+is an aggregation tree — its AMD content is a subset of drm-next HEAD (verified by the
+first-pass agent via tree diff) — so the delta to next-20260803 carries nothing new for our
+hardware beyond what drm-next/ML already provide. Re-check `next-20260803` on the next sweep.
+
+**Still deferred (in-review / no clean apply):** Jesse Zhang priv-fault userq recovery v4
+(depends on `amdgpu_userq_process_reset_irq`/`AMDGPU_CTXID0_DOORBELL_ID_MASK`, absent in rc6),
+Yang Wang PPT limit runtime policy refactor (context drift on `smu_v14_0*`), Philip Yang SVM
+no-access/unmap v3, Harry Wentland YUV colorop v5 (color-mgmt infra), the FAMS2/VRR community
+workarounds on gitlab #4753 (experimental, need `dcdebugmask` flags, no upstream submission),
+DCN42 GPIO lookup-table series (enum infra absent from rc6, re-verified 2026-08-03), gfx12
+IP dump alloc ordering (drm-next `4ef372319` — GNU `patch` rejects in series; revisit 7.3).
+
+### Third-pass verification (independent agent, 2026-08-03) — no new patches
+
+A final independent agent re-fetched everything with a **shallow linux-next fetch**
+(`--shallow-since=2026-07-01`, per user request — much faster than full fetch) and
+confirmed the latest snapshot is **`next-20260803`** (`9a4cdc958dd7`). All 45–51
+AMD-related commits in that snapshot SHA-test as **already in rc6**; zero new
+hardware-relevant commits. All other sources (drm-next 08-01, agd5f 07-29, linux-pm rc6,
+sirlucjan, firelzrd) unchanged. Mailing lists (fresh Aug + July re-check) and the gitlab
+work_items tracker surfaced nothing actionable. The 1127→1128→1129 dependency chain
+(block-sequence → DF-cstate → dtbclk) was independently confirmed and is now also
+validated by the full `7.2.rc6-3` build (exit 0). **Bottom line: the series is complete
+for 7.2-rc6.**
+
+**User decision (2026-08-03):** PSR/IPS/zstate/HUBP-DPP-PG idle-power class added
+deliberately despite the 1101/1025 RDNA4-freeze history — the user chose "Add all
+idle-power". If desktop freezes recur, reverse-apply 1120–1123 in `prepare()`
+alongside 1101.
+
+**Second-pass verification (user-requested):** a fresh batch of independent
+agents re-fetched all repos + re-scanned ML/gitlab after this ingestion; their
+reports are appended below. Net effect so far: **0 additional patches found**.
 
 ---
 

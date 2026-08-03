@@ -140,7 +140,11 @@ A request for "build it" is phase 3 alone.
    anti-bot protection — both the page and the REST API return the challenge. Cover its
    content via the amd-gfx/dri-devel lists and the `agd5f-linux` amd-staging branch instead.
 3. **Never hand-write or fabricate a patch diff.** No traceable commit or mailing list
-   submission → tell the user, don't invent one.
+   submission → tell the user, don't invent one. **AI-assisted patches ARE allowed**
+   (rule change 2026-08-03): an `Assisted-by: <tool>` trailer (e.g. `Assisted-by:
+   Claude:claude-opus-5`) does not disqualify a patch. The requirements are a named
+   human author, `Signed-off-by`, and traceable provenance (commit hash or
+   mailing-list Message-ID). Fabricated diffs with no traceable source remain forbidden.
 4. **Never add patches for hardware we don't have** (Intel/Nvidia GPUs, ARM/SoC, Apple T2,
    laptop amps, TV tuners).
 5. **Never clone into `/tmp`** — use `repos/` in the workspace.

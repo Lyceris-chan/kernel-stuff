@@ -219,8 +219,14 @@ git -C repos/linux-7.2-rc5 apply --check -R <candidate>.patch    # already-appli
 - Both fail → context shifted or prerequisites missing; report and investigate.
 
 **Check 4 — Author/source trustworthiness.** The patch must have a real
-author (a named kernel developer with a traceable commit hash or message-ID),
-never an AI/`Antigravity`/`claude` author. `Signed-off-by` should be present.
+author (a named kernel developer with a traceable commit hash or message-ID).
+`Signed-off-by` must be present. **AI-assistance is allowed (rule change
+2026-08-03):** an `Assisted-by: <tool>` trailer (e.g. `Assisted-by:
+Claude:claude-opus-5`) does NOT disqualify a patch as long as the author is a
+named human developer, the patch is not fabricated/hand-written, and its
+provenance (commit hash or mailing-list Message-ID) is traceable. What is
+still forbidden is an entirely fabricated/hallucinated diff with no traceable
+source.
 ```bash
 head -8 <candidate>.patch   # From: / Date: / Subject: / Signed-off-by:
 ```

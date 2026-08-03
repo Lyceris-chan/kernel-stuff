@@ -1,0 +1,71 @@
+From 219fb1f4c5b91a58b2db55ff2fe2d06412e39888 Mon Sep 17 00:00:00 2001
+From: Gabe Teeger <gabe.teeger@amd.com>
+Date: Wed, 10 Jun 2026 11:42:50 -0400
+Subject: [PATCH] drm/amd/display: Enable zstate support and fix seamless boot
+
+[Why & How]
+Port seamless boot fix from DCN42 to DCN42B and enable zstate
+support for DCN42B.
+
+Reviewed-by: Ovidiu (Ovi) Bunea <ovidiu.bunea@amd.com>
+Signed-off-by: Gabe Teeger <gabe.teeger@amd.com>
+Signed-off-by: Matthew Stewart <matthew.stewart2@amd.com>
+Signed-off-by: George Zhang <george.zhang@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ .../drm/amd/display/dc/resource/dcn42b/dcn42b_resource.c  | 8 ++++----
+ .../drm/amd/display/dc/resource/dcn42b/dcn42b_resource.h  | 3 ++-
+ 2 files changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/display/dc/resource/dcn42b/dcn42b_resource.c b/drivers/gpu/drm/amd/display/dc/resource/dcn42b/dcn42b_resource.c
+index 18a7fd913..172836dfd 100644
+--- a/drivers/gpu/drm/amd/display/dc/resource/dcn42b/dcn42b_resource.c
++++ b/drivers/gpu/drm/amd/display/dc/resource/dcn42b/dcn42b_resource.c
+@@ -253,10 +253,10 @@ static struct bios_registers bios_regs;
+ static struct dce110_clk_src_regs clk_src_regs[5];
+ 
+ static const struct dce110_clk_src_shift cs_shift = {
+-	CS_COMMON_MASK_SH_LIST_DCN3_2(__SHIFT)
++	CS_COMMON_MASK_SH_LIST_DCN4_0_1(__SHIFT)
+ };
+ static const struct dce110_clk_src_mask cs_mask = {
+-	CS_COMMON_MASK_SH_LIST_DCN3_2(_MASK)
++	CS_COMMON_MASK_SH_LIST_DCN4_0_1(_MASK)
+ };
+ #define abm_regs_init(id) \
+ 	ABM_DCN42B_REG_LIST_RI(id)
+@@ -801,7 +801,7 @@ static const struct dc_debug_options debug_defaults_drv = {
+ 		}
+ 	},
+ 	.seamless_boot_odm_combine = DML_FAIL_SOURCE_PIXEL_FORMAT,
+-	.enable_z9_disable_interface = false, /* Allow support for the PMFW interface for disable Z9*/
++	.enable_z9_disable_interface = true, /* Allow support for the PMFW interface for disable Z9*/
+ 	.minimum_z8_residency_time = 1, /* Always allow when other conditions are met */
+ 	.support_eDP1_5 = true,
+ 	.use_max_lb = true,
+@@ -823,7 +823,7 @@ static const struct dc_debug_options debug_defaults_drv = {
+ 	.disable_timeout = true,
+ 	.min_disp_clk_khz = 50000,
+ 	.static_screen_wait_frames = 2,
+-	.disable_z10 = true,
++	.disable_z10 = false,
+ 	.ignore_pg = true,
+ 	.disable_stutter_for_wm_program = true,
+ 	.min_deep_sleep_dcfclk_khz = 8000,
+diff --git a/drivers/gpu/drm/amd/display/dc/resource/dcn42b/dcn42b_resource.h b/drivers/gpu/drm/amd/display/dc/resource/dcn42b/dcn42b_resource.h
+index 2824a0e1a..1a6e0e7be 100644
+--- a/drivers/gpu/drm/amd/display/dc/resource/dcn42b/dcn42b_resource.h
++++ b/drivers/gpu/drm/amd/display/dc/resource/dcn42b/dcn42b_resource.h
+@@ -518,7 +518,8 @@
+ 		SRII_ARR_2(MODULO, DP_DTO, 2, index),                   \
+ 		SRII_ARR_2(PIXEL_RATE_CNTL, OTG, 0, index),             \
+ 		SRII_ARR_2(PIXEL_RATE_CNTL, OTG, 1, index),             \
+-		SRII_ARR_2(PIXEL_RATE_CNTL, OTG, 2, index)
++		SRII_ARR_2(PIXEL_RATE_CNTL, OTG, 2, index),				\
++		SR_ARR(OTG_PIXEL_RATE_DIV, index)
+ 
+ /* ABM */
+ #define ABM_DCN42B_REG_LIST_RI(id)                               \
+-- 
+2.55.0
+

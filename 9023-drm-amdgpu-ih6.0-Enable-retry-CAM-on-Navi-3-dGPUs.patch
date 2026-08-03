@@ -1,0 +1,33 @@
+From 20260701161721.85681-14-timur.kristof@gmail.com Mon Sep 17 00:00:00 2001
+From: timur.kristof at gmail.com (=?UTF-8?q?Timur=20Krist=C3=B3f?=)
+Date: Wed,  1 Jul 2026 18:17:20 +0200
+Subject: [PATCH 13/14] drm/amdgpu/ih6.0: Enable retry CAM on Navi 3 dGPUs
+
+---
+ drivers/gpu/drm/amd/amdgpu/ih_v6_0.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c b/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c
+index a97c85b0cb99..bbe399f9e233 100644
+--- a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c
+@@ -397,6 +397,16 @@ static int ih_v6_0_irq_init(struct amdgpu_device *adev)
+ 
+ 	pci_set_master(adev->pdev);
+ 
++	if (!(adev->flags & AMD_IS_APU)) {
++		/* Enable IH Retry CAM */
++		tmp = RREG32_SOC15(OSSSYS, 0, regIH_RETRY_INT_CAM_CNTL);
++		tmp = REG_SET_FIELD(tmp, IH_RETRY_INT_CAM_CNTL, ENABLE, 1);
++		tmp = REG_SET_FIELD(tmp, IH_RETRY_INT_CAM_CNTL, CAM_SIZE, 0xF);
++		WREG32_SOC15(OSSSYS, 0, regIH_RETRY_INT_CAM_CNTL, tmp);
++
++		adev->irq.retry_cam_enabled = true;
++	}
++
+ 	/* enable interrupts */
+ 	ret = ih_v6_0_toggle_interrupts(adev, true);
+ 	if (ret)
+-- 
+2.54.0
+

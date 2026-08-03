@@ -69,9 +69,8 @@ grep -n "<candidate>.patch" PATCH_SOURCES.md # read the context line
 ```
 
 Examples of candidates that legitimately appear here: files using an old naming
-scheme (`0013-...`, `0014-...`, `0015-...`, `ai01-...`, `ai04-...`), a
-deferred/never-applied upstream patch, or a patch you regenerated under a new
-number leaving the old copy behind.
+scheme (`0013-...`, `0014-...`, `0015-...`), a deferred/never-applied upstream
+patch, or a patch you regenerated under a new number leaving the old copy behind.
 
 ## Step 3 — Delete orphaned patches (only the confirmed ones)
 

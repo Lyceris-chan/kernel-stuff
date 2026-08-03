@@ -1,0 +1,63 @@
+From 5b7e4ad090f2700bfad37f43e4d3553b71be3591 Mon Sep 17 00:00:00 2001
+From: Charlene Liu <Charlene.Liu@amd.com>
+Date: Wed, 24 Jun 2026 18:54:43 -0400
+Subject: [PATCH] drm/amd/display: ensure dtbclk clk_src selected before
+ hdmistream_clk_en
+
+[why]
+correct a sequence issue by switching to dcn35's dccg sequence:
+to make sure select dtbclk src first before programming hdmistream_clk_en.
+
+Reviewed-by: Leo Chen <leo.chen@amd.com>
+Signed-off-by: Charlene Liu <Charlene.Liu@amd.com>
+Signed-off-by: George Zhang <george.zhang@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/display/dc/dccg/dcn35/dcn35_dccg.c | 2 +-
+ drivers/gpu/drm/amd/display/dc/dccg/dcn35/dcn35_dccg.h | 5 ++++-
+ drivers/gpu/drm/amd/display/dc/dccg/dcn42/dcn42_dccg.c | 2 +-
+ 3 files changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/display/dc/dccg/dcn35/dcn35_dccg.c b/drivers/gpu/drm/amd/display/dc/dccg/dcn35/dcn35_dccg.c
+index 483cd9ab7..617f504c8 100644
+--- a/drivers/gpu/drm/amd/display/dc/dccg/dcn35/dcn35_dccg.c
++++ b/drivers/gpu/drm/amd/display/dc/dccg/dcn35/dcn35_dccg.c
+@@ -1654,7 +1654,7 @@ void dccg35_set_dpstreamclk_root_clock_gating(struct dccg *dccg, int dp_hpo_inst
+ 
+ 
+ 
+-static void dccg35_set_hdmistreamclk(
++void dccg35_set_hdmistreamclk(
+ 		struct dccg *dccg,
+ 		enum streamclk_source src,
+ 		uint32_t otg_inst)
+diff --git a/drivers/gpu/drm/amd/display/dc/dccg/dcn35/dcn35_dccg.h b/drivers/gpu/drm/amd/display/dc/dccg/dcn35/dcn35_dccg.h
+index 554700287..58f4c1e99 100644
+--- a/drivers/gpu/drm/amd/display/dc/dccg/dcn35/dcn35_dccg.h
++++ b/drivers/gpu/drm/amd/display/dc/dccg/dcn35/dcn35_dccg.h
+@@ -269,5 +269,8 @@ void dccg35_disable_dscclk(struct dccg *dccg, int inst);
+ 
+ void dccg35_enable_symclk_se(struct dccg *dccg, uint32_t stream_enc_inst, uint32_t link_enc_inst);
+ void dccg35_disable_symclk_se(struct dccg *dccg, uint32_t stream_enc_inst, uint32_t link_enc_inst);
+-
++void dccg35_set_hdmistreamclk(
++		struct dccg *dccg,
++		enum streamclk_source src,
++		uint32_t otg_inst);
+ #endif //__DCN35_DCCG_H__
+diff --git a/drivers/gpu/drm/amd/display/dc/dccg/dcn42/dcn42_dccg.c b/drivers/gpu/drm/amd/display/dc/dccg/dcn42/dcn42_dccg.c
+index 616a896f0..3b03b152d 100644
+--- a/drivers/gpu/drm/amd/display/dc/dccg/dcn42/dcn42_dccg.c
++++ b/drivers/gpu/drm/amd/display/dc/dccg/dcn42/dcn42_dccg.c
+@@ -313,7 +313,7 @@ static void dccg42_init(struct dccg *dccg)
+ static const struct dccg_funcs dccg42_funcs = {
+ 	.enable_hdmicharclk = dccg401_enable_hdmicharclk,
+ 	.disable_hdmicharclk = dccg42_disable_hdmicharclk,
+-	.set_hdmistreamclk = dccg401_set_hdmistreamclk,
++	.set_hdmistreamclk = dccg35_set_hdmistreamclk,
+ 	.set_hdmistreamclk_root_clock_gating = dccg35_set_hdmistreamclk_root_clock_gating,
+ 	.update_dpp_dto = dccg35_update_dpp_dto,
+ 	.dpp_root_clock_control = dccg35_dpp_root_clock_control,
+-- 
+2.55.0
+

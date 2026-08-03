@@ -1,0 +1,49 @@
+From f73dd04acd0e8202870d40776b76a60df9ded776 Mon Sep 17 00:00:00 2001
+From: Relja Vojvodic <Relja.Vojvodic@amd.com>
+Date: Thu, 9 Jul 2026 13:56:53 -0400
+Subject: [PATCH] drm/amd/display: Fix force FRL rate debug setting
+
+[Why & How]
+- force FRL rate debug bit was not correctly forcing requested FRL rate
+
+Reviewed-by: Chris Park <chris.park@amd.com>
+Signed-off-by: Relja Vojvodic <Relja.Vojvodic@amd.com>
+Signed-off-by: Fangzhi Zuo <jerry.zuo@amd.com>
+Tested-by: Dan Wheeler <daniel.wheeler@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/display/dc/core/dc_stream.c               | 4 +++-
+ drivers/gpu/drm/amd/display/dc/link/protocols/link_hdmi_frl.c | 2 +-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/display/dc/core/dc_stream.c b/drivers/gpu/drm/amd/display/dc/core/dc_stream.c
+index 25f904ecc..cdcf140bc 100644
+--- a/drivers/gpu/drm/amd/display/dc/core/dc_stream.c
++++ b/drivers/gpu/drm/amd/display/dc/core/dc_stream.c
+@@ -100,7 +100,9 @@ void update_stream_signal(struct dc_stream_state *stream, struct dc_sink *sink)
+ 
+ 		if (stream->link->frl_flags.force_frl_always ||
+ 				stream->link->frl_flags.force_frl_max
+-				|| stream->link->frl_flags.force_frl_dsc)
++				|| stream->link->frl_flags.force_frl_dsc
++				|| (stream->link->frl_flags.force_frl_rate != 0 &&
++					stream->link->frl_flags.force_frl_rate != 0xF))
+ 			stream->signal = SIGNAL_TYPE_HDMI_FRL;
+ 	}
+ }
+diff --git a/drivers/gpu/drm/amd/display/dc/link/protocols/link_hdmi_frl.c b/drivers/gpu/drm/amd/display/dc/link/protocols/link_hdmi_frl.c
+index c35074177..2afdfc113 100644
+--- a/drivers/gpu/drm/amd/display/dc/link/protocols/link_hdmi_frl.c
++++ b/drivers/gpu/drm/amd/display/dc/link/protocols/link_hdmi_frl.c
+@@ -1090,7 +1090,7 @@ void hdmi_frl_decide_link_settings(struct dc_stream_state *stream,
+ 		&stream->link->frl_verified_link_cap);
+ 
+ 	if (stream->link->frl_flags.force_frl_rate != 0 &&
+-		stream->link->frl_flags.force_frl_rate < stream->link->frl_verified_link_cap.frl_link_rate) {
++		stream->link->frl_flags.force_frl_rate <= stream->link->frl_verified_link_cap.frl_link_rate) {
+ 		switch (stream->link->frl_flags.force_frl_rate) {
+ 		case HDMI_FRL_LINK_RATE_3GBPS:
+ 			temp_settings.frl_link_rate = HDMI_FRL_LINK_RATE_3GBPS;
+-- 
+2.55.0
+

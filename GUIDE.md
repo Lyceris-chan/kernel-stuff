@@ -173,16 +173,16 @@ cpuidle.governor=nap amd_pstate.epp_boost=1
 
 ---
 
-## PROFILE_PEAK Behavior & Deep Sleep Control (patches ai03 & ai04)
+## PROFILE_PEAK Behavior & Deep Sleep Control (patches 0003 & 0004)
 
-**These patches are custom (`ai03` and `ai04`).** They modify `drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0.c`.
+**These patches are custom (`0003` and `0004`).** They modify `drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0.c`.
 
 ### What the patches do
 
-- **`ai03-drm-amd-pm-Allow-PROFILE_PEAK-GFXCLK-ceiling-to-floa.patch`**:
+- **`0003-drm-amd-pm-Allow-PROFILE_PEAK-GFXCLK-ceiling-to-floa.patch`**:
   Refactors `smu_v14_0_set_soft_freq_limited_range()` into `smu_v14_0_set_soft_freq_limited_range_split()` to support independent `min_automatic` and `max_automatic` flags. Sets `sclk_max_auto = true` for GFXCLK during `PROFILE_PEAK` so GPU core clocks float freely to full hardware boost speeds (>3.0 GHz) while keeping `sclk_min` pinned to peak DPM levels.
 
-- **`ai04-drm-amd-pm-Disable-deep-sleep-in-PROFILE_PEAK.patch`**:
+- **`0004-drm-amd-pm-Disable-deep-sleep-in-PROFILE_PEAK.patch`**:
   Disables deep sleep (`smu_v14_0_deep_sleep_control(smu, false)`) when entering `PROFILE_PEAK` to eliminate power state wake-up latencies and micro-stutter. Evaluates deep sleep control uniformly across all performance levels, re-enabling deep sleep on transitions away from `PROFILE_PEAK` to `AUTO`, `HIGH`, `LOW`, `MANUAL`, or `PROFILE_STANDARD` (unless compute profile mode is active).
 
 ### Effect
