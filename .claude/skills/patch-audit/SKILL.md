@@ -84,11 +84,21 @@ Never scrape `lore.kernel.org` — its anti-bot protection blocks agents.
   find the **original submission** (unquoted `diff --git`, author `Signed-off-by`), then
   extract with `git mailinfo <msgfile> <patchfile>` → clean patch body + separate commit
   message. Reconstruct the patch file with the original `From:`/`Date:`/`Subject:`/`Message-ID:`
-  headers (mbox format is fine; preserve author and `Signed-off-by`).
+  headers (mbox format is fine; preserve author and `Signed-off-by`). **Sanitize the
+  filename**: a `Subject:` with a folded header line embeds a literal `\n` in the name —
+  strip it (e.g. `subj.split('] ',1)[-1].replace('\n',' ').replace('/','-')`) or rename to a
+  clean `NNNN-short-desc.patch` before copying into the repo.
 - **Series-order check:** a candidate whose trailing context matches content that an
   earlier *backported* patch adds (e.g. `9008`'s DB_RING_CONTROL context comes from `9007`)
   must be numbered to apply **after** that patch. Test sequentially in a scratch tree, not
   just `git apply --check` in isolation.
+- **Context-symbol dependency (learned 2026-08-03):** a patch can require a *struct field*
+  or *function* another patch adds — e.g. `1129` (dtbclk) needs `execute_clk_mgr_block_sequence`
+  (added by `1127`) and `notify_cstate_disable` (added by `1128`) in its `clk_mgr.h`/`dcn42_clk_mgr.c`
+  hunk context. `git apply --check` on the full series tree may still pass (offset tolerance)
+  while GNU `patch` in prepare() rejects it. When a `.rej` shows context lines that reference a
+  symbol another carried patch adds, renumber so that patch comes FIRST (1127→1128→1129 order).
+  The definitive check is `prepare()`/`makepkg -o` applying the whole series in order.
 
 ### 4b. drm/amd work items tracker (gitlab.freedesktop.org) — ACCESS WORKAROUND (learned 2026-08-03)
 
@@ -146,11 +156,20 @@ Run these in order. Copy the commands exactly — do not improvise.
 
 3. **Forward apply check** — patch must apply to the clean rc6 tree:
    ```bash
-   git -C repos/linux-7.2-rc6 apply --check <NNNN-short-description.patch>
+   git -C repos/linux-7.2-rc6 apply --check "$PWD/<NNNN-short-description.patch>"   # use ABSOLUTE path
+   patch -p1 --forward --dry-run < <NNNN-short-description.patch>                  # authoritative — matches prepare()
    ```
    - No output = clean, proceeds to step 4.
    - Error output = context shifted or prereqs missing. Fix hunk offsets,
      regenerate from source, or drop the patch. Do not silently force it.
+   - **`git apply --check` can pass while GNU `patch -p1 --forward` rejects**
+     (learned 2026-08-03): ambiguous leading context (e.g. `if (r)` appears many
+     times in `gfx_v12_0_sw_init`) or a hunk touching a file absent from rc6
+     (DCN6 `dcn60_resource.c`) both fool `git apply`. ALWAYS confirm with
+     `patch -p1 --forward --dry-run`. For a file absent from rc6, strip that
+     file's hunks + its stats line + fix the "N files changed" summary as a
+     documented backport adjustment. Capture git's real exit code —
+     `git apply ... > log 2>&1; echo $?` — never `| head && echo OK`.
 
 4. **Already-applied check** — confirm it is NOT already in the tree:
    ```bash

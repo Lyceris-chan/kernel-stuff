@@ -51,9 +51,18 @@ reverse-applied with `patch -Np1 --forward -R` to keep `.pstate_enabled = false`
 - Context lines shifted → regenerate from the source repo (see `patch-audit`).
 - Test a patch independently against the clean tree:
   ```bash
-  git -C repos/linux-7.2-rc6 apply --check <patch>     # forward
-  git -C repos/linux-7.2-rc6 apply --check -R <patch>  # already-applied?
+  git -C repos/linux-7.2-rc6 apply --check "$PWD/<patch>"     # forward (use ABSOLUTE path — git -C changes CWD)
+  git -C repos/linux-7.2-rc6 apply --check -R "$PWD/<patch>"  # already-applied?
+  patch -p1 --forward --dry-run < <patch>                     # THE authoritative check — matches prepare()'s tool
   ```
+  **Lesson (2026-08-03):** `git apply --check` can PASS where GNU `patch -p1
+  --forward` (the tool `prepare()` actually runs) REJECTS the same patch —
+  e.g. a hunk whose leading `if (r)` context is ambiguous, or a patch touching
+  a file absent from rc6 (like DCN6 `dcn60_resource.c`). Always confirm with
+  `patch -p1 --forward --dry-run` against the series tree. If a patch passes
+  `git apply` but `patch` still rejects it, DROP it and document why (9025 did
+  this) rather than hand-forcing the hunk. For `git apply --check`, capture the
+  real exit code (`git apply ... > log 2>&1; echo $?`) — never `| head && echo OK`.
 
 ### 2. BTF failures (`Failed to generate BTF for vmlinux`)
 Check in this order:

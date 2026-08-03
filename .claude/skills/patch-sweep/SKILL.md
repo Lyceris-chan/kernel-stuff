@@ -31,6 +31,19 @@ description: >
   are no candidates.
 - Do not silently continue past a step that produced no output — re-run the
   previous step and verify before proceeding.
+- **Use absolute patch paths with `git -C`.** `git -C <repo> apply --check`
+  changes the process directory to the repo, so a relative patch path like
+  `NNNN-....patch` resolves against the repo and errors "can't open patch".
+  Always write `git -C repos/linux-7.2-rc6 apply --check "$PWD/NNNN-....patch"`.
+- **Capture real exit codes, never `| head && echo OK`.** `git apply --check f 2>&1 |
+  head -3 && echo CLEAN` always prints CLEAN because `head`'s exit status wins.
+  Use `git apply --check f > log 2>&1; echo "exit: $?"` and read `log`.
+- **`git apply --check` passing is NOT enough** (learned 2026-08-03). The patch
+  must also survive `patch -p1 --forward --dry-run`, the exact tool `prepare()`
+  uses. Git-apply tolerates offset/ambiguity that GNU patch rejects (a hunk whose
+  leading `if (r)` context appears many times, or a hunk touching `dcn60_resource.c`
+  — DCN6, absent from rc6). For a file absent from rc6, strip that file's hunks +
+  its stats line + fix the "N files changed" summary as a documented adjustment.
 
 # Six-Source Patch Sweep
 
