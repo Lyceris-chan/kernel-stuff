@@ -95,7 +95,7 @@ Off-target groups reverted by `0106-cachy-drops.patch`:
 Do **not** copy each `-sep` file individually. Apply each branch's patches
 **in order** to the series tree, then emit the cumulative `git diff` as one
 `format-patch`. The squash must be generated against the **actual series
-state** (rc5 + the `0001`–`0058` local/upstream patches), because those
+state** (rc6 + the `0001`–`0058` local/upstream patches), because those
 pre-CachyOS patches touch shared files like `drm_edid.c`.
 
 ```bash
@@ -145,7 +145,7 @@ the series (Fangzhi Zuo 2/4), then the `0151`
 **Exclude `0151` from the `0107-cachy-hdmi.patch` squash.** Check with:
 
 ```bash
-git -C repos/linux-7.2-rc5 apply --check -R "$BASE/hdmi-patches-sep/0151-...patch" 2>&1
+git -C repos/linux-7.2-rc6 apply --check -R "$BASE/hdmi-patches-sep/0151-...patch" 2>&1
 ```
 
 If the reverse check passes, `0151` is already present — drop it from the
