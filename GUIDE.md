@@ -237,7 +237,11 @@ tc filter show dev <iface> ingress # expect a mirred redirect to ifb4cake
 
 If the ingress (download) half is missing — no `ingress ffff:` qdisc and no
 `ifb4cake` device — downloads run unshaped and you'll see bufferbloat on the
-download leg of a test while upload stays clean.
+download leg of a test while upload stays clean. Download shaping requires the
+`ingress` qdisc to be built into the kernel (`CONFIG_NET_SCH_INGRESS=y`, enabled
+in the PKGBUILD) — on a kernel without it, no amount of service configuration
+can create the ingress path, and the service will log
+`net-tune: ERROR - no ingress qdisc on <iface> ...`.
 
 ---
 

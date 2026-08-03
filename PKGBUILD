@@ -446,10 +446,12 @@ prepare() {
         read -r enable_sqm || enable_sqm="n"
         if [[ "$enable_sqm" =~ ^[Yy]$ ]]; then
             touch "$startdir/src/.enable_sqm"
-            echo "Enter your true DOWNLOAD speed in Mbit/s (e.g. 950):"
+            echo "Enter your true DOWNLOAD speed in Mbit/s [90]:"
             read -r dl_mbit || dl_mbit=""
-            echo "Enter your true UPLOAD speed in Mbit/s (e.g. 950):"
+            dl_mbit="${dl_mbit:-90}"
+            echo "Enter your true UPLOAD speed in Mbit/s [90]:"
             read -r ul_mbit || ul_mbit=""
+            ul_mbit="${ul_mbit:-90}"
             cat > "$startdir/src/net-tune.conf" << EOF
 ENABLE_SQM=yes
 DOWNLOAD_MBIT="$dl_mbit"
@@ -508,8 +510,10 @@ EOF
                    -e KPROBES -e KPROBE_EVENTS -e UPROBES -e UPROBE_EVENTS \
                    -e KALLSYMS -e KALLSYMS_ALL \
                    -e FTRACE -e FTRACE_SYSCALLS -e DYNAMIC_FTRACE -e FUNCTION_TRACER -e FUNCTION_GRAPH_TRACER
-    # Enable IFB and Mirroring for CAKE SQM Ingress shaping
-    scripts/config -e NET_CLS_ACT -m IFB -m NET_ACT_MIRRED -m NET_CLS_U32
+    # Enable IFB and Mirroring for CAKE SQM Ingress shaping.
+    # NET_SCH_INGRESS is REQUIRED — without it the ingress qdisc does not exist
+    # and net-tune's download shaping cannot be created at all.
+    scripts/config -e NET_SCH_INGRESS -e NET_CLS_ACT -m IFB -m NET_ACT_MIRRED -m NET_CLS_U32
     
     # olddefconfig: silently accepts Torvalds defaults for any NEW 7.2-rc1 options.
 

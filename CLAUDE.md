@@ -325,9 +325,10 @@ scripts/config -e BPF_SYSCALL -e BPF_TRACING -e BPF_EVENTS -e BPF_KPROBE_OVERRID
 scripts/config -e LRU_GEN -e LRU_GEN_ENABLED -e LRU_GEN_WALKS_MMU -e LRU_MARIE
 scripts/config -e CPU_IDLE_GOV_NAP
 
-# CAKE SQM ingress — NET_CLS_U32 is the classifier net-tune.sh uses for the
+# CAKE SQM ingress — NET_SCH_INGRESS (the ingress qdisc) is REQUIRED for
+# download shaping; NET_CLS_U32 is the classifier net-tune.sh uses for the
 # ingress redirect (matchall is NOT built into this kernel)
-scripts/config -e NET_CLS_ACT -m IFB -m NET_ACT_MIRRED -m NET_CLS_U32
+scripts/config -e NET_SCH_INGRESS -e NET_CLS_ACT -m IFB -m NET_ACT_MIRRED -m NET_CLS_U32
 
 # Bloat removal
 scripts/config -d DRM_I915 -d DRM_XE -d DRM_NOUVEAU
@@ -363,8 +364,8 @@ running makepkg, after `mkdir -p src`):
 mkdir -p src
 cat > src/net-tune.conf << EOF
 ENABLE_SQM=yes
-DOWNLOAD_MBIT="80"
-UPLOAD_MBIT="85"
+DOWNLOAD_MBIT="90"
+UPLOAD_MBIT="90"
 ENABLE_LATENCY=yes
 EOF
 touch src/.enable_sqm
@@ -372,14 +373,16 @@ touch src/.enable_sqm
 
 The route-detection probe uses Quad9 (`9.9.9.9`), never `8.8.8.8`.
 
-Ingress shaping requires a **named** ifb device: `modprobe ifb` creates `ifb0`,
-so `net-tune.sh` creates `ifb4cake` explicitly with
-`ip link add ifb4cake type ifb` (idempotent). The ingress filter uses the **u32
-match-all idiom** (`u32 match u32 0 0`) because this kernel does not build the
-`matchall` classifier (`CONFIG_NET_CLS_MATCHALL=n`); `CONFIG_NET_CLS_U32` is
-enabled in the PKGBUILD for exactly this purpose. The service verifies both CAKE
-halves after applying and logs `net-tune: OK - CAKE shaping active (...)` or an
-`ERROR` to journald — a missing ingress is no longer silent. To check by hand:
+Ingress shaping requires the **`ingress` qdisc** in the kernel
+(`CONFIG_NET_SCH_INGRESS=y`, enabled in the PKGBUILD) — without it the qdisc
+cannot be created and downloads cannot be shaped at all. It also requires a
+**named** ifb device: `modprobe ifb` creates `ifb0`, so `net-tune.sh` creates
+`ifb4cake` explicitly with `ip link add ifb4cake type ifb` (idempotent). The
+ingress filter uses the **u32 match-all idiom** (`u32 match u32 0 0`) —
+`CONFIG_NET_CLS_U32` is enabled for CAKE SQM ingress (matchall is not built).
+The service verifies both CAKE halves after applying and logs
+`net-tune: OK - CAKE shaping active (...)` or an `ERROR` to journald — a missing
+ingress is no longer silent. To check by hand:
 `tc qdisc show dev <iface>` (expect a root `cake` AND `qdisc ingress ffff:`),
 `ip link show ifb4cake` (expect `state UP`, `qdisc cake`), and
 `tc filter show dev <iface> ingress` (expect a `mirred` redirect).
@@ -439,7 +442,7 @@ halves after applying and logs `net-tune: OK - CAKE shaping active (...)` or an
 | gitlab.freedesktop.org work items tracker is Anubis-blocked | The `drm/amd/-/work_items` page and REST API both return the Anubis challenge (same anti-bot as lore.kernel.org) — could not read the tracker directly | Use the amd-gfx/dri-devel lists + `agd5f-linux` staging branch to cover the same work; note the limitation in sweep reports |
 | A `--since`-window git log sweep can miss patches that moved between staging and drm-next | Staging commits appear in drm-next under *different* SHAs (re-submitted), so hash-based `comm` diffs showed 216 "staging-only" commits that were actually already in drm-next | Diff staging vs drm-next by **subject line**, not SHA; a same-subject commit in drm-next = already reviewed/merged upstream |
 | `modprobe ifb numifbs=1` names its device `ifb0`, not the named `ifb4cake` the net-tune script references | Download CAKE never applied (silently — all errors were `2>/dev/null \|\| true`); bufferbloat test showed clean upload but 102 ms download spikes | Create the named ifb explicitly with `ip link add ifb4cake type ifb` (idempotent) before `ip link set ... up`. All tc/ip errors are suppressed, so `net-tune.sh` now verifies the ingress path (ifb4cake present + mirred filter) and logs an ERROR instead of failing silently |
-| net-tune used the `matchall` classifier, but `CONFIG_NET_CLS_MATCHALL` is not set in this kernel | The ingress redirect filter (`tc filter ... matchall ...`) failed silently again — only the ifb4cake fix had landed; download still unshaped | The PKGBUILD enables `CONFIG_NET_CLS_U32` for CAKE SQM — use the u32 match-all idiom (`tc filter ... protocol all u32 match u32 0 0 action mirred egress redirect dev ifb4cake`) instead of `matchall`, or verify the classifier is built (`zcat /proc/config.gz \| grep NET_CLS_MATCHALL`) |
+| net-tune's download shaping silently never worked: `CONFIG_NET_SCH_INGRESS` was not set in the kernel, and the script used the `matchall` classifier (`CONFIG_NET_CLS_MATCHALL` also not set) | The ingress qdisc (`tc qdisc ... handle ffff: ingress`) cannot exist without NET_SCH_INGRESS, so every subsequent filter/mirred step failed behind `2>/dev/null \|\| true` — uploads shaped, downloads bufferbloated at line rate (102 ms spikes) | PKGBUILD must enable `NET_SCH_INGRESS` (=y) plus `IFB`/`NET_ACT_MIRRED`/`NET_CLS_U32` (=m) for CAKE SQM ingress; the script uses the u32 match-all idiom (`tc filter ... protocol all u32 match u32 0 0 action mirred egress redirect dev ifb4cake`). Verify the running kernel: `zcat /proc/config.gz \| grep NET_SCH_INGRESS`. net-tune.sh now checks for the ingress qdisc and logs a targeted ERROR |
 
 ---
 

@@ -68,10 +68,12 @@ if [ "$ENABLE_SQM" = "yes" ] && [ -n "$UPLOAD_MBIT" ] && [ -n "$DOWNLOAD_MBIT" ]
     ip link set dev ifb4cake up 2>/dev/null || true
     tc qdisc replace dev ifb4cake root cake bandwidth "${DOWNLOAD_MBIT}mbit" \
         "${DIFFSERV}" dual-dsthost wash nat "${RTT}" "${OVERHEAD}" 2>/dev/null || true
+    # The ingress qdisc requires CONFIG_NET_SCH_INGRESS in the kernel — if that
+    # is not set, the qdisc and every filter below fail silently and downloads
+    # cannot be shaped at all (see the verification block). The classifier is
+    # u32 (CONFIG_NET_CLS_U32 is enabled for CAKE SQM ingress; matchall is not
+    # built into this kernel).
     tc qdisc replace dev "$IFACE" handle ffff: ingress 2>/dev/null || true
-    # The matchall classifier is NOT built into this kernel
-    # (CONFIG_NET_CLS_MATCHALL is not set), so use the u32 match-all idiom —
-    # CONFIG_NET_CLS_U32 is enabled for CAKE SQM ingress.
     tc filter replace dev "$IFACE" parent ffff: protocol all u32 match u32 0 0 \
         action mirred egress redirect dev ifb4cake 2>/dev/null || true
 
@@ -83,6 +85,8 @@ if [ "$ENABLE_SQM" = "yes" ] && [ -n "$UPLOAD_MBIT" ] && [ -n "$DOWNLOAD_MBIT" ]
     # explicitly and log to journald instead of failing silently.
     if ! ip link show ifb4cake >/dev/null 2>&1; then
         echo "net-tune: ERROR - ifb4cake missing; download CAKE NOT applied" >&2
+    elif ! tc qdisc show dev "$IFACE" 2>/dev/null | grep -q 'ingress ffff:'; then
+        echo "net-tune: ERROR - no ingress qdisc on $IFACE (kernel needs CONFIG_NET_SCH_INGRESS); download CAKE NOT applied" >&2
     elif ! tc filter show dev "$IFACE" ingress 2>/dev/null | grep -q mirred; then
         echo "net-tune: ERROR - ingress redirect missing; download CAKE NOT applied" >&2
     elif tc qdisc show dev "$IFACE" 2>/dev/null | grep -q cake; then
