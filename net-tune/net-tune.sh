@@ -61,7 +61,10 @@ fi
 if [ "$ENABLE_SQM" = "yes" ] && [ -n "$UPLOAD_MBIT" ] && [ -n "$DOWNLOAD_MBIT" ]; then
     echo "net-tune: applying CAKE SQM to $IFACE (${UPLOAD_MBIT}/${DOWNLOAD_MBIT} Mbit)"
     # Ingress (download): mirror LAN-facing traffic to ifb4cake, then shape it.
-    modprobe ifb numifbs=1 2>/dev/null || true
+    # modprobe ifb numifbs=1 creates ifb0, NOT ifb4cake — the named device must
+    # be created explicitly, or every tc/mirred step below fails silently.
+    modprobe ifb 2>/dev/null || true
+    ip link add ifb4cake type ifb 2>/dev/null || true   # idempotent across re-runs
     ip link set dev ifb4cake up 2>/dev/null || true
     tc qdisc replace dev ifb4cake root cake bandwidth "${DOWNLOAD_MBIT}mbit" \
         "${DIFFSERV}" dual-dsthost wash nat "${RTT}" "${OVERHEAD}" 2>/dev/null || true
@@ -72,6 +75,18 @@ if [ "$ENABLE_SQM" = "yes" ] && [ -n "$UPLOAD_MBIT" ] && [ -n "$DOWNLOAD_MBIT" ]
     # Egress (upload): dual-srchost fairness, ack-filter for asymmetric links.
     tc qdisc replace dev "$IFACE" root cake bandwidth "${UPLOAD_MBIT}mbit" \
         "${DIFFSERV}" dual-srchost nat ack-filter "${RTT}" "${OVERHEAD}" 2>/dev/null || true
+
+    # Verify both halves took; all tc/ip errors above are suppressed, so check
+    # explicitly and log to journald instead of failing silently.
+    if ! ip link show ifb4cake >/dev/null 2>&1; then
+        echo "net-tune: ERROR - ifb4cake missing; download CAKE NOT applied" >&2
+    elif ! tc filter show dev "$IFACE" ingress 2>/dev/null | grep -q mirred; then
+        echo "net-tune: ERROR - ingress redirect missing; download CAKE NOT applied" >&2
+    elif tc qdisc show dev "$IFACE" 2>/dev/null | grep -q cake; then
+        echo "net-tune: OK - CAKE shaping active ($(tc qdisc show dev "$IFACE" | grep -o 'bandwidth [0-9]*Mbit' | tr '\n' ' '))"
+    else
+        echo "net-tune: ERROR - no cake qdisc on $IFACE" >&2
+    fi
 fi
 
 exit 0

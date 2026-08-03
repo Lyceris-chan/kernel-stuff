@@ -225,6 +225,20 @@ BBR3 does **not** need to be set by this service; it is the kernel-compiled defa
 To adjust speeds without rebuilding, edit `/etc/net-tune.conf` and restart the
 service (`sudo systemctl restart net-tune.service`).
 
+To confirm CAKE is actually shaping (both directions), check
+`journalctl -u net-tune -n 20` for the `net-tune: OK - CAKE shaping active` line
+after a restart, or inspect by hand:
+
+```bash
+tc qdisc show dev <iface>          # expect a root cake AND "qdisc ingress ffff:"
+ip link show ifb4cake              # expect state UP, qdisc cake
+tc filter show dev <iface> ingress # expect a mirred redirect to ifb4cake
+```
+
+If the ingress (download) half is missing — no `ingress ffff:` qdisc and no
+`ifb4cake` device — downloads run unshaped and you'll see bufferbloat on the
+download leg of a test while upload stays clean.
+
 ---
 
 ## Known issues and limitations

@@ -371,6 +371,15 @@ touch src/.enable_sqm
 
 The route-detection probe uses Quad9 (`9.9.9.9`), never `8.8.8.8`.
 
+Ingress shaping requires a **named** ifb device: `modprobe ifb` creates `ifb0`,
+so `net-tune.sh` creates `ifb4cake` explicitly with
+`ip link add ifb4cake type ifb` (idempotent). The service verifies both CAKE
+halves after applying and logs `net-tune: OK - CAKE shaping active (...)` or an
+`ERROR` to journald — a missing ingress is no longer silent. To check by hand:
+`tc qdisc show dev <iface>` (expect a root `cake` AND `qdisc ingress ffff:`),
+`ip link show ifb4cake` (expect `state UP`, `qdisc cake`), and
+`tc filter show dev <iface> ingress` (expect a `mirred` redirect).
+
 ---
 
 ## Lessons learned — do not repeat
@@ -425,6 +434,7 @@ The route-detection probe uses Quad9 (`9.9.9.9`), never `8.8.8.8`.
 | Mailing-list mboxes contain quoted replies, not just originals | `git apply --check` on a `thread.html`-downloaded mbox message fails ("corrupt patch") because the diff is inside a quoted reply body | Split the monthly mbox, find the **original** submission (unquoted `diff --git`), extract with `git mailinfo` → clean patch + separate commit message |
 | gitlab.freedesktop.org work items tracker is Anubis-blocked | The `drm/amd/-/work_items` page and REST API both return the Anubis challenge (same anti-bot as lore.kernel.org) — could not read the tracker directly | Use the amd-gfx/dri-devel lists + `agd5f-linux` staging branch to cover the same work; note the limitation in sweep reports |
 | A `--since`-window git log sweep can miss patches that moved between staging and drm-next | Staging commits appear in drm-next under *different* SHAs (re-submitted), so hash-based `comm` diffs showed 216 "staging-only" commits that were actually already in drm-next | Diff staging vs drm-next by **subject line**, not SHA; a same-subject commit in drm-next = already reviewed/merged upstream |
+| `modprobe ifb numifbs=1` names its device `ifb0`, not the named `ifb4cake` the net-tune script references | Download CAKE never applied (silently — all errors were `2>/dev/null \|\| true`); bufferbloat test showed clean upload but 102 ms download spikes | Create the named ifb explicitly with `ip link add ifb4cake type ifb` (idempotent) before `ip link set ... up`. All tc/ip errors are suppressed, so `net-tune.sh` now verifies the ingress path (ifb4cake present + mirred filter) and logs an ERROR instead of failing silently |
 
 ---
 
