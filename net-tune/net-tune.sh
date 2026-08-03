@@ -69,7 +69,10 @@ if [ "$ENABLE_SQM" = "yes" ] && [ -n "$UPLOAD_MBIT" ] && [ -n "$DOWNLOAD_MBIT" ]
     tc qdisc replace dev ifb4cake root cake bandwidth "${DOWNLOAD_MBIT}mbit" \
         "${DIFFSERV}" dual-dsthost wash nat "${RTT}" "${OVERHEAD}" 2>/dev/null || true
     tc qdisc replace dev "$IFACE" handle ffff: ingress 2>/dev/null || true
-    tc filter replace dev "$IFACE" parent ffff: matchall \
+    # The matchall classifier is NOT built into this kernel
+    # (CONFIG_NET_CLS_MATCHALL is not set), so use the u32 match-all idiom —
+    # CONFIG_NET_CLS_U32 is enabled for CAKE SQM ingress.
+    tc filter replace dev "$IFACE" parent ffff: protocol all u32 match u32 0 0 \
         action mirred egress redirect dev ifb4cake 2>/dev/null || true
 
     # Egress (upload): dual-srchost fairness, ack-filter for asymmetric links.
