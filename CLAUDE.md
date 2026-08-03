@@ -59,7 +59,7 @@ base, with additional upstream and local patches filtered to this hardware.
 | Range | Category | Source / How to obtain |
 |---|---|---|
 | `0001–0049` | Handmade local patches (Sleepy/Antigravity) | SMU14, DCN401, GFX12 hand-written fixes for this hardware |
-| `0050–0099` | Upstream EDID/display ML patches not yet landed | `b4` mbox or mbox from freedesktop archives — verify with `git apply --check` against clean rc5 |
+| `0050–0099` | Upstream EDID/display ML patches not yet landed | `b4` mbox or mbox from freedesktop archives — verify with `git apply --check` against the current clean tree (`repos/linux-7.2-rc6`) |
 | `0101` | CachyOS `bbr3` (squashed) | Apply `bbr3-cachyos-patches-sep/` in order, emit cumulative `git diff` |
 | `0102` | CachyOS `cachy` kbuild (squashed) | `kbuild-cachyos-patches/` |
 | `0103` | CachyOS `cachy` cpu-isa (squashed) | `cpu-cachyos-patches/` |
@@ -82,7 +82,7 @@ All sirlucjan directories are under `repos/sirlucjan-kernel-patches/7.2-rc/`.
 **CachyOS branch workflow** (use `patch-cachy-branches` skill):
 1. Identify the latest `-sep` subdirectory for each branch in `repos/sirlucjan-kernel-patches/7.2-rc/`
 2. For the `fixes` branch: squash the FULL branch into `0105-cachy-fixes.patch`, then revert the off-target groups (i915, btusb, rtw89, laptop audio, i2c touchpad, iwlwifi, SOF Intel, nouveau, DisplayID eDP) in `0106-cachy-drops.patch`. Net effect = only the 10 hardware-relevant fixes remain. See the skills file for the full off-target list.
-3. Squash each branch: apply its `-sep` patches **in order to the actual series tree** (rc5 + the `0001`–`0058` local/upstream patches, since those touch shared files like `drm_edid.c`), delete `.orig`/`.rej` leftovers, then emit the cumulative `git diff` as one `format-patch` per branch.
+3. Squash each branch: apply its `-sep` patches **in order to the actual series tree** (rc6 + the `0001`–`0058` local/upstream patches, since those touch shared files like `drm_edid.c`), delete `.orig`/`.rej` leftovers, then emit the cumulative `git diff` as one `format-patch` per branch.
 4. The CachyOS `hdmi` branch (squashed as `0107`) replaces the old `0051`/`0052` FreeSync patches — do not add both.
 5. The `hdmi` squash **excludes `0151`** (`drm-edid-Parse-more-info-from-HDMI-Forum-vsdb`): if `0055` (Fangzhi Zuo HF-VSDB) is in the series, `0151` adds identical content to `drm_edid.c`/`drm_connector.h` and shows as "already applied" — drop it before squashing.
 
@@ -97,7 +97,8 @@ When asked to update the kernel ("update to 7.3-rc1", "bump to the latest RC"),
 run all three phases in order without waiting for the user to ask for each one:
 
 1. **Version bump** — update `_major`, `_minor`, `_rcver`, `_srcname` in PKGBUILD.
-   Rebase every patch with `patch --dry-run`. Regenerate the CachyOS squashed branch patches (`0101`–`0109`) from latest sirlucjan `-sep` directories.
+   Rebase every patch with `patch --dry-run`. Regenerate the CachyOS squashed branch patches (`0101`–`0109`) from latest sirlucjan `-sep` directories
+   (keep a branch's squash unchanged when its content is identical and it still applies cleanly — only `fixes`/`drops` usually drift).
    Report every patch dropped or regenerated, and why, before going further.
 2. **Patch audit** — check all six sources (drm-next, linux-next, linux-pm,
    amd-gfx mailing list, dri-devel mailing list, sirlucjan) for anything new.
@@ -205,10 +206,10 @@ The CachyOS patchset is now sourced as individual per-branch `-sep` files from s
 
 ### Squash workflow (one patch per branch)
 
-Each `0101`–`0109` patch is the cumulative `git diff` of one branch's `-sep` patches applied **in order to the actual series tree** (rc5 + the `0001`–`0058` local/upstream patches). The pre-CachyOS patches matter — e.g. `0055` modifies `drm_edid.c` before the `hdmi` branch is applied, so each squash must be generated against that tree state, not a clean rc5.
+Each `0101`–`0109` patch is the cumulative `git diff` of one branch's `-sep` patches applied **in order to the actual series tree** (rc6 + the `0001`–`0058` local/upstream patches). The pre-CachyOS patches matter — e.g. `0055` modifies `drm_edid.c` before the `hdmi` branch is applied, so each squash must be generated against that tree state, not a clean rc6.
 
 ```bash
-# From a tree at the correct series state (rc5 + 0001–0058):
+# From a tree at the correct series state (rc6 + 0001–0058):
 for f in "$BASE/cachyos-fixes-patches-vN-sep"/*.patch; do
   patch -p1 --forward < "$f"          # apply branch patches in order
 done
@@ -401,7 +402,7 @@ The route-detection probe uses Quad9 (`9.9.9.9`), never `8.8.8.8`.
 | Added `0151` (HDMI HF-VSDB) when `0055` was already applied | `0151` adds the same `drm_hdmi_vrr_cap` struct as `0055` (Fangzhi Zuo 2/4). Patch shows as "Reversed" at apply time. | If `0055` is in the series, exclude `0151` from the `0107-cachy-hdmi` squash. The two patches add identical content to `drm_edid.c` and `drm_connector.h`. |
 | Applied `0053` (remove DMCU parser) before CachyOS hdmi branch | `0053` deletes `dc_edid_parser.h`. The CachyOS hdmi branch still includes `amdgpu_dm.c` which includes that header. Compile fails with "file not found". | When the CachyOS hdmi branch is present, drop `0053`. The DMCU parser cleanup is moot because the hdmi branch already refactored the callers. |
 | Attempted to backport Fangzhi Zuo 1/4, 3/4, 4/4 (HDMI FRL patches) | These patches target `amdgpu_dm_connector.c` which was split from `amdgpu_dm.c` by Alex Hung (agd5f `0e967e086e75`) in April 2026. That split is not in rc5. | Defer until the `amdgpu_dm_connector.c` split lands in mainline (expected 7.3). Only `0055` (2/4, touches `drm_edid.c` only) and `0058` (FRL cap restore) are safe to add now. |
-| `vm_flags & VM_EXEC` in LRU-MARIE after `fixes` branch applied | Sirlucjan `fixes` branch (squashed in `0105`) renames `vm_flags` → `vma_flags` with new type `vma_flags_t`. LRU-MARIE's `#ifdef CONFIG_LRU_MARIE` block still used the old `(vm_flags & VM_EXEC)` expression — compile error: invalid operands to binary expression. | In-tree fix: change `(vm_flags & VM_EXEC)` to `vma_flags_test(&vma_flags, VMA_EXEC_BIT)` in `mm/vmscan.c` inside the `CONFIG_LRU_MARIE` block. This is an in-tree source edit, not a patch file. |
+| `vm_flags & VM_EXEC` in LRU-MARIE after `fixes` branch applied | Sirlucjan `fixes` branch (squashed in `0105`) renames `vm_flags` → `vma_flags` with new type `vma_flags_t`. LRU-MARIE's `#ifdef CONFIG_LRU_MARIE` block still used the old `(vm_flags & VM_EXEC)` expression — compile error: invalid operands to binary expression. | In-tree fix: change `(vm_flags & VM_EXEC)` to `vma_flags_test(&vma_flags, VMA_EXEC_BIT)` in `mm/vmscan.c` inside the `CONFIG_LRU_MARIE` block. This is an in-tree source edit, not a patch file. **Update (2026-08-03, rc6): no longer required — LRU-MARIE v12 (`2101`) already ships the `vma_flags_test(&vma_flags, VMA_EXEC_BIT)` form.** |
 | `amdgpu_dm_connector.c` split required by upstream HDMI patches | Fangzhi Zuo's July 2026 HDMI series was written against agd5f tree where `amdgpu_dm.c` was split. Applied against rc5 (no split) → "No such file or directory" error. | Check `find repos/linux-7.2-rcN -name "amdgpu_dm_connector.c"` before applying any patch targeting that file. If absent, defer the patch. |
 | DCN401 GPIO lookup table patch (`334cbfa3c`) fails to compile | `drm/amd/display: convert dcn401 GPIO translation to lookup tables` uses `DC_GPIO_GENERIC_A`, `DC_GPIO_HPD_A`, etc. which come from a prerequisite GPIO infrastructure patch not in rc5. | Verify all symbol names used in a patch exist in the tree: `grep -r "DC_GPIO_GENERIC_A" src/linux-*/drivers/gpu/drm/amd/`. If absent, the patch depends on staging prerequisites and must be dropped. |
 | `git apply --check` better than `patch --dry-run` | `patch --dry-run` treats mbox-format patches differently and reports false "corrupt patch" errors. `git apply --check` handles both `git format-patch` and mbox formats correctly. | Use `git apply --check <file>` for dry-run testing. Use `git apply --check -R <file>` to test if a patch is already applied (reverse check). |
@@ -412,6 +413,11 @@ The route-detection probe uses Quad9 (`9.9.9.9`), never `8.8.8.8`.
 | `disable_configs.py` cannot disable symbols that are `select`ed | `RESCTRL_FS` (AMD resctrl) and `SND_INTEL_NHLT` (HDA/audio) came back after `olddefconfig` because another option hard-`select`s them | For `select`-forced symbols, disable the selector (e.g. `X86_RESCTRL`) instead, or accept the tiny bloat; verify the built `.config` after each build |
 | CAKE flow-isolation directions are easy to get backwards | egress (upload) must use `dual-srchost`, ingress (download) `dual-dsthost` (per tc-cake(8)); a first draft had them swapped | Use `tc qdisc replace` and follow tc-cake(8): egress `dual-srchost nat ack-filter`, ingress `dual-dsthost wash nat`, with `rtt regional` and `overhead ethernet` for a direct Ethernet handoff |
 | A clean `git apply --check -R` on a candidate means it is ALREADY in the base tree | Sweeps kept re-proposing `f8ee6447e`, `7e1b4bdb0`, etc. that were already in rc5 | Treat a clean reverse check as "already in rc5" — record it and do not add it; only add candidates where the forward check is clean and the reverse check fails |
+| cdn.kernel.org lagged the rc6 tag | `updpkgsums` 404'd on `cdn.kernel.org/pub/linux/kernel/v7.x/testing/linux-7.2-rc6.tar.gz` right after the tag was cut — the cdn mirrors RC tarballs late | Use `https://git.kernel.org/torvalds/t/linux-<tag>.tar.gz` in `source=()` when the cdn 404s |
+| gitlab.freedesktop.org persistent HTTP 503 | `drm-next` and `amd-staging-drm-next` fetches failed with `RPC failed; HTTP 503` for hours, blocking the sweep | Don't block the cycle: cover drm-next via `linux-next` and the AMD staging branch via `agd5f-linux`, and retry gitlab in the background |
+| `patch` leaves `.orig` backups in a git worktree | Regenerating the `01xx` squashes staged `.orig` backups created by `patch`, and they leaked into the squash as huge bogus deletions (`0105` ballooned 51 KB → 628 KB) | `find . -name '*.orig' -delete; find . -name '*.rej' -delete` after EVERY patch phase, before `git add`/`git diff` |
+| Overlapping local patches pass `git apply` only in isolation | `0003` and `0004` both edit `smu_v14_0.c` near PROFILE_PEAK; strict `git apply` fails on `0004` after `0003`, but `patch -p1 --forward` applies it with fuzz (offset 2) | Generate and validate squashes with `patch -p1 --forward`, exactly as `prepare()` does — strict `git apply` misreports fuzz-tolerable sequences |
+| Regenerated every 01xx squash on a bump, then only fixes/drops needed it | sirlucjan branch content was identical (repo master at 2026-07-31) and `0101`–`0104`/`0107`–`0109` applied cleanly to rc6; only `0105`/`0106` had drifted | On a bump, regenerate only the 01xx squashes that fail `git apply --check`; keep unchanged + clean-applying ones |
 
 ---
 
@@ -423,7 +429,7 @@ echo "-${pkgbase#linux-}" > localversion.20-pkgname
 scripts/config --set-str LOCALVERSION ""
 ```
 
-Result: `uname -r` → `7.2.0-rc5-1-sleepy`
+Result: `uname -r` → `7.2.0-rc6-1-sleepy`
 
 ## Local model routing
 

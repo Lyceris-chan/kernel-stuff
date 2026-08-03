@@ -102,7 +102,7 @@ pre-CachyOS patches touch shared files like `drm_edid.c`.
 BASE="repos/sirlucjan-kernel-patches/7.2-rc"
 
 # Example: squash the bbr3 branch into 0101-cachy-bbr3.patch
-# (run inside a working tree at the correct series state: rc5 + 0001–0058)
+# (run inside a working tree at the correct series state: rc6 + 0001–0058)
 for f in "$BASE/bbr3-cachyos-patches-sep"/00*.patch; do
   patch -p1 --forward < "$f" || echo "FAILED: $f"   # apply in order
 done
@@ -111,11 +111,18 @@ find . -name '*.rej' -delete
 git diff --binary > ../../0101-cachy-bbr3.patch      # cumulative diff = the squash
 ```
 
+**Purge `.orig`/`.rej` after EVERY patch phase and BEFORE `git add`/`git diff`**
+— not just at the end. A `.orig` staged into the index shows up in the squash as
+a huge bogus deletion (an `0105` regeneration ballooned 51 KB → 628 KB this
+way). Build the baseline with `patch -p1 --forward` (not strict `git apply`):
+overlapping local patches like `0003`/`0004` fail strict sequential `git apply`
+but apply cleanly under `patch` fuzz — exactly what `prepare()` uses.
+
 Repeat for each branch with the squash numbers from Step 3. For `fixes`,
 squash the full branch into `0105-cachy-fixes.patch`, then build
 `0106-cachy-drops.patch` as the reverse diff of the off-target groups (Step 4).
 Verify each squash with `git apply --check 01xx-cachy-*.patch` against a clean
-`repos/linux-7.2-rc5` tree.
+`repos/linux-7.2-rc6` tree.
 
 After regenerating ANY `01xx` squash, re-validate the FULL series in order —
 a changed `01xx` sits mid-series and can shift context for the later `10xx`/
@@ -167,12 +174,16 @@ of a whole branch wrapped as a single `format-patch`, so it carries one
 generated header rather than the individual upstream authors' `From:` lines.
 Provenance for every squashed hunk is tracked per-patch in `PATCH_SOURCES.md`.
 
-## Step 8 — vma_flags_t compile fix
+## Step 8 — vma_flags_t compile fix (only needed for pre-v12 LRU-MARIE)
 
 After adding the `fixes` branch (squashed into `0105-cachy-fixes.patch`; the
 `mm: vmscan: convert folio_referenced() to use vma_flags_t` change is inside
-it) alongside `2101` (LRU-MARIE), the build will fail at `mm/vmscan.c`.
-Fix the one line inside `#ifdef CONFIG_LRU_MARIE`:
+it) alongside `2101` (LRU-MARIE), the build **used to** fail at `mm/vmscan.c`
+because LRU-MARIE's `#ifdef CONFIG_LRU_MARIE` block still used the old
+`(vm_flags & VM_EXEC)` expression. **LRU-MARIE v12 (`2101`) already ships the
+`vma_flags_test(&vma_flags, VMA_EXEC_BIT)` form (verified on 7.2-rc6), so this
+edit is no longer needed.** Keep it documented only for older LRU-MARIE
+revisions:
 
 ```c
 // Change:

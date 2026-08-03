@@ -13,6 +13,11 @@ Never scrape `lore.kernel.org` — its anti-bot protection blocks agents.
 - **Repository**: `https://gitlab.freedesktop.org/drm/kernel.git` (branch `drm-next`) or `https://gitlab.freedesktop.org/drm/amd.git` (branch `amd-staging-drm-next`)
 - **Location**: `repos/drm-next`
 - **Fetch**: `cd repos/drm-next && git fetch origin`
+- **If gitlab.freedesktop.org returns HTTP 503 (`RPC failed; expected 'packfile'`)**:
+  do not block the cycle. Cover drm-next content via `repos/linux-next`
+  (drm-next is merged into it) and the AMD staging branch via
+  `repos/agd5f-linux` (same `amd-staging-drm-next` branch), and retry the
+  gitlab fetch in the background. Seen for hours on the 2026-08-03 7.2-rc6 bump.
 - **Search Query**:
   ```bash
   git log --oneline --grep="gfx12\|navi48\|dcn4\|smu14\|psp14\|mmhub_4\|sdma_v7\|vcn_v5\|dcn42b" origin/drm-next

@@ -1,50 +1,11 @@
-From 55753c93570a57c684faf8661525448b6862739d Mon Sep 17 00:00:00 2001
+From af4cf1e1763c26ba2cd107929408fda42f4895c2 Mon Sep 17 00:00:00 2001
 From: squash <squash@local>
-Date: Sun, 2 Aug 2026 20:27:23 +0200
+Date: Mon, 3 Aug 2026 03:01:22 +0200
 Subject: [PATCH] cachyos-fixes: hardware-relevant fixes (full 26-patch branch)
 
 ---
- .../admin-guide/kernel-parameters.txt         | 10 +++
- arch/arm/include/asm/mmu_context.h            |  2 +-
- arch/riscv/include/asm/sync_core.h            |  2 +-
- arch/s390/include/asm/mmu_context.h           |  2 +-
- arch/sparc/include/asm/mmu_context_64.h       |  2 +-
- arch/x86/include/asm/sync_core.h              |  2 +-
- arch/x86/kernel/cpu/amd.c                     |  7 +-
- drivers/bluetooth/btusb.c                     |  4 +
- drivers/gpu/drm/drm_displayid_internal.h      |  1 +
- drivers/gpu/drm/drm_edid.c                    | 81 ++++++++++++++++---
- .../gpu/drm/i915/display/intel_frontbuffer.c  |  1 +
- drivers/gpu/drm/i915/display/intel_psr.c      | 44 +++++++++-
- drivers/gpu/drm/i915/display/intel_psr.h      |  1 +
- drivers/gpu/drm/i915/gt/intel_rc6.c           | 13 ++-
- drivers/gpu/drm/nouveau/nouveau_ttm.c         |  5 ++
- drivers/i2c/i2c-core-acpi.c                   |  1 +
- .../net/wireless/intel/iwlwifi/mld/mac80211.c |  4 +
- drivers/net/wireless/intel/iwlwifi/mld/tx.c   |  3 +
- drivers/net/wireless/realtek/rtw89/fw.c       |  4 +-
- drivers/net/wireless/realtek/rtw89/fw.h       |  1 -
- drivers/usb/core/config.c                     | 39 +++++++--
- drivers/usb/core/message.c                    | 19 +++++
- drivers/usb/core/quirks.c                     |  4 +
- include/linux/perf_event.h                    |  2 +-
- include/linux/rmap.h                          |  7 +-
- include/linux/sched/mm.h                      | 20 ++---
- include/linux/tick.h                          |  4 +-
- include/linux/usb/quirks.h                    |  3 +
- include/linux/vtime.h                         |  8 +-
- kernel/sched/core.c                           | 15 ++--
- kernel/sched/fair.c                           |  7 +-
- kernel/sched/sched.h                          | 24 +++---
- mm/rmap.c                                     | 19 +++--
- mm/vmscan.c                                   | 63 +++++++++------
- sound/hda/codecs/realtek/alc269.c             | 15 ++++
- sound/soc/amd/acp-config.c                    | 12 +++
- sound/soc/intel/boards/sof_sdw.c              |  9 +++
- 37 files changed, 353 insertions(+), 107 deletions(-)
-
 diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index b5493a7f8..14121458a 100644
+index b5493a7f8f22..14121458a0c0 100644
 --- a/Documentation/admin-guide/kernel-parameters.txt
 +++ b/Documentation/admin-guide/kernel-parameters.txt
 @@ -8169,6 +8169,16 @@ Kernel parameters
@@ -65,7 +26,7 @@ index b5493a7f8..14121458a 100644
  
  	usbhid.mousepoll=
 diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
-index db2cb06aa..bebde469f 100644
+index db2cb06aa8cf..bebde469f81a 100644
 --- a/arch/arm/include/asm/mmu_context.h
 +++ b/arch/arm/include/asm/mmu_context.h
 @@ -80,7 +80,7 @@ static inline void check_and_switch_context(struct mm_struct *mm,
@@ -78,7 +39,7 @@ index db2cb06aa..bebde469f 100644
  	struct mm_struct *mm = current->mm;
  
 diff --git a/arch/riscv/include/asm/sync_core.h b/arch/riscv/include/asm/sync_core.h
-index 9153016da..2fe6b7fe6 100644
+index 9153016da8f1..2fe6b7fe6b12 100644
 --- a/arch/riscv/include/asm/sync_core.h
 +++ b/arch/riscv/include/asm/sync_core.h
 @@ -6,7 +6,7 @@
@@ -91,7 +52,7 @@ index 9153016da..2fe6b7fe6 100644
  	asm volatile ("fence.i" ::: "memory");
  }
 diff --git a/arch/s390/include/asm/mmu_context.h b/arch/s390/include/asm/mmu_context.h
-index bd1ef5e2d..95d03be2c 100644
+index bd1ef5e2d2eb..95d03be2ce45 100644
 --- a/arch/s390/include/asm/mmu_context.h
 +++ b/arch/s390/include/asm/mmu_context.h
 @@ -93,7 +93,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
@@ -104,7 +65,7 @@ index bd1ef5e2d..95d03be2c 100644
  	struct task_struct *tsk = current;
  	struct mm_struct *mm = tsk->mm;
 diff --git a/arch/sparc/include/asm/mmu_context_64.h b/arch/sparc/include/asm/mmu_context_64.h
-index 78bbacc14..d1967214e 100644
+index 78bbacc14d2d..d1967214ef25 100644
 --- a/arch/sparc/include/asm/mmu_context_64.h
 +++ b/arch/sparc/include/asm/mmu_context_64.h
 @@ -160,7 +160,7 @@ static inline void arch_start_context_switch(struct task_struct *prev)
@@ -117,7 +78,7 @@ index 78bbacc14..d1967214e 100644
  	/* Restore the state of MCDPER register for the new process
  	 * just switched to.
 diff --git a/arch/x86/include/asm/sync_core.h b/arch/x86/include/asm/sync_core.h
-index 96bda4353..4b55fa353 100644
+index 96bda43538ee..4b55fa353bb5 100644
 --- a/arch/x86/include/asm/sync_core.h
 +++ b/arch/x86/include/asm/sync_core.h
 @@ -93,7 +93,7 @@ static __always_inline void sync_core(void)
@@ -130,10 +91,10 @@ index 96bda4353..4b55fa353 100644
  	/* With PTI, we unconditionally serialize before running user code. */
  	if (static_cpu_has(X86_FEATURE_PTI))
 diff --git a/arch/x86/kernel/cpu/amd.c b/arch/x86/kernel/cpu/amd.c
-index 487ac147e..12e3f3ed4 100644
+index d61df70d6875..45b660883179 100644
 --- a/arch/x86/kernel/cpu/amd.c
 +++ b/arch/x86/kernel/cpu/amd.c
-@@ -1040,11 +1040,8 @@ static const struct x86_cpu_id zen5_rdseed_microcode[] = {
+@@ -1042,11 +1042,8 @@ static const struct x86_cpu_id zen5_rdseed_microcode[] = {
  
  static void init_amd_zen5(struct cpuinfo_x86 *c)
  {
@@ -148,7 +109,7 @@ index 487ac147e..12e3f3ed4 100644
  
  static void init_amd(struct cpuinfo_x86 *c)
 diff --git a/drivers/bluetooth/btusb.c b/drivers/bluetooth/btusb.c
-index 8f7ed469c..dda6e87ab 100644
+index 184e95c1625e..76e9bf00f13e 100644
 --- a/drivers/bluetooth/btusb.c
 +++ b/drivers/bluetooth/btusb.c
 @@ -566,6 +566,8 @@ static const struct usb_device_id quirks_table[] = {
@@ -170,7 +131,7 @@ index 8f7ed469c..dda6e87ab 100644
  						     BTUSB_WIDEBAND_SPEECH },
  	{ USB_DEVICE(0x13d3, 0x3610), .driver_info = BTUSB_MEDIATEK |
 diff --git a/drivers/gpu/drm/drm_displayid_internal.h b/drivers/gpu/drm/drm_displayid_internal.h
-index 4590d6a3d..dbdc20533 100644
+index 4590d6a3d821..dbdc2053332d 100644
 --- a/drivers/gpu/drm/drm_displayid_internal.h
 +++ b/drivers/gpu/drm/drm_displayid_internal.h
 @@ -67,6 +67,7 @@ struct drm_edid;
@@ -182,7 +143,7 @@ index 4590d6a3d..dbdc20533 100644
  #define DATA_BLOCK_2_CTA_DISPLAY_ID		0x81
  
 diff --git a/drivers/gpu/drm/drm_edid.c b/drivers/gpu/drm/drm_edid.c
-index 2b3bfa311..c853116c1 100644
+index 2b3bfa311c9d..c853116c1b71 100644
 --- a/drivers/gpu/drm/drm_edid.c
 +++ b/drivers/gpu/drm/drm_edid.c
 @@ -6723,6 +6723,46 @@ static void drm_get_monitor_range(struct drm_connector *connector,
@@ -288,7 +249,7 @@ index 2b3bfa311..c853116c1 100644
  }
  
 diff --git a/drivers/gpu/drm/i915/display/intel_frontbuffer.c b/drivers/gpu/drm/i915/display/intel_frontbuffer.c
-index 705742e11..8bc1a88a1 100644
+index 705742e117ca..8bc1a88a1fee 100644
 --- a/drivers/gpu/drm/i915/display/intel_frontbuffer.c
 +++ b/drivers/gpu/drm/i915/display/intel_frontbuffer.c
 @@ -97,6 +97,7 @@ static void frontbuffer_flush(struct intel_display *display,
@@ -300,7 +261,7 @@ index 705742e11..8bc1a88a1 100644
  	intel_fbc_flush(display, frontbuffer_bits, origin);
  }
 diff --git a/drivers/gpu/drm/i915/display/intel_psr.c b/drivers/gpu/drm/i915/display/intel_psr.c
-index beaa1d626..bc7842e9e 100644
+index beaa1d62613d..bc7842e9e148 100644
 --- a/drivers/gpu/drm/i915/display/intel_psr.c
 +++ b/drivers/gpu/drm/i915/display/intel_psr.c
 @@ -714,8 +714,14 @@ static void _psr_init_dpcd(struct intel_dp *intel_dp, struct intel_connector *co
@@ -374,7 +335,7 @@ index beaa1d626..bc7842e9e 100644
 +	}
 +}
 diff --git a/drivers/gpu/drm/i915/display/intel_psr.h b/drivers/gpu/drm/i915/display/intel_psr.h
-index 29723e638..12a6b62fd 100644
+index 29723e63888f..12a6b62fdec4 100644
 --- a/drivers/gpu/drm/i915/display/intel_psr.h
 +++ b/drivers/gpu/drm/i915/display/intel_psr.h
 @@ -40,6 +40,7 @@ int intel_psr_debug_set(struct intel_dp *intel_dp, u64 value);
@@ -386,7 +347,7 @@ index 29723e638..12a6b62fd 100644
  		     unsigned frontbuffer_bits,
  		     enum fb_op_origin origin);
 diff --git a/drivers/gpu/drm/i915/gt/intel_rc6.c b/drivers/gpu/drm/i915/gt/intel_rc6.c
-index e91e5cdca..a0361f823 100644
+index e91e5cdca26c..a0361f823610 100644
 --- a/drivers/gpu/drm/i915/gt/intel_rc6.c
 +++ b/drivers/gpu/drm/i915/gt/intel_rc6.c
 @@ -2,9 +2,9 @@
@@ -419,7 +380,7 @@ index e91e5cdca..a0361f823 100644
  		return false;
  
 diff --git a/drivers/gpu/drm/nouveau/nouveau_ttm.c b/drivers/gpu/drm/nouveau/nouveau_ttm.c
-index ad01f922a..860bca7e3 100644
+index ad01f922aa86..860bca7e3ce2 100644
 --- a/drivers/gpu/drm/nouveau/nouveau_ttm.c
 +++ b/drivers/gpu/drm/nouveau/nouveau_ttm.c
 @@ -188,6 +188,11 @@ nouveau_ttm_init_vram(struct nouveau_drm *drm)
@@ -435,7 +396,7 @@ index ad01f922a..860bca7e3 100644
  					  drm->gem.vram_available >> PAGE_SHIFT);
  		ttm_set_driver_manager(&drm->ttm.bdev, TTM_PL_VRAM, man);
 diff --git a/drivers/i2c/i2c-core-acpi.c b/drivers/i2c/i2c-core-acpi.c
-index e5fddacae..405fa15c8 100644
+index e5fddacae9a4..405fa15c80e5 100644
 --- a/drivers/i2c/i2c-core-acpi.c
 +++ b/drivers/i2c/i2c-core-acpi.c
 @@ -373,6 +373,7 @@ static const struct acpi_device_id i2c_acpi_force_100khz_device_ids[] = {
@@ -447,7 +408,7 @@ index e5fddacae..405fa15c8 100644
  	{ "ELAN0678", 0 },
  	{ "ELAN06FA", 0 },
 diff --git a/drivers/net/wireless/intel/iwlwifi/mld/mac80211.c b/drivers/net/wireless/intel/iwlwifi/mld/mac80211.c
-index 9ac17be30..3d3e956b6 100644
+index 9ac17be30400..3d3e956b6b7d 100644
 --- a/drivers/net/wireless/intel/iwlwifi/mld/mac80211.c
 +++ b/drivers/net/wireless/intel/iwlwifi/mld/mac80211.c
 @@ -516,6 +516,10 @@ iwl_mld_mac80211_tx(struct ieee80211_hw *hw,
@@ -462,7 +423,7 @@ index 9ac17be30..3d3e956b6 100644
  	 * so the FW can't translate the MLD addr to the link addr. Do it here
  	 */
 diff --git a/drivers/net/wireless/intel/iwlwifi/mld/tx.c b/drivers/net/wireless/intel/iwlwifi/mld/tx.c
-index 2df6643a5..7db7554ce 100644
+index 2df6643a5aa8..7db7554ceae1 100644
 --- a/drivers/net/wireless/intel/iwlwifi/mld/tx.c
 +++ b/drivers/net/wireless/intel/iwlwifi/mld/tx.c
 @@ -987,6 +987,9 @@ void iwl_mld_tx_from_txq(struct iwl_mld *mld, struct ieee80211_txq *txq)
@@ -476,7 +437,7 @@ index 2df6643a5..7db7554ce 100644
  	 * Don't transmit during firmware restart. The firmware is dead,
  	 * so iwl_trans_tx() would return -EIO for each frame. Avoid the
 diff --git a/drivers/net/wireless/realtek/rtw89/fw.c b/drivers/net/wireless/realtek/rtw89/fw.c
-index d6a594b75..c6f175041 100644
+index d6a594b75ab2..c6f175041680 100644
 --- a/drivers/net/wireless/realtek/rtw89/fw.c
 +++ b/drivers/net/wireless/realtek/rtw89/fw.c
 @@ -11780,7 +11780,7 @@ static void rtw89_fw_cmd_ofld_write_rf(struct rtw89_dev *rtwdev,
@@ -498,7 +459,7 @@ index d6a594b75..c6f175041 100644
  		.value = ms * 1000,
  	};
 diff --git a/drivers/net/wireless/realtek/rtw89/fw.h b/drivers/net/wireless/realtek/rtw89/fw.h
-index 20721d520..3fcb3ac8c 100644
+index 20721d5209aa..3fcb3ac8c711 100644
 --- a/drivers/net/wireless/realtek/rtw89/fw.h
 +++ b/drivers/net/wireless/realtek/rtw89/fw.h
 @@ -3142,7 +3142,6 @@ enum rtw89_fw_cmd_ofld_arg_src {
@@ -510,7 +471,7 @@ index 20721d520..3fcb3ac8c 100644
  
  enum rtw89_fw_cmd_ofld_arg_type {
 diff --git a/drivers/usb/core/config.c b/drivers/usb/core/config.c
-index 45e20c6d7..442c15f92 100644
+index 45e20c6d76c0..442c15f92ccd 100644
 --- a/drivers/usb/core/config.c
 +++ b/drivers/usb/core/config.c
 @@ -912,6 +912,17 @@ int usb_get_configuration(struct usb_device *dev)
@@ -593,7 +554,7 @@ index 45e20c6d7..442c15f92 100644
  
  		result = usb_parse_configuration(dev, cfgno,
 diff --git a/drivers/usb/core/message.c b/drivers/usb/core/message.c
-index 75e2bfd74..1d83f8be0 100644
+index 75e2bfd744a9..1d83f8be04f5 100644
 --- a/drivers/usb/core/message.c
 +++ b/drivers/usb/core/message.c
 @@ -1052,6 +1052,25 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
@@ -623,7 +584,7 @@ index 75e2bfd74..1d83f8be0 100644
  		dev_dbg(&dev->dev,
  			"wrong descriptor type %02x for string %d (\"%s\")\n",
 diff --git a/drivers/usb/core/quirks.c b/drivers/usb/core/quirks.c
-index 87ee2d938..f5a60ccf2 100644
+index 87ee2d938bc0..f5a60ccf21d3 100644
 --- a/drivers/usb/core/quirks.c
 +++ b/drivers/usb/core/quirks.c
 @@ -142,6 +142,10 @@ static int quirks_param_set(const char *value, const struct kernel_param *kp)
@@ -638,7 +599,7 @@ index 87ee2d938..f5a60ccf2 100644
  			}
  		}
 diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-index 48d851fbd..7c1dac8da 100644
+index 48d851fbd8ea..7c1dac8da5e5 100644
 --- a/include/linux/perf_event.h
 +++ b/include/linux/perf_event.h
 @@ -1632,7 +1632,7 @@ static inline void perf_event_task_migrate(struct task_struct *task)
@@ -651,7 +612,7 @@ index 48d851fbd..7c1dac8da 100644
  {
  	if (static_branch_unlikely(&perf_sched_events))
 diff --git a/include/linux/rmap.h b/include/linux/rmap.h
-index 8dc0871e5..e090aa098 100644
+index 8dc0871e5f00..e090aa09825d 100644
 --- a/include/linux/rmap.h
 +++ b/include/linux/rmap.h
 @@ -843,7 +843,7 @@ static inline int folio_try_share_anon_rmap_pmd(struct folio *folio,
@@ -677,7 +638,7 @@ index 8dc0871e5..e090aa098 100644
  }
  
 diff --git a/include/linux/sched/mm.h b/include/linux/sched/mm.h
-index 95d0040df..a17730d63 100644
+index 95d0040df584..a17730d63f88 100644
 --- a/include/linux/sched/mm.h
 +++ b/include/linux/sched/mm.h
 @@ -32,7 +32,7 @@ extern struct mm_struct *mm_alloc(void);
@@ -764,7 +725,7 @@ index 95d0040df..a17730d63 100644
  	/*
  	 * The atomic_read() below prevents CSE. The following should
 diff --git a/include/linux/tick.h b/include/linux/tick.h
-index 1cf4651f0..2f91eccd2 100644
+index 1cf4651f09ad..2f91eccd2ab5 100644
 --- a/include/linux/tick.h
 +++ b/include/linux/tick.h
 @@ -173,7 +173,7 @@ extern cpumask_var_t tick_nohz_full_mask;
@@ -786,7 +747,7 @@ index 1cf4651f0..2f91eccd2 100644
  	if (tick_nohz_full_enabled())
  		__tick_nohz_task_switch();
 diff --git a/include/linux/usb/quirks.h b/include/linux/usb/quirks.h
-index b3cc7beab..a4043b33c 100644
+index b3cc7beab4a3..a4043b33c2c2 100644
 --- a/include/linux/usb/quirks.h
 +++ b/include/linux/usb/quirks.h
 @@ -81,4 +81,7 @@
@@ -798,7 +759,7 @@ index b3cc7beab..a4043b33c 100644
 +
  #endif /* __LINUX_USB_QUIRKS_H */
 diff --git a/include/linux/vtime.h b/include/linux/vtime.h
-index 82825e775..ce83fc743 100644
+index 82825e775499..ce83fc74387d 100644
 --- a/include/linux/vtime.h
 +++ b/include/linux/vtime.h
 @@ -89,24 +89,24 @@ static __always_inline void vtime_account_guest_exit(void)
@@ -831,7 +792,7 @@ index 82825e775..ce83fc743 100644
  	if (vtime_accounting_enabled_this_cpu())
  		vtime_task_switch_generic(prev);
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index 96226707c..85f215e7d 100644
+index 96226707c2f6..85f215e7de3e 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
 @@ -3732,6 +3732,9 @@ static inline void ttwu_do_wakeup(struct task_struct *p)
@@ -899,7 +860,7 @@ index 96226707c..85f215e7d 100644
  {
  	struct rq *rq = this_rq();
 diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index d78467ec6..c324882e5 100644
+index d78467ec6ee1..c324882e550e 100644
 --- a/kernel/sched/fair.c
 +++ b/kernel/sched/fair.c
 @@ -13336,12 +13336,15 @@ static int sched_balance_rq(int this_cpu, struct rq *this_rq,
@@ -921,7 +882,7 @@ index d78467ec6..c324882e5 100644
  		 * cur_ld_moved - load moved in current iteration
  		 * ld_moved     - cumulative load moved across iterations
 diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
-index 56acf502b..c7135879f 100644
+index 56acf502ba26..c7135879ffef 100644
 --- a/kernel/sched/sched.h
 +++ b/kernel/sched/sched.h
 @@ -1457,12 +1457,12 @@ static inline struct cpumask *sched_group_span(struct sched_group *sg);
@@ -1021,7 +982,7 @@ index 56acf502b..c7135879f 100644
  {
  	raw_spin_rq_unlock(rq);
 diff --git a/mm/rmap.c b/mm/rmap.c
-index 1c77d5dc0..d0d595a35 100644
+index 1c77d5dc06e9..d0d595a3559b 100644
 --- a/mm/rmap.c
 +++ b/mm/rmap.c
 @@ -907,7 +907,7 @@ pmd_t *mm_find_pmd(struct mm_struct *mm, unsigned long address)
@@ -1101,7 +1062,7 @@ index 1c77d5dc0..d0d595a35 100644
  	if (we_locked)
  		folio_unlock(folio);
 diff --git a/mm/vmscan.c b/mm/vmscan.c
-index 35c3bb15a..03ef7f65d 100644
+index 56708d1d2dfd..c17f84d4f617 100644
 --- a/mm/vmscan.c
 +++ b/mm/vmscan.c
 @@ -267,6 +267,12 @@ static int sc_swappiness(struct scan_control *sc, struct mem_cgroup *memcg)
@@ -1232,7 +1193,7 @@ index 35c3bb15a..03ef7f65d 100644
  		set_mask_bits(&folio->flags.f, LRU_REFS_MASK, BIT(PG_referenced));
  		return -1;
  	}
-@@ -3433,8 +3450,8 @@ static bool suitable_to_scan(int total, int young)
+@@ -3435,8 +3452,8 @@ static bool suitable_to_scan(int total, int young)
  	return young * n >= total;
  }
  
@@ -1243,7 +1204,7 @@ index 35c3bb15a..03ef7f65d 100644
  {
  	int old_gen;
  
-@@ -3447,10 +3464,10 @@ static void walk_update_folio(struct lru_gen_mm_walk *walk, struct folio *folio,
+@@ -3449,10 +3466,10 @@ static void walk_update_folio(struct lru_gen_mm_walk *walk, struct folio *folio,
  		folio_mark_dirty(folio);
  
  	if (walk) {
@@ -1256,7 +1217,7 @@ index 35c3bb15a..03ef7f65d 100644
  		old_gen = folio_lru_gen(folio);
  		if (old_gen >= 0 && old_gen != new_gen)
  			folio_activate(folio);
-@@ -3523,7 +3540,7 @@ static bool walk_pte_range(pmd_t *pmd, unsigned long start, unsigned long end,
+@@ -3525,7 +3542,7 @@ static bool walk_pte_range(pmd_t *pmd, unsigned long start, unsigned long end,
  			continue;
  
  		if (last != folio) {
@@ -1265,7 +1226,7 @@ index 35c3bb15a..03ef7f65d 100644
  
  			last = folio;
  			dirty = false;
-@@ -3536,7 +3553,7 @@ static bool walk_pte_range(pmd_t *pmd, unsigned long start, unsigned long end,
+@@ -3538,7 +3555,7 @@ static bool walk_pte_range(pmd_t *pmd, unsigned long start, unsigned long end,
  		walk->mm_stats[MM_LEAF_YOUNG] += nr;
  	}
  
@@ -1274,7 +1235,7 @@ index 35c3bb15a..03ef7f65d 100644
  	last = NULL;
  
  	if (i < PTRS_PER_PTE && get_next_vma(PMD_MASK, PAGE_SIZE, args, &start, &end))
-@@ -3614,7 +3631,7 @@ static void walk_pmd_range_locked(pud_t *pud, unsigned long addr, struct vm_area
+@@ -3616,7 +3633,7 @@ static void walk_pmd_range_locked(pud_t *pud, unsigned long addr, struct vm_area
  			goto next;
  
  		if (last != folio) {
@@ -1283,7 +1244,7 @@ index 35c3bb15a..03ef7f65d 100644
  
  			last = folio;
  			dirty = false;
-@@ -3628,7 +3645,7 @@ static void walk_pmd_range_locked(pud_t *pud, unsigned long addr, struct vm_area
+@@ -3630,7 +3647,7 @@ static void walk_pmd_range_locked(pud_t *pud, unsigned long addr, struct vm_area
  		i = i > MIN_LRU_BATCH ? 0 : find_next_bit(bitmap, MIN_LRU_BATCH, i) + 1;
  	} while (i <= MIN_LRU_BATCH);
  
@@ -1292,7 +1253,7 @@ index 35c3bb15a..03ef7f65d 100644
  
  	lazy_mmu_mode_disable();
  	spin_unlock(ptl);
-@@ -4266,7 +4283,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw, unsigned int nr)
+@@ -4265,7 +4282,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw, unsigned int nr)
  			continue;
  
  		if (last != folio) {
@@ -1301,7 +1262,7 @@ index 35c3bb15a..03ef7f65d 100644
  
  			last = folio;
  			dirty = false;
-@@ -4278,7 +4295,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw, unsigned int nr)
+@@ -4277,7 +4294,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw, unsigned int nr)
  		young += nr;
  	}
  
@@ -1311,10 +1272,10 @@ index 35c3bb15a..03ef7f65d 100644
  	lazy_mmu_mode_disable();
  
 diff --git a/sound/hda/codecs/realtek/alc269.c b/sound/hda/codecs/realtek/alc269.c
-index 379e1458f..01310605b 100644
+index 48a2e7f2ebb1..70a029ea0cff 100644
 --- a/sound/hda/codecs/realtek/alc269.c
 +++ b/sound/hda/codecs/realtek/alc269.c
-@@ -4066,6 +4066,7 @@ enum {
+@@ -4077,6 +4077,7 @@ enum {
  	ALC294_FIXUP_ASUS_GU502_VERBS,
  	ALC294_FIXUP_ASUS_G513_PINS,
  	ALC285_FIXUP_ASUS_G533Z_PINS,
@@ -1322,9 +1283,9 @@ index 379e1458f..01310605b 100644
  	ALC285_FIXUP_HP_GPIO_LED,
  	ALC285_FIXUP_HP_MUTE_LED,
  	ALC285_FIXUP_HP_SPECTRE_X360_MUTE_LED,
-@@ -6855,6 +6856,19 @@ static const struct hda_fixup alc269_fixups[] = {
- 		.type = HDA_FIXUP_FUNC,
- 		.v.func = alc285_fixup_invalidate_dacs,
+@@ -6898,6 +6899,19 @@ static const struct hda_fixup alc269_fixups[] = {
+ 		.chained = true,
+ 		.chain_id = ALC274_FIXUP_HP_89E9_GPIO,
  	},
 +	[ALC285_FIXUP_ASUS_G733Z_VERBS] = {
 +		.type = HDA_FIXUP_VERBS,
@@ -1342,7 +1303,7 @@ index 379e1458f..01310605b 100644
  };
  
  static const struct hda_quirk alc269_fixup_tbl[] = {
-@@ -7484,6 +7498,7 @@ static const struct hda_quirk alc269_fixup_tbl[] = {
+@@ -7533,6 +7547,7 @@ static const struct hda_quirk alc269_fixup_tbl[] = {
  	SND_PCI_QUIRK(0x1043, 0x12a3, "Asus N7691ZM", ALC269_FIXUP_ASUS_N7601ZM),
  	SND_PCI_QUIRK(0x1043, 0x12af, "ASUS UX582ZS", ALC245_FIXUP_CS35L41_SPI_2),
  	SND_PCI_QUIRK(0x1043, 0x12b4, "ASUS B3405CCA / P3405CCA", ALC294_FIXUP_ASUS_CS35L41_SPI_2),
@@ -1351,7 +1312,7 @@ index 379e1458f..01310605b 100644
  	SND_PCI_QUIRK(0x1043, 0x12f0, "ASUS X541UV", ALC256_FIXUP_ASUS_MIC_NO_PRESENCE),
  	SND_PCI_QUIRK(0x1043, 0x1313, "Asus K42JZ", ALC269VB_FIXUP_ASUS_MIC_NO_PRESENCE),
 diff --git a/sound/soc/amd/acp-config.c b/sound/soc/amd/acp-config.c
-index 051946562..d42d4b3aa 100644
+index 88e4230d66c3..5070d6a50b3c 100644
 --- a/sound/soc/amd/acp-config.c
 +++ b/sound/soc/amd/acp-config.c
 @@ -24,6 +24,12 @@
@@ -1367,7 +1328,7 @@ index 051946562..d42d4b3aa 100644
  	{
  		.matches = {
  			DMI_MATCH(DMI_BOARD_VENDOR, "ASUSTeK COMPUTER INC."),
-@@ -56,6 +62,12 @@ static const struct dmi_system_id acp70_acpi_flag_override_table[] = {
+@@ -63,6 +69,12 @@ static const struct dmi_system_id acp70_acpi_flag_override_table[] = {
  			DMI_MATCH(DMI_PRODUCT_NAME, "Vivobook 18 M1807GA"),
  		},
  	},
@@ -1381,7 +1342,7 @@ index 051946562..d42d4b3aa 100644
  };
  
 diff --git a/sound/soc/intel/boards/sof_sdw.c b/sound/soc/intel/boards/sof_sdw.c
-index c527d575d..454c608d7 100644
+index c527d575d1ed..454c608d7c8e 100644
 --- a/sound/soc/intel/boards/sof_sdw.c
 +++ b/sound/soc/intel/boards/sof_sdw.c
 @@ -845,6 +845,15 @@ static const struct dmi_system_id sof_sdw_quirk_table[] = {
@@ -1400,6 +1361,3 @@ index c527d575d..454c608d7 100644
  	{}
  };
  
--- 
-2.55.0
-

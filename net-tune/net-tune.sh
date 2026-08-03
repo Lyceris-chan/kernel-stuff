@@ -24,12 +24,18 @@ CONF="/etc/net-tune.conf"
 : "${OVERHEAD:=ethernet}"
 
 if [ -z "$IFACE" ]; then
-    # Find the default internet interface (with a retry for boot races).
-    for _ in $(seq 1 30); do
+    # Find the default internet interface. The unit runs after
+    # network-online.target, so the route is usually present immediately; the
+    # short retry is a boot-race safety net. If no route exists yet, fall back
+    # to the first carrier-up ethernet NIC so latency tuning still applies.
+    for _ in $(seq 1 10); do
         IFACE=$(ip route get 9.9.9.9 2>/dev/null | awk '{print $5}' | head -n 1)
         [ -n "$IFACE" ] && break
         sleep 1
     done
+fi
+if [ -z "$IFACE" ]; then
+    IFACE=$(ip -o link show 2>/dev/null | awk -F': ' '/state UP/ && $2 != "lo" {print $2; exit}')
 fi
 [ -z "$IFACE" ] && { echo "net-tune: no internet interface found"; exit 1; }
 

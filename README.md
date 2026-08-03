@@ -2,11 +2,11 @@
 
 `linux-sleepy` is a custom Arch Linux kernel package built for one machine: an
 AMD Zen 4 desktop with an RDNA 4 graphics card. It is based on Linux mainline
-`7.2-rc5` and layers a sanitized [CachyOS](https://github.com/CachyOS/linux-cachyos)
+`7.2-rc6` and layers a sanitized [CachyOS](https://github.com/CachyOS/linux-cachyos)
 patchset plus targeted local and upstream patches on top.
 
-**Base version:** `7.2.0-rc5-1-sleepy`
-**Artifact:** `linux-sleepy-7.2.rc5-1-x86_64.pkg.tar.zst`
+**Base version:** `7.2.0-rc6-1-sleepy`
+**Artifact:** `linux-sleepy-7.2.rc6-1-x86_64.pkg.tar.zst`
 
 This is not a general-purpose kernel; the configuration is opinionated for the
 hardware below.
@@ -53,13 +53,13 @@ hardware is unsupported.
 
 Here's what `linux-sleepy` gives you on top of each baseline.
 
-**Over vanilla Linux 7.2-rc5:**
+**Over vanilla Linux 7.2-rc6:**
 
 - The hardware-relevant subset of CachyOS: BBRv3 TCP, `-O3` + Zen 4 ISA, VRAM
   cgroups, sched-ext preemption, HDMI 2.1 FreeSync/VRR, and EDID DSC BPP.
 - ~50 AMD-specific backports from `drm-next`, `linux-pm`, and `amd-gfx`: SMU14
-  power fixes, DCN401/DCN42B display fixes, `amd-pstate` EPP boost, ACPI CPPC
-  fixes, and GFX12 stability work.
+  power fixes, DCN401/DCN42B display fixes, `amd-pstate` EPP boost, and GFX12
+  stability work.
 - agd5f staging backports: the Exit-idle-optimizations v2 series and
   `BUG()` → `WARN()` conversions for GFX12/PSP14.
 - Local handmade SMU14/DCN401 patches, including the `PROFILE_PEAK` GFXCLK
@@ -98,8 +98,8 @@ makepkg -f -s -c
 
 The build produces these packages:
 
-- `linux-sleepy-7.2.rc5-1-x86_64.pkg.tar.zst`
-- `linux-sleepy-headers-7.2.rc5-1-x86_64.pkg.tar.zst`
+- `linux-sleepy-7.2.rc6-1-x86_64.pkg.tar.zst`
+- `linux-sleepy-headers-7.2.rc6-1-x86_64.pkg.tar.zst`
 
 During the build you are prompted whether to enable CAKE SQM shaping (via the
 `net-tune` service); in non-interactive environments (CI, piped input) the
@@ -133,8 +133,8 @@ against — not with your distro's compiler.
 Install the kernel and headers:
 
 ```bash
-sudo pacman -U linux-sleepy-7.2.rc5-1-x86_64.pkg.tar.zst \
-              linux-sleepy-headers-7.2.rc5-1-x86_64.pkg.tar.zst
+sudo pacman -U linux-sleepy-7.2.rc6-1-x86_64.pkg.tar.zst \
+              linux-sleepy-headers-7.2.rc6-1-x86_64.pkg.tar.zst
 ```
 
 Regenerate your bootloader config (for GRUB):
@@ -320,7 +320,7 @@ provenance (authors, commit hashes, Message-IDs).
 | `1110` | Ports DCN4+ MCIF ARB programming to the new format. | drm-next |
 | `1111` | Fixes `dc_stream_remove_writeback()` dropping wrong writeback entries. | drm-next |
 
-### Power management (1200–1213)
+### Power management (1200–1209)
 
 | Patch | What it does | Source |
 |---|---|---|
@@ -328,16 +328,13 @@ provenance (authors, commit hashes, Message-IDs).
 | `1201` | Updates `cppc_req_cached` before writing the MSR. | linux-pm |
 | `1202` | Adds per-core EPP boost for recently-busy CPUs. | linux-pm |
 | `1203` | Documents the `epp_boost` parameter. | linux-pm |
-| `1204` | Bails out early when `X86_FEATURE_HW_PSTATE` is absent. | linux-pm |
 | `1205` | Skips amd-pstate-ut tests when the driver is inactive. | linux-pm |
 | `1206` | Fixes the EPP return type and init error handling. | linux-pm |
 | `1207` | Toggles `auto_sel` in active mode on shared-memory systems. | linux-pm |
 | `1208` | Caches the firmware-programmed EPP value. | linux-pm |
 | `1209` | Handles a missing policy in dynamic EPP callbacks. | linux-pm |
-| `1210` | Loosens the lowest-nonlinear-frequency requirement. | linux-pm |
-| `1211` | Sanitizes lockless policy-limit snapshots in cpufreq/cppc. | mainline post-rc5 |
-| `1212` | Checks all controls for fast switching in ACPI CPPC. | mainline post-rc5 |
-| `1213` | Skips writes to unsupported performance controls in ACPI CPPC. | mainline post-rc5 |
+
+`1204`, `1210`–`1213` merged upstream in 7.2-rc6 and dropped from the series.
 
 ### Block / I/O (2000–2004)
 
@@ -362,16 +359,13 @@ provenance (authors, commit hashes, Message-IDs).
 |---|---|---|
 | `2200` | NAP cpuidle governor v0.5.0 for 7.2. | CachyOS (sirlucjan) |
 
-### agd5f staging (9000–9007)
+### agd5f staging (9001–9007)
 
 | Patch | What it does | Source |
 |---|---|---|
-| `9000` | Exits idle optimizations before programming (v2). | agd5f staging |
 | `9001` | Drops all `BUG()`s in gfx12. | agd5f staging |
 | `9002` | Drops all `BUG()`s in gfx12.1. | agd5f staging |
 | `9003` | Replaces a PSP14 `BUG()` with an error. | agd5f staging |
-| `9004` | Uses milliwatts for GPU power sensors. | agd5f staging |
-| `9005` | Restores UMD profile pstate after runtime resume. | agd5f staging |
 | `9006` | Uses more optimal copy-packet sizes for copy/fill in TTM. | agd5f staging |
 | `9007` | Programs DB_RING_CONTROL on gfx12. | agd5f staging |
 

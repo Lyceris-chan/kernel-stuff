@@ -1,6 +1,6 @@
 # linux-sleepy
 
-A custom Arch Linux kernel package (`linux-sleepy`) based on Linux 7.2-rc5, targeting AMD Zen 4 CPUs and RDNA 4 (Navi 48 / gfx1201) GPUs.
+A custom Arch Linux kernel package (`linux-sleepy`) based on Linux 7.2-rc6, targeting AMD Zen 4 CPUs and RDNA 4 (Navi 48 / gfx1201) GPUs.
 
 ## Target audience
 
@@ -15,7 +15,7 @@ It is not a general-purpose distribution kernel. Configuration choices are inten
 
 ---
 
-## Differences from vanilla linux-7.2-rc5
+## Differences from vanilla linux-7.2-rc6
 
 ### Build toolchain
 
@@ -31,7 +31,7 @@ The LLVM toolchain is downloaded automatically from [mirrors.edge.kernel.org/pub
 
 ### Scheduler and core patches
 
-The following patches come from the [CachyOS linux-cachyos](https://github.com/CachyOS/linux-cachyos) patchset, squashed to one patch per branch (`0101`–`0109`), rebased onto 7.2-rc5:
+The following patches come from the [CachyOS linux-cachyos](https://github.com/CachyOS/linux-cachyos) patchset, squashed to one patch per branch (`0101`–`0109`), rebased onto 7.2-rc6:
 
 <details>
 <summary>CachyOS patch subsystems included</summary>
@@ -214,21 +214,16 @@ The build prompts interactively whether to configure the CAKE SQM service. In no
 
 ### SQM / bufferbloat mitigation (optional)
 
-If you answer `y` to the SQM prompt, `makepkg` installs:
-
-- `/usr/local/bin/sqm-qos.sh` — applies CAKE shaper to egress and ingress using an IFB device
-- `/usr/lib/systemd/system/sqm-qos.service` — runs the script at network-online.target
-- `/etc/sqm-qos.conf` — your configured upload/download speed in Mbit/s
+The `net-tune` service ships one unit (`/usr/lib/systemd/system/net-tune.service`)
+that applies low-latency ethernet tuning (`ENABLE_LATENCY`) and, optionally,
+CAKE SQM shaping (`ENABLE_SQM`), each independently toggleable in
+`/etc/net-tune.conf`. If you answer `y` to the SQM prompt at build time, `makepkg`
+installs a config with your upload/download speeds and enables the service.
 
 BBR3 does **not** need to be set by this service; it is the kernel-compiled default.
 
-To enable the service after install:
-
-```bash
-sudo systemctl enable --now sqm-qos.service
-```
-
-To adjust speeds without rebuilding, edit `/etc/sqm-qos.conf` and restart the service.
+To adjust speeds without rebuilding, edit `/etc/net-tune.conf` and restart the
+service (`sudo systemctl restart net-tune.service`).
 
 ---
 
@@ -249,10 +244,11 @@ To adjust speeds without rebuilding, edit `/etc/sqm-qos.conf` and restart the se
 PKGBUILD                  Build script (Arch Linux makepkg format)
 config                    Base kernel .config (from CachyOS)
 disable_configs.py        Script to strip CachyOS-specific symbols before olddefconfig
-0001-0019-*.patch         Local and upstream SMU14/DCN401/amd-pstate patches
-0101-0109-cachy-*.patch       Squashed CachyOS branch patches (one per branch)
-1002-1084-*.patch         Upstream mailing list patches (amd-gfx, linux-pm, block, mm)
-sqm-qos/                  Optional CAKE SQM systemd service
+0001-0058-*.patch         Local and upstream SMU14/DCN401/EDID/HDMI patches
+0101-0109-cachy-*.patch   Squashed CachyOS branch patches (one per branch)
+1000-2200-*.patch         Upstream patches (amd-gfx, drm-next, linux-pm, block, mm, cpuidle)
+9001-9007-*.patch         agd5f staging backports
+net-tune/                 Unified CAKE SQM + latency tuning systemd service
 PATCH_SOURCES.md          Per-patch source URLs and commit hashes
 GUIDE.md                  Developer notes (build, patch workflow, CI)
 ```

@@ -1,33 +1,11 @@
-From c45f7bea7b5f3fe5301ab38d6978f52f58014182 Mon Sep 17 00:00:00 2001
+From 91e3ae613f94f9a25b5ecde55d280ec3df0d43f0 Mon Sep 17 00:00:00 2001
 From: squash <squash@local>
-Date: Sun, 2 Aug 2026 20:28:00 +0200
+Date: Mon, 3 Aug 2026 03:01:22 +0200
 Subject: [PATCH] cachyos-drops: revert off-target fixes (i915/btusb/rtw89/touchpad/audio/SOF/iwlwifi/nouveau)
 
 ---
- .../admin-guide/kernel-parameters.txt         | 10 ---
- drivers/bluetooth/btusb.c                     |  4 -
- drivers/gpu/drm/drm_displayid_internal.h      |  1 -
- drivers/gpu/drm/drm_edid.c                    | 81 +++----------------
- .../gpu/drm/i915/display/intel_frontbuffer.c  |  1 -
- drivers/gpu/drm/i915/display/intel_psr.c      | 44 +---------
- drivers/gpu/drm/i915/display/intel_psr.h      |  1 -
- drivers/gpu/drm/i915/gt/intel_rc6.c           | 13 +--
- drivers/gpu/drm/nouveau/nouveau_ttm.c         |  5 --
- drivers/i2c/i2c-core-acpi.c                   |  1 -
- .../net/wireless/intel/iwlwifi/mld/mac80211.c |  4 -
- drivers/net/wireless/intel/iwlwifi/mld/tx.c   |  3 -
- drivers/net/wireless/realtek/rtw89/fw.c       |  4 +-
- drivers/net/wireless/realtek/rtw89/fw.h       |  1 +
- drivers/usb/core/config.c                     | 39 ++-------
- drivers/usb/core/quirks.c                     |  4 -
- include/linux/usb/quirks.h                    |  3 -
- sound/hda/codecs/realtek/alc269.c             | 15 ----
- sound/soc/amd/acp-config.c                    | 12 ---
- sound/soc/intel/boards/sof_sdw.c              |  9 ---
- 20 files changed, 25 insertions(+), 230 deletions(-)
-
 diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index 14121458a..b5493a7f8 100644
+index 14121458a0c0..b5493a7f8f22 100644
 --- a/Documentation/admin-guide/kernel-parameters.txt
 +++ b/Documentation/admin-guide/kernel-parameters.txt
 @@ -8169,16 +8169,6 @@ Kernel parameters
@@ -48,7 +26,7 @@ index 14121458a..b5493a7f8 100644
  
  	usbhid.mousepoll=
 diff --git a/drivers/bluetooth/btusb.c b/drivers/bluetooth/btusb.c
-index dda6e87ab..8f7ed469c 100644
+index 76e9bf00f13e..184e95c1625e 100644
 --- a/drivers/bluetooth/btusb.c
 +++ b/drivers/bluetooth/btusb.c
 @@ -566,8 +566,6 @@ static const struct usb_device_id quirks_table[] = {
@@ -70,7 +48,7 @@ index dda6e87ab..8f7ed469c 100644
  						     BTUSB_WIDEBAND_SPEECH },
  	{ USB_DEVICE(0x13d3, 0x3610), .driver_info = BTUSB_MEDIATEK |
 diff --git a/drivers/gpu/drm/drm_displayid_internal.h b/drivers/gpu/drm/drm_displayid_internal.h
-index dbdc20533..4590d6a3d 100644
+index dbdc2053332d..4590d6a3d821 100644
 --- a/drivers/gpu/drm/drm_displayid_internal.h
 +++ b/drivers/gpu/drm/drm_displayid_internal.h
 @@ -67,7 +67,6 @@ struct drm_edid;
@@ -82,7 +60,7 @@ index dbdc20533..4590d6a3d 100644
  #define DATA_BLOCK_2_CTA_DISPLAY_ID		0x81
  
 diff --git a/drivers/gpu/drm/drm_edid.c b/drivers/gpu/drm/drm_edid.c
-index c853116c1..2b3bfa311 100644
+index c853116c1b71..2b3bfa311c9d 100644
 --- a/drivers/gpu/drm/drm_edid.c
 +++ b/drivers/gpu/drm/drm_edid.c
 @@ -6723,46 +6723,6 @@ static void drm_get_monitor_range(struct drm_connector *connector,
@@ -188,7 +166,7 @@ index c853116c1..2b3bfa311 100644
  }
  
 diff --git a/drivers/gpu/drm/i915/display/intel_frontbuffer.c b/drivers/gpu/drm/i915/display/intel_frontbuffer.c
-index 8bc1a88a1..705742e11 100644
+index 8bc1a88a1fee..705742e117ca 100644
 --- a/drivers/gpu/drm/i915/display/intel_frontbuffer.c
 +++ b/drivers/gpu/drm/i915/display/intel_frontbuffer.c
 @@ -97,7 +97,6 @@ static void frontbuffer_flush(struct intel_display *display,
@@ -200,7 +178,7 @@ index 8bc1a88a1..705742e11 100644
  	intel_fbc_flush(display, frontbuffer_bits, origin);
  }
 diff --git a/drivers/gpu/drm/i915/display/intel_psr.c b/drivers/gpu/drm/i915/display/intel_psr.c
-index bc7842e9e..beaa1d626 100644
+index bc7842e9e148..beaa1d62613d 100644
 --- a/drivers/gpu/drm/i915/display/intel_psr.c
 +++ b/drivers/gpu/drm/i915/display/intel_psr.c
 @@ -714,14 +714,8 @@ static void _psr_init_dpcd(struct intel_dp *intel_dp, struct intel_connector *co
@@ -274,7 +252,7 @@ index bc7842e9e..beaa1d626 100644
 -	}
 -}
 diff --git a/drivers/gpu/drm/i915/display/intel_psr.h b/drivers/gpu/drm/i915/display/intel_psr.h
-index 12a6b62fd..29723e638 100644
+index 12a6b62fdec4..29723e63888f 100644
 --- a/drivers/gpu/drm/i915/display/intel_psr.h
 +++ b/drivers/gpu/drm/i915/display/intel_psr.h
 @@ -40,7 +40,6 @@ int intel_psr_debug_set(struct intel_dp *intel_dp, u64 value);
@@ -286,7 +264,7 @@ index 12a6b62fd..29723e638 100644
  		     unsigned frontbuffer_bits,
  		     enum fb_op_origin origin);
 diff --git a/drivers/gpu/drm/i915/gt/intel_rc6.c b/drivers/gpu/drm/i915/gt/intel_rc6.c
-index a0361f823..e91e5cdca 100644
+index a0361f823610..e91e5cdca26c 100644
 --- a/drivers/gpu/drm/i915/gt/intel_rc6.c
 +++ b/drivers/gpu/drm/i915/gt/intel_rc6.c
 @@ -2,9 +2,9 @@
@@ -319,7 +297,7 @@ index a0361f823..e91e5cdca 100644
  		return false;
  
 diff --git a/drivers/gpu/drm/nouveau/nouveau_ttm.c b/drivers/gpu/drm/nouveau/nouveau_ttm.c
-index 860bca7e3..ad01f922a 100644
+index 860bca7e3ce2..ad01f922aa86 100644
 --- a/drivers/gpu/drm/nouveau/nouveau_ttm.c
 +++ b/drivers/gpu/drm/nouveau/nouveau_ttm.c
 @@ -188,11 +188,6 @@ nouveau_ttm_init_vram(struct nouveau_drm *drm)
@@ -335,7 +313,7 @@ index 860bca7e3..ad01f922a 100644
  					  drm->gem.vram_available >> PAGE_SHIFT);
  		ttm_set_driver_manager(&drm->ttm.bdev, TTM_PL_VRAM, man);
 diff --git a/drivers/i2c/i2c-core-acpi.c b/drivers/i2c/i2c-core-acpi.c
-index 405fa15c8..e5fddacae 100644
+index 405fa15c80e5..e5fddacae9a4 100644
 --- a/drivers/i2c/i2c-core-acpi.c
 +++ b/drivers/i2c/i2c-core-acpi.c
 @@ -373,7 +373,6 @@ static const struct acpi_device_id i2c_acpi_force_100khz_device_ids[] = {
@@ -347,7 +325,7 @@ index 405fa15c8..e5fddacae 100644
  	{ "ELAN0678", 0 },
  	{ "ELAN06FA", 0 },
 diff --git a/drivers/net/wireless/intel/iwlwifi/mld/mac80211.c b/drivers/net/wireless/intel/iwlwifi/mld/mac80211.c
-index 3d3e956b6..9ac17be30 100644
+index 3d3e956b6b7d..9ac17be30400 100644
 --- a/drivers/net/wireless/intel/iwlwifi/mld/mac80211.c
 +++ b/drivers/net/wireless/intel/iwlwifi/mld/mac80211.c
 @@ -516,10 +516,6 @@ iwl_mld_mac80211_tx(struct ieee80211_hw *hw,
@@ -362,7 +340,7 @@ index 3d3e956b6..9ac17be30 100644
  	 * so the FW can't translate the MLD addr to the link addr. Do it here
  	 */
 diff --git a/drivers/net/wireless/intel/iwlwifi/mld/tx.c b/drivers/net/wireless/intel/iwlwifi/mld/tx.c
-index 7db7554ce..2df6643a5 100644
+index 7db7554ceae1..2df6643a5aa8 100644
 --- a/drivers/net/wireless/intel/iwlwifi/mld/tx.c
 +++ b/drivers/net/wireless/intel/iwlwifi/mld/tx.c
 @@ -987,9 +987,6 @@ void iwl_mld_tx_from_txq(struct iwl_mld *mld, struct ieee80211_txq *txq)
@@ -376,7 +354,7 @@ index 7db7554ce..2df6643a5 100644
  	 * Don't transmit during firmware restart. The firmware is dead,
  	 * so iwl_trans_tx() would return -EIO for each frame. Avoid the
 diff --git a/drivers/net/wireless/realtek/rtw89/fw.c b/drivers/net/wireless/realtek/rtw89/fw.c
-index c6f175041..d6a594b75 100644
+index c6f175041680..d6a594b75ab2 100644
 --- a/drivers/net/wireless/realtek/rtw89/fw.c
 +++ b/drivers/net/wireless/realtek/rtw89/fw.c
 @@ -11780,7 +11780,7 @@ static void rtw89_fw_cmd_ofld_write_rf(struct rtw89_dev *rtwdev,
@@ -398,7 +376,7 @@ index c6f175041..d6a594b75 100644
  		.value = ms * 1000,
  	};
 diff --git a/drivers/net/wireless/realtek/rtw89/fw.h b/drivers/net/wireless/realtek/rtw89/fw.h
-index 3fcb3ac8c..20721d520 100644
+index 3fcb3ac8c711..20721d5209aa 100644
 --- a/drivers/net/wireless/realtek/rtw89/fw.h
 +++ b/drivers/net/wireless/realtek/rtw89/fw.h
 @@ -3142,6 +3142,7 @@ enum rtw89_fw_cmd_ofld_arg_src {
@@ -410,7 +388,7 @@ index 3fcb3ac8c..20721d520 100644
  
  enum rtw89_fw_cmd_ofld_arg_type {
 diff --git a/drivers/usb/core/config.c b/drivers/usb/core/config.c
-index 442c15f92..45e20c6d7 100644
+index 442c15f92ccd..45e20c6d76c0 100644
 --- a/drivers/usb/core/config.c
 +++ b/drivers/usb/core/config.c
 @@ -912,17 +912,6 @@ int usb_get_configuration(struct usb_device *dev)
@@ -493,7 +471,7 @@ index 442c15f92..45e20c6d7 100644
  
  		result = usb_parse_configuration(dev, cfgno,
 diff --git a/drivers/usb/core/quirks.c b/drivers/usb/core/quirks.c
-index f5a60ccf2..87ee2d938 100644
+index f5a60ccf21d3..87ee2d938bc0 100644
 --- a/drivers/usb/core/quirks.c
 +++ b/drivers/usb/core/quirks.c
 @@ -142,10 +142,6 @@ static int quirks_param_set(const char *value, const struct kernel_param *kp)
@@ -508,7 +486,7 @@ index f5a60ccf2..87ee2d938 100644
  			}
  		}
 diff --git a/include/linux/usb/quirks.h b/include/linux/usb/quirks.h
-index a4043b33c..b3cc7beab 100644
+index a4043b33c2c2..b3cc7beab4a3 100644
 --- a/include/linux/usb/quirks.h
 +++ b/include/linux/usb/quirks.h
 @@ -81,7 +81,4 @@
@@ -520,10 +498,10 @@ index a4043b33c..b3cc7beab 100644
 -
  #endif /* __LINUX_USB_QUIRKS_H */
 diff --git a/sound/hda/codecs/realtek/alc269.c b/sound/hda/codecs/realtek/alc269.c
-index 01310605b..379e1458f 100644
+index 70a029ea0cff..48a2e7f2ebb1 100644
 --- a/sound/hda/codecs/realtek/alc269.c
 +++ b/sound/hda/codecs/realtek/alc269.c
-@@ -4066,7 +4066,6 @@ enum {
+@@ -4077,7 +4077,6 @@ enum {
  	ALC294_FIXUP_ASUS_GU502_VERBS,
  	ALC294_FIXUP_ASUS_G513_PINS,
  	ALC285_FIXUP_ASUS_G533Z_PINS,
@@ -531,9 +509,9 @@ index 01310605b..379e1458f 100644
  	ALC285_FIXUP_HP_GPIO_LED,
  	ALC285_FIXUP_HP_MUTE_LED,
  	ALC285_FIXUP_HP_SPECTRE_X360_MUTE_LED,
-@@ -6856,19 +6855,6 @@ static const struct hda_fixup alc269_fixups[] = {
- 		.type = HDA_FIXUP_FUNC,
- 		.v.func = alc285_fixup_invalidate_dacs,
+@@ -6899,19 +6898,6 @@ static const struct hda_fixup alc269_fixups[] = {
+ 		.chained = true,
+ 		.chain_id = ALC274_FIXUP_HP_89E9_GPIO,
  	},
 -	[ALC285_FIXUP_ASUS_G733Z_VERBS] = {
 -		.type = HDA_FIXUP_VERBS,
@@ -551,7 +529,7 @@ index 01310605b..379e1458f 100644
  };
  
  static const struct hda_quirk alc269_fixup_tbl[] = {
-@@ -7498,7 +7484,6 @@ static const struct hda_quirk alc269_fixup_tbl[] = {
+@@ -7547,7 +7533,6 @@ static const struct hda_quirk alc269_fixup_tbl[] = {
  	SND_PCI_QUIRK(0x1043, 0x12a3, "Asus N7691ZM", ALC269_FIXUP_ASUS_N7601ZM),
  	SND_PCI_QUIRK(0x1043, 0x12af, "ASUS UX582ZS", ALC245_FIXUP_CS35L41_SPI_2),
  	SND_PCI_QUIRK(0x1043, 0x12b4, "ASUS B3405CCA / P3405CCA", ALC294_FIXUP_ASUS_CS35L41_SPI_2),
@@ -560,7 +538,7 @@ index 01310605b..379e1458f 100644
  	SND_PCI_QUIRK(0x1043, 0x12f0, "ASUS X541UV", ALC256_FIXUP_ASUS_MIC_NO_PRESENCE),
  	SND_PCI_QUIRK(0x1043, 0x1313, "Asus K42JZ", ALC269VB_FIXUP_ASUS_MIC_NO_PRESENCE),
 diff --git a/sound/soc/amd/acp-config.c b/sound/soc/amd/acp-config.c
-index d42d4b3aa..051946562 100644
+index 5070d6a50b3c..88e4230d66c3 100644
 --- a/sound/soc/amd/acp-config.c
 +++ b/sound/soc/amd/acp-config.c
 @@ -24,12 +24,6 @@
@@ -576,7 +554,7 @@ index d42d4b3aa..051946562 100644
  	{
  		.matches = {
  			DMI_MATCH(DMI_BOARD_VENDOR, "ASUSTeK COMPUTER INC."),
-@@ -62,12 +56,6 @@ static const struct dmi_system_id acp70_acpi_flag_override_table[] = {
+@@ -69,12 +63,6 @@ static const struct dmi_system_id acp70_acpi_flag_override_table[] = {
  			DMI_MATCH(DMI_PRODUCT_NAME, "Vivobook 18 M1807GA"),
  		},
  	},
@@ -590,7 +568,7 @@ index d42d4b3aa..051946562 100644
  };
  
 diff --git a/sound/soc/intel/boards/sof_sdw.c b/sound/soc/intel/boards/sof_sdw.c
-index 454c608d7..c527d575d 100644
+index 454c608d7c8e..c527d575d1ed 100644
 --- a/sound/soc/intel/boards/sof_sdw.c
 +++ b/sound/soc/intel/boards/sof_sdw.c
 @@ -845,15 +845,6 @@ static const struct dmi_system_id sof_sdw_quirk_table[] = {
@@ -609,6 +587,3 @@ index 454c608d7..c527d575d 100644
  	{}
  };
  
--- 
-2.55.0
-

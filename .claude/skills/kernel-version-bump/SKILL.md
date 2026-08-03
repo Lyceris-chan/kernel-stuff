@@ -14,6 +14,11 @@ curl -I -s "https://git.kernel.org/torvalds/t/linux-<X.Y-rcN>.tar.gz"
 Stop and tell the user if this 404s — don't guess a nearby tag or round to one
 that exists.
 
+**Tarball source URL:** the `cdn.kernel.org/pub/linux/kernel/v7.x/testing/`
+URL 404s right after a tag is cut (the cdn mirrors RC tarballs late). Point
+`source=()` at `https://git.kernel.org/torvalds/t/linux-<tag>.tar.gz` instead
+(seen on the 7.2-rc6 bump).
+
 ## 2. Bump PKGBUILD
 
 Update `_major`/`_minor`/`_srcname` to match the verified tag. Don't touch
@@ -36,6 +41,10 @@ git -C repos/linux-7.2-rcN apply --check -R <patch>.patch  # already-applied che
   `patch-audit` skill for where each number range's source lives).
 - CachyOS per-branch patches (01xx) shifted → do NOT hand-rebase; refresh the
   whole branch set in step 4 instead.
+- A branch's squash that still applies cleanly (forward check passes) AND whose
+  sirlucjan `-sep` content is unchanged can be kept as-is — only the drifted
+  branches need regenerating (on 7.2-rc6 only `0105`/`0106` needed it). Verify
+  content is unchanged with the sirlucjan repo's HEAD date.
 
 Report every dropped or regenerated patch, with reasons, before moving to
 step 4 — never add or remove a patch silently.

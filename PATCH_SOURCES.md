@@ -179,7 +179,7 @@ Only `1101` is reverse-applied in `prepare()` (PKGBUILD line 551). If you renumb
 
 ---
 
-## 1200–1213 — AMD Power Management
+## 1200–1209 — AMD Power Management
 
 ### 1200–1203 — amd-pstate EPP boost series (David Vernet, RFC)
 
@@ -190,25 +190,26 @@ Only `1101` is reverse-applied in `prepare()` (PKGBUILD line 551). If you renumb
 | `1202` | `20260728073150.54964-4` | cpufreq/amd-pstate: Add per-core EPP boost for recently-busy CPUs |
 | `1203` | `20260728073150.54964-5` | Documentation: amd-pstate: Document the epp_boost parameter |
 
-### 1204–1210 — amd-pstate fixes (upstream series 1/7–7/7)
+### 1205–1209 — amd-pstate fixes (upstream series; `1204` and `1210` merged upstream in rc6)
 
 | File | Author | Subject | Source (Message-ID / Link) |
 |------|--------|---------|-----------------------------|
-| `1204` | Rong Zhang | cpufreq/amd-pstate: Bail out early if !X86_FEATURE_HW_PSTATE | `<20260721-amd-pstate-vm-v3-1-8b59574fb714@rong.moe>` |
 | `1205` | Qianheng Peng | cpufreq: amd-pstate-ut: Skip tests when amd-pstate driver is not active | `<1784191899-28957-1-git-send-email-pengqh1@chinatelecom.cn>` |
 | `1206` | Marco Scardovi | cpufreq/amd-pstate: Fix EPP return type and handle errors during initialization | `<20260609073042.81275-2-scardracs@disroot.org>` |
 | `1207` | Marco Scardovi | cpufreq/amd-pstate: Toggle auto_sel in active mode on shared memory systems | `<20260609073042.81275-3-scardracs@disroot.org>` |
 | `1208` | Marco Scardovi | cpufreq/amd-pstate: Cache the firmware programmed EPP value | `<20260609073042.81275-4-scardracs@disroot.org>` |
 | `1209` | EDAMAMEX | cpufreq/amd-pstate: handle missing policy in dynamic EPP callbacks | `<20260520070211.2753183-1-edame8080@gmail.com>` |
-| `1210` | Mario Limonciello | cpufreq/amd-pstate: Loosen requirement on lowest nonlinear frequency != min freq | `<20260715174318.18235-1-mario.limonciello@amd.com>` |
 
-### 1211–1213 — ACPI CPPC / cpufreq-cppc fixes (backported from post-rc5 mainline, added 2026-08-02)
+~~`1204`~~ (Bail out early if !X86_FEATURE_HW_PSTATE, Rong Zhang) — **DROPPED** 2026-08-03: merged upstream in rc6 as `cpufreq/amd-pstate: Prevent the driver from loading on unsupported hardware` (`08fc1e7b3`).
+~~`1210`~~ (Loosen requirement on lowest nonlinear freq, Mario Limonciello) — **DROPPED** 2026-08-03: merged upstream in rc6 (`6842427bf299`).
+
+### ~~1211–1213~~ — ACPI CPPC / cpufreq-cppc fixes — **ALL DROPPED** 2026-08-03 (merged upstream in rc6)
 
 | File | Commit | Author | Subject |
 |------|--------|--------|---------|
-| `1211` | `9753c0ab8` | Christian Loehle | cpufreq: cppc: Sanitize lockless policy limit snapshots |
-| `1212` | `11055a46f` | Christian Loehle | ACPI: CPPC: Check all controls for fast switching |
-| `1213` | `47d4e945d` | Christian Loehle | ACPI: CPPC: Skip writes to unsupported performance controls |
+| ~~`1211`~~ | `9753c0ab8` | Christian Loehle | cpufreq: cppc: Sanitize lockless policy limit snapshots |
+| ~~`1212`~~ | `11055a46f` | Christian Loehle | ACPI: CPPC: Check all controls for fast switching |
+| ~~`1213`~~ | `47d4e945d` | Christian Loehle | ACPI: CPPC: Skip writes to unsupported performance controls |
 
 ---
 
@@ -241,20 +242,21 @@ Source: sirlucjan `7.2-rc/block-patches-sep/`. Formerly numbered `1300`–`1304`
 
 ---
 
-## 9000–9007 — agd5f staging backports
+## 9001–9007 — agd5f staging backports (`9000`, `9004`, `9005` merged upstream in rc6)
 
 Source: `git clone --shallow-since="2026-06-01" https://gitlab.freedesktop.org/agd5f/linux.git repos/agd5f-linux`. Formerly numbered `2000`–`2007`.
 
 | File | Commit | Author | Subject |
-|------|--------|--------|---------|
-| `9000` | `8419331e64d9` | Leo Li | drm/amd/display: Exit idle optimizations before programming — v2 revision (checkpatch-fixed, `Cc: stable`), applied through the normal patch loop |
+|------|--------|---------|---------|
 | `9001` | `70a5cb5d2` | Alex Deucher | drm/amdgpu/gfx12: drop all BUG()s |
 | `9002` | `0238fd8a2` | Alex Deucher | drm/amdgpu/gfx12.1: drop all BUG()s |
 | `9003` | `d9e6b531b` | Alex Deucher | drm/amdgpu/psp14: replace BUG() with an error |
-| `9004` | `c54f8d7af` | Yang Wang | drm/amd/pm: use milliwatts for GPU power sensors |
-| `9005` | `39866e3d3` | Candice Li | drm/amdgpu: restore UMD profile pstate after runtime resume |
 | `9006` | `58b53f58e` | Timur Kristóf | drm/amdgpu/ttm: Use more optimal copy packet sizes for copy and fill |
 | `9007` | `402ebe22b267` | Alex Deucher | drm/gfx12: Program DB_RING_CONTROL |
+
+~~`9000`~~ (Exit idle optimizations before programming, Leo Li, `8419331e64d9`) — **DROPPED** 2026-08-03: merged upstream in rc6.
+~~`9004`~~ (use milliwatts for GPU power sensors, Yang Wang, `c54f8d7af`) — **DROPPED** 2026-08-03: merged upstream in rc6.
+~~`9005`~~ (restore UMD profile pstate after runtime resume, Candice Li, `39866e3d3`) — **DROPPED** 2026-08-03: merged upstream in rc6.
 
 Dropped candidates (formerly `2008`/`2009`): Jesse Zhang `47862766d211` (gfx12 userq error interrupts) and Lijo Lazar `d1331c7d89b8` (SMUv14 pptable helper) — both reference agd5f staging symbols absent from mainline rc5. Do not re-add until the staging infrastructure lands.
 
@@ -286,6 +288,52 @@ Checked and **deferred**:
 | Zuo FRL `0054` (1/4), `0056` (3/4), `0057` (4/4) | target `amdgpu_dm_connector.c`, split out of `amdgpu_dm.c` by Alex Hung (agd5f) — split not in rc5; revisit at 7.3 |
 | `695bc1971` Fixes for dcn42b_soc_bb.h | neither fwd nor rev applies to rc5; depends on intermediate drm-next commits |
 | `1eefee546` Drop CONFIG_DRM_AMD_DC_DCN4_2 from 3dlut | context mismatch in dc.h/dcn42_hwseq.c vs rc5 |
+
+---
+
+## 2026-08-03 sweep results (7.2-rc6 bump)
+
+**8 patches dropped — merged upstream in 7.2-rc6** (verified `git apply --check -R` clean against `repos/linux-7.2-rc6`):
+
+| Patch | Subject | rc6 status |
+|-------|---------|------------|
+| `1204` | cpufreq/amd-pstate: Bail out early if !X86_FEATURE_HW_PSTATE | merged (`08fc1e7b3` "Prevent the driver from loading on unsupported hardware") |
+| `1210` | cpufreq/amd-pstate: Loosen requirement on lowest nonlinear frequency | merged (`6842427bf299`) |
+| `1211` | cpufreq: cppc: Sanitize lockless policy limit snapshots | merged |
+| `1212` | ACPI: CPPC: Check all controls for fast switching | merged |
+| `1213` | ACPI: CPPC: Skip writes to unsupported performance controls | merged |
+| `9000` | drm/amd/display: Exit idle optimizations before programming | merged |
+| `9004` | drm/amd/pm: use milliwatts for GPU power sensors | merged |
+| `9005` | drm/amdgpu: restore UMD profile pstate after runtime resume | merged |
+
+**CachyOS squashes regenerated for rc6 context:**
+
+- `0105-cachy-fixes.patch` and `0106-cachy-drops.patch` re-squashed from
+  `cachyos-fixes-patches-v10-sep/` against the rc6 series tree (rc6 + local
+  `0001`–`0058`), via `patch -p1 --forward` exactly as `prepare()` applies them.
+  Net applied state verified byte-identical to the rc5-era squashes.
+- `0101`–`0104`, `0107`–`0109` kept unchanged: sirlucjan branch content is
+  identical since 2026-07-31 and the squashes still apply cleanly to rc6.
+
+**No new patches added this cycle.** Swept drm-next (via `linux-next` and the
+`agd5f-linux` amd-staging-drm-next branch — `gitlab.freedesktop.org` was
+persistently HTTP 503 during the cycle), linux-next, linux-pm, amd-gfx and
+dri-devel archives, sirlucjan, and firelzrd. Every candidate AMD/display commit
+found is already in rc6 (e.g. `fbbbd98f200f` DCN42B null registers,
+`29c57db1629e` discovery DCN42 family, `46c3c32ba655` DCN42B mcache).
+Considered and deferred:
+
+| Item | Reason |
+|------|--------|
+| `34fa4d00a111` Fixes for dcn42b_soc_bb.h | context drift vs rc6 (June 2026 staging commit; file changed since) |
+| `23ac3d628379` Reintroduce dcn42 GPIO lookup tables | staging commit ships a `.orig` artifact; revert/reintroduce churn. GPIO infra now present in rc6 — revisit at 7.3 |
+| BT.2020 YCbCr output CSC matrices fix (amd-gfx, 2 patches) | display color-space fix; not cleanly extractable from Aug archives, outside the rc6 window |
+| Alex Hung degamma helper (3/5) | series refactor, low value |
+| YUV conversion colorop (v5 00/10) | core colorop framework series — defer |
+
+**Source URL change:** the rc6 tarball was not yet on `cdn.kernel.org` at bump
+time (404 — cdn lags the git tag). Switched the `source=()` URL to
+`https://git.kernel.org/torvalds/t/linux-7.2-rc6.tar.gz`.
 
 ---
 
