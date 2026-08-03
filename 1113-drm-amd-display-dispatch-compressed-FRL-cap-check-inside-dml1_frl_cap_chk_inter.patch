@@ -1,0 +1,62 @@
+From 9afc6186faa64f5d00cfccbb0931b2ddb03975e8 Mon Sep 17 00:00:00 2001
+From: Fangzhi Zuo <jerry.zuo@amd.com>
+Date: Wed, 15 Jul 2026 15:09:34 -0400
+Subject: [PATCH] drm/amd/display: dispatch compressed FRL cap check inside
+ dml1_frl_cap_chk_inter
+
+[why]
+DSC over HDMI FRL (e.g. 4k144) was pruned by DML mode support
+because the compressed FRL cap check was never reached.
+
+dml32_TruncToValidBPP() validates the FRL output by calling
+dml1_frl_cap_chk_inter() directly. The compressed-vs-uncompressed
+dispatch (if params->compressed -> dml1_frl_cap_chk_compressed()) had
+been moved up into the top-level dml1_frl_cap_chk() wrapper, leaving
+dml1_frl_cap_chk_inter() as uncompressed-only. As a result a DSC stream
+routed through TruncToValidBPP was validated against the full
+uncompressed bandwidth, failed the cap check, and the mode was pruned
+(vlevel == num_states).
+
+[how]
+Move the compressed dispatch back into dml1_frl_cap_chk_inter() so every
+caller of _inter() (including TruncToValidBPP) honours params->compressed.
+This matches the internal DAL tree.
+
+Reviewed-by: Harry Wentland <harry.wentland@amd.com>
+Signed-off-by: Fangzhi Zuo <Jerry.Zuo@amd.com>
+Tested-by: Dan Wheeler <daniel.wheeler@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/display/dc/dml/dml1_frl_cap_chk.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/display/dc/dml/dml1_frl_cap_chk.c b/drivers/gpu/drm/amd/display/dc/dml/dml1_frl_cap_chk.c
+index 260f58a97..da2c92e5c 100644
+--- a/drivers/gpu/drm/amd/display/dc/dml/dml1_frl_cap_chk.c
++++ b/drivers/gpu/drm/amd/display/dc/dml/dml1_frl_cap_chk.c
+@@ -630,17 +630,17 @@ enum frl_cap_chk_result dml1_frl_cap_chk(struct frl_cap_chk_params *params)
+ {
+ 	struct frl_cap_chk_intermediates inter;
+ 
+-#if defined (CONFIG_DRM_AMD_DC_FP)
+-	if (params->compressed)
+-		return dml1_frl_cap_chk_compressed(params, &inter);
+-#endif
+-
+ 	return dml1_frl_cap_chk_inter(params, &inter);
+ }
+ 
+ enum frl_cap_chk_result dml1_frl_cap_chk_inter(struct frl_cap_chk_params *params,
+ 					       struct frl_cap_chk_intermediates *inter)
+ {
++#if defined (CONFIG_DRM_AMD_DC_FP)
++	if (params->compressed)
++		return dml1_frl_cap_chk_compressed(params, inter);
++#endif
++
+ 	return dml1_frl_cap_chk_uncompressed(params, inter);
+ }
+ 
+-- 
+2.55.0
+

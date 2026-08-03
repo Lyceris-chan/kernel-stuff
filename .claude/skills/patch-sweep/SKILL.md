@@ -137,25 +137,19 @@ for mbox_file in ['/tmp/amd-gfx-2026-August.txt', '/tmp/dri-devel-2026-August.tx
 
 ## Step 4 — GitLab drm/amd issue scan
 
-Fetch via REST API (no auth needed for public project):
+**BLOCKED (verified 2026-08-03):** `gitlab.freedesktop.org` now fronts the
+`drm/amd/-/work_items` tracker and the REST API (`/api/v4/projects/drm%2Famd/...`)
+with the **Anubis** anti-bot challenge — both the web page and API return the
+proof-of-work page, and a browser User-Agent does not bypass it. Do not waste
+attempts on direct access this cycle. Cover the same ground via the
+`amd-gfx`/`dri-devel` archives (Step 3) and the `agd5f-linux`
+`amd-staging-drm-next` branch (Step 2); retry the API only opportunistically:
 
 ```bash
-# Project ID for drm/amd is available via:
-# curl "https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd" | python3 -m json.tool | grep '"id"'
-# Then fetch recent issues:
-curl -sf "https://gitlab.freedesktop.org/api/v4/projects/1687/issues?state=opened&per_page=100&sort=updated_desc" \
-  | python3 -c "
-import json, sys
-issues = json.load(sys.stdin)
-kw = re.compile(r'navi48|9070|gfx12|DCN401|dcn4|SMU14|rdna.?4|RX.?90[67]', re.IGNORECASE)
-for i in issues:
-    if kw.search(i.get('title','') + ' ' + i.get('description','') or ''):
-        print(i['iid'], i['title'], i['web_url'])
-"
+# May return an Anubis HTML challenge — treat non-JSON as blocked.
+curl -sf "https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/issues?state=opened&per_page=100&sort=updated_desc" \
+  | head -c 200
 ```
-
-Comment text requires authentication — check referenced MR numbers in the issue
-body for cherry-pickable commits.
 
 ## Step 5 — Dry-run clean candidates
 

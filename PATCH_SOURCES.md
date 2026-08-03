@@ -125,7 +125,7 @@ The `0105` fixes squash carries the full 26-patch branch; `0106` reverses the of
 
 ---
 
-## 1000–1019 — AMDGPU GPU core
+## 1000–1021 — AMDGPU GPU core
 
 Source: drm-next (`https://gitlab.freedesktop.org/drm/kernel.git`) / amd-gfx. Formerly numbered `1002`–`1065`.
 
@@ -151,10 +151,12 @@ Source: drm-next (`https://gitlab.freedesktop.org/drm/kernel.git`) / amd-gfx. Fo
 | `1017` | Alex Deucher | gmc12: switch to new gmc tlb inv helpers |
 | `1018` | Matthew Stewart | Switch order of GC and Display IP blocks (DCN42B) |
 | `1019` | Alex Deucher | update mmhub 4.2.0 client list — drm-next `658422c7b` |
+| `1020` | Alex Deucher | gmc12.1: fix MMHUB0 check in pasid tlb flush — amd-gfx ML `<20260728153930.1531949-1-alexander.deucher@amd.com>` (not yet upstream) |
+| `1021` | Alex Deucher | gmc12.1: implement tlb inv semaphore — amd-gfx ML `<20260730172740.1268133-1-alexander.deucher@amd.com>` (not yet upstream) |
 
 ---
 
-## 1100–1111 — AMD display
+## 1100–1113 — AMD display
 
 Source: drm-next, confirmed CLEAN-APPLY on v7.2-rc5 via `git apply --check`. `1100`–`1103` were formerly `1025`, `1031`, `1033`, `1065`.
 
@@ -172,6 +174,7 @@ Source: drm-next, confirmed CLEAN-APPLY on v7.2-rc5 via `git apply --check`. `11
 | `1109` | `889afb51a` | Dillon Varone | Add updated MCIF ARB register definitions |
 | `1110` | `e324cce52` | Dillon Varone | Port DCN4+ MCIF ARB programming to new format |
 | `1111` | `5a22cc7c7` | Bhuvanachandra Pinninti | Fix dc_stream_remove_writeback dropping wrong writeback entries |
+| `1113` | `9afc6186f` | Fangzhi Zuo | dispatch compressed FRL cap check inside dml1_frl_cap_chk_inter (fixes DSC-over-HDMI-FRL mode pruning, e.g. 4k144) — drm-next `9afc6186f` |
 
 ~~`1112`~~ (`334cbfa3c`, dcn401 GPIO lookup tables) — **DROPPED**: requires `DC_GPIO_GENERIC_A`/`DC_GPIO_HPD_A` type defs from a prerequisite GPIO infrastructure patch not in rc5.
 
@@ -242,7 +245,7 @@ Source: sirlucjan `7.2-rc/block-patches-sep/`. Formerly numbered `1300`–`1304`
 
 ---
 
-## 9001–9007 — agd5f staging backports (`9000`, `9004`, `9005` merged upstream in rc6)
+## 9001–9008 — agd5f staging backports (`9000`, `9004`, `9005` merged upstream in rc6)
 
 Source: `git clone --shallow-since="2026-06-01" https://gitlab.freedesktop.org/agd5f/linux.git repos/agd5f-linux`. Formerly numbered `2000`–`2007`.
 
@@ -253,6 +256,7 @@ Source: `git clone --shallow-since="2026-06-01" https://gitlab.freedesktop.org/a
 | `9003` | `d9e6b531b` | Alex Deucher | drm/amdgpu/psp14: replace BUG() with an error |
 | `9006` | `58b53f58e` | Timur Kristóf | drm/amdgpu/ttm: Use more optimal copy packet sizes for copy and fill |
 | `9007` | `402ebe22b267` | Alex Deucher | drm/gfx12: Program DB_RING_CONTROL |
+| `9008` | — | Qiang Yu | drm/amdgpu: read TRUNCATE_COORD_MODE on gfx12 — amd-gfx ML `<20260723095431.2831513-1-qiang.yu@amd.com>`; **must apply after `9007`** (its trailing context is the DB_RING_CONTROL block that `9007` adds) |
 
 ~~`9000`~~ (Exit idle optimizations before programming, Leo Li, `8419331e64d9`) — **DROPPED** 2026-08-03: merged upstream in rc6.
 ~~`9004`~~ (use milliwatts for GPU power sensors, Yang Wang, `c54f8d7af`) — **DROPPED** 2026-08-03: merged upstream in rc6.
@@ -334,6 +338,53 @@ Considered and deferred:
 **Source URL change:** the rc6 tarball was not yet on `cdn.kernel.org` at bump
 time (404 — cdn lags the git tag). Switched the `source=()` URL to
 `https://git.kernel.org/torvalds/t/linux-7.2-rc6.tar.gz`.
+
+---
+
+## 2026-08-03 second sweep (post-rc6 build)
+
+**4 patches added** (all verified `git apply --check` forward-clean, reverse-fails
+= genuinely not in rc6):
+
+| File | Subject | Source |
+|------|---------|--------|
+| `1020` | gmc12.1: fix MMHUB0 check in pasid tlb flush | amd-gfx ML `<20260728153930.1531949-1-alexander.deucher@amd.com>` (Alex Deucher) |
+| `1021` | gmc12.1: implement tlb inv semaphore | amd-gfx ML `<20260730172740.1268133-1-alexander.deucher@amd.com>` (Alex Deucher) |
+| `1113` | dispatch compressed FRL cap check inside dml1_frl_cap_chk_inter | drm-next `9afc6186f` (Fangzhi Zuo — same FRL series author as `0055`/`0058`) |
+| `9008` | read TRUNCATE_COORD_MODE on gfx12 | amd-gfx ML `<20260723095431.2831513-1-qiang.yu@amd.com>` (Qiang Yu, R-b Alex Deucher) |
+
+**Series-order dependency discovered:** `9008`'s trailing context is the
+`DB_RING_CONTROL` comment block that `9007` adds to `gfx_v12_0.c`. `9008` must
+apply **after** `9007` — verified sequentially. Do not renumber it into the
+`10xx` range (would apply before `9007` and fail).
+
+**CachyOS: unchanged.** sirlucjan repo master is still 2026-07-31 (no new
+commits since the rc6 bump); the `01xx` squashes already match the current
+`-sep` sources (`fixes` v10, `preempt-ipi` v3, `lru-marie` v12, `nap` v0.5.0).
+The two amd-pstate v2-sep patches we don't carry (`0001` Bail-out-early,
+`0007` Loosen-lowest-nonlinear) are recorded as merged upstream in rc6.
+
+**Merged-patch audit: 0 to drop.** Reverse-apply checked all 80 pre-existing
+patches against pristine `repos/linux-7.2-rc6`; none reverse-apply clean, so
+none are redundant with the base. rc6 is unchanged since the bump.
+
+**Mailing-list candidates considered and deferred:**
+
+| Item | Reason |
+|------|--------|
+| Retry fault handling v3 (Timur Kristóf, 14 patches) | large series, still in review after a month (likely needs v4); gfxhub/gmc/ih/mmhub changes |
+| gfx12 priv-fault user-queue recovery v4 (Jesse Zhang, 5 patches) | in-review WIP; user-queue resilience, not pulled yet |
+| PPT limit runtime policy refactor (Yang Wang, 4 patches, ~1500 lines) | touches `smu_v14_0.c`/`smu_v14_0_2_ppt.c` where our local `0003`/`0004` live — heavy conflict + behavioral risk |
+| sdma6/7/7.1 "don't do MMIO in MQD init" series | multi-patch with prerequisites; cleanup-oriented |
+| RAS UMC v12 refactor (Tao Zhou, 3 patches) | fresh (Aug 3), refactor-only, low desktop value |
+| AMD VSDB FreeSync EDID common-code series (Fangzhi Zuo) | overlaps our `0050`/`0055`; different (common-code) approach — revisit at 7.3 |
+| `34fa4d00a111` Fixes for dcn42b_soc_bb.h | hunk 2 (`cursor_buffer_size`) targets `dml2_dcn42b_max_ip_caps`, a struct absent from rc6; only the `gpuvm_min_page_size` hunk applies — deferred, revisit at 7.3 |
+
+**Work items tracker note:** `https://gitlab.freedesktop.org/drm/amd/-/work_items`
+is behind Anubis anti-bot (same as `lore.kernel.org`) — the page and the REST
+API both return the Anubis challenge. No content could be read directly;
+covered the same ground via the amd-gfx/dri-devel lists and the agd5f staging
+branch.
 
 ---
 

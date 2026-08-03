@@ -67,6 +67,24 @@ Never scrape `lore.kernel.org` — its anti-bot protection blocks agents.
   `.txt.gz` mbox is also available: `.../{YYYY-Month}.txt.gz`.
 - **Search**: Parse thread HTML for subjects targeting `gfx12`, `navi48`, `dcn4`, `smu14`, `sdma7`, `vcn5`.
 - **Extraction**: Download raw mbox file for the target thread or save patch directly.
+- **Clean-patch extraction from mboxes (learned 2026-08-03):** a saved thread mbox
+  contains replies that *quote* the original patch, so `git apply --check` on a raw
+  message fails ("corrupt patch"). Split the **full monthly mbox** (`amd-gfx-2026-July.mbox`),
+  find the **original submission** (unquoted `diff --git`, author `Signed-off-by`), then
+  extract with `git mailinfo <msgfile> <patchfile>` → clean patch body + separate commit
+  message. Reconstruct the patch file with the original `From:`/`Date:`/`Subject:`/`Message-ID:`
+  headers (mbox format is fine; preserve author and `Signed-off-by`).
+- **Series-order check:** a candidate whose trailing context matches content that an
+  earlier *backported* patch adds (e.g. `9008`'s DB_RING_CONTROL context comes from `9007`)
+  must be numbered to apply **after** that patch. Test sequentially in a scratch tree, not
+  just `git apply --check` in isolation.
+
+### 4b. drm/amd work items tracker (gitlab.freedesktop.org)
+
+`https://gitlab.freedesktop.org/drm/amd/-/work_items` is behind **Anubis** anti-bot (same
+as `lore.kernel.org`) — the page and the REST API (`/api/v4/projects/drm%2Famd/...`) both
+return the challenge. Do not waste attempts on it; cover the same work via the
+amd-gfx/dri-devel archives and the `agd5f-linux` amd-staging-drm-next branch.
 
 ### 5. `sirlucjan` (Third-Party Performance Patches)
 - **Repository**: `https://github.com/sirlucjan/kernel-patches.git`

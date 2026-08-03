@@ -135,7 +135,10 @@ A request for "build it" is phase 3 alone.
 
 1. **Never use `ld.mold`** — crashes on kernel vDSO linker scripts (`fatal: unknown linker script token SECTIONS`).
 2. **Never access `lore.kernel.org`** — anti-bot protection blocks automated agents. Use git
-   repos or `lists.freedesktop.org` archives instead.
+   repos or `lists.freedesktop.org` archives instead. The **drm/amd work items tracker**
+   (`https://gitlab.freedesktop.org/drm/amd/-/work_items`) is behind the same Anubis
+   anti-bot protection — both the page and the REST API return the challenge. Cover its
+   content via the amd-gfx/dri-devel lists and the `agd5f-linux` amd-staging branch instead.
 3. **Never hand-write or fabricate a patch diff.** No traceable commit or mailing list
    submission → tell the user, don't invent one.
 4. **Never add patches for hardware we don't have** (Intel/Nvidia GPUs, ARM/SoC, Apple T2,
@@ -418,6 +421,10 @@ The route-detection probe uses Quad9 (`9.9.9.9`), never `8.8.8.8`.
 | `patch` leaves `.orig` backups in a git worktree | Regenerating the `01xx` squashes staged `.orig` backups created by `patch`, and they leaked into the squash as huge bogus deletions (`0105` ballooned 51 KB → 628 KB) | `find . -name '*.orig' -delete; find . -name '*.rej' -delete` after EVERY patch phase, before `git add`/`git diff` |
 | Overlapping local patches pass `git apply` only in isolation | `0003` and `0004` both edit `smu_v14_0.c` near PROFILE_PEAK; strict `git apply` fails on `0004` after `0003`, but `patch -p1 --forward` applies it with fuzz (offset 2) | Generate and validate squashes with `patch -p1 --forward`, exactly as `prepare()` does — strict `git apply` misreports fuzz-tolerable sequences |
 | Regenerated every 01xx squash on a bump, then only fixes/drops needed it | sirlucjan branch content was identical (repo master at 2026-07-31) and `0101`–`0104`/`0107`–`0109` applied cleanly to rc6; only `0105`/`0106` had drifted | On a bump, regenerate only the 01xx squashes that fail `git apply --check`; keep unchanged + clean-applying ones |
+| New patch's trailing context matched content an earlier backport adds (`9008` vs `9007` DB_RING_CONTROL) | The truncate-coord gfx12 patch was written against a tree that already had `9007`'s DB_RING_CONTROL block, so it only applied AFTER `9007`; numbered into `10xx` it would fail | When a candidate's context depends on another backport's added content, number it to apply AFTER that backport — even if that crosses into the `90xx` range. Always verify the sequential order |
+| Mailing-list mboxes contain quoted replies, not just originals | `git apply --check` on a `thread.html`-downloaded mbox message fails ("corrupt patch") because the diff is inside a quoted reply body | Split the monthly mbox, find the **original** submission (unquoted `diff --git`), extract with `git mailinfo` → clean patch + separate commit message |
+| gitlab.freedesktop.org work items tracker is Anubis-blocked | The `drm/amd/-/work_items` page and REST API both return the Anubis challenge (same anti-bot as lore.kernel.org) — could not read the tracker directly | Use the amd-gfx/dri-devel lists + `agd5f-linux` staging branch to cover the same work; note the limitation in sweep reports |
+| A `--since`-window git log sweep can miss patches that moved between staging and drm-next | Staging commits appear in drm-next under *different* SHAs (re-submitted), so hash-based `comm` diffs showed 216 "staging-only" commits that were actually already in drm-next | Diff staging vs drm-next by **subject line**, not SHA; a same-subject commit in drm-next = already reviewed/merged upstream |
 
 ---
 

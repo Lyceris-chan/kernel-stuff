@@ -234,7 +234,7 @@ echo profile_peak | sudo tee /sys/class/drm/card0/device/power_dpm_force_perform
 
 ## Patch series
 
-Per-patch manifest of the full 88-patch series. See `PATCH_SOURCES.md` for full
+Per-patch manifest of the full 84-patch series. See `PATCH_SOURCES.md` for full
 provenance (authors, commit hashes, Message-IDs).
 
 ### Local / upstream SMU14 + DCN401 (0001–0034)
@@ -278,7 +278,7 @@ provenance (authors, commit hashes, Message-IDs).
 | `0108` | Adds SMP preemption + TLB flush (14 patches). | CachyOS (sirlucjan) |
 | `0109` | Adds EDID DSC BPP parsing (8 patches). | CachyOS (sirlucjan) |
 
-### GPU core (1000–1019)
+### GPU core (1000–1021)
 
 | Patch | What it does | Source |
 |---|---|---|
@@ -302,8 +302,10 @@ provenance (authors, commit hashes, Message-IDs).
 | `1017` | Switches GMC12 to the new TLB-invalidation helpers. | drm-next |
 | `1018` | Switches the order of GC and Display IP blocks (DCN42B). | drm-next |
 | `1019` | Updates the mmhub 4.2.0 client list. | drm-next |
+| `1020` | Fixes the MMHUB0 check in the gmc12.1 pasid TLB flush (copy-paste typo). | amd-gfx ML |
+| `1021` | Adds a TLB-invalidation semaphore for gmc12.1 (locks the interface). | amd-gfx ML |
 
-### Display (1100–1111)
+### Display (1100–1113)
 
 | Patch | What it does | Source |
 |---|---|---|
@@ -319,6 +321,7 @@ provenance (authors, commit hashes, Message-IDs).
 | `1109` | Adds updated MCIF ARB register definitions. | drm-next |
 | `1110` | Ports DCN4+ MCIF ARB programming to the new format. | drm-next |
 | `1111` | Fixes `dc_stream_remove_writeback()` dropping wrong writeback entries. | drm-next |
+| `1113` | Fixes DSC-over-HDMI-FRL mode pruning (compressed FRL cap check dispatch). | drm-next |
 
 ### Power management (1200–1209)
 
@@ -359,7 +362,7 @@ provenance (authors, commit hashes, Message-IDs).
 |---|---|---|
 | `2200` | NAP cpuidle governor v0.5.0 for 7.2. | CachyOS (sirlucjan) |
 
-### agd5f staging (9001–9007)
+### agd5f staging (9001–9008)
 
 | Patch | What it does | Source |
 |---|---|---|
@@ -368,6 +371,7 @@ provenance (authors, commit hashes, Message-IDs).
 | `9003` | Replaces a PSP14 `BUG()` with an error. | agd5f staging |
 | `9006` | Uses more optimal copy-packet sizes for copy/fill in TTM. | agd5f staging |
 | `9007` | Programs DB_RING_CONTROL on gfx12. | agd5f staging |
+| `9008` | Reads `TA_CNTL2.TRUNCATE_COORD_MODE` on gfx12 (conformant truncation flag). | amd-gfx ML |
 
 ## Repository layout
 

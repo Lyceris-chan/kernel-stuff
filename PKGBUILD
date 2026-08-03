@@ -282,6 +282,8 @@ source=(
   "1017-drm-amdgpu-gmc12-switch-to-new-gmc-tlb-inv-helpers.patch"
   "1018-drm-amdgpu-Switch-order-of-GC-and-Display-IP-blocks.patch"
   "1019-drm-amdgpu-update-mmhub-4.2.0-client-list.patch"
+  "1020-drm-amdgpu-gmc12.1-fix-MMHUB0-check-in-pasid-tlb-flush.patch"
+  "1021-drm-amdgpu-gmc12.1-implement-tlb-inv-semaphore.patch"
   "1100-drm-amd-display-enable-psr-and-replay-on-dcn4-variant-and-fi.patch"
   "1101-drm-amd-display-enable-pstate-for-dcn4-non-emulation-builds.patch"
   "1102-drm-amd-display-increase-dcn42b-uclk-value.patch"
@@ -295,6 +297,7 @@ source=(
   "1109-drm-amd-display-Add-updated-MCIF-ARB-register-definitions.patch"
   "1110-drm-amd-display-Port-DCN4-MCIF-ARB-programming-to-new-format.patch"
   "1111-drm-amd-display-Fix-dc_stream_remove_writeback.patch"
+  "1113-drm-amd-display-dispatch-compressed-FRL-cap-check-inside-dml1_frl_cap_chk_inter.patch"
   # 1112 dropped: dcn401 GPIO lookup tables requires prerequisite GPIO infrastructure patch not in rc5
   "1200-cpufreq-amd-pstate-Document-missing-kernel-doc-mem.patch"
   "1201-cpufreq-amd-pstate-Update-cppc_req_cached-before-w.patch"
@@ -321,6 +324,7 @@ source=(
   "9003-drm-amdgpu-psp14-replace-BUG-with-an-error.patch"
   "9006-drm-amdgpu-ttm-Use-more-optimal-copy-packet-sizes-for-copy-and-fill.patch"
   "9007-drm-gfx12-Program-DB_RING_CONTROL.patch"
+  "9008-drm-amdgpu-read-TRUNCATE_COORD_MODE-on-gfx12.patch"
 )
 
 validpgpkeys=(
@@ -897,6 +901,8 @@ b2sums=('60508428f39763690e8911ca78770db4be6a19200a915f1e0e7d253e94eee86dbc96a0d
         '7d10158ac24ec34febf7153b9880592ad46e035c702c91cda424e11722074a5c7590172400d321f1b69f74494591a2fada799a486d5d159e6e8ae57869925379'
         'a47c00f575dc689566a58d4e511f29cc40d642a11aa66b806ffbc5de4659c09ee6a486fdca237c3322336d716d15eb78f794bde7148885b51dfee24a0ad65edd'
         '9882a49729b1030941352cda465deaa36965b288a03acca7030fc9b9f1dd74e7e8257895da29b2ebd38041bf5d89d555335ef5c635379261957c563348d0b1f0'
+        '34d5ec2694549ce12a66a057d754931fdb33f4aba4edac25303d0aedcb6548b7e073bf2b4e33d83bef194ef33a409904052837b8b0f64a96359494a34f0d88dc'
+        '7abf4a2492041ebb6d4181f2de6b74e71f1b46f8c95eb3314ae6af1b59c4d7ec4bcc5656f4824f8fdf21d0e6c060eaa76c38fb783046117cde4ef0574e052eb6'
         '02803704ce3fe311f9bc88e0cdeae545829023a7c3c241a00f4a2bc07ffd27fe5089010b4fc0456c56898bbd09ab93ab3d764cfa97080a5aaf114df1bd91680b'
         '692244e62c6d34c7aca8fda750d18befaefdc02a3be11632aeb6a69327645e6814efb00a4c475bfc407c0dabbce0b5d88c86262acbf32b29111c5e99e2acabd6'
         '9395fc7d168c7cd6cb6b13edbedc2adc58a4a18cd024ae259345034b06bac84e8f9a34334508cd3571aaedb22e85aa2c9a01cd11e5c5336be148e07d63230bd8'
@@ -909,6 +915,7 @@ b2sums=('60508428f39763690e8911ca78770db4be6a19200a915f1e0e7d253e94eee86dbc96a0d
         '166da22fdf4e5d4bff79d16888b55b7290bfa363d3f64a33bdbcebb56cb796d6fa9a6070477ace108947284a4f64ff560f7e85cc1b0abc23f164ec9c7b145d6f'
         'defc3d776fb7ab16215a8df6951b8c2dddaf7f19838cd5123732e6d9e16cc504410b4fdbd0ad547a198cf0164ba513f32c5191273a67ac1b8721a6f7797d95ae'
         '40e7f2df3c07a21af963e0f8dca7a11b4db43b15ea52cbfc42caee01180d5fda91cc4391fa3cc5d84ee42870ae8fa73dd17025b2115691f010af531cdc63c025'
+        '565377c225854f57a74a48d742231b6148b25fe8c26e80578b784f8f25d6cb0126eed7361b36d9efb260301c5616c46eab7faf56d224d461bf063df0a4c3c39b'
         'aad86c7d3e29956976634971ed46663e67365517b69e35e7cce3e135bcc855c324187dd691630af28a5da7045e6766d52a3b2392726b0bc8587a221f9eedca48'
         'e9d464ebf525cd8d93d48f1cbedea0197bd9d0142085da7d83ec3dfda0174483a0fea4077055fd7d1ad9180563dc6dfb77e4f52f9bcb023b7c7d7c9fb5c39ece'
         '9d3e36dbc5c9c5342d2991c4665278ed075073196251e59280bd12f1d6812a37d31db58f5cb978b926e2dcd0a32365960a414b69d10f463bd8f68cedbb4bb6ae'
@@ -931,6 +938,7 @@ b2sums=('60508428f39763690e8911ca78770db4be6a19200a915f1e0e7d253e94eee86dbc96a0d
         'c8c7a6f608eb18b41c771b9fca38f254aaea887f761300494520e9164ac5d695c0f58f6f12702c30e291ef1938384fe7110bbb9f260d354b898b5d1b89465108'
         '270c2bb7cb1e3e2540abf29ff51e0babed092c7eebedcea82805a471c145b1e4ed72f34aec076270ee56ad3743fa4fa0c17f85a0e248cc179d3d4706eee7c717'
         'bdc839d1629f22095c5907e62b7a1a4edfcedebe0cf7e430897ae87aa331cbad28e28cef106ae38c05cafa585fa19ddc019579f1b73fcfaa69d8a8bd40ba8111'
+        '5add019b593c53579ffc0bb8a0ad5febca0f7dc566f0f555c8eb42e028ec8bfb3ed412b70bfb5f080099687502167f2176c52e62240a987ab91625dc28fa06f3'
         '116ec92181c091e7e57f3c88b159a7080d3f3dfd05ed661da95811dd58209e4b83a69edfc47a57126524c014cdc0bb7b72f9be94294237c24461ac702e2b1206')
 
 if [ "$_use_kernel_org_llvm" = "yes" ]; then
