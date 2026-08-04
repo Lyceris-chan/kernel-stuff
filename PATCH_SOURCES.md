@@ -125,7 +125,7 @@ The `0105` fixes squash carries the full 26-patch branch; `0106` reverses the of
 
 ---
 
-## 1000–1022 — AMDGPU GPU core
+## 1000–1023 — AMDGPU GPU core
 
 Source: drm-next (`https://gitlab.freedesktop.org/drm/kernel.git`) / amd-gfx. Formerly numbered `1002`–`1065`.
 
@@ -154,6 +154,7 @@ Source: drm-next (`https://gitlab.freedesktop.org/drm/kernel.git`) / amd-gfx. Fo
 | `1020` | Alex Deucher | gmc12.1: fix MMHUB0 check in pasid tlb flush — amd-gfx ML `<20260728153930.1531949-1-alexander.deucher@amd.com>` (not yet upstream) |
 | `1021` | Alex Deucher | gmc12.1: implement tlb inv semaphore — amd-gfx ML `<20260730172740.1268133-1-alexander.deucher@amd.com>` (not yet upstream) |
 | `1022` | Candice Li | reject oversized IBs with per-ring packet limits — amd-gfx ML `<20260803102416.3776005-1-candice.li@amd.com>` (v2, not yet upstream). Per-ring 20-bit IB packet-size limit checked before IB allocation in `amdgpu_cs.c`; applies to GFX/compute/SDMA/VPE rings (RDNA4). CLEAN on rc6 (`git apply --check` + `patch -p1 --forward --dry-run`, offset 5). |
+| `1023` | Steven Barrett (Liquorix) | drm/amdgpu/pm: Allow override of min_power_limit with `ignore_min_pcap` — backport from CachyOS/linux fork commit `16cd15654cc6` (2024, carried by CachyOS in every release). Adds an opt-in module param (`amdgpu.ignore_min_pcap=1`) that reads the min power cap as 0 and bypasses the SMU min-power-limit floor in `amdgpu_pm.c`/`amdgpu_smu.c` (swsmu, incl. SMU14). Default 0 = unchanged behavior. Adopted 2026-08-04 after the linux-cachyos-rc 7.2-rc6-2 release audit (the one fork-direct change relevant to our SMU14 power handling). CLEAN on rc6 (`git apply --check` forward, reverse fails). |
 
 ---
 
@@ -560,6 +561,42 @@ Repos re-fetched (drm-next, agd5f-linux, amd-staging-drm-next, linux-next to `ne
 **sirlucjan / CachyOS:** all `7.2-rc/` branch dirs unchanged (fixes v10, preempt-ipi v3, lru-marie v12, nap v0.5.0, master at 2026-07-31). No `01xx` squash regeneration needed. amd-pstate `-v2-sep` already audited on 2026-08-03; overlapping patches differ only by hunk offsets.
 
 **Already in rc6 (reverse-check clean, no re-add):** `8419331e64d9` (Leo Li DCN vblank/flip follow-up), `fbbaca9e2087` (DCE check in dm_gpureset_toggle_interrupts), `82730dba0cf9` (flip-done timeouts on mode1 reset), `00c391102abc`/`6d92c4d03063` (FAMS2 DMUB hw lock rename).
+
+---
+
+## 2026-08-04 CachyOS release audit (linux-cachyos-rc 7.2-rc6-2)
+
+CachyOS pushed `linux-cachyos-rc 7.2-rc6-2` (2026-08-04; base bumped rc5→rc6,
+pkgrel 2). Audited against our series by applying our `0101`–`0109` squashes to
+a clean torvalds-rc6 tree and diffing against the `cachyos-7.2-rc6-2` fork tag
+(`CachyOS/linux`), plus a per-file `(cachyos rc5-1→rc6-2 delta) vs (torvalds
+rc5→rc6 delta)` comparison.
+
+**Result: our kept-branch squashes are already current.** 60/91 files byte-identical;
+the 31 diffs are:
+- **Branches we deliberately exclude** (13): i915, btusb, rtw89, iwlwifi, nouveau,
+  i2c touchpad, alc269 laptop audio, SOF — expected (`0106` drops them).
+- **Our `0151` exclusion in the hdmi squash** (`drm_edid.c`/`amdgpu_dm.c`/`drm_connector.h`)
+  plus our `00xx`/`10xx` additions — expected.
+- **Fork-direct commits CachyOS carries in `CachyOS/linux` but NOT in sirlucjan's
+  `-sep` dirs** — evaluated, not adopted:
+  - `CONFIG_CACHY` Kconfig + CONFIG_CACHY-gated sched tunables in `sched/fair.c`
+    (`sysctl_sched_base_slice=400000`, `migration_cost=400000`), `likely/unlikely`
+    hints in `sched/core.c`, `h_load`/`runnable_avg` fields — CachyOS's opinionated
+    scheduler tuning. Not adopted (behavior change; we historically strip CACHY
+    overrides; sched-ext is our scheduler path).
+  - `SCHED_POC_SELECTOR` — the `poc-selector` branch (new CachyOS idle-CPU selector).
+    Not in our branch set. Not adopted.
+  - Makefile `-fmodulo-sched`/`-mllvm -enable-pipeliner` — LLVM pipelining, same
+    miscompilation-risk class as the excluded `clang-patches` branch. Not adopted.
+  - `unprivileged_userns_clone` restriction (`kernel/fork.c`) — from `arch-patches`
+    branch (un-carried). Not adopted.
+  - **`amdgpu_ignore_min_pcap`** — adopted as `1023` (the one change relevant to
+    our SMU14 power-cap handling).
+
+Also removed the stale `scripts/config -e CACHY` from `prepare()` (+ `kernel-build/
+reference.md`) — CONFIG_CACHY is defined only in the CachyOS/linux fork, so the line
+was a silent no-op.
 
 ---
 

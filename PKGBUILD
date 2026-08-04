@@ -181,7 +181,7 @@ _minor=
 _rcver=rc6
 pkgver=${_major}.${_rcver}
 _tagrel=1
-pkgrel=4
+pkgrel=5
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}-${_rcver}
@@ -287,6 +287,8 @@ source=(
   # Candice Li: reject oversized IBs — per-ring packet limit check in amdgpu_cs.c
   # <20260803102416.3776005-1-candice.li@amd.com> — CLEAN on rc6
   "1022-drm-amdgpu-reject-oversized-IBs-with-per-ring-packet-limits.patch"
+  # Steven Barrett (Liquorix): amdgpu ignore_min_pcap module param (CachyOS/linux fork, carried since 2024)
+  "1023-drm-amdgpu-pm-Allow-override-of-min_power_limit-with-ignore_min_pcap.patch"
   "1100-drm-amd-display-enable-psr-and-replay-on-dcn4-variant-and-fi.patch"
   "1101-drm-amd-display-enable-pstate-for-dcn4-non-emulation-builds.patch"
   "1102-drm-amd-display-increase-dcn42b-uclk-value.patch"
@@ -553,7 +555,8 @@ EOF
     scripts/config -d GENERIC_CPU -e MZEN4
     scripts/config -d LTO_NONE -e LTO_CLANG_THIN
     scripts/config -d CC_OPTIMIZE_FOR_PERFORMANCE -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
-    scripts/config -e CACHY
+    # Note: no CONFIG_CACHY — the CachyOS Kconfig symbol is defined only in the
+    # CachyOS/linux fork, not in the sirlucjan branches we carry; -e CACHY was a no-op.
     scripts/config -e CMDLINE_BOOL --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 elevator=kyber" -d CMDLINE_OVERRIDE
     scripts/config -e DEBUG_KERNEL -d DEBUG_INFO_NONE -d DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT -e DEBUG_INFO_DWARF5 -e DEBUG_INFO_BTF
     scripts/config -d SECURITY_APPARMOR -d SECURITY_APPARMOR_DEBUG -d SECURITY_APPARMOR_INTROSPECT_POLICY
@@ -961,6 +964,7 @@ b2sums=('60508428f39763690e8911ca78770db4be6a19200a915f1e0e7d253e94eee86dbc96a0d
         '34d5ec2694549ce12a66a057d754931fdb33f4aba4edac25303d0aedcb6548b7e073bf2b4e33d83bef194ef33a409904052837b8b0f64a96359494a34f0d88dc'
         '7abf4a2492041ebb6d4181f2de6b74e71f1b46f8c95eb3314ae6af1b59c4d7ec4bcc5656f4824f8fdf21d0e6c060eaa76c38fb783046117cde4ef0574e052eb6'
         'de7ebab6e38309c80bdd861136973fa5455caefe54eae03b75e88c83fe524c379875b86da027258299554056a1363346fc74fa64ee1dec6e61a86242786dcdac'
+        '492fe63e48d54f7c7d5fbcd614d937f71116bfe823588b0c8dbad53cae920cc8ce10468135382c55effcea8d57f8fff91b2b640c75e620b53a597f2af416fa2b'
         '02803704ce3fe311f9bc88e0cdeae545829023a7c3c241a00f4a2bc07ffd27fe5089010b4fc0456c56898bbd09ab93ab3d764cfa97080a5aaf114df1bd91680b'
         '692244e62c6d34c7aca8fda750d18befaefdc02a3be11632aeb6a69327645e6814efb00a4c475bfc407c0dabbce0b5d88c86262acbf32b29111c5e99e2acabd6'
         '9395fc7d168c7cd6cb6b13edbedc2adc58a4a18cd024ae259345034b06bac84e8f9a34334508cd3571aaedb22e85aa2c9a01cd11e5c5336be148e07d63230bd8'
