@@ -240,7 +240,7 @@ echo profile_peak | sudo tee /sys/class/drm/card0/device/power_dpm_force_perform
 
 ## Patch series
 
-Per-patch manifest of the full 126-patch series. See `PATCH_SOURCES.md` for full
+Per-patch manifest of the full 127-patch series. See `PATCH_SOURCES.md` for full
 provenance (authors, commit hashes, Message-IDs).
 
 ### Local / upstream SMU14 + DCN401 (0001–0034)
@@ -317,7 +317,7 @@ provenance (authors, commit hashes, Message-IDs).
 | `1022` | Rejects oversized IBs with per-ring packet limits in `amdgpu_cs.c` (CS hardening). | amd-gfx ML |
 | `1023` | `amdgpu.ignore_min_pcap=1` module param — override the SMU min power cap (Liquorix, CachyOS backport). | CachyOS/linux fork |
 
-### Display (1100–1133)
+### Display (1100–1134)
 
 | Patch | What it does | Source |
 |---|---|---|
@@ -354,6 +354,7 @@ provenance (authors, commit hashes, Message-IDs).
 | `1131` | Adds missing DCN42B register defines. | amd-gfx ML (Roman.Li DC batch) |
 | `1132` | Adds missing DMUB CACP and PR definitions. | amd-gfx ML (Roman.Li DC batch) |
 | `1133` | Adds FFE level defaults (DCN6 hunks stripped — absent from rc6). | amd-gfx ML (Roman.Li DC batch) |
+| `1134` | Fixes BT.2020 YCbCr limited-output CSC matrix (too-bright HDR on calibrated panels; author-tested on 9070 XT). | amd-gfx ML (Nathan Lucas, 2026-08-02; P2 DCE copy rejected — off-target) |
 
 ### Power management (1200–1209)
 

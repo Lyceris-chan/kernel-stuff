@@ -16,6 +16,7 @@ PATCH_SOURCES.md for renumber history, e.g. `1100`–`1103` were formerly
 | `DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT` with Clang 23 | pahole 1.31 couldn't parse DWARF → BTF generation failed | Use `DEBUG_INFO_DWARF5` explicitly |
 | Dropped patch without user approval | User directive: never remove without sign-off | Always ask first |
 | Checked only drm-next for patches | Missed mailing-list-only patches | Check all six sources every sweep |
+| Trusted `ls-remote --tags` for linux-next | kernel.org's huge repo may not advertise the newest snapshot (`next-20260803` missing from the tag list though fetchable) | If a newer working-day tag should exist, `git fetch origin tag next-YYYYMMDD` directly before concluding nothing is new |
 | Assumed mailing list patch was merged | Mailing list ≠ drm-next | Verify with `git log --grep` in mainline |
 | Reconstructed patch using upstream line numbers | Didn't match our patched tree | Always regenerate against our actual layout |
 | Added already-merged patch | `--dry-run` showed "already applied" | `grep` for the symbol first |

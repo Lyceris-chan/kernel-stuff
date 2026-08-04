@@ -56,6 +56,13 @@ description: >
 #   git ls-remote --tags repos/linux-next 'next-*' | awk -F/ '{print $NF}' | grep -v "\^{}" | sort -V | tail -1
 #   git -C repos/linux-next describe --tags master   # what we already have
 # Tags are published on working days only — weekends have no new snapshot.
+# CAVEAT (learned 2026-08-04): ls-remote --tags on kernel.org's linux-next may
+# NOT advertise the newest snapshot (stale/truncated ref advertisement on this
+# huge repo). next-20260803 existed but ls-remote only showed next-20260731.
+# If the calendar says a newer working-day snapshot should exist but ls-remote
+# disagrees, try a DIRECT tag fetch before concluding nothing is new:
+#   git -C repos/linux-next fetch origin tag next-YYYYMMDD
+# That bypasses the advertisement and either fetches the tag or errors cleanly.
 
 # Git repos (use background processes)
 for repo in repos/drm-next repos/agd5f-linux repos/linux-pm repos/amd-staging-drm-next; do

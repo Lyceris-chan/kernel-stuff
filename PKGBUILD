@@ -338,6 +338,8 @@ source=(
   "1131-drm-amd-display-Add-missing-DCN42B-register-defines.patch"
   "1132-drm-amd-display-Add-missing-DMUB-CACP-and-PR-definitions.patch"
   "1133-drm-amd-display-Add-FFE-level-defaults.patch"
+  # 1134: Nathan Lucas BT.2020 YCbCr output CSC fix (amd-gfx ML 2026-08-02) — DCN output-CSC path
+  "1134-drm-amd-display-fix-BT.2020-YCbCr-limited-output-CSC-matrix.patch"
   "1200-cpufreq-amd-pstate-Document-missing-kernel-doc-mem.patch"
   "1201-cpufreq-amd-pstate-Update-cppc_req_cached-before-w.patch"
   "1202-cpufreq-amd-pstate-Add-per-core-EPP-boost-for-rec.patch"
@@ -1010,6 +1012,7 @@ b2sums=('60508428f39763690e8911ca78770db4be6a19200a915f1e0e7d253e94eee86dbc96a0d
         '4dc9541e6fe91c823a609662e37e3877b2b670e6009071d479067d3e06873504a803d77aa48742030ad6d12a5db9fec8b1e096c672f40f8c4fb5ccaae6b4d71a'
         '85e4c5a397120f3625acb6848f30243367de31a2e9188ee70e86c008c85430ff390cdbcea80783d77fc7a6852738d36370ebab492c5e271841475e3cb8bec4cf'
         '0210f5e8f3ea12f6714aa9787ed6bc301aba3678d85fd38dd4b9827bbd1312b43436834d8d228b072e7017de38cd648301a388e6d35bbbe2d31247d302cfd838'
+        'ad43e6797c6711caf03bf09a41b3a489d24f046d518111e4e58209526188d3caaa21eb6ae849bc060adaa334ebd39d44560a0e65bd521c5089785cd985316052'
         'aad86c7d3e29956976634971ed46663e67365517b69e35e7cce3e135bcc855c324187dd691630af28a5da7045e6766d52a3b2392726b0bc8587a221f9eedca48'
         'e9d464ebf525cd8d93d48f1cbedea0197bd9d0142085da7d83ec3dfda0174483a0fea4077055fd7d1ad9180563dc6dfb77e4f52f9bcb023b7c7d7c9fb5c39ece'
         '9d3e36dbc5c9c5342d2991c4665278ed075073196251e59280bd12f1d6812a37d31db58f5cb978b926e2dcd0a32365960a414b69d10f463bd8f68cedbb4bb6ae'
