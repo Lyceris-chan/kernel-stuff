@@ -1,13 +1,13 @@
 ---
 name: patch-sweep
 description: >
-  Run a full six-source patch sweep for sleepy-kernel, checking drm-next,
-  agd5f, linux-next, linux-pm, amd-gfx and dri-devel mailing lists, sirlucjan,
-  and firelzrd for new commits relevant to our hardware. Produces a triage
-  report and dry-runs clean candidates against the reference rc tree.
+  Run the periodic six-source patch sweep for sleepy-kernel, checking drm-next,
+  agd5f, linux-next, linux-pm, the amd-gfx and dri-devel mailing lists,
+  sirlucjan, firelzrd, and the GitLab drm/amd work-items tracker for new
+  commits relevant to our hardware. Produces a triage report and dry-runs clean
+  candidates against the reference rc tree.
   Use when asked to "check for new patches", "sync sources", or "run a patch
-  sweep". Covers fetching, keyword scanning, applicability testing, and the
-  GitLab drm/amd issue tracker scan.
+  sweep". For a single named patch/commit, use the patch-audit skill instead.
 ---
 
 ## Local model (Qwen) tips — READ THIS FIRST

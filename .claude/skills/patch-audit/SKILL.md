@@ -1,9 +1,9 @@
 ---
 name: patch-audit
-description: Ingest a specific upstream kernel patch, audit third-party (10xx) patches, replace/upgrade an existing patch to a newer revision (e.g. a v2-to-v4 swap), or run the periodic six-source sweep for sleepy-kernel. Use when asked to check for new patches, ingest or add a named patch/commit, swap in a revised version of a patch we already carry, audit patch sources, verify PATCH_SOURCES.md provenance, or review whether a candidate patch belongs in the tree. Covers drm-next, linux-next, linux-pm, amd-gfx, dri-devel, sirlucjan, and firelzrd.
+description: Ingest or upgrade a specific kernel patch for sleepy-kernel — add a named patch or commit SHA, swap an existing patch to a newer revision (e.g. a v2-to-v4 swap), or verify a candidate's provenance and eligibility (symbols exist, applies cleanly, hardware-relevant) before it goes in. Use when given a specific patch, commit, or series to bring into the tree, or when asked to audit/verify a patch source or PATCH_SOURCES.md provenance. For the periodic all-source sweep, use the patch-sweep skill instead.
 ---
 
-# Patch Audit & Ingestion (Six-Source Sweep)
+# Patch Audit & Ingestion
 
 Never scrape `lore.kernel.org` — its anti-bot protection blocks agents.
 
@@ -152,7 +152,7 @@ Run these in order. Copy the commands exactly — do not improvise.
    ```
    Run this for EVERY function/macro the patch references. If any symbol is
    absent from the clean rc6 tree, the patch depends on staging infrastructure
-   and must be DROPPED (see the agd5f staging lesson in CLAUDE.md).
+   and must be DROPPED (see the agd5f staging lesson in `LESSONS.md`).
 
 3. **Forward apply check** — patch must apply to the clean rc6 tree:
    ```bash
@@ -179,7 +179,7 @@ Run these in order. Copy the commands exactly — do not improvise.
      DROP it and report why.
    - If the reverse check also errors, the patch is genuinely new.
 
-   (Lesson from CLAUDE.md: use `git apply --check` for both — `patch --dry-run`
+   (Lesson in `LESSONS.md`: use `git apply --check` for both — `patch --dry-run`
    reports false "corrupt patch" errors on mbox-format patches.)
 
    **LESSON (2026-08-02 sweep) — reverse-clean means ALREADY IN BASE TREE:**
