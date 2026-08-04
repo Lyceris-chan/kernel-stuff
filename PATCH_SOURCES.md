@@ -125,7 +125,7 @@ The `0105` fixes squash carries the full 26-patch branch; `0106` reverses the of
 
 ---
 
-## 1000–1021 — AMDGPU GPU core
+## 1000–1022 — AMDGPU GPU core
 
 Source: drm-next (`https://gitlab.freedesktop.org/drm/kernel.git`) / amd-gfx. Formerly numbered `1002`–`1065`.
 
@@ -153,6 +153,7 @@ Source: drm-next (`https://gitlab.freedesktop.org/drm/kernel.git`) / amd-gfx. Fo
 | `1019` | Alex Deucher | update mmhub 4.2.0 client list — drm-next `658422c7b` |
 | `1020` | Alex Deucher | gmc12.1: fix MMHUB0 check in pasid tlb flush — amd-gfx ML `<20260728153930.1531949-1-alexander.deucher@amd.com>` (not yet upstream) |
 | `1021` | Alex Deucher | gmc12.1: implement tlb inv semaphore — amd-gfx ML `<20260730172740.1268133-1-alexander.deucher@amd.com>` (not yet upstream) |
+| `1022` | Candice Li | reject oversized IBs with per-ring packet limits — amd-gfx ML `<20260803102416.3776005-1-candice.li@amd.com>` (v2, not yet upstream). Per-ring 20-bit IB packet-size limit checked before IB allocation in `amdgpu_cs.c`; applies to GFX/compute/SDMA/VPE rings (RDNA4). CLEAN on rc6 (`git apply --check` + `patch -p1 --forward --dry-run`, offset 5). |
 
 ---
 
@@ -532,6 +533,33 @@ alongside 1101.
 **Second-pass verification (user-requested):** a fresh batch of independent
 agents re-fetched all repos + re-scanned ML/gitlab after this ingestion; their
 reports are appended below. Net effect so far: **0 additional patches found**.
+
+---
+
+## 2026-08-04 sweep results (6-source re-fetch + agents; 1 patch added)
+
+Repos re-fetched (drm-next, agd5f-linux, amd-staging-drm-next, linux-next to `next-20260804`, linux-pm, sirlucjan, firelzrd, linux-7.2-rc6 reference) and the August amd-gfx/dri-devel mboxes re-downloaded. Torvalds latest tag is still `v7.2-rc6` → **no version bump**.
+
+**Added (1):**
+- `1022` Candice Li — reject oversized IBs with per-ring packet limits (see 1000–1022 section).
+
+**Evaluated and not added (with reasons):**
+- König `[PATCH v7 1/6]` amdgpu_vram_mgr_init ordering fix — only 1/6 of the series present in the mbox; König greenlit merging the series via drm-misc-next upstream. Skip (mid-series, being merged upstream).
+- Arunpravin Paneer Selvam amdgpu_vram_mgr_fini UAF fix — the mbox entry is **Christian König's rejection reply** ("this approach here is clearly not correct") — maintainer-rejected, do not add.
+- Timur Kristóf `hwss_set_output_transfer_func()` crash fix — fixes NULL-hubp deref on **DCE/Vega and older** hardware (not ours); a no-op on DCN4. Skip per "no patches for hardware we don't have".
+- Timur Kristóf "Set native cursor mode for disabled CRTCs again" — targets `amdgpu_dm_cursor.c`, split out by the "add cursor module" refactor (`151164f96a4b`) which is **not in rc6**; function absent. Defer (same class as the `amdgpu_dm_connector.c` split).
+- Jesse Zhang userq serialize queue-map / remove guilty-compute-userq-reset — in-review; amdgpu_userq.c exists in rc6 but the patches are reply-quoted in the mbox and in-review. Not added.
+
+**GitLab drm/amd work-items tracker (no-UA curl, confirmed readable):**
+- SMU14 IF mismatch (driver 0x2e vs fw 0x33) — issues #5538/#5113/#5479. No fix in rc6 or drm-next; nothing to backport. Monitor.
+- FAMS2/DCN42B reclock stutter — #4753. fililip's workaround patches are not upstreamable; related "enforce UCLK pstate support" drm-next candidate conflicts with our deliberate `.pstate_enabled=false` (1101 reverse-applied). Not added.
+- dc_stream_retain UAF on dual-monitor — #5237/#5242. No fix merged. Monitor.
+- GPU-recovery failure on Navi 48 — #5552 (opened 08-02). No fix merged; AMD assigned. Monitor.
+- Fan/RPM hwmon on Navi4x — #5422/#5514. AMD: by design (Overdrive domain). No action.
+
+**sirlucjan / CachyOS:** all `7.2-rc/` branch dirs unchanged (fixes v10, preempt-ipi v3, lru-marie v12, nap v0.5.0, master at 2026-07-31). No `01xx` squash regeneration needed. amd-pstate `-v2-sep` already audited on 2026-08-03; overlapping patches differ only by hunk offsets.
+
+**Already in rc6 (reverse-check clean, no re-add):** `8419331e64d9` (Leo Li DCN vblank/flip follow-up), `fbbaca9e2087` (DCE check in dm_gpureset_toggle_interrupts), `82730dba0cf9` (flip-done timeouts on mode1 reset), `00c391102abc`/`6d92c4d03063` (FAMS2 DMUB hw lock rename).
 
 ---
 

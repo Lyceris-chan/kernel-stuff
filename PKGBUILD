@@ -181,7 +181,7 @@ _minor=
 _rcver=rc6
 pkgver=${_major}.${_rcver}
 _tagrel=1
-pkgrel=3
+pkgrel=4
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}-${_rcver}
@@ -284,6 +284,9 @@ source=(
   "1019-drm-amdgpu-update-mmhub-4.2.0-client-list.patch"
   "1020-drm-amdgpu-gmc12.1-fix-MMHUB0-check-in-pasid-tlb-flush.patch"
   "1021-drm-amdgpu-gmc12.1-implement-tlb-inv-semaphore.patch"
+  # Candice Li: reject oversized IBs — per-ring packet limit check in amdgpu_cs.c
+  # <20260803102416.3776005-1-candice.li@amd.com> — CLEAN on rc6
+  "1022-drm-amdgpu-reject-oversized-IBs-with-per-ring-packet-limits.patch"
   "1100-drm-amd-display-enable-psr-and-replay-on-dcn4-variant-and-fi.patch"
   "1101-drm-amd-display-enable-pstate-for-dcn4-non-emulation-builds.patch"
   "1102-drm-amd-display-increase-dcn42b-uclk-value.patch"
@@ -957,6 +960,7 @@ b2sums=('60508428f39763690e8911ca78770db4be6a19200a915f1e0e7d253e94eee86dbc96a0d
         '9882a49729b1030941352cda465deaa36965b288a03acca7030fc9b9f1dd74e7e8257895da29b2ebd38041bf5d89d555335ef5c635379261957c563348d0b1f0'
         '34d5ec2694549ce12a66a057d754931fdb33f4aba4edac25303d0aedcb6548b7e073bf2b4e33d83bef194ef33a409904052837b8b0f64a96359494a34f0d88dc'
         '7abf4a2492041ebb6d4181f2de6b74e71f1b46f8c95eb3314ae6af1b59c4d7ec4bcc5656f4824f8fdf21d0e6c060eaa76c38fb783046117cde4ef0574e052eb6'
+        'de7ebab6e38309c80bdd861136973fa5455caefe54eae03b75e88c83fe524c379875b86da027258299554056a1363346fc74fa64ee1dec6e61a86242786dcdac'
         '02803704ce3fe311f9bc88e0cdeae545829023a7c3c241a00f4a2bc07ffd27fe5089010b4fc0456c56898bbd09ab93ab3d764cfa97080a5aaf114df1bd91680b'
         '692244e62c6d34c7aca8fda750d18befaefdc02a3be11632aeb6a69327645e6814efb00a4c475bfc407c0dabbce0b5d88c86262acbf32b29111c5e99e2acabd6'
         '9395fc7d168c7cd6cb6b13edbedc2adc58a4a18cd024ae259345034b06bac84e8f9a34334508cd3571aaedb22e85aa2c9a01cd11e5c5336be148e07d63230bd8'

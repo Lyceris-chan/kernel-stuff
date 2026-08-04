@@ -240,7 +240,7 @@ echo profile_peak | sudo tee /sys/class/drm/card0/device/power_dpm_force_perform
 
 ## Patch series
 
-Per-patch manifest of the full 120-patch series. See `PATCH_SOURCES.md` for full
+Per-patch manifest of the full 121-patch series. See `PATCH_SOURCES.md` for full
 provenance (authors, commit hashes, Message-IDs).
 
 ### Local / upstream SMU14 + DCN401 (0001–0034)
@@ -284,7 +284,7 @@ provenance (authors, commit hashes, Message-IDs).
 | `0108` | Adds SMP preemption + TLB flush (14 patches). | CachyOS (sirlucjan) |
 | `0109` | Adds EDID DSC BPP parsing (8 patches). | CachyOS (sirlucjan) |
 
-### GPU core (1000–1021)
+### GPU core (1000–1022)
 
 | Patch | What it does | Source |
 |---|---|---|
@@ -310,6 +310,7 @@ provenance (authors, commit hashes, Message-IDs).
 | `1019` | Updates the mmhub 4.2.0 client list. | drm-next |
 | `1020` | Fixes the MMHUB0 check in the gmc12.1 pasid TLB flush (copy-paste typo). | amd-gfx ML |
 | `1021` | Adds a TLB-invalidation semaphore for gmc12.1 (locks the interface). | amd-gfx ML |
+| `1022` | Rejects oversized IBs with per-ring packet limits in `amdgpu_cs.c` (CS hardening). | amd-gfx ML |
 
 ### Display (1100–1133)
 
