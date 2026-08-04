@@ -13,8 +13,8 @@ scripts/config -d GENERIC_CPU -e MZEN4
 scripts/config -d LTO_NONE -e LTO_CLANG_THIN
 scripts/config -d CC_OPTIMIZE_FOR_PERFORMANCE -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
 
-# CachyOS config hooks (no CONFIG_CACHY — the Kconfig symbol exists only in the
-# CachyOS/linux fork, not the sirlucjan branches we carry, so -e CACHY was dropped)
+# CachyOS config hooks (gates the 0110 CONFIG_CACHY backport)
+scripts/config -e CACHY
 
 # NAP governor baked into cmdline (bootloader params still appended, not replaced)
 scripts/config -e CMDLINE_BOOL --set-str CMDLINE "cpuidle.governor=nap" -d CMDLINE_OVERRIDE

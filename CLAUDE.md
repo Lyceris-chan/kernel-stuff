@@ -62,7 +62,7 @@ Each range is a category; use the next unused number in the correct range.
 |---|---|---|
 | `0001–0049` | Handmade local patches (Sleepy/Antigravity) | SMU14, DCN401, GFX12 hand-written fixes for this hardware |
 | `0050–0099` | Upstream EDID/display ML patches not yet landed | `b4` mbox or freedesktop archives — verify with `git apply --check` against `repos/linux-7.2-rc6` |
-| `0101–0109` | CachyOS branch squashes (0106 = off-target drops) | sirlucjan `-sep` dirs (see `patch-cachy-branches`) |
+| `0101–0113` | CachyOS branch squashes (0106 = off-target drops; 0110–0113 = CachyOS/linux-fork backports) | sirlucjan `-sep` dirs (see `patch-cachy-branches`); 0110–0113 from CachyOS/linux fork |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | drm-next / agd5f |
 | `1100–1199` | AMD Display (DCN4, DCN42B, PSR, Replay, pstate, MCIF ARB) | drm-next |
 | `1200–1299` | AMD Power Management (amd-pstate, cpufreq) | linux-pm / sirlucjan |

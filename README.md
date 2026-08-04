@@ -240,7 +240,7 @@ echo profile_peak | sudo tee /sys/class/drm/card0/device/power_dpm_force_perform
 
 ## Patch series
 
-Per-patch manifest of the full 122-patch series. See `PATCH_SOURCES.md` for full
+Per-patch manifest of the full 126-patch series. See `PATCH_SOURCES.md` for full
 provenance (authors, commit hashes, Message-IDs).
 
 ### Local / upstream SMU14 + DCN401 (0001–0034)
@@ -270,7 +270,7 @@ provenance (authors, commit hashes, Message-IDs).
 | `0055` | Parses HDMI 2.1 gaming (ALLM/VRR) caps from the HF-VSDB. | amd-gfx ML |
 | `0058` | Restores the FRL cap on non-destructive HDMI link verify. | amd-gfx ML |
 
-### CachyOS branches (0101–0109)
+### CachyOS branches (0101–0113)
 
 | Patch | What it does | Source |
 |---|---|---|
@@ -283,6 +283,10 @@ provenance (authors, commit hashes, Message-IDs).
 | `0107` | Backports the HDMI 2.1 FreeSync/VRR/PCON series (26 patches, excludes `0151`). | CachyOS (sirlucjan) |
 | `0108` | Adds SMP preemption + TLB flush (14 patches). | CachyOS (sirlucjan) |
 | `0109` | Adds EDID DSC BPP parsing (8 patches). | CachyOS (sirlucjan) |
+| `0110` | CONFIG_CACHY config hooks — sched EEVDF latency tuning, THP defrag, lru-gen working-set, compaction/watermark off, bus_lock SLD. | CachyOS/linux fork (curated) |
+| `0111` | Disable the legacy ACPI bus-master poll on AMD C3 (Zen 4 idle). | CachyOS/linux fork |
+| `0112` | Skip VRAM eviction at S4/S5 poweroff (faster GPU shutdown). | CachyOS/linux fork |
+| `0113` | Micro-opts: readahead 256K, sched/readdir hints, `list.h` inline, evdev `call_rcu`. | CachyOS/linux fork |
 
 ### GPU core (1000–1023)
 

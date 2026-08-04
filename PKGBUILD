@@ -181,7 +181,7 @@ _minor=
 _rcver=rc6
 pkgver=${_major}.${_rcver}
 _tagrel=1
-pkgrel=5
+pkgrel=7
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}-${_rcver}
@@ -258,6 +258,15 @@ source=(
   "0107-cachy-hdmi.patch"
   "0108-cachy-preempt-ipi.patch"
   "0109-cachy-vesa-dsc.patch"
+  # 0110: CONFIG_CACHY config hooks — curated CachyOS/linux-fork backport
+  # (sched EEVDF latency tuning, THP defrag, lru_gen_min_ttl, compaction/watermark,
+  #  bus_lock sld_mitigate; excludes vm_swappiness=100 and the elevator bfq hunk)
+  "0110-cachy-config-hooks.patch"
+  # 0111-0113: more CachyOS/linux-fork backports (2026-08-04 audit):
+  #  ACPI BM check (Zen4 C3), amdgpu S5 eviction skip, micro-opts bundle
+  "0111-cachy-acpi-disable-bus-master-check-for-AMD.patch"
+  "0112-cachy-amdgpu-avoid-evicting-resources-at-S5.patch"
+  "0113-cachy-micro-opts.patch"
   # NOTE: Zuo 1/4+3/4+4/4 deferred — need amdgpu_dm_connector.c split (not in rc5 yet)
   # Excluded: i915, btusb, rtw89, i2c touchpad, laptop audio, SOF, nouveau
   # 0151 dropped: drm_edid.c + drm_connector.h changes already applied by 0055 (Fangzhi Zuo 2/4)
@@ -555,8 +564,7 @@ EOF
     scripts/config -d GENERIC_CPU -e MZEN4
     scripts/config -d LTO_NONE -e LTO_CLANG_THIN
     scripts/config -d CC_OPTIMIZE_FOR_PERFORMANCE -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
-    # Note: no CONFIG_CACHY — the CachyOS Kconfig symbol is defined only in the
-    # CachyOS/linux fork, not in the sirlucjan branches we carry; -e CACHY was a no-op.
+    scripts/config -e CACHY   # gates the 0110 CachyOS config-hooks backport
     scripts/config -e CMDLINE_BOOL --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 elevator=kyber" -d CMDLINE_OVERRIDE
     scripts/config -e DEBUG_KERNEL -d DEBUG_INFO_NONE -d DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT -e DEBUG_INFO_DWARF5 -e DEBUG_INFO_BTF
     scripts/config -d SECURITY_APPARMOR -d SECURITY_APPARMOR_DEBUG -d SECURITY_APPARMOR_INTROSPECT_POLICY
@@ -941,6 +949,10 @@ b2sums=('60508428f39763690e8911ca78770db4be6a19200a915f1e0e7d253e94eee86dbc96a0d
         '7163c9c1549000442721f60b54798fe6e15901285a2f750efb5676a7e81612c3d0bc34e639c9d373d0c6c2f2f805484a51a9e2006e5e1435bd4ae425fa5acd00'
         '1e5978896fe68926133ad6ee291f9b5eb59a550d689118f0dc2bebc793add069785c5b151fb339dbf85213badd790b0383144394217591aeedaab63cd89f3f66'
         '8fa361ac6a9d4b2c8254d4cbd0bbd9bec9d09b633d8bfd0d97f71248194c82714737f6fcbb04db85e727763a000d53d6e0c13c74848dbe21ff2927d33734c221'
+        '9e09ebb057ad702b03c3caaaa30660d6f4b1b475002e95f7c1f3fe757980ac3e75a2cead66b01f5ba85bfa2c42bb18b672c316edc3fa645801efee0dfc894e8b'
+        '0070a22fe00e90fb691ba892496d9239c81a0bd1242dba1a843a001ae5ee11c81ce3848b763db0d868dba7d366b333cc9ee99f1e29e1963123cb9e49751784e0'
+        '2782b795c66d9dd50e04f89f87feb313c0f42f4e64eb4286edcf8a8820eb6157cf88687b64d115a684b38de20b5358ef9a831b645323c1f635357929ec6ca4da'
+        'bcd8c5ad80a953f2ee2b3a0e8b7874c6570ce3842f489b5bbbc9aa1499cfd1f99bad00dcb00db2e69b6d582bc56ea25b3c6e7e3b7326e087bcf00f27c460975a'
         '5f90f7eaef640dec990030967987f44e9f9a429e65edc20789e200b90836c5263b827e9c4c07f18a1c13d167365736489edbdffaef4f4965d1d8bb38cfa6e2ef'
         '9dfb09f65d28ca3cbbe7bcf1c7e064a3c3abf61a6ca3ba4e270fd44123fbfcb5fb919c814926965f1dbdbdcf92cc793103cdf22457ed454c5016b54d2b843eae'
         '90b8ca8a98554f9e7ca261662756a06de878d95290ca0dff39ba372d3cabf14408f22152a06bb39448317ec4de271d4182fc28ffe4e282bb959e7aadded4a7cd'
