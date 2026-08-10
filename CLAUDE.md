@@ -23,6 +23,7 @@ base, with additional upstream and local patches filtered to this hardware.
 |---|---|
 | `GUIDE.md` | End-user README: target audience, differences from vanilla, build instructions |
 | `README.md` | User-facing project doc |
+| `CHANGELOG.md` | Per-release summary of what changed, by kernel version + pkgrel |
 | `PATCH_SOURCES.md` | Per-patch provenance ledger — authors, commit hashes, source URLs, revisions |
 | `LESSONS.md` | Full incident log ("do not repeat") — the durable rules are below; the context is there |
 

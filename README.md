@@ -442,6 +442,7 @@ gfx12 priv-fault recovery dropped — needs gfx11 priv-fault infra absent from r
 | `net-tune/` | Unified CAKE SQM + latency tuning systemd service |
 | `repos/` | Cloned upstream git repos for patch extraction |
 | `GUIDE.md` | End-user guide with build details and PROFILE_PEAK notes |
+| `CHANGELOG.md` | Per-release summary of what changed |
 | `PATCH_SOURCES.md` | Per-patch provenance ledger |
 | `CLAUDE.md` | Maintenance rules and workflow for LLM agents |
 
