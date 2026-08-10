@@ -368,3 +368,16 @@ def extract_patch(mbox_file, target_mid, output_file):
 
 **Important**: match by subject + author keywords, not Message-ID prefix, because
 mbox parsers may truncate IDs. Verify extracted patch content before using.
+
+**Outlook-mangled mbox diffs (learned 2026-08-10, patch `1026`):** patches sent
+from Microsoft-hosted addresses (e.g. `...@amd.com` via `namprd12.prod.outlook.com`)
+arrive at lists.freedesktop.org with the leading space stripped from every
+context line AND tabs converted to spaces. `git apply --check` reports "corrupt
+patch" and GNU `patch` reports "malformed patch" — both unwritable as-is. If a
+patch's `+`/`-` lines are intact but its context is mangled, verify the added
+content against the rc7 tree (e.g. against an older-IP sibling file the commit
+message says it's "modeled after" — the GFX12 CRIU fix was modeled after the
+rc7 `kfd_mqd_manager_v11.c` functions), rebuild the diff body from rc7 ground
+truth with proper tabs, and confirm content-identical modulo whitespace. Then
+pass BOTH `git apply --check` and GNU `patch -p1 --forward --dry-run` before
+adopting. Record the reconstruction in `PATCH_SOURCES.md` with the Message-ID.

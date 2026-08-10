@@ -1,8 +1,15 @@
-From 91e3ae613f94f9a25b5ecde55d280ec3df0d43f0 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: squash <squash@local>
-Date: Mon, 10 Aug 2026 08:18:00 +0200
-Subject: [PATCH] cachyos-drops: revert off-target fixes (i915/btusb/rtw89/touchpad/audio/SOF/iwlwifi/nouveau)
+Date: Mon, 10 Aug 2026 12:00:00 +0200
+Subject: [PATCH] cachyos-drops: revert off-target fixes (i915/btusb/rtw89/touchpad/audio/SOF/iwlwifi/nouveau/mt76)
 
+Reverts the off-target groups from the v11 fixes branch (0105), so the net
+applied effect is only the hardware-relevant fixes. v11 changes vs v10:
+- no longer drops the usbcore 255-byte quirk (branch no longer carries it)
+- adds the mt76/dma.c revert (MediaTek WiFi, off-target)
+- ASoC amd acp TUF self-reverts within the branch (no drop needed)
+
+Signed-off-by: squash <squash@local>
 ---
 diff --git a/drivers/bluetooth/btusb.c b/drivers/bluetooth/btusb.c
 index 76e9bf00f..184e95c16 100644
@@ -39,10 +46,10 @@ index dbdc20533..4590d6a3d 100644
  #define DATA_BLOCK_2_CTA_DISPLAY_ID		0x81
  
 diff --git a/drivers/gpu/drm/drm_edid.c b/drivers/gpu/drm/drm_edid.c
-index c853116c1..2b3bfa311 100644
+index 0e049301a..5fa9afa28 100644
 --- a/drivers/gpu/drm/drm_edid.c
 +++ b/drivers/gpu/drm/drm_edid.c
-@@ -6723,46 +6723,6 @@ static void drm_get_monitor_range(struct drm_connector *connector,
+@@ -6729,46 +6729,6 @@ static void drm_get_monitor_range(struct drm_connector *connector,
  		    info->monitor_range.min_vfreq, info->monitor_range.max_vfreq);
  }
  
@@ -89,7 +96,7 @@ index c853116c1..2b3bfa311 100644
  static void drm_parse_vesa_mso_data(struct drm_connector *connector,
  				    const struct displayid_block *block)
  {
-@@ -6885,41 +6845,26 @@ static void update_displayid_info(struct drm_connector *connector,
+@@ -6891,41 +6851,26 @@ static void update_displayid_info(struct drm_connector *connector,
  {
  	struct drm_display_info *info = &connector->display_info;
  	const struct displayid_block *block;
@@ -332,6 +339,22 @@ index 7db7554ce..2df6643a5 100644
  	/*
  	 * Don't transmit during firmware restart. The firmware is dead,
  	 * so iwl_trans_tx() would return -EIO for each frame. Avoid the
+diff --git a/drivers/net/wireless/mediatek/mt76/dma.c b/drivers/net/wireless/mediatek/mt76/dma.c
+index f8c2fe5f2..322041859 100644
+--- a/drivers/net/wireless/mediatek/mt76/dma.c
++++ b/drivers/net/wireless/mediatek/mt76/dma.c
+@@ -1189,7 +1189,10 @@ void mt76_dma_cleanup(struct mt76_dev *dev)
+ 	mt76_for_each_q_rx(dev, i) {
+ 		struct mt76_queue *q = &dev->q_rx[i];
+ 
+-		netif_napi_del(&dev->napi[i]);
++		if (!mt76_queue_is_wed_rro(q)) {
++			napi_disable(&dev->napi[i]);
++			netif_napi_del(&dev->napi[i]);
++		}
+ 		mt76_dma_rx_cleanup(dev, q);
+ 
+ 		page_pool_destroy(q->page_pool);
 diff --git a/drivers/net/wireless/realtek/rtw89/fw.c b/drivers/net/wireless/realtek/rtw89/fw.c
 index c6f175041..d6a594b75 100644
 --- a/drivers/net/wireless/realtek/rtw89/fw.c
@@ -366,39 +389,6 @@ index 3fcb3ac8c..20721d520 100644
  };
  
  enum rtw89_fw_cmd_ofld_arg_type {
-diff --git a/drivers/usb/core/config.c b/drivers/usb/core/config.c
-index d9691c276..346a2faa9 100644
---- a/drivers/usb/core/config.c
-+++ b/drivers/usb/core/config.c
-@@ -980,16 +980,6 @@ int usb_get_configuration(struct usb_device *dev)
- 			goto err;
- 		}
- 
--		/*
--		 * If the device returns the full configuration descriptor set,
--		 * skip the second read. Otherwise, send a second request
--		 * asking for the full set.
--		 */
--		if (result >= length) {
--			memcpy(bigbuffer, desc, length);
--			goto store_and_parse;
--		}
--
- 		if (dev->quirks & USB_QUIRK_DELAY_INIT)
- 			msleep(200);
- 
-diff --git a/include/linux/usb/quirks.h b/include/linux/usb/quirks.h
-index 94cbe90e0..a4043b33c 100644
---- a/include/linux/usb/quirks.h
-+++ b/include/linux/usb/quirks.h
-@@ -84,7 +84,4 @@
- /* Use a 255 bytes config descriptor request mirroring windows behavior */
- #define USB_QUIRK_WINDOWS_CONFIG_REQ_SIZE	BIT(19)
- 
--/* Use a 255 bytes config descriptor request mirroring windows behavior */
--#define USB_QUIRK_WINDOWS_CONFIG_REQ_SIZE	BIT(19)
--
- #endif /* __LINUX_USB_QUIRKS_H */
 diff --git a/sound/hda/codecs/realtek/alc269.c b/sound/hda/codecs/realtek/alc269.c
 index 70a029ea0..48a2e7f2e 100644
 --- a/sound/hda/codecs/realtek/alc269.c
@@ -439,36 +429,6 @@ index 70a029ea0..48a2e7f2e 100644
  	SND_PCI_QUIRK(0x1043, 0x12e0, "ASUS X541SA", ALC256_FIXUP_ASUS_MIC_NO_PRESENCE),
  	SND_PCI_QUIRK(0x1043, 0x12f0, "ASUS X541UV", ALC256_FIXUP_ASUS_MIC_NO_PRESENCE),
  	SND_PCI_QUIRK(0x1043, 0x1313, "Asus K42JZ", ALC269VB_FIXUP_ASUS_MIC_NO_PRESENCE),
-diff --git a/sound/soc/amd/acp-config.c b/sound/soc/amd/acp-config.c
-index 5070d6a50..88e4230d6 100644
---- a/sound/soc/amd/acp-config.c
-+++ b/sound/soc/amd/acp-config.c
-@@ -24,12 +24,6 @@
- static int acp_quirk_data;
- 
- static const struct dmi_system_id acp70_acpi_flag_override_table[] = {
--	{
--		.matches = {
--			DMI_MATCH(DMI_BOARD_VENDOR, "ASUSTeK COMPUTER INC."),
--			DMI_MATCH(DMI_PRODUCT_NAME, "FA401EA"),
--		},
--	},
- 	{
- 		.matches = {
- 			DMI_MATCH(DMI_BOARD_VENDOR, "ASUSTeK COMPUTER INC."),
-@@ -69,12 +63,6 @@ static const struct dmi_system_id acp70_acpi_flag_override_table[] = {
- 			DMI_MATCH(DMI_PRODUCT_NAME, "Vivobook 18 M1807GA"),
- 		},
- 	},
--	{
--		.matches = {
--			DMI_MATCH(DMI_BOARD_VENDOR, "ASUSTeK COMPUTER INC"),
--			DMI_MATCH(DMI_PRODUCT_NAME, "M1807EA"),
--		},
--	},
- 	{}
- };
- 
 diff --git a/sound/soc/intel/boards/sof_sdw.c b/sound/soc/intel/boards/sof_sdw.c
 index 454c608d7..c527d575d 100644
 --- a/sound/soc/intel/boards/sof_sdw.c

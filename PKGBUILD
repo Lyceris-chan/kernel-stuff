@@ -252,8 +252,9 @@ source=(
   "0102-cachy-kbuild.patch"
   "0103-cachy-cpu-isa.patch"
   "0104-cachy-cgroup-vram.patch"
+  # 0105/0106: CachyOS fixes branch v11 (25 patches, 2026-08-10) squashed against
+  # rc7 series state; 0106 reverts the off-target hardware groups (now incl. mt76).
   "0105-cachy-fixes.patch"
-  # 0106 reverts the off-target hardware patches included in the full fixes branch
   "0106-cachy-drops.patch"
   "0107-cachy-hdmi.patch"
   "0108-cachy-preempt-ipi.patch"
@@ -298,6 +299,10 @@ source=(
   # 1025 (gfx12 priv-fault recovery) DROPPED: needs gfx11 priv-fault worker fields
   #   (userq_priv_fault_work/slots) not present in rc7's struct amdgpu_gfx — see PATCH_SOURCES.
   "1024-drm-amdgpu-mes12-fix-dropped-dispatches-under-queue-oversubscription.patch"
+  # 1026: GFX12 KFD CRIU restore NULL-deref panic fix (Vladimir Marioukhine/AMD,
+  #   amd-gfx ML 2026-08-04, Message-ID SA1PR12MB8600...). ML-only, not yet merged;
+  #   reconstructed from the mbox after Outlook stripped whitespace. See PATCH_SOURCES.
+  "1026-drm-amdkfd-fix-NULL-pointer-dereference-in-GFX12-CRIU.patch"
   "1100-drm-amd-display-enable-psr-and-replay-on-dcn4-variant-and-fi.patch"
   "1101-drm-amd-display-enable-pstate-for-dcn4-non-emulation-builds.patch"
   "1102-drm-amd-display-increase-dcn42b-uclk-value.patch"
@@ -983,8 +988,8 @@ b2sums=('4299f17dac88bd1aacf58f1ba0b7061859c1723845925b0efc36e09248f74fa5eb57fa9
         'ee5f2c4aead1f2fc8d8096ae2a953d4c45d4c79de29e0578da543767a2d96664f903f043af36cf481adc13f203e2eca8fb616c26257e6cce5b3cae26b1d46ddf'
         'fdc7fc1d942be4fe8dadcb228b7f9c02273eaec91631ff609a07722b74b1db64828e144856e01a8ffd039762d1970a7ec511a3d240481544c570592914573b69'
         'b6be0eb69eb52e27b8aad11d56e17965a6cddfa480ab665e8d03274bb7fdec1bd6adb943414c8338e2eb19ad3a23f6cc6fa5e7397d193b65ee57b3ab439493d2'
-        'a5ea2334f23fb487acb6d57939e7f63a7dd1a88fd33c74813c657855972c56716b507a4bc333a74294e62b8dc51b4c915b1da3616d935ae07b3ee19a48be437b'
-        '96ec83d837c5717a485174b2099a6a7dd1d368d42fb20733cd110a61e897ee3f2f5e06692f39c477bcd28861658d926e89355525ab815885172a623d8e22b36e'
+        'f802c1d11992edb3ca978adb0c09b7d98ebdb92c870d4ecc65edb9c81b48589af5a2734ca16b34b1d283ab22b05070b4466ca48817467050894c1e7472de4f27'
+        'bc191eb98f2a19c9b9274fb62084d7b9eb4217ac2abad73803ff3f6f7c21e02bda903ff853d6a6c9cba07d6b1c7e0dbf851dff77d3bab26119451d156c688c0b'
         '7163c9c1549000442721f60b54798fe6e15901285a2f750efb5676a7e81612c3d0bc34e639c9d373d0c6c2f2f805484a51a9e2006e5e1435bd4ae425fa5acd00'
         '1e5978896fe68926133ad6ee291f9b5eb59a550d689118f0dc2bebc793add069785c5b151fb339dbf85213badd790b0383144394217591aeedaab63cd89f3f66'
         '8fa361ac6a9d4b2c8254d4cbd0bbd9bec9d09b633d8bfd0d97f71248194c82714737f6fcbb04db85e727763a000d53d6e0c13c74848dbe21ff2927d33734c221'
@@ -1014,6 +1019,7 @@ b2sums=('4299f17dac88bd1aacf58f1ba0b7061859c1723845925b0efc36e09248f74fa5eb57fa9
         '9882a49729b1030941352cda465deaa36965b288a03acca7030fc9b9f1dd74e7e8257895da29b2ebd38041bf5d89d555335ef5c635379261957c563348d0b1f0'
         '492fe63e48d54f7c7d5fbcd614d937f71116bfe823588b0c8dbad53cae920cc8ce10468135382c55effcea8d57f8fff91b2b640c75e620b53a597f2af416fa2b'
         'ff999bfa1fe6de439f05c9a44b4a023443dc373b30b1817e2cfdbdbac4e9418de13e6644fc0e0d08c9ee3b7fc3f54ab283450a5512f546699c7b8e86f3c9156b'
+        '85028ee0b1271d0bb1f1618a46c28984ef605c9b4f05f3b686f0362ecb10f391712ebec321c47a2220761e1497077869d694c47fce7a74074e5d5270693744b7'
         '02803704ce3fe311f9bc88e0cdeae545829023a7c3c241a00f4a2bc07ffd27fe5089010b4fc0456c56898bbd09ab93ab3d764cfa97080a5aaf114df1bd91680b'
         '692244e62c6d34c7aca8fda750d18befaefdc02a3be11632aeb6a69327645e6814efb00a4c475bfc407c0dabbce0b5d88c86262acbf32b29111c5e99e2acabd6'
         '9395fc7d168c7cd6cb6b13edbedc2adc58a4a18cd024ae259345034b06bac84e8f9a34334508cd3571aaedb22e85aa2c9a01cd11e5c5336be148e07d63230bd8'

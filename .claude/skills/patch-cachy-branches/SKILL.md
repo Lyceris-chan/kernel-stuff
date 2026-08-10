@@ -41,9 +41,10 @@ ls repos/sirlucjan-kernel-patches/7.2-rc/ | grep -E "bbr3|cgroup|fixes|hdmi|pree
 ```
 
 For versioned branches choose the highest-numbered version. **Current versions
-to expect (as of the 7.2-rc maintenance session):** `fixes` = `-v10-sep`
-(`cachyos-fixes-patches-v10-sep`), `preempt-ipi` = `-v3-sep`
-(`preempt-ipi-patches-v3-sep`), `lru-marie` = `-v12` (`lru-marie-patches-v12`).
+to expect (as of the 7.2-rc maintenance session):** `fixes` = `-v11-sep`
+(`cachyos-fixes-patches-v11-sep`), `preempt-ipi` = `-v3-sep`
+(`preempt-ipi-patches-v3-sep`), `lru-marie` = `-v13` (`lru-marie-patches-v13`,
+0.9.3 = same as our `2101`; no regen needed).
 For all others, the single `-sep` directory is canonical.
 
 ## Step 3 — Branch selection table
@@ -54,7 +55,7 @@ For all others, the single `-sep` directory is canonical.
 | `cachy` kbuild | `kbuild-cachyos-patches/` | `0102-cachy-kbuild.patch` | ✅ |
 | `cachy` cpu-isa | `cpu-cachyos-patches/` | `0103-cachy-cpu-isa.patch` | ✅ |
 | `cgroup-vram` | `cgroup-patches-sep/` | `0104-cachy-cgroup-vram.patch` | ✅ |
-| `fixes` (v10) | `cachyos-fixes-patches-v10-sep/` | `0105-cachy-fixes.patch` + `0106-cachy-drops.patch` | ✅ |
+| `fixes` (v11) | `cachyos-fixes-patches-v11-sep/` | `0105-cachy-fixes.patch` + `0106-cachy-drops.patch` | ✅ |
 | `hdmi` | `hdmi-patches-sep/` | `0107-cachy-hdmi.patch` (excl. 0151) | ✅ |
 | `preempt-ipi` (v3) | `preempt-ipi-patches-v3-sep/` | `0108-cachy-preempt-ipi.patch` | ✅ |
 | `vesa-dsc-bpp` | `vesa-patches-sep/` | `0109-cachy-vesa-dsc.patch` | ✅ |
@@ -68,11 +69,13 @@ For all others, the single `-sep` directory is canonical.
 ## Step 4 — Off-target filtering for the `fixes` branch
 
 The `fixes` branch is squashed **in full** into `0105-cachy-fixes.patch` (all
-26 patches, including off-target hardware). `0106-cachy-drops.patch` then
-**reverts** the off-target groups below, so the net applied effect is only the
-10 hardware-relevant fixes. Keep the branch whole in `0105` and revert the
+25 patches in v11, including off-target hardware). `0106-cachy-drops.patch`
+then **reverts** the off-target groups below, so the net applied effect is only
+the hardware-relevant fixes. Keep the branch whole in `0105` and revert the
 unwanted parts in `0106` — do not try to exclude off-target patches from the
-squash itself.
+squash itself. (v11 note: the branch renumbered 26→25 and dropped the usbcore
+255-byte quirk upstream, so `0106` no longer carries that drop; the branch also
+self-reverts the ASoC ASUS-TUF override internally via its own `0024`.)
 
 Off-target groups reverted by `0106-cachy-drops.patch`:
 
@@ -87,13 +90,17 @@ Off-target groups reverted by `0106-cachy-drops.patch`:
 | `i2c.*touchpad`, `i2c-core-acpi.*ASUE` | Laptop touchpad |
 | `ALSA.*realtek.*internal speakers.*ASUS` | Laptop internal speakers |
 | `wifi.*iwlwifi` | Intel WiFi |
-| `ASoC.*amd.*acp.*DMI` | ASUS laptop audio DMI overrides |
+| `ASoC.*amd.*acp.*DMI` | ASUS laptop audio DMI overrides (self-reverted in-branch in v11) |
 | `sof.*Dell`, `sof.*XPS` | Intel SoundOpen Firmware |
-| `usbcore.*quirk.*255` | Generic USB quirk — harmless but unnecessary |
+| `mt76` | MediaTek WiFi — not our RTL8125 NIC (v11-only revert) |
+
+(As of v11 the branch no longer carries the `usbcore.*quirk.*255` patch, so it
+is not in the drop list either.)
 
 **Kept** (net effect of `0105` + `0106`): `x86/cpu/amd` (RDSEED32),
 `sched/fair`, `sched/idle`, `sched/core`, `USB-core sanitize string`,
-`mm/mglru`, `mm/vmscan`.
+`mm/mglru`, `mm/vmscan`, **`drivers/pci/quirks.c` (PCI Skip Target Speed quirk,
+added in v11 — saves ~2s boot on empty/clamped PCIe slots)**.
 
 ## Step 5 — Squash each branch to one patch
 

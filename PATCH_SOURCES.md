@@ -84,8 +84,8 @@ Source: `repos/sirlucjan-kernel-patches/7.2-rc/`
 | `0102-cachy-kbuild.patch` | kbuild | `kbuild-cachyos-patches/` | Allow `-O3` |
 | `0103-cachy-cpu-isa.patch` | cpu-isa | `cpu-cachyos-patches/` | x86_64 Zen4 ISA optimizations |
 | `0104-cachy-cgroup-vram.patch` | cgroup-vram | `cgroup-patches-sep/` | VRAM cgroup accounting (8 patches) |
-| `0105-cachy-fixes.patch` | fixes (FULL) | `cachyos-fixes-patches-v10-sep/` | Full 26-patch v10 fixes branch, **including off-target hardware** |
-| `0106-cachy-drops.patch` | drops | n/a (generated) | **Reverts the off-target fixes** (see table below); net effect = only the 10 hardware-relevant fixes remain |
+| `0105-cachy-fixes.patch` | fixes (FULL) | `cachyos-fixes-patches-v11-sep/` | Full 25-patch **v11** fixes branch, **including off-target hardware** (regen 2026-08-10: renumbered to 25, mm/mglru reworked to vma_flags_t API, adds PCI Skip Target Speed quirk) |
+| `0106-cachy-drops.patch` | drops | n/a (generated) | **Reverts the off-target fixes** (see table below); net effect = only the hardware-relevant fixes remain. v11: no longer drops the usbcore 255-byte quirk (branch dropped it), now reverts `mt76/dma.c`; ASoC amd acp TUF self-reverts inside the branch |
 | `0107-cachy-hdmi.patch` | hdmi | `hdmi-patches-sep/` | HDMI 2.1 FreeSync/VRR/PCON (26 patches, **excludes `0151`**) |
 | `0108-cachy-preempt-ipi.patch` | preempt-ipi | `preempt-ipi-patches-v3-sep/` | SMP preemption + TLB flush (14 patches) |
 | `0109-cachy-vesa-dsc.patch` | vesa-dsc-bpp | `vesa-patches-sep/` | EDID DSC BPP parsing (8 patches) |
@@ -111,7 +111,7 @@ The squashed patches are generated **against the actual series state** (7.2-rc5 
 
 ### What the `0106` drop patch reverts (off-target content in the full fixes branch)
 
-The `0105` fixes squash carries the full 26-patch branch; `0106` reverses the off-target hardware changes so the final tree only contains the hardware-relevant subset. The off-target subjects, by upstream fixes-branch index:
+The `0105` fixes squash carries the full 25-patch v11 branch; `0106` reverses the off-target hardware changes so the final tree only contains the hardware-relevant subset. The off-target subjects, by upstream fixes-branch index:
 
 | Fixes-branch index | Reason |
 |--------------------|--------|
@@ -124,9 +124,13 @@ The `0105` fixes squash carries the full 26-patch branch; `0106` reverses the of
 | `0015` (i2c ASUE140D touchpad) | Laptop touchpad |
 | `0016` (ALSA ALC269 ASUS laptop) | Laptop internal speaker quirk |
 | `0017` (iwlwifi mld TX) | Intel WiFi — not our NIC |
-| `0018`–`0019` (ASoC ASUS laptop) | Laptop audio DMI overrides |
-| `0021` (SOF Dell XPS) | Intel SoundOpen Firmware |
-| `0022` (usbcore quirk) | Generic USB quirk, not needed |
+| `0018` (ASoC ASUS laptop) | Laptop audio DMI overrides (v11 also self-reverts it via `0024`) |
+| `0019` (SOF Dell XPS) | Intel SoundOpen Firmware |
+| `0025` (mt76 revert) | MediaTek WiFi — not our RTL8125 NIC |
+
+v11 vs v10 index note: the branch was renumbered 26→25 patches and the usbcore
+255-byte quirk (`0022` in v10) was dropped from the branch upstream — so `0106`
+no longer reverts `usb/core/config.c`/`usb/quirks.h` (obsolete drops removed).
 
 ### Dropped CachyOS branch
 
@@ -140,7 +144,7 @@ The `0105` fixes squash carries the full 26-patch branch; `0106` reverses the of
 
 ---
 
-## 1000–1025 — AMDGPU GPU core
+## 1000–1026 — AMDGPU GPU core
 
 Source: drm-next (`https://gitlab.freedesktop.org/drm/kernel.git`) / amd-gfx. Formerly numbered `1002`–`1065`.
 
@@ -168,6 +172,7 @@ Source: drm-next (`https://gitlab.freedesktop.org/drm/kernel.git`) / amd-gfx. Fo
 | `1019` | Alex Deucher | update mmhub 4.2.0 client list — drm-next `658422c7b` |
 | `1023` | Steven Barrett (Liquorix) | drm/amdgpu/pm: Allow override of min_power_limit with `ignore_min_pcap` — backport from CachyOS/linux fork commit `16cd15654cc6` (2024, carried by CachyOS in every release). Adds an opt-in module param (`amdgpu.ignore_min_pcap=1`) that reads the min power cap as 0 and bypasses the SMU min-power-limit floor in `amdgpu_pm.c`/`amdgpu_smu.c` (swsmu, incl. SMU14). Default 0 = unchanged behavior. Adopted 2026-08-04 after the linux-cachyos-rc 7.2-rc6-2 release audit (the one fork-direct change relevant to our SMU14 power handling). CLEAN on rc6 (`git apply --check` forward, reverse fails). |
 | `1024` | Jesse Zhang | drm/amdgpu/mes12: fix dropped dispatches under queue oversubscription — drm-next `288cc4a54` (amd-drm-next-7.3-2026-08-06 merge, 08-08). GFX12 MES: pads/spaces the MES queue dispatch so concurrent queue oversubscription no longer drops dispatches. **Added 2026-08-10** (AMDGPU 7.3 last-round backport). CLEAN on rc7 series. |
+| `1026` | Vladimir Marioukhine (AMD) | drm/amdkfd: fix NULL pointer dereference in GFX12 CRIU queue restore — **amd-gfx ML 2026-08-04** (`Message-ID SA1PR12MB8600E8B1821FA7D76923FC259FD42@SA1PR12MB8600...`, mbox `amd-gfx-2026-August.txt`). GFX 12.0/12.1 MQD managers leave `restore_mqd`/`checkpoint_mqd` NULL; `create_queue_cpsch`/`create_queue_nocpsch` call them unconditionally during CRIU restore, so a `CAP_CHECKPOINT_RESTORE` user can trigger a kernel NULL-deref panic. Fix implements the callbacks (modeled after GFX 11) + adds NULL guards. **Added 2026-08-10.** **Reconstruction caveat:** the freedesktop mbox copy had context-line leading spaces stripped and tabs→spaces (Outlook sender), so the diff body could not be applied verbatim. Reconstructed byte-for-byte from the mbox `+` lines against the rc7 v11 MQD manager reference (verified content-identical modulo whitespace, incl. the `sdmax_rlcx_doorbell_offset` field + `CP_HQD_PQ_DOORBELL_CONTROL` shift that v11 also uses), kernel-standard tabs restored. Passes `git apply --check` (fwd) and GNU `patch -p1 --forward --dry-run` against rc7. **Not yet merged upstream; Alex Deucher requested brace-style revisions (v2 pending) — swap for the merged commit when it lands.** `Assisted-by: Claude`. **Deviation (compile fix):** the original used the GC 12.0 macro `SDMA0_QUEUE0_DOORBELL_OFFSET__OFFSET__SHIFT` in both files; rc7's v12_1.c (GC 12.1) has that macro undeclared, so the v12_1 hunk here uses `SDMA0_SDMA_QUEUE0_DOORBELL_OFFSET__OFFSET__SHIFT` (the v12_1 header's macro) — the original ML submission would not compile on v12_1.c either. |
 ~~`1025`~~ (gfx12 priv-fault user-queue recovery worker, Jesse Zhang, drm-next `30f07c06`) — **DROPPED 2026-08-10 at build**: applies cleanly but does NOT compile on rc7 — references `adev->gfx.userq_priv_fault_work`/`userq_priv_fault_slots`, fields that live in `struct amdgpu_gfx` only via the gfx11 priv-fault worker infra which is in drm-next (post-rc7), not rc7 (`amdgpu_gfx.h` has only `userq_sch_*`). Requires the whole gfx11 priv-fault prerequisite series — defer to the 7.3 move. Symbol-existence check failed; do not re-add without the prerequisite.
 
 ~~`1020`~~ (gmc12.1 fix MMHUB0 check in pasid tlb flush, Alex Deucher) — **DROPPED 2026-08-10**: merged upstream in rc7 (`5227c2c77c38`).
@@ -854,6 +859,42 @@ policy and the built-in CMDLINE passes `pcie_aspm=off` (sets `aspm_disabled=true
 `pr_info("PCIe ASPM is disabled")` — verified in `aspm.c`). This is the !5538
 SMU bus-drop stopgap. Trade-off: slightly higher idle PCIe power. Documented in
 README.md.
+
+---
+
+## 2026-08-10 late-day sweep — CachyOS fixes v11 + GFX12 CRIU fix
+
+Run after the 7.2-rc7 bump sweep (this morning). Linux-next fetched to
+`next-20260810`; torvalds still 7.2-rc7 (no bump).
+
+**CachyOS fixes branch advanced v10 → v11** (sirlucjan `7.2-rc/cachyos-fixes-patches-v11-sep`,
+added 2026-08-10 10:42 — after this morning's sweep). v11 renumbers 26→25 patches
+(drops the usbcore 255-byte quirk), reworks `mm/mglru` + `mm/vmscan` to the
+`vma_flags_t` API (our 0105 already matched), and adds the **PCI Skip Target
+Speed quirk** (Maciej W. Rozycki, `Cc: stable` — skips 2.5GT/s link-retrain on
+empty/clamped PCIe slots, saving ~2s per boot). Regenerated `0105`/`0106` from
+v11 against the rc7 series state; net effect verified byte-identical to the old
+squashes except `drivers/pci/quirks.c` (the new quirk). 0106 drop list updated:
+no longer reverts the usbcore 255-byte quirk (gone from branch), now reverts
+`mt76/dma.c`. User-approved inclusion.
+
+**GFX12 CRIU NULL-deref fix** (Vladimir Marioukhine/AMD, amd-gfx 2026-08-04) —
+adopted as `1026`. Security-relevant: a `CAP_CHECKPOINT_RESTORE` user can panic
+the machine on gfx1201 via `KFD_IOC_CRIU_OP_RESTORE`. ML-only (not in
+drm-next/linux-next yet); Alex Deucher requested brace-style revisions, so a v2
+may supersede — swap when the merged commit lands. **mbox reconstruction:** the
+lists.freedesktop.org copy had context-line leading spaces stripped and
+tabs→spaces by the Outlook sender; the `+`/`-` content was intact. Rebuilt the
+diff body against rc7 (v11 MQD manager as the "modeled after GFX 11" template),
+verified content-identical modulo whitespace, passes both `git apply --check`
+and GNU `patch --dry-run`.
+
+**Not taken this sweep:** dmemcg aggressive-protect v8 (Natalie Vock) — already
+merged in drm-misc-next/drm-next (comes with next bump); ACPI CPPC series
+(linux-pm linux-next branch, 08-05) — 7.3-targeted, not rc7-backport material;
+PCIe link-capability quirks in linux-pm — off-target. Work-items tracker: all
+open reports still unresolved, no new driver-fix commits; SMU-IF (issue !5538)
+remains firmware-side with `pcie.aspm=off` as the stopgap.
 
 ---
 

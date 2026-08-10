@@ -257,7 +257,7 @@ echo profile_peak | sudo tee /sys/class/drm/card0/device/power_dpm_force_perform
 
 ## Patch series
 
-Per-patch manifest of the full 127-patch series. See `PATCH_SOURCES.md` for full
+Per-patch manifest of the full 140-patch series. See `PATCH_SOURCES.md` for full
 provenance (authors, commit hashes, Message-IDs).
 
 ### Local / upstream SMU14 + DCN401 (0001–0034)
@@ -305,7 +305,7 @@ provenance (authors, commit hashes, Message-IDs).
 | `0112` | Skip VRAM eviction at S4/S5 poweroff (faster GPU shutdown). | CachyOS/linux fork |
 | `0113` | Micro-opts: readahead 256K, sched/readdir hints, `list.h` inline, evdev `call_rcu`. | CachyOS/linux fork |
 
-### GPU core (1000–1023)
+### GPU core (1000–1026)
 
 | Patch | What it does | Source |
 |---|---|---|
@@ -332,8 +332,10 @@ provenance (authors, commit hashes, Message-IDs).
 | `1020` | Fixes the MMHUB0 check in the gmc12.1 pasid TLB flush (copy-paste typo). | amd-gfx ML |
 | `1023` | `amdgpu.ignore_min_pcap=1` module param — override the SMU min power cap (Liquorix, CachyOS backport). | CachyOS/linux fork |
 | `1024` | Fixes dropped MES dispatches under queue oversubscription (GFX12 MES). | drm-next `288cc4a54` (7.3 last-round backport) |
+| `1026` | Fixes a GFX12 KFD CRIU-restore NULL-deref panic (implemented `restore_mqd`/`checkpoint_mqd` callbacks + NULL guards). | amd-gfx ML 2026-08-04 (reconstructed from mbox) |
 
-(`1020`–`1022` merged upstream in 7.2-rc7 and were dropped on the bump.)
+(`1020`–`1022` merged upstream in 7.2-rc7 and were dropped on the bump; `1025`
+gfx12 priv-fault recovery dropped — needs gfx11 priv-fault infra absent from rc7.)
 
 ### Display (1100–1136)
 

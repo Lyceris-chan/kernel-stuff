@@ -1,8 +1,16 @@
-From af4cf1e1763c26ba2cd107929408fda42f4895c2 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: squash <squash@local>
-Date: Mon, 10 Aug 2026 08:18:00 +0200
-Subject: [PATCH] cachyos-fixes: hardware-relevant fixes (full 26-patch branch)
+Date: Mon, 10 Aug 2026 12:00:00 +0200
+Subject: [PATCH] cachyos-fixes: hardware-relevant fixes (full 25-patch v11 branch)
 
+CachyOS fixes branch v11 (25 patches) squashed against the rc7 series state
+(rc7 + 0001-0058). Includes the full branch incl. off-target hardware;
+0106-cachy-drops reverts the off-target groups so only the hardware-relevant
+fixes remain. v11 vs v10: renumbered to 25 patches (dropped usbcore 255-byte
+quirk), mm/mglru + mm/vmscan reworked to the vma_flags_t API, adds the PCI
+Skip Target Speed quirk (saves ~2s boot on empty/clamped PCIe slots).
+
+Signed-off-by: squash <squash@local>
 ---
 diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
 index db2cb06aa..bebde469f 100644
@@ -122,10 +130,10 @@ index 4590d6a3d..dbdc20533 100644
  #define DATA_BLOCK_2_CTA_DISPLAY_ID		0x81
  
 diff --git a/drivers/gpu/drm/drm_edid.c b/drivers/gpu/drm/drm_edid.c
-index 2b3bfa311..c853116c1 100644
+index 5fa9afa28..0e049301a 100644
 --- a/drivers/gpu/drm/drm_edid.c
 +++ b/drivers/gpu/drm/drm_edid.c
-@@ -6723,6 +6723,46 @@ static void drm_get_monitor_range(struct drm_connector *connector,
+@@ -6729,6 +6729,46 @@ static void drm_get_monitor_range(struct drm_connector *connector,
  		    info->monitor_range.min_vfreq, info->monitor_range.max_vfreq);
  }
  
@@ -172,7 +180,7 @@ index 2b3bfa311..c853116c1 100644
  static void drm_parse_vesa_mso_data(struct drm_connector *connector,
  				    const struct displayid_block *block)
  {
-@@ -6845,26 +6885,41 @@ static void update_displayid_info(struct drm_connector *connector,
+@@ -6851,26 +6891,41 @@ static void update_displayid_info(struct drm_connector *connector,
  {
  	struct drm_display_info *info = &connector->display_info;
  	const struct displayid_block *block;
@@ -415,6 +423,22 @@ index 2df6643a5..7db7554ce 100644
  	/*
  	 * Don't transmit during firmware restart. The firmware is dead,
  	 * so iwl_trans_tx() would return -EIO for each frame. Avoid the
+diff --git a/drivers/net/wireless/mediatek/mt76/dma.c b/drivers/net/wireless/mediatek/mt76/dma.c
+index 322041859..f8c2fe5f2 100644
+--- a/drivers/net/wireless/mediatek/mt76/dma.c
++++ b/drivers/net/wireless/mediatek/mt76/dma.c
+@@ -1189,10 +1189,7 @@ void mt76_dma_cleanup(struct mt76_dev *dev)
+ 	mt76_for_each_q_rx(dev, i) {
+ 		struct mt76_queue *q = &dev->q_rx[i];
+ 
+-		if (!mt76_queue_is_wed_rro(q)) {
+-			napi_disable(&dev->napi[i]);
+-			netif_napi_del(&dev->napi[i]);
+-		}
++		netif_napi_del(&dev->napi[i]);
+ 		mt76_dma_rx_cleanup(dev, q);
+ 
+ 		page_pool_destroy(q->page_pool);
 diff --git a/drivers/net/wireless/realtek/rtw89/fw.c b/drivers/net/wireless/realtek/rtw89/fw.c
 index d6a594b75..c6f175041 100644
 --- a/drivers/net/wireless/realtek/rtw89/fw.c
@@ -449,27 +473,23 @@ index 20721d520..3fcb3ac8c 100644
  };
  
  enum rtw89_fw_cmd_ofld_arg_type {
-diff --git a/drivers/usb/core/config.c b/drivers/usb/core/config.c
-index 346a2faa9..d9691c276 100644
---- a/drivers/usb/core/config.c
-+++ b/drivers/usb/core/config.c
-@@ -980,6 +980,16 @@ int usb_get_configuration(struct usb_device *dev)
- 			goto err;
- 		}
+diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+index b09f27f78..9e407c449 100644
+--- a/drivers/pci/quirks.c
++++ b/drivers/pci/quirks.c
+@@ -108,7 +108,11 @@ int pcie_failed_link_retrain(struct pci_dev *dev)
  
-+		/*
-+		 * If the device returns the full configuration descriptor set,
-+		 * skip the second read. Otherwise, send a second request
-+		 * asking for the full set.
-+		 */
-+		if (result >= length) {
-+			memcpy(bigbuffer, desc, length);
-+			goto store_and_parse;
-+		}
-+
- 		if (dev->quirks & USB_QUIRK_DELAY_INIT)
- 			msleep(200);
- 
+ 	pcie_capability_read_word(dev, PCI_EXP_LNKSTA, &lnksta);
+ 	pcie_capability_read_word(dev, PCI_EXP_LNKCTL2, &oldlnkctl2);
+-	if (!(lnksta & PCI_EXP_LNKSTA_DLLLA) && pcie_lbms_seen(dev, lnksta)) {
++	if (lnksta & PCI_EXP_LNKSTA_DLLLA) {
++		;
++	} else if (PCIE_LNKCTL2_TLS2SPEED(oldlnkctl2) == PCIE_SPEED_2_5GT) {
++		return ret;
++	} else if (pcie_lbms_seen(dev, lnksta)) {
+ 		pci_info(dev, "broken device, retraining non-functional downstream link at 2.5GT/s\n");
+ 		ret = pcie_set_target_speed(dev, PCIE_SPEED_2_5GT, false);
+ 		if (ret)
 diff --git a/drivers/usb/core/message.c b/drivers/usb/core/message.c
 index 75e2bfd74..1d83f8be0 100644
 --- a/drivers/usb/core/message.c
@@ -648,18 +668,6 @@ index 1cf4651f0..2f91eccd2 100644
  {
  	if (tick_nohz_full_enabled())
  		__tick_nohz_task_switch();
-diff --git a/include/linux/usb/quirks.h b/include/linux/usb/quirks.h
-index a4043b33c..94cbe90e0 100644
---- a/include/linux/usb/quirks.h
-+++ b/include/linux/usb/quirks.h
-@@ -84,4 +84,7 @@
- /* Use a 255 bytes config descriptor request mirroring windows behavior */
- #define USB_QUIRK_WINDOWS_CONFIG_REQ_SIZE	BIT(19)
- 
-+/* Use a 255 bytes config descriptor request mirroring windows behavior */
-+#define USB_QUIRK_WINDOWS_CONFIG_REQ_SIZE	BIT(19)
-+
- #endif /* __LINUX_USB_QUIRKS_H */
 diff --git a/include/linux/vtime.h b/include/linux/vtime.h
 index 82825e775..ce83fc743 100644
 --- a/include/linux/vtime.h
@@ -1213,36 +1221,6 @@ index 48a2e7f2e..70a029ea0 100644
  	SND_PCI_QUIRK(0x1043, 0x12e0, "ASUS X541SA", ALC256_FIXUP_ASUS_MIC_NO_PRESENCE),
  	SND_PCI_QUIRK(0x1043, 0x12f0, "ASUS X541UV", ALC256_FIXUP_ASUS_MIC_NO_PRESENCE),
  	SND_PCI_QUIRK(0x1043, 0x1313, "Asus K42JZ", ALC269VB_FIXUP_ASUS_MIC_NO_PRESENCE),
-diff --git a/sound/soc/amd/acp-config.c b/sound/soc/amd/acp-config.c
-index 88e4230d6..5070d6a50 100644
---- a/sound/soc/amd/acp-config.c
-+++ b/sound/soc/amd/acp-config.c
-@@ -24,6 +24,12 @@
- static int acp_quirk_data;
- 
- static const struct dmi_system_id acp70_acpi_flag_override_table[] = {
-+	{
-+		.matches = {
-+			DMI_MATCH(DMI_BOARD_VENDOR, "ASUSTeK COMPUTER INC."),
-+			DMI_MATCH(DMI_PRODUCT_NAME, "FA401EA"),
-+		},
-+	},
- 	{
- 		.matches = {
- 			DMI_MATCH(DMI_BOARD_VENDOR, "ASUSTeK COMPUTER INC."),
-@@ -63,6 +69,12 @@ static const struct dmi_system_id acp70_acpi_flag_override_table[] = {
- 			DMI_MATCH(DMI_PRODUCT_NAME, "Vivobook 18 M1807GA"),
- 		},
- 	},
-+	{
-+		.matches = {
-+			DMI_MATCH(DMI_BOARD_VENDOR, "ASUSTeK COMPUTER INC"),
-+			DMI_MATCH(DMI_PRODUCT_NAME, "M1807EA"),
-+		},
-+	},
- 	{}
- };
- 
 diff --git a/sound/soc/intel/boards/sof_sdw.c b/sound/soc/intel/boards/sof_sdw.c
 index c527d575d..454c608d7 100644
 --- a/sound/soc/intel/boards/sof_sdw.c
