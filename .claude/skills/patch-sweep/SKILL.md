@@ -1,11 +1,12 @@
 ---
 name: patch-sweep
 description: >
-  Run the periodic six-source patch sweep for sleepy-kernel, checking drm-next,
-  agd5f, linux-next, linux-pm, the amd-gfx and dri-devel mailing lists,
-  sirlucjan, firelzrd, and the GitLab drm/amd work-items tracker for new
-  commits relevant to our hardware. Produces a triage report and dry-runs clean
-  candidates against the reference rc tree.
+  Run the periodic patch sweep for sleepy-kernel, checking drm-next,
+  agd5f/amd-staging-drm-next, linux-next, linux-pm, the amd-gfx and dri-devel
+  mailing lists, sirlucjan, firelzrd, the GitLab drm/amd work-items tracker,
+  AND the x86/security line (torvalds x86_bugs / SRSO / MCE — Zen 4 CPU
+  mitigations like the Safe-RET interrupt fix). Produces a triage report and
+  dry-runs clean candidates against the reference rc tree.
   Use when asked to "check for new patches", "sync sources", or "run a patch
   sweep". For a single named patch/commit, use the patch-audit skill instead.
 ---
@@ -68,6 +69,9 @@ description: >
 for repo in repos/drm-next repos/agd5f-linux repos/linux-pm repos/amd-staging-drm-next; do
   git -C "$repo" fetch --shallow-since=2026-08-01 origin 2>&1 | tail -3 &
 done
+# torvalds mainline (x86/security line). repos/linux-7.2-rc6 is a shallow
+# torvalds clone with full history to the rc7 tag — fetch to get the latest.
+git -C repos/linux-7.2-rc6 fetch --shallow-since=2026-08-01 origin 2>&1 | tail -3 &
 git -C repos/sirlucjan-kernel-patches pull 2>&1 | tail -3 &
 git -C repos/firelzrd-bore-scheduler pull 2>&1 | tail -3 &
 wait
@@ -130,6 +134,31 @@ echo "=== sirlucjan 7.2-rc (new version dirs) ==="
 ls repos/sirlucjan-kernel-patches/7.2-rc/ | grep -E "fixes-v|lru-marie-v|preempt-ipi-v|nap"
 ```
 
+## Step 2b — x86/security scan (Zen 4 CPU mitigations)
+
+Added 2026-08-10 after the Phoronix Safe-RET / Zapscape disclosures. The
+GPU/drm sweep misses CPU-side security fixes that affect our Zen 4 7950X.
+Scan torvalds mainline (repos/linux-7.2-rc6 holds full history to the rc7
+tag; fetch it in Step 1) for speculative-execution / SRSO / MCE / entry
+fixes since the last sweep:
+
+```bash
+# SRSO / Safe-RET / speculative execution mitigations (x86_bugs, entry)
+git -C repos/linux-7.2-rc6 log --since="$SINCE" --oneline --all -E \
+  --grep="x86/bugs|SRSO|Safe.?RET|speculat|ibrs|IBPB|entry_64|ist_enter|retbleed" 2>/dev/null | head -20
+# Machine check / RAS (MCE can present as hard resets on Zen 4)
+git -C repos/linux-7.2-rc6 log --since="$SINCE" --oneline --all -E \
+  --grep="x86/mce|machine.check|mce_intel|mce_amd|threshold" 2>/dev/null | head -10
+# KVM/security follow-ups (Zapscape class)
+git -C repos/linux-7.2-rc6 log --since="$SINCE" --oneline --all -E \
+  --grep="KVM: x86|kvm.*mmu|kvm.*shadow" 2>/dev/null | head -10
+```
+
+Eligibility: an x86 fix goes in ONLY if it targets Zen 4-class AMD (SRSO
+mitigations, Safe-RET, MCE/RAS on AMD) and is NOT already in the rc base.
+Most land in mainline and arrive with the next version bump — only carry one
+if it is security-relevant, on-target, and absent from the current base.
+
 ## Step 3 — Mailing list scan
 
 Parse the downloaded mbox with Python:
@@ -177,6 +206,17 @@ curl -s "https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/events?per_pag
 Check issue titles/descriptions and events (comment bodies + referenced commit SHAs)
 for unmerged patch series relevant to our hardware. If a request returns an Anubis
 challenge page, you likely used a browser UA — retry with no UA.
+
+**Watch the hard-reset / SMU-IF class (learned 2026-08-10, work-item !5538):**
+our RX 9070 XT reports `smu driver if version = 0x0000002e, smu fw if version =
+0x00000033` — a 5-minor-version IF mismatch between the kernel driver and the
+VBIOS-resident PMFW. During SMU power transitions the GPU can drop off the PCIe
+bus (`device lost from bus!`, SMU message `response:0xFFFFFFFF`), black-screen,
+and hang/reboot the system — with `nowatchdog` on the cmdline, nothing is
+logged. This is a VBIOS/firmware issue, not a kernel patch fix. Each sweep,
+grep issue titles for: `SMU`, `lost from bus`, `reboot`, `black screen`,
+`IF version`, `Navi 48`, `9070`. If AMD lands a driver-side IF-compat fix,
+that IS a candidate for our tree.
 
 ## Step 5 — Dry-run clean candidates
 

@@ -71,3 +71,33 @@ PATCH_SOURCES.md for renumber history, e.g. `1100`–`1103` were formerly
 | Adopting an upstream version bump wholesale can REGRESS local fixes | The firelzrd LRU-MARIE 0.9.3 patch is based on 7.2-rc1 and reverted our `vma_flags_test(&vma_flags, VMA_EXEC_BIT)` fix back to the old `(vm_flags & VM_EXEC)` API; it also restructures the `root_reclaim`/`lru_gen_shrink_node` `#ifdef` block | When bumping a carried patch's version, apply the **version delta** onto our already-series-adjusted patch rather than replacing it with the upstream tarball patch. For MARIE specifically: the 0.9.2→0.9.3 delta is the orphaned-L1-bit self-heal fix + `marie_dbg_orphan_bit[2]` counters + version string — keep our `vma_flags` fix and our block structure |
 | A stray backgrounded shell holding the reference tree's git index lock blocks EVERY foreground `git checkout` on that tree for minutes | A backgrounded apply-loop's `git checkout -q -- . && git clean -qfd` on `repos/linux-7.2-rc7` grabbed the index lock and then wedged at 0% CPU; every later foreground `git apply`/`git checkout` in that repo blocked behind it, producing silent 2-minute tool timeouts that looked like patch slowness | Before diagnosing a "slow" git operation on the reference tree, check for stray processes (`ps aux | grep -E "zsh.*linux-7.2-rc7|git checkout"`) and kill them; check `.git/index.lock` in the tree. Prefer writing multi-step shell logic to a script file and running `bash /tmp/x.sh` over long inline loops, and always capture the real exit status (`set -o pipefail`) so a pipeline's last command doesn't mask a failure |
 | Regenerating a revert-patch (`0106-cachy-drops`) with `patch -R` silently SKIPS hunks it can't reverse, leaving an inconsistent tree (a `goto` without its label → `undeclared label` build error) | Reversing the `0022` usbcore-quirk member of the fixes branch with `patch --reverse -f` (stderr discarded) dropped some config.c hunks — the build then failed with `use of undeclared label 'store_and_parse'` in `drivers/usb/core/config.c`. The off-target revert is only correct when it returns those files byte-identical to the pre-fixes baseline | Generate squashes and their reverts by **git diff between commits**, never by reverse-applying the source patches: commit the series baseline, commit the full branch application, then `git diff <baseline> <full> > 01xx-squash.patch` and `git diff <full> <baseline> -- <off-target-files> > 01xx-drops.patch`. Verify the net effect by applying the drops onto the full state and `git diff --quiet <baseline>` for every off-target file |
+
+---
+
+## 2026-08-10 hardware investigation — blackscreen + self-reboot root cause
+
+`last -x` and the persistent journal revealed boot `e2839a9` (2026-08-09
+16:29 → 21:36, 5 h) ended in a **silent hard reset**: journal stops abruptly
+at 21:36:29 (user active on Steam/Spotify/Discord/hcaptcha), next boot at
+21:37:12, no panic/shutdown/lockup output. `last` shows `crash` for that boot.
+This is distinct from the display-death broken-pipe bursts seen at clean
+shutdowns.
+
+**Root cause (strong correlation): SMU driver/firmware IF version mismatch.**
+Our RX 9070 XT (Gigabyte, sub 1458:2424, VBIOS `113-R907XTGOL-F2`) reports
+`smu driver if version = 0x0000002e, smu fw if version = 0x00000033` — driver
+speaks IF protocol 46, VBIOS-resident PMFW speaks 51 (5 minor versions apart).
+This exactly matches drm/amd work-item **!5538** (same IF versions, same
+`device lost from bus!` + SMU `response:0xFFFFFFFF` during power transitions,
+began after a motherboard BIOS update). During an SMU power transition the GPU
+drops off the PCIe bus → black screen → system hang. With `nowatchdog` in the
+cmdline, kernel lockup detection is OFF, so the hang logs nothing and the
+platform resets. No MCE errors logged (rules out CPU machine-check).
+
+**This is NOT fixable by a kernel patch** (PMFW is VBIOS-resident, not
+downgradable via linux-firmware). Actions: (1) check Gigabyte for a newer
+RX 9070 XT VBIOS; (2) check motherboard BIOS; (3) remove `nowatchdog` so a
+repeat produces a lockup log (or keep nmi_watchdog on while silencing the
+boot-time clocksource message separately); (4) reduce SMU DPM transitions as a
+stopgap (LACT `power_dpm_force_performance_level=high`); (5) file/bump a bug
+against !5538. The patch-sweep skill now greps for this class every run.
