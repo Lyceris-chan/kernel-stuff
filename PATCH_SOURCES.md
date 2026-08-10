@@ -896,6 +896,16 @@ PCIe link-capability quirks in linux-pm — off-target. Work-items tracker: all
 open reports still unresolved, no new driver-fix commits; SMU-IF (issue !5538)
 remains firmware-side with `pcie.aspm=off` as the stopgap.
 
+**Follow-up re-check (sirlucjan / firelzrd / linux-next, 2026-08-10):** nothing
+new to adopt. sirlucjan still at fixes v11 (adopted above), lru-marie v13 =
+0.9.3 (= our `2101`), preempt-ipi v3 (unchanged). firelzrd latest = BORE 6.8.0
+and LRU-MARIE 0.9.3 — both match our tree. linux-next remains `next-20260810`
+(no newer tag); no new drm/amd/display commits since 08-07. The 7-patch
+sirlucjan amd-pstate set was cross-checked: `0001` (Bail out early) and `0007`
+(Loosen `lowest_nonlinear_freq != min_freq` requirement, Mario Limonciello)
+are **already in the rc7 base** (verified in `amd-pstate.c`); `0002`–`0006`
+are our `1205`–`1209`. No gaps.
+
 ---
 
 ## Adding new patches
