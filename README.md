@@ -57,16 +57,22 @@ Here's what `linux-sleepy` gives you on top of each baseline.
 
 - The hardware-relevant subset of CachyOS: BBRv3 TCP, `-O3` + Zen 4 ISA, VRAM
   cgroups, sched-ext preemption, HDMI 2.1 FreeSync/VRR, and EDID DSC BPP.
-- ~80 AMD-specific backports from `drm-next`, `linux-pm`, `amd-gfx`, and the
-  amd-gfx/dri-devel lists: SMU14 power fixes, DCN401/DCN42B display fixes
-  (incl. PSR/Replay Part 2, IPS/zstate, HDMI clock + DML fixes),
-  `amd-pstate` EPP boost, and GFX12 stability work.
+- ~90 AMD-specific backports from `drm-next`, `linux-pm`, `amd-gfx`, and the
+  amd-gfx/dri-devel lists: SMU14 power fixes (incl. the smu_v14_0_0 DPM
+  clock-query set), DCN401/DCN42B display fixes (incl. PSR/Replay Part 2,
+  IPS/zstate, HDMI clock + DML fixes, HDR/SDR seamless switch, MST HDCP
+  bounds-check), `amd-pstate` EPP boost, and GFX12 stability work.
 - agd5f/staging backports: `BUG()` → `WARN()` conversions for GFX12/PSP14/MES/IMU
   (`9001`–`9003`, `9009`–`9010`), the TTM copy-packet-size optimization (`9006`),
-  `DB_RING_CONTROL` / `TRUNCATE_COORD_MODE` GFX12 fixes (`9007`–`9008`), and the
-  **retry-fault handling v3 series** (`9011`–`9024`, Timur Kristóf) — GFX12.1
-  noretry, IH7.0 retry-CAM, GMC12 NOALLOC fault handling, Navi 4 retry CAM enable.
+  `DB_RING_CONTROL` / `TRUNCATE_COORD_MODE` GFX12 fixes (`9007`–`9008`), the
+  **retry-fault handling v3 series** (`9011`–`9024`, Timur Kristóf), and the
+  **amd-drm-next-7.3-2026-08-06 backports** (`9030`–`9032`: smu_v14_0_0 DCLK metric,
+  DCEFCLK, and `find_clk_level()` DPM fixes), the amdgpu CS/VM correctness
+  series (`9033`–`9035`: FENCE-chunk leak, VM overrun, BO-VA kmap offset), and
+  the gfx12 userq sub-page VA-validation fix (`9036`).
   The Exit-idle-optimizations series merged upstream into rc6 and was dropped.
+  The SMU14 PPT-limits framework rework from the same tag is **deferred to 7.3**
+  (does not apply cleanly to the rc7 series state).
 - Local handmade SMU14/DCN401 patches, including the `PROFILE_PEAK` GFXCLK
   ceiling float.
 - BFQ/mq-deadline contention fixes, LRU-MARIE page eviction, the zstd 7.2
@@ -80,6 +86,17 @@ Here's what `linux-sleepy` gives you on top of each baseline.
   `DRM_XE`, `IIO`, `ISDN`, `CAN`, and AppArmor are disabled.
 - A custom `PROFILE_PEAK` power-profile enhancement and an optional CAKE SQM
   service are included.
+
+**PCIe ASPM is disabled.** The kernel no longer forces a compile-time ASPM policy
+(was `PCIEASPM_PERFORMANCE` — there is no Kconfig "off" option) and the built-in
+cmdline passes **`pcie_aspm=off`**, which disables PCIe Active State Power
+Management entirely at boot. This is the drm/amd work-item **!5538** stopgap: our
+RX 9070 XT's SMU driver/firmware IF mismatch (driver `0x2e` vs fw `0x33`) can drop
+the GPU off the PCIe bus during power transitions (black screen → hard reset), and
+an AMD engineer recommended testing ASPM off. Trade-off: slightly higher idle PCIe
+power draw. The primary mitigations remain the LACT
+`power_dpm_force_performance_level=high` stopgap and (recommended) removing
+`nowatchdog` from the bootloader cmdline so a repeat is diagnosable.
 
 ## Requirements
 

@@ -56,7 +56,7 @@ Present on disk (mbox format from amd-gfx/dri-devel mailing lists):
 
 | File | Author | Message-ID | Subject |
 |------|--------|------------|---------|
-| `0050-drm-edid-Parse-AMD-VSDB-for-FreeSync-refresh-range.patch` | Alex Huang | `20260724161713.119382-2` | drm/edid: Parse AMD VSDB for FreeSync refresh range |
+| `0050-drm-edid-Parse-AMD-VSDB-for-FreeSync-refresh-range.patch` | Alex Huang | `20260804143339.714548-2` (**v3 1/4**, swapped in 2026-08-10; formerly v2 `20260724161713.119382-2`) | drm/edid: Parse AMD VSDB for FreeSync refresh range — v3 adds: restructured `amd_vsdb_v1/v2/v3_payload` (common/v1/v2/v3 nested) with v1/v2 FreeSync range parsing, and parses VSDB **version > 3 as v3 with a warning** (future-version tolerance). Verified ALL-OK: replaces v2 1/4 in `0050`'s slot, full 127-patch series still applies (`patch -p1 --forward`). Deferred same-series members: 2/4 (use HDMI FreeSync range from common parser), 3/4 (Clean up FreeSync capability detection — the DP-VRR regression fix; needs rebase on rc7 `amdgpu_dm.c`), 4/4 (Remove unused DMCU/DMUB EDID CEA parser — conflicts with the CachyOS hdmi branch's `dc_edid_parser.h`, same blocker as dropped `0053`). |
 | `0055-drm-edid-parse-HDMI-2.1-gaming-ALLM-VRR-caps-from-HF-VSDB.patch` | Fangzhi Zuo | `20260730171754.704049-2` | drm/edid: parse HDMI 2.1 gaming (ALLM/VRR) capabilities from HF-VSDB |
 | `0058-drm-amd-display-restore-FRL-cap-on-non-destructive-HDMI-link.patch` | Fangzhi Zuo | `20260730205047.1016922-1` | drm/amd/display: restore FRL cap on non-destructive HDMI link verify |
 
@@ -197,6 +197,10 @@ Source: drm-next, confirmed CLEAN-APPLY on v7.2-rc5 via `git apply --check`. `11
 | `1113` | `9afc6186f` | Fangzhi Zuo | dispatch compressed FRL cap check inside dml1_frl_cap_chk_inter (fixes DSC-over-HDMI-FRL mode pruning, e.g. 4k144) — drm-next `9afc6186f` |
 | `1135` | Charlene Liu | fix HPD program filter programming — Tom Chung "DC Patches Aug 10 2026" 12/34, amd-gfx ML `<20260805063937.2145774-13-chiahsuan.chung@amd.com>` (08-05). DCN42B DIO: `DC_HPD_TOGGLE_FILT_CNTL` delay fields were written in ms but the HW register unit is 10 ms (÷10), which made connection time extremely long. **Added 2026-08-10** (unmerged ML member). CLEAN on rc7 series. |
 | `1136` | Relja Vojvodic | Update and revert FRL LT Timeout — Tom Chung "DC Patches Aug 10 2026" 20/34, amd-gfx ML `<20260805063937.2145774-21-chiahsuan.chung@amd.com>` (08-05). `link_hdmi_frl.c`: fall back to polling when LT-no-timeout is set and bound the FRL LT timer (155 polls at ≥16 Gbps ≈ 300 ms) for appropriate link rates. **Added 2026-08-10** (unmerged ML member). CLEAN on rc7 series. |
+| `1137` | `7cc88c0d` | Harry Wentland — Bounds-check connector->index in dm_dp_mst_get_modes — **Added 2026-08-10** from `amd-drm-next-7.3-2026-08-06` tag (Phoronix "AMDGPU last round" follow-up). `amdgpu_dm_mst_types.c`: defensive bounds check on `drm_connector->index` before indexing the per-connector HDCP arrays (sized `AMDGPU_DM_MAX_DISPLAY_COUNT`). CLEAN on rc7 series (applies after 1136). |
+| `1138` | `73efd24e2` | Karthi Kandasamy — Fix seamless mode switch not triggering for HDR to SDR transition — **Added 2026-08-10** (drm-next 08-06). Touches `dcn401_hwseq.c` (our DCN401). CLEAN on rc7 series. |
+| `1139` | `261e0fe4e` | Harry Wentland — Resize MST HDCP per-connector arrays to 32 — **Added 2026-08-10** (drm-next 08-06). Companion to `1137`: sizes `hdcp_workqueue` arrays to the DRM connector index range so the bounds check is complete. CLEAN on rc7 series. |
+| `1140` | Tom Chung 10/34 `20260805063937.2145774-11` | Gabe Teeger — Clamp `force_min_dcfclk` to dcn42b range — **Added 2026-08-10** (was the previous session's planned `1137`; numbered 1140 after the 08-06-tag display members). `dcn42b_clk_mgr.c`: clamps the debug-only `force_min_dcfclk_mhz` override to [200,600] MHz. Debug-option sanitization (no normal-path effect) but DCN42B-safe and clean on rc7 series. |
 
 ~~`1112`~~ (`334cbfa3c`, dcn401 GPIO lookup tables) — **DROPPED**: requires `DC_GPIO_GENERIC_A`/`DC_GPIO_HPD_A` type defs from a prerequisite GPIO infrastructure patch not in rc5.
 
@@ -287,6 +291,52 @@ Source: `git clone --shallow-since="2026-06-01" https://gitlab.freedesktop.org/a
 ~~`9005`~~ (restore UMD profile pstate after runtime resume, Candice Li, `39866e3d3`) — **DROPPED** 2026-08-03: merged upstream in rc6.
 
 Dropped candidates (formerly `2008`/`2009`): Jesse Zhang `47862766d211` (gfx12 userq error interrupts) and Lijo Lazar `d1331c7d89b8` (SMUv14 pptable helper) — both reference agd5f staging symbols absent from mainline rc5. Do not re-add until the staging infrastructure lands.
+
+---
+
+## 9025–9032 — SMU14 PPT + DPM backports (amd-drm-next-7.3-2026-08-06)
+
+**Added 2026-08-10** from the agd5f staging tag `amd-drm-next-7.3-2026-08-06` (commit `daaeec23`, the "AMDGPU last round for Linux 7.3" pull the Phoronix article covered). Tag fetched into `repos/agd5f-linux`. All 9 verified CLEAN on the rc7 series tree in dependency order (`patch -p1 --forward`, prepare()'s tool), and reverse-checked against the clean rc7 tree (not already upstream). These land in drm-next for 7.3 — the backports are pre-bumps; flag for `patch-cleanup` at the 7.3 move.
+
+### 9025–9029 — PPT-limits framework rework (Yang Wang) — **DROPPED**
+
+| File | Commit | Subject |
+|------|--------|---------|
+| ~~`9025`~~ | `25f4a46b0c8a` | drm/amd/pm: derive stable PPT limits from PPTable |
+| ~~`9026`~~ | `6c9e0328d1de` | drm/amd/pm: refactor PPT limits by controller and power source |
+| ~~`9027`~~ | `93bd6de5518d` | drm/amd/pm: account for OD percentage in effective PPT limits |
+| ~~`9028`~~ | `534e172b888d` | drm/amd/pm: refactor user PPT policy save and restore |
+| ~~`9029`~~ | `cf9fa4d4d033` | drm/amd/pm: restore user PPT limits after GPU reset |
+
+The full 5-commit series applies cleanly to a **clean** rc7 tree, but **`9026` fails on our actual series state**: its 77-line `smu_get_power_limit()` hunk in `amdgpu_smu.c` (hunk #9, `@@ -2954,77 +2948,77 @@`) does not match because the carried CachyOS `01xx`/`0113` micro-opts bundle shifts the surrounding context. `9027`/`9028` then cascade-fail (they build on `9026`). Not taken as a partially-ordered set (`9025` alone is smu11/smu13-only = off-target; `9029` needs the refactor). **Deferred to the 7.3 bump**, where the whole PPT framework arrives via drm-next unchanged. Re-evaluate only if the 7.3 rebase still conflicts — do not hand-force the hunk (framework refactor on the SMU power path implicated in the blackscreen class).
+
+### 9033–9035 — amdgpu CS/VM correctness series (Junrui Luo, amd-gfx ML)
+
+| File | Source | Subject |
+|------|--------|---------|
+| `9033` | amd-gfx ML `<20260806-amdgpu-fixes-v1-1-ce247012d4da@outlook.com>` | drm/amdgpu: disallow multiple FENCE chunks in one submit — per-submit BO reference leak, `Fixes: d38ceaf99ed0`, `Cc: stable` |
+| `9034` | amd-gfx ML `<20260806-amdgpu-fixes-v1-2-ce247012d4da@outlook.com>` | drm/amdgpu: fix VM update overrun on non-4K page kernels |
+| `9035` | amd-gfx ML `<20260808-amdgpu-fixes-v2-1-36d66398601f@outlook.com>` (**v2**) | drm/amdgpu: add the BO-va mapping offset when kmapping an IB |
+
+All three CLEAN on the rc7 series (git + GNU `patch`). Applied upstream by Deucher 08-06 (7.3-merge). `9035` uses the 08-08 v2 revision. `0035` is deliberately NOT used (sparse `00xx` gap would suggest a local DCN patch); these live in the `90xx` backport range.
+
+| `9036` | `c0122bf2c` | drm-next 08-06 — Fix userq VA validation for sub-page buffers — **Added 2026-08-10**. `amdgpu_userq.c`: span-check via `amdgpu_vm_bo_lookup_mapping()` for sub-page VA ranges (symbol-clean on rc7; the userq fence/mapping path exists). gfx12 userq correctness. |
+
+**Not taken from the userq/priv-fault family:** `9ad81600b` (track faulted gfx user-queue slots) references `userq_priv_fault_slots`/`userq_priv_fault_work` — the same `struct amdgpu_gfx` fields absent from rc7 that dropped `1025` (LESSONS #69). Defer the whole recovery-worker set to 7.3.
+
+**TTM/dmem "aggressive protection" + reclaim stack (drm-misc, merged drm-next 08-08) — DEFERRED to 7.3.** The 11-commit stack (`dd517e49a`…`bd4f284df`, incl. `bbc744c06` "Be more aggressive when allocating below protection limit") applies to clean rc7 but **fails on our series state**: our carried `0104-cachy-cgroup-vram` reworks the same dmem limit-pool API, so the upstream cgroup/dmem + TTM members reject under GNU `patch`. Reconciling means reworking the CachyOS cgroup-vram base — defer to the 7.3 bump (drm-misc-next content arrives via drm-next, and the CachyOS fork reconciles it there). This corrects the earlier PATCH_SOURCES note: the upstream dmem split *is* in rc7; the blocker is our `0104` variant, not a missing split.
+
+---
+
+### 9030–9032 — smu_v14_0_0 DPM clock-query fixes (Priya Hosur)
+
+| File | Commit | Subject |
+|------|--------|---------|
+| `9030` | `abbc038bcbdb` | smu_v14_0_0: fix DCLK metric reporting via VCLK level index |
+| `9031` | `ae60a2b05f81` | smu_v14_0_0: add SMU_DCEFCLK support in DPM frequency queries |
+| `9032` | `39dfe8a7d709` | smu_v14_0_0: use find_clk_level() for DPM level marking |
+
+Our RX 9070 XT is `smu_v14_0_0` (dmesg: `detected ip block number 4 <smu_v14_0_0>`); all three edit `smu_v14_0_0_ppt.c` (apply in parent order `abbc038b → ae60a2b0 → 39dfe8a7`). `9031` is motivated by Strix Halo (`pp_dpm_dcefclk` N/A) but adds DCEFCLK to the generic smu_v14_0_0 DPM-frequency query path used by our dGPU — included as a same-file correctness fix. Excluded from the same tag: `19d408ea` (adds GC 11.5.1 = Strix Halo APU IP to the vclk/dclk whitelist — off-target, our GC is 12.0.1), `8e37aa0b`/`0e8faef0` (GMC12.1 TLB semaphore + MMHUB0 check — **already upstream in rc7**), `79b36128` (JPEG v5.0.0 queue reset — **already in rc7**), `bd0c0098` (DC self-refresh exit — **already in rc7**), `df94112c`/`8b87300e` (touch `amdgpu_dm_connector.c`, absent), `047f6037` (touches `dcn60_*`, absent), gfx12 userq priv-fault set `30f07c06`/`e9e0bd23`/`8a28e151`/`a8e151fe` (needs gfx11 priv-fault infra absent from rc7 — same blocker as dropped `1025`).
 
 ---
 
@@ -404,11 +454,28 @@ none are redundant with the base. rc6 is unchanged since the bump.
 | AMD VSDB FreeSync EDID common-code series (Fangzhi Zuo) | overlaps our `0050`/`0055`; different (common-code) approach — revisit at 7.3 |
 | `34fa4d00a111` Fixes for dcn42b_soc_bb.h | hunk 2 (`cursor_buffer_size`) targets `dml2_dcn42b_max_ip_caps`, a struct absent from rc6; only the `gpuvm_min_page_size` hunk applies — deferred, revisit at 7.3 |
 
-**Work items tracker note:** `https://gitlab.freedesktop.org/drm/amd/-/work_items`
-is behind Anubis anti-bot (same as `lore.kernel.org`) — the page and the REST
-API both return the Anubis challenge. No content could be read directly;
-covered the same ground via the amd-gfx/dri-devel lists and the agd5f staging
-branch.
+**Work items tracker — READABLE (three working methods, learned 2026-08-10):**
+The Anubis anti-scrape challenge is served **only to browser-like User-Agents**.
+All of the following work with plain `curl` and **no User-Agent** header:
+1. **Issues + project events API** — `GET /api/v4/projects/drm%2Famd/issues?...`
+   and `GET /api/v4/projects/drm%2Famd/events` (events include full `note.body`).
+2. **HTML page per issue** — `https://gitlab.freedesktop.org/drm/amd/-/issues/<iid>`
+   (no UA) returns HTTP 200 with the issue description rendered server-side.
+   Comments are Vue-lazy-loaded and NOT in this HTML.
+3. **GraphQL API — full comments/notes (the breakthrough)** — unauthenticated:
+   ```bash
+   curl -s "https://gitlab.freedesktop.org/api/graphql" -H "Content-Type: application/json" \
+     --data '{"query":"query { project(fullPath: \"drm/amd\") { issue(iid: \"5538\") { title notes { nodes { body system } } } } }"}'
+   ```
+   Returns every note body for the issue (filter `system:true` out). This was the
+   missing piece — the REST **notes API is 401-gated** (real auth), but GraphQL
+   exposes the same notes unauthenticated for public projects. Scripts live in
+   the scratch tools (`/tmp/gl_comments.sh`, `/tmp/gl_fixscan.sh`, `/tmp/gl_scan.sh`).
+   **2026-08-10 comment-scan result:** no driver-side SMU IF fix in !5538/!5479/!5038
+   (confirmed firmware/VBIOS-side); AMD dev on !5538 suggests testing `pcie.aspm=off`
+   (grub) as a stopgap; the display-stall class (!4753/!5203/!5571/!5320) has an
+   in-progress FAMS2 investigation + a `pp_dpm_mclk` sysfs fix (`d81e52fc`) and
+   P-state fixes (`c764b7af`) that are **newer than rc7**.
 
 ---
 
@@ -709,6 +776,83 @@ timeout), not a compute/thermal failure — the 1135/1136 display fixes and rc7'
 DCN/JPEG-reset fixes are the relevant mitigations. Consider the drm/amd
 work-items !4753 (FAMS2 memclk-change pipeline stall on gfx1201) and !5596
 (flip_done timeout on 9070 XT) as follow-ups.
+
+### 2026-08-10 follow-up — Phoronix-source re-audit + full six-source sweep (subagents)
+
+**Result: 11 patches added + 1 revision swap (series 127 → 138).** Ran 4 parallel
+agents (Phoronix articles + their sources; gitlab drm/amd work-items + amd-gfx +
+dri-devel ML; drm-next/amd-staging-drm-next/linux-next git sweeps; torvalds
+x86/security + linux-pm + sirlucjan + firelzrd). Full re-verification of the five
+Phoronix stories:
+
+- **More-Aggressive-TTM (Linux 7.3):** `dmemcg-aggressive-protect` v8 (Valve,
+  Natalie Vock) — **deferred**. Needs the DMEMCG `ttm_bo_attempt_alloc` split
+  absent from rc7's `drivers/gpu/drm/ttm/` (re-verified; no dmemcg hooks in rc7
+  TTM). Lands via drm-misc-next at the 7.3 bump.
+- **AMD HDMI VRR/ALLM v2:** `0055` **is** the v2 2/4 `drm/edid` member (verified
+  byte-identical modulo a trailing blank line); 1/4 (AMD VSDB FreeSync, now the
+  Alex Huang common-code series) and 3/4/4/4 (display) need `amdgpu_dm_connector.c`/
+  `amdgpu_dm_freesync.c`, still absent from rc7 — **deferred** to the 7.3 bump.
+- **Zapscape (CVE-2026-64561):** fix `2abd5287f083` already in rc5/rc7 — **no action**.
+- **Safe-RET interrupt vuln:** `x86/bugs: Make Safe-RET robust against interrupt
+  injection` (`7e7f81cf6f5c`) is an ancestor of v7.2-rc7 — **no action**.
+- **AMDGPU last round for 7.3** (`amd-drm-next-7.3-2026-08-06`, 100 commits):
+  took the hardware-relevant members that apply to rc7 (below). Already-upstream
+  in rc7 (skipped): GMC12.1 TLB-inv semaphore + MMHUB0 check, JPEG v5.0.0 queue
+  reset, DC self-refresh-exit, lockdep fix. Blocked (skipped): gfx12/userq
+  priv-fault set (needs gfx11 priv-fault infra, same as dropped `1025`), native
+  cursor (`amdgpu_dm_cursor.c` absent), DCN6 `dcn60_*` members, MCM color-manager
+  (dcn60), hwss_set_output_transfer_func (Vega/DCE = off-target), FRL-gating +
+  wb-info-leak (`amdgpu_dm_connector.c` absent), SMU15 commits (off-target).
+
+**Added this follow-up:**
+
+| Patch | Source | What |
+|-------|--------|------|
+| `0050` (**swapped**) | Alex Huang v3 1/4, ML `20260804143339.714548-2` | AMD VSDB FreeSync parser upgraded from v2 — adds v1/v2 payload structs + parses VSDB version >3 as v3. Deferred same-series: 2/4, 3/4 (needs rebase), 4/4 (CachyOS-hdmi conflict) |
+| `1137` | `7cc88c0d` (08-06 tag) | MST connector->index bounds check |
+| `1138` | `73efd24e2` (drm-next 08-06) | DCN401 HDR/SDR seamless-mode-switch fix |
+| `1139` | `261e0fe4e` (drm-next 08-06) | MST HDCP per-connector array resize (companion to 1137) |
+| `1140` | Tom Chung 10/34 (ML 08-05) | DCN42B `force_min_dcfclk` debug clamp (prev. session's planned `1137`) |
+| `9030` | `abbc038b` (08-06 tag) | smu_v14_0_0: DCLK metric fix |
+| `9031` | `ae60a2b05f81` (08-06 tag) | smu_v14_0_0: SMU_DCEFCLK in DPM queries |
+| `9032` | `39dfe8a7d709` (08-06 tag) | smu_v14_0_0: find_clk_level() DPM level marking |
+| `9033` | amd-gfx ML `amdgpu-fixes-v1-1` | disallow multiple FENCE chunks (BO-ref leak) |
+| `9034` | amd-gfx ML `amdgpu-fixes-v1-2` | fix VM update overrun on non-4K pages |
+| `9035` | amd-gfx ML `amdgpu-fixes-v2-1` (v2) | add BO-VA mapping offset when kmapping IB |
+| `9036` | `c0122bf2c` (drm-next 08-06) | gfx12 userq VA validation for sub-page buffers |
+
+**Evaluated and rejected/deferred:** PPT-limits framework rework `25f4a46b`–`cf9fa4d4`
+(9025–9029) — `9026`'s 77-line `smu_get_power_limit()` hunk fails GNU patch on our
+series state; whole framework defers to the 7.3 bump (see the 9025–9029 section).
+`19d408ea` vclk/dclk whitelist = GC 11.5.1 (Strix Halo APU) — off-target.
+`drm/amdgpu: check ASPM on the dGPU host link` — only changes behavior for dGPUs
+behind an internal AMD PCIe switch; our single 9070 XT is unaffected (off-target).
+CachyOS branch dirs (`sirlucjan`/`firelzrd`): nothing new since 07-31 (`fixes` v10,
+`lru-marie` v12/0.9.3, `nap` v0.5.0). x86/security: Safe-RET in rc7, no new Zen-4
+items after 08-08. linux-pm: no new amd-pstate after 08-08.
+
+**Work-items to watch (no fix merged yet):** !5596 (flip_done timeout, 9070 XT),
+!5538 (SMU IF 0x2e/0x33 — blackscreen root cause, still open), !5585 (RDNA4
+artifacts @ high refresh + FreeSync), !5582 (GEM BO leak → OOM on gfx1201),
+!5593 (atomic EBUSY flicker).
+
+**Comment-scan result (GraphQL method, same day):** pulled every commit SHA /
+patch link from the comments of ~25 hardware-relevant work items. **No new
+backportable patches** — every fix referenced in the comments is already in the
+rc7 base: `239d0ccf` smu v14 soft-clock freq (and `c764b7af` v13), `d81e52fc`
+missing `*` on pp_dpm_xxx, `76a2db58` FRL support, `8419331e`/`05984e29` exit
+idle-opt (in rc6). The rest are regression-bisect targets (!5527), upload
+hashes, or register addresses. The one action: AMD devs on !5538 recommend
+`pcie.aspm=off`.
+
+**Config change (not a patch):** **PCIe ASPM → off** (was `PCIEASPM_PERFORMANCE`).
+rc7's Kconfig has no ASPM "off" policy (choice = BIOS-default/powersave/
+powersupersave/performance), so `prepare()` now drops the compile-time PERFORMANCE
+policy and the built-in CMDLINE passes `pcie_aspm=off` (sets `aspm_disabled=true`,
+`pr_info("PCIe ASPM is disabled")` — verified in `aspm.c`). This is the !5538
+SMU bus-drop stopgap. Trade-off: slightly higher idle PCIe power. Documented in
+README.md.
 
 ---
 

@@ -1,10 +1,11 @@
-From Alex.Huang2 at amd.com  Fri Jul 24 16:17:10 2026
+
+From Alex.Huang2 at amd.com  Tue Aug  4 14:33:36 2026
 From: Alex.Huang2 at amd.com (Alex Huang)
-Date: Fri, 24 Jul 2026 12:17:10 -0400
-Subject: [PATCH v2 1/4] drm/edid: Parse AMD VSDB for FreeSync refresh range
-In-Reply-To: <20260724161713.119382-1-Alex.Huang2@amd.com>
-References: <20260724161713.119382-1-Alex.Huang2@amd.com>
-Message-ID: <20260724161713.119382-2-Alex.Huang2@amd.com>
+Date: Tue, 4 Aug 2026 10:33:36 -0400
+Subject: [PATCH v3 1/4] drm/edid: Parse AMD VSDB for FreeSync refresh range
+In-Reply-To: <20260804143339.714548-1-Alex.Huang2@amd.com>
+References: <20260804143339.714548-1-Alex.Huang2@amd.com>
+Message-ID: <20260804143339.714548-2-Alex.Huang2@amd.com>
 
 Commit 118362a96286 ("drm/edid: Parse AMD Vendor-Specific Data Block")
 added parsing of the AMD VSDB, but only for version 3 and only for the
@@ -13,16 +14,19 @@ FreeSync through a v1 or v2 AMD VSDB therefore get no variable refresh
 rate range from the common EDID parser.
 
 Restructure drm_parse_amd_vsdb() and implement parsing for the FreeSync
-refresh range fields provided in the AMD VSDB.
+refresh range fields provided in the AMD VSDB. Additionally, version > 3
+will be parsed as if they were version 3 (with a warning of this
+occurring) as future versions will likely be backwards compatible.
 
 Signed-off-by: Alex Huang <Alex.Huang2 at amd.com>
+Reviewed-by: Mario Limonciello (AMD) <superm1 at kernel.org>
 ---
- drivers/gpu/drm/drm_edid.c  | 141 ++++++++++++++++++++++++++++--------
+ drivers/gpu/drm/drm_edid.c  | 147 +++++++++++++++++++++++++++++-------
  include/drm/drm_connector.h |  22 +++++-
- 2 files changed, 133 insertions(+), 30 deletions(-)
+ 2 files changed, 139 insertions(+), 30 deletions(-)
 
 diff --git a/drivers/gpu/drm/drm_edid.c b/drivers/gpu/drm/drm_edid.c
-index df3c25bac761..2abe85b76d33 100644
+index df3c25bac761..a12b5e6905fb 100644
 --- a/drivers/gpu/drm/drm_edid.c
 +++ b/drivers/gpu/drm/drm_edid.c
 @@ -101,20 +101,42 @@ enum drm_edid_internal_quirk {
@@ -94,7 +98,7 @@ index df3c25bac761..2abe85b76d33 100644
  		cea_db_payload_len(db) <= AMD_VSDB_V3_PAYLOAD_MAX_LEN;
  }
  
-@@ -6431,43 +6459,98 @@ static void drm_parse_microsoft_vsdb(struct drm_connector *connector,
+@@ -6431,43 +6459,104 @@ static void drm_parse_microsoft_vsdb(struct drm_connector *connector,
  		    connector->base.id, connector->name, version, db[5]);
  }
  
@@ -167,7 +171,7 @@ index df3c25bac761..2abe85b76d33 100644
 +	version = ((const struct amd_vsdb_common_payload *)data)->version;
  
 -	if (p->version != 0x03) {
-+	if (version < 1 || version > 3) {
++	if (version < 1) {
  		drm_dbg_kms(connector->dev,
  			    "[CONNECTOR:%d:%s] Unsupported AMD VSDB version %u\n",
 -			    connector->base.id, connector->name, p->version);
@@ -182,7 +186,8 @@ index df3c25bac761..2abe85b76d33 100644
 -	info->amd_vsdb.luminance_range1.min_luminance = p->lum1_min;
 -	info->amd_vsdb.luminance_range2.max_luminance = p->lum2_max;
 -	info->amd_vsdb.luminance_range2.min_luminance = p->lum2_min;
-+	if (payload_len < amd_vsdb_min_len[version]) {
++	if ((version <= 3 && payload_len < amd_vsdb_min_len[version]) ||
++		(version > 3 && payload_len < AMD_VSDB_V3_PAYLOAD_MIN_LEN)) {
 +		drm_dbg_kms(connector->dev,
 +			    "[CONNECTOR:%d:%s] AMD VSDB v%u payload too short (%d bytes)\n",
 +			    connector->base.id, connector->name, version, payload_len);
@@ -203,6 +208,11 @@ index df3c25bac761..2abe85b76d33 100644
 -	 *       info->amd_vsdb.foo = p->extra[0];
 -	 */
 +	switch (version) {
++	default:
++		drm_dbg_kms(connector->dev,
++				"[CONNECTOR:%d:%s] AMD VSDB v%u is unsupported, VSDB will be parsed as v3.\n",
++				connector->base.id, connector->name, version);
++		fallthrough;
 +	case 3:
 +		drm_parse_amd_vsdb_v3(info, (const struct amd_vsdb_v3_payload *)data,
 +				      payload_len);
@@ -259,4 +269,5 @@ index 5f5ca023cd65..0914a2bd8ef1 100644
  	 */
 -- 
 2.34.1
+
 

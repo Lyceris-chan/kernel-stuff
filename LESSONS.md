@@ -39,6 +39,7 @@ PATCH_SOURCES.md for renumber history, e.g. `1100`–`1103` were formerly
 | Attempted to backport Fangzhi Zuo 1/4, 3/4, 4/4 (HDMI FRL patches) | These patches target `amdgpu_dm_connector.c` which was split from `amdgpu_dm.c` by Alex Hung (agd5f `0e967e086e75`) in April 2026. That split is not in rc5. | Defer until the `amdgpu_dm_connector.c` split lands in mainline (expected 7.3). Only `0055` (2/4, touches `drm_edid.c` only) and `0058` (FRL cap restore) are safe to add now. |
 | `vm_flags & VM_EXEC` in LRU-MARIE after `fixes` branch applied | Sirlucjan `fixes` branch (squashed in `0105`) renames `vm_flags` → `vma_flags` with new type `vma_flags_t`. LRU-MARIE's `#ifdef CONFIG_LRU_MARIE` block still used the old `(vm_flags & VM_EXEC)` expression — compile error: invalid operands to binary expression. | In-tree fix: change `(vm_flags & VM_EXEC)` to `vma_flags_test(&vma_flags, VMA_EXEC_BIT)` in `mm/vmscan.c` inside the `CONFIG_LRU_MARIE` block. This is an in-tree source edit, not a patch file. **Update (2026-08-03, rc6): no longer required — LRU-MARIE v12 (`2101`) already ships the `vma_flags_test(&vma_flags, VMA_EXEC_BIT)` form.** |
 | `amdgpu_dm_connector.c` split required by upstream HDMI patches | Fangzhi Zuo's July 2026 HDMI series was written against agd5f tree where `amdgpu_dm.c` was split. Applied against rc5 (no split) → "No such file or directory" error. | Check `find repos/linux-7.2-rcN -name "amdgpu_dm_connector.c"` before applying any patch targeting that file. If absent, defer the patch. |
+| Validated a candidate only against a **clean** rc7 tree and it applied; it FAILED GNU patch on the actual series state | The PPT-limits refactor `6c9e0328` (9026) applies cleanly to clean rc7 but its 77-line `smu_get_power_limit()` hunk in `amdgpu_smu.c` was rejected by `patch -p1 --forward` on the series tree because the carried CachyOS `01xx` micro-opts patches shift the surrounding context — same for the cascade 9027/9028 | **The authoritative dry-run is always against the full series-applied tree** (repos/linux-7.2-rc7-series, rebuilt via `bash /tmp/apply_series.sh`), with `patch -p1 --forward` — a clean result on clean rc7 proves nothing about our tree. When a framework refactor fails there, drop/defer it (it lands via drm-next at the next bump) rather than hand-forcing hunk offsets on a sensitive subsystem |
 | DCN401 GPIO lookup table patch (`334cbfa3c`) fails to compile | `drm/amd/display: convert dcn401 GPIO translation to lookup tables` uses `DC_GPIO_GENERIC_A`, `DC_GPIO_HPD_A`, etc. which come from a prerequisite GPIO infrastructure patch not in rc5. | Verify all symbol names used in a patch exist in the tree: `grep -r "DC_GPIO_GENERIC_A" src/linux-*/drivers/gpu/drm/amd/`. If absent, the patch depends on staging prerequisites and must be dropped. |
 | `git apply --check` better than `patch --dry-run` | `patch --dry-run` treats mbox-format patches differently and reports false "corrupt patch" errors. `git apply --check` handles both `git format-patch` and mbox formats correctly. | Use `git apply --check <file>` for dry-run testing. Use `git apply --check -R <file>` to test if a patch is already applied (reverse check). |
 | `.orig`/`.rej` files from `patch` got committed into squashed patches | `patch` leaves `.orig`/`.rej` backup files next to modified sources; `git add -A` swept them into the squashed CachyOS patches as garbage hunks | Always `find . -name '*.orig' -delete; find . -name '*.rej' -delete` before `git add -A` when generating squashed patches |
@@ -55,7 +56,7 @@ PATCH_SOURCES.md for renumber history, e.g. `1100`–`1103` were formerly
 | Regenerated every 01xx squash on a bump, then only fixes/drops needed it | sirlucjan branch content was identical (repo master at 2026-07-31) and `0101`–`0104`/`0107`–`0109` applied cleanly to rc6; only `0105`/`0106` had drifted | On a bump, regenerate only the 01xx squashes that fail `git apply --check`; keep unchanged + clean-applying ones |
 | New patch's trailing context matched content an earlier backport adds (`9008` vs `9007` DB_RING_CONTROL) | The truncate-coord gfx12 patch was written against a tree that already had `9007`'s DB_RING_CONTROL block, so it only applied AFTER `9007`; numbered into `10xx` it would fail | When a candidate's context depends on another backport's added content, number it to apply AFTER that backport — even if that crosses into the `90xx` range. Always verify the sequential order |
 | Mailing-list mboxes contain quoted replies, not just originals | `git apply --check` on a `thread.html`-downloaded mbox message fails ("corrupt patch") because the diff is inside a quoted reply body | Split the monthly mbox, find the **original** submission (unquoted `diff --git`), extract with `git mailinfo` → clean patch + separate commit message |
-| gitlab.freedesktop.org work items tracker is Anubis-blocked (browser UAs only) | For months the `drm/amd/-/work_items` page + REST API returned the Anubis challenge, so we documented it as blocked | **2026-08-03: the challenge is served only to browser-like User-Agents.** Plain `curl` with no User-Agent returns real GitLab content (issues + events API; notes API is 401-gated). Use `curl -s "https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/issues?state=opened&per_page=100"` in every sweep; check issue comments (via events feed) for unmerged commit SHAs |
+| gitlab.freedesktop.org work items tracker is Anubis-blocked (browser UAs only) | For months the `drm/amd/-/work_items` page + REST API returned the Anubis challenge, so we documented it as blocked | **2026-08-03: the challenge is served only to browser-like User-Agents.** Plain `curl` with no User-Agent returns real GitLab content (issues + events API). **2026-08-10: full issue comments are readable via the unauthenticated GraphQL API** (`https://gitlab.freedesktop.org/api/graphql`, `query { project(fullPath:"drm/amd") { issue(iid:"N") { notes { nodes { body } } } } }`) — the REST notes API is 401-gated but GraphQL is not. Use `curl -s ".../issues?search=<kw>&state=all"` to find relevant issues, then GraphQL to scan comments for fix SHAs ("fixed by", `[0-9a-f]{12,40}`, patch links). The HTML issue page renders the description only (comments are Vue-lazy-loaded) |
 | A `--since`-window git log sweep can miss patches that moved between staging and drm-next | Staging commits appear in drm-next under *different* SHAs (re-submitted), so hash-based `comm` diffs showed 216 "staging-only" commits that were actually already in drm-next | Diff staging vs drm-next by **subject line**, not SHA; a same-subject commit in drm-next = already reviewed/merged upstream |
 | `modprobe ifb numifbs=1` names its device `ifb0`, not the named `ifb4cake` the net-tune script references | Download CAKE never applied (silently — all errors were `2>/dev/null \|\| true`); bufferbloat test showed clean upload but 102 ms download spikes | Create the named ifb explicitly with `ip link add ifb4cake type ifb` (idempotent) before `ip link set ... up`. All tc/ip errors are suppressed, so `net-tune.sh` now verifies the ingress path (ifb4cake present + mirred filter) and logs an ERROR instead of failing silently |
 | net-tune's download shaping silently never worked: `CONFIG_NET_SCH_INGRESS` was not set in the kernel, and the script used the `matchall` classifier (`CONFIG_NET_CLS_MATCHALL` also not set) | The ingress qdisc (`tc qdisc ... handle ffff: ingress`) cannot exist without NET_SCH_INGRESS, so every subsequent filter/mirred step failed behind `2>/dev/null \|\| true` — uploads shaped, downloads bufferbloated at line rate (102 ms spikes) | PKGBUILD must enable `NET_SCH_INGRESS` (=y) plus `IFB`/`NET_ACT_MIRRED`/`NET_CLS_U32` (=m) for CAKE SQM ingress; the script uses the u32 match-all idiom (`tc filter ... protocol all u32 match u32 0 0 action mirred egress redirect dev ifb4cake`). Verify the running kernel: `zcat /proc/config.gz \| grep NET_SCH_INGRESS`. net-tune.sh now checks for the ingress qdisc and logs a targeted ERROR |
@@ -101,3 +102,52 @@ repeat produces a lockup log (or keep nmi_watchdog on while silencing the
 boot-time clocksource message separately); (4) reduce SMU DPM transitions as a
 stopgap (LACT `power_dpm_force_performance_level=high`); (5) file/bump a bug
 against !5538. The patch-sweep skill now greps for this class every run.
+
+### 2026-08-10 follow-up — full journal cross-check (log1.txt + log2.txt)
+
+`log2.txt` is a `journalctl` export spanning Aug 05 → Aug 10 (grabbed via
+`sudo journalctl` on Aug 10 07:54). `log1.txt` is the dmesg of a 7.2.0-rc6
+boot. Cross-checking every incident window against the whole journal:
+
+- **Recurrence is much higher than one incident.** COSMIC portal / Wayland
+  `Broken pipe` + `SCTK dispatch error` bursts occur on Aug 05 23:36, Aug 06
+  20:56, Aug 07 21:43, Aug 08 21:49, Aug 09 13:02, Aug 09 16:29, Aug 09 22:43 —
+  seven events in six days, each = display connection died, then session
+  teardown and (mostly) a reset/reboot.
+- **The Aug 09 16:29→21:36 session died mid-activity.** Last journal lines are
+  blocky DNS for Steam P2P discovery (21:36:26), hcaptcha (21:36:09), Spotify
+  (21:36:29); journal stops at 21:36:29, next boot 21:37:12. **Zero kernel
+  output at the crash instant**: no Oops, no MCE, no `amdgpu: GPU reset`, no
+  ring/job/fence timeout, no SMU error, no soft/hard lockup. The journal simply
+  ends → silent platform reset (matches the `crash` marker `last -x` reports).
+- **Why it is silent:** `nowatchdog` on the cmdline disables the kernel lockup
+  detector, so a hang can't emit `BUG: soft lockup` even if it wanted to.
+- **Every boot logs three standing anomalies** (not crash-specific, but load
+  bearing):
+  1. `smu driver if version = 0x0000002e, smu fw if version = 0x00000033` —
+     the !5538-class IF mismatch.
+  2. `[drm] REG_WAIT timeout 1us * 150000 tries - optc401_disable_crtc line:237`
+     — the DCN401 OPTC4 display controller stalls on a register wait at mode
+     set, twice per boot. Shows this pipe can hang on its own; a display-pipe
+     hang during a DPMS/VRR/modeset transition would black the screen exactly
+     as observed, without touching any ring (hence no GPU-reset messages).
+  3. `[drm] Failed to setup vendor infoframe on connector DP-2: -22` — vendor
+     infoframe programming (HDMI VRR/ALLM/gaming) fails with EINVAL every boot.
+
+**Conclusion:** the SMU IF mismatch remains the best-supported root cause for
+the *reset itself* (matches !5538 byte-for-byte, incident timing tracks GPU
+load: Overwatch/Steam/hcaptcha/YouTube), but the recurring OPTC401 REG_WAIT
+timeout + vendor-infoframe failure mean a DCN401 display-pipe hang is a live
+second candidate and the two are not mutually exclusive. Decisive next step is
+still (3): **drop `nowatchdog`** so the next event leaves a lockup trace —
+everything else (VBIOS/BIOS update, LACT `performance_level=high` stopgap)
+stays. Sweep greps now cover `optc401_disable_crtc`, `vendor infoframe`, and
+DCN4 OPTC/DPMS-hang fixes as a first-class class.
+
+**New 2026-08-10 work-item-comment lead:** on !5538 an AMD engineer asked the
+reporter to test `pcie.aspm=off` on the grub command line — ASPM on the dGPU
+PCIe link is a candidate trigger for the bus-drop. Worth a controlled test on
+our 9070 XT (Gigabyte B850 board) alongside the `nowatchdog` removal. The
+display-stall class (!4753/!5203/!5571/!5320) is under active investigation by
+AMD (FAMS2 + a `pp_dpm_mclk` sysfs fix `d81e52fc`, newer than rc7) — no merged
+fix to backport yet; monitor via the GraphQL comment check each sweep.

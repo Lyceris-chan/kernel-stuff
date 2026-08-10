@@ -2,11 +2,13 @@
 name: patch-sweep
 description: >
   Run the periodic patch sweep for sleepy-kernel, checking drm-next,
-  agd5f/amd-staging-drm-next, linux-next, linux-pm, the amd-gfx and dri-devel
-  mailing lists, sirlucjan, firelzrd, the GitLab drm/amd work-items tracker,
-  AND the x86/security line (torvalds x86_bugs / SRSO / MCE — Zen 4 CPU
-  mitigations like the Safe-RET interrupt fix). Produces a triage report and
-  dry-runs clean candidates against the reference rc tree.
+  drm-misc-next (TTM / dmemcg / dmabuf — e.g. the Valve aggressive-TTM
+  dmemcg-protect series), agd5f/amd-staging-drm-next, linux-next, linux-pm,
+  the amd-gfx and dri-devel mailing lists, sirlucjan, firelzrd, the GitLab
+  drm/amd work-items tracker, AND the x86/security line (torvalds x86_bugs /
+  SRSO / MCE — Zen 4 CPU mitigations like the Safe-RET interrupt fix).
+  Produces a triage report and dry-runs clean candidates against the reference
+  rc tree.
   Use when asked to "check for new patches", "sync sources", or "run a patch
   sweep". For a single named patch/commit, use the patch-audit skill instead.
 ---
@@ -65,8 +67,10 @@ description: >
 #   git -C repos/linux-next fetch origin tag next-YYYYMMDD
 # That bypasses the advertisement and either fetches the tag or errors cleanly.
 
-# Git repos (use background processes)
-for repo in repos/drm-next repos/agd5f-linux repos/linux-pm repos/amd-staging-drm-next; do
+# Git repos (use background processes). drm-misc is the TTM/dmemcg/dmabuf line
+# (Valve dmemcg-aggressive-protect series) — clone on first sweep.
+[ -d repos/drm-misc ] || git clone --shallow-since=2026-08-01 https://gitlab.freedesktop.org/drm/misc.git repos/drm-misc >/dev/null 2>&1 &
+for repo in repos/drm-next repos/agd5f-linux repos/linux-pm repos/amd-staging-drm-next repos/drm-misc; do
   git -C "$repo" fetch --shallow-since=2026-08-01 origin 2>&1 | tail -3 &
 done
 # torvalds mainline (x86/security line). repos/linux-7.2-rc6 is a shallow
@@ -206,6 +210,25 @@ curl -s "https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/events?per_pag
 Check issue titles/descriptions and events (comment bodies + referenced commit SHAs)
 for unmerged patch series relevant to our hardware. If a request returns an Anubis
 challenge page, you likely used a browser UA — retry with no UA.
+
+**Read full issue COMMENTS via unauthenticated GraphQL (learned 2026-08-10):**
+the REST notes API is 401-gated, but GraphQL exposes the same notes for public
+projects with no auth. This is how to check issue comments for in-progress fixes /
+commit SHAs / workarounds:
+
+```bash
+curl -s "https://gitlab.freedesktop.org/api/graphql" -H "Content-Type: application/json" \
+  --data '{"query":"query { project(fullPath: \"drm/amd\") { issue(iid: \"5538\") { title notes { nodes { body system } } } } }"}'
+```
+
+Sweep flow: (1) search issues by hardware keyword —
+`curl -s "https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/issues?search=<kw>&state=all&per_page=100"` —
+then (2) pull notes for each relevant iid via GraphQL and grep for
+`([0-9a-f]{12,40})|fixed by|patch|commit|in progress|merged`. The HTML issue page
+(`/-/issues/<iid>`) renders the description but comments are Vue-lazy-loaded, so
+GraphQL is the reliable route for comments. (2026-08-10 scan: no SMU-IF driver
+fix in !5538/!5479/!5038 — firmware-side; AMD devs suggest `pcie.aspm=off` as a
+!5538 stopgap; display-stall class !4753 has an in-progress FAMS2 investigation.)
 
 **Watch the hard-reset / SMU-IF class (learned 2026-08-10, work-item !5538):**
 our RX 9070 XT reports `smu driver if version = 0x0000002e, smu fw if version =

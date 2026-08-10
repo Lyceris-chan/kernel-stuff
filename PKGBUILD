@@ -343,6 +343,13 @@ source=(
   # 1135-1136: Tom Chung "DC Patches Aug 10 2026" DCN42B/HDMI-FRL members (amd-gfx ML 2026-08-05)
   "1135-drm-amd-display-fix-HPD-program-filter-programming.patch"
   "1136-drm-amd-display-update-and-revert-FRL-LT-timeout.patch"
+  # 1137: Harry Wentland MST connector->index bounds check (amd-drm-next-7.3-2026-08-06) — DM MST HDCP array safety
+  "1137-drm-amd-display-Bounds-check-connector-index-in-MST-get_modes.patch"
+  # 1138-1139: DCN401 HDR/SDR seamless-switch fix (73efd24e2) + MST HDCP array resize (261e0fe4e, companion to 1137)
+  "1138-drm-amd-display-fix-seamless-mode-switch-for-HDR-to-SDR.patch"
+  "1139-drm-amd-display-resize-MST-HDCP-arrays-to-32.patch"
+  # 1140: DCN42B force_min_dcfclk debug-option clamp to [200,600] MHz (Tom Chung 10/34) — previous-session plan
+  "1140-drm-amd-display-clamp-force_min_dcfclk-to-dcn42b-range.patch"
   "1200-cpufreq-amd-pstate-Document-missing-kernel-doc-mem.patch"
   "1201-cpufreq-amd-pstate-Update-cppc_req_cached-before-w.patch"
   "1202-cpufreq-amd-pstate-Add-per-core-EPP-boost-for-rec.patch"
@@ -387,6 +394,21 @@ source=(
   "9022-drm-amdgpu-ih7.0-Use-MMIO-ACK-instead-of-doorbell-for-retry-CAM.patch"
   "9023-drm-amdgpu-ih6.0-Enable-retry-CAM-on-Navi-3-dGPUs.patch"
   "9024-drm-amdgpu-ih7.0-Enable-retry-CAM-on-Navi-4-dGPUs.patch"
+  # 9030-9032: smu_v14_0_0 DPM clock-query fixes (Priya Hosur, amd-drm-next-7.3-2026-08-06 tag) —
+  #   DCLK metric, DCEFCLK, find_clk_level() DPM level marking on our exact smu_v14_0_0_ppt.c
+  #   (9070 XT = smu_v14_0_0). PPT-limits rework (9025-9029, same tag) DROPPED: 9026's 77-line
+  #   smu_get_power_limit() hunk fails GNU patch on our series state (CachyOS shifts the context) —
+  #   defer the whole PPT framework to the 7.3 bump via drm-next. See PATCH_SOURCES.
+  "9030-drm-amd-pm-smu_v14_0_0-fix-DCLK-metric-reporting-via-VCLK.patch"
+  "9031-drm-amd-pm-smu_v14_0_0-add-SMU_DCEFCLK-support-in-DPM-queries.patch"
+  "9032-drm-amd-pm-smu_v14_0_0-use-find_clk_level-for-DPM-level-marking.patch"
+  # 9033-9035: amdgpu CS/VM correctness (Junrui Luo, amd-gfx ML 2026-08-06 "amdgpu-fixes" v1; 3/3 v2 08-08)
+  #   FENCE-chunk BO-ref leak, VM update overrun on non-4K pages, BO-VA mapping offset in IB kmap
+  "9033-drm-amdgpu-disallow-multiple-FENCE-chunks-in-one-submit.patch"
+  "9034-drm-amdgpu-fix-VM-update-overrun-on-non-4K-page-kernels.patch"
+  "9035-drm-amdgpu-add-the-BO-va-mapping-offset-when-kmapping-an-IB.patch"
+  # 9036: gfx12 userq VA validation for sub-page buffers (c0122bf2c, drm-next 08-06) — symbol-clean on rc7
+  "9036-drm-amdgpu-fix-userq-VA-validation-for-sub-page-buffers.patch"
 )
 
 validpgpkeys=(
@@ -564,13 +586,23 @@ EOF
     scripts/config -d IIO -d INFINIBAND -d ISDN -d CAN -d PARPORT -d FIREWIRE -d PCMCIA -d GAMEPORT -d MOST -d GREYBUS -d COMEDI -d ANDROID_BINDER_IPC -d ANDROID_BINDERFS -d ANDROID_BINDER_DEVICES -d F2FS_FS
     scripts/config -d DRM_I915 -d DRM_XE -d DRM_NOUVEAU -d DRM_VGEM -d DRM_VMWGFX -d DRM_GMA500 -d DRM_UDL -d DRM_AST -d DRM_MGAG200 -d DRM_QXL -d DRM_VIRTIO_GPU
     scripts/config -e LRU_GEN -e LRU_GEN_ENABLED -e LRU_GEN_WALKS_MMU -e LRU_MARIE -e CPU_IDLE_GOV_NAP -e MQ_IOSCHED_ADIOS -e MQ_IOSCHED_KYBER --set-str DEFAULT_IOSCHED "kyber" -m USB_VIDEO_CLASS -m I2C_CHARDEV -m R8169 -d TCP_CONG_BBR -e TCP_CONG_BBR3 -e DEFAULT_BBR3 --set-str DEFAULT_TCP_CONG "bbr3"
-    scripts/config -e PCIEASPM_PERFORMANCE -d PCIEASPM_DEFAULT
+    # ASPM: OFF (was PERFORMANCE). There is no Kconfig "off" policy for PCIe ASPM —
+    # the choice is BIOS-default/powersave/powersupersave/performance. The real
+    # "off" is the runtime pcie_aspm=off param (the drm/amd !5538 SMU bus-drop
+    # stopgap an AMD engineer recommended), passed via the built-in CMDLINE below.
+    # We drop the compile-time PERFORMANCE policy so nothing forces a policy;
+    # olddefconfig leaves the base PCIEASPM_DEFAULT (BIOS default), and the
+    # pcie_aspm=off param overrides it at boot to disable ASPM entirely.
+    scripts/config -d PCIEASPM_PERFORMANCE -d PCIEASPM_POWERSAVE -d PCIEASPM_POWER_SUPERSAVE
 
     scripts/config -d GENERIC_CPU -e MZEN4
     scripts/config -d LTO_NONE -e LTO_CLANG_THIN
     scripts/config -d CC_OPTIMIZE_FOR_PERFORMANCE -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
     scripts/config -e CACHY   # gates the 0110 CachyOS config-hooks backport
-    scripts/config -e CMDLINE_BOOL --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 elevator=kyber" -d CMDLINE_OVERRIDE
+    # pcie_aspm=off: disable PCIe ASPM entirely — the !5538 SMU bus-drop stopgap.
+    # Appended to the bootloader params (CMDLINE_OVERRIDE is off); boots this kernel
+    # with ASPM off regardless of the platform/BIOS default.
+    scripts/config -e CMDLINE_BOOL --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 elevator=kyber pcie_aspm=off" -d CMDLINE_OVERRIDE
     scripts/config -e DEBUG_KERNEL -d DEBUG_INFO_NONE -d DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT -e DEBUG_INFO_DWARF5 -e DEBUG_INFO_BTF
     scripts/config -d SECURITY_APPARMOR -d SECURITY_APPARMOR_DEBUG -d SECURITY_APPARMOR_INTROSPECT_POLICY
     scripts/config -d AUDIT -d AUDITSYSCALL -d AUDIT_ARCH -d SLUB_DEBUG
@@ -942,7 +974,7 @@ b2sums=('4299f17dac88bd1aacf58f1ba0b7061859c1723845925b0efc36e09248f74fa5eb57fa9
         '2b7e1ea1ff4592bc8484e97a274c2aac959ccca317cec9523deaf4472be8c91d472567ae4a7029e4afb2dece0b9a934ce94a35ff9da938e26ef0e1d5a1612079'
         '48064b932392d2d8b7c33903a88ec99a5c7d0baf723b58331eeb6bba2e632ec7a38ff1efe8cb022fc95fb50a270f5d57bc075bed0215fe65847c555a7949f706'
         '92148f845b35b0ad77fad1b004fa8625385bfbabd1b83b4a4ba262bb44a51e611473bfc05524cf72db85e3c53838d99175149d035b3ddeea24c3435e1d145e93'
-        '57d214236c741a78f0f2b7e0667ffdf8be422aac2d290e03a4e1961cd80a2e444638a044b97fe95b6ef345d3443d6395d522d23ce1ac2be63adee3834304f407'
+        'b866c2e213614bff04f852e67c2762e6ca28b402dd43142df61192d516bedb7b6d8a7a647870e1121461375735a5e84acae96dc03059347fbf405dddbefd1212'
         'f61685cae107b07fd76a108f80cb0452378c672180a98dd49cf0707a7a6013162f20c1f893f080add632d8ad3fe1e0667db1a4d494f16bd2bd980eee506bbf91'
         'bb8068b44b22abd2316e41425cc250e517bcd76b52885a6ab81de8129f1a82bb93e6f048d521325666cbddb23f32cf74038abc577d1fbe6a20e655dc3f852137'
         '1cb6e0ae6f57e9eca2067594ce83c005c6bc49e6a3d7fb11aa1aeee12204691304da0483e5be3c20b233c132a54831ffa587765599634a5ad123489e99982a58'
@@ -1016,6 +1048,10 @@ b2sums=('4299f17dac88bd1aacf58f1ba0b7061859c1723845925b0efc36e09248f74fa5eb57fa9
         'ad43e6797c6711caf03bf09a41b3a489d24f046d518111e4e58209526188d3caaa21eb6ae849bc060adaa334ebd39d44560a0e65bd521c5089785cd985316052'
         '57a1e09f83fb09fe170d647ac35e2fff00b0d9209a3a7e7a472b71992a9352634ea57d2406f7e0509c5691cce9c9cc24b1fd3abcbb2dd6c757537ab7038f5d0a'
         '42b15486c818c2681e820b7ac171141792be250237fec9431898bd5f968f850bbd7f6a4d1398f017fb01e41b1b107529f0d1562e212aab0af11daab3fdc8e512'
+        '0eced8df6c40f49c572184aa1a888461ee495db3bd147f2772374ebfc517337ea0a88e0b4d6fbcee6259e1cd04575a0a330da3cc02f23aab96ab8eda2b08230a'
+        'a2d40fbc155534aaca840d5fa6f19f90bc4a39190e55edec06209d9aecae9c3095a52604d3b9c6c3038a0dd903676be913c1db7d0f7493e8cac34fb863e7a0ae'
+        '9732479235914fb6f4b125d9bfcb5656a9b06c117bf40927e8a09ab3bd771f5d0474e07525ba1211909246d1c8da9b2b01ea4db20ae442462dd366473337bbd6'
+        'fa40e8b06e0aaa0b2a27d1acf93dd6a9024728ee395a85878bafa05ad736950de70a20aed0033e76c26e12360f018d5ae58d647b055d8deb35f874da4ed69dcd'
         'aad86c7d3e29956976634971ed46663e67365517b69e35e7cce3e135bcc855c324187dd691630af28a5da7045e6766d52a3b2392726b0bc8587a221f9eedca48'
         'e9d464ebf525cd8d93d48f1cbedea0197bd9d0142085da7d83ec3dfda0174483a0fea4077055fd7d1ad9180563dc6dfb77e4f52f9bcb023b7c7d7c9fb5c39ece'
         '9d3e36dbc5c9c5342d2991c4665278ed075073196251e59280bd12f1d6812a37d31db58f5cb978b926e2dcd0a32365960a414b69d10f463bd8f68cedbb4bb6ae'
@@ -1055,6 +1091,13 @@ b2sums=('4299f17dac88bd1aacf58f1ba0b7061859c1723845925b0efc36e09248f74fa5eb57fa9
         '6c0c2e11448f49aa31d9178ab124dd3771b8a625c96511679aaeeec0cf9e61eac8c95f44c93766322db2688d2a41a11a40b254fe45f59fed52817abd833aa54a'
         'e322c8e1dab6618e55e2305005a3bf59080e81bdfd44c446809be59aebe6289027523a246807edf6e21294377b8a8782b547e0a29f0e35d839ebdbc1ed959353'
         'ad3cce7913eb24cb95270e4df78f74c901c268e4d530453744145baa8c4038beaf961bed036dc57d119674fc07e8a059669db1375c6a32d6e208b98d341124ff'
+        '3c551d4584ced461857a64c102997af9dd957c8566bdf9a6b94e6f7f99d9312aba8b0a0914c8083cf7cca3ff79b1c6758594e37a308014d0a1c68218bcf5062f'
+        'f93c27e8be8f23a5983c43a15f59c58b02f3f9a6d898c4ec1e860dd22e76838ebc5d1a9fd9cfc07e81e75212ea87d32dc8ec19c548be14987e51892ed5f57217'
+        '3156023d567e3c114ebcb27755bf8e66174f13fb9ea901f28ed45ea7ab9673e3e1b47ebf7928689caa4949e1f4f85777df2d8b770b08f0b9c1a46bd0ea7da4a6'
+        '962092660e1914ac41ade4d1354463615dcc3dd1bf4e112bcf1a8161feea555865da4087b6af9104c45d21ba51c4f1eae3a4b3aadf00163e1066c3bd36777ded'
+        '0c25491212274500756b31955cafa5f757480985f21d616ab179df8773f1d8a869ab5eb319add233c5f998ec286e12e0fbaf40c1f01cc4f6d577c799cd0a40a7'
+        '2f6ecc84e0141cbee5ce379a2959550cb4830e923afa3d5275283d74d69b8e3bba51f84af96df329d1ea30af0a26f320678907833b40172cbff4a751de3682a7'
+        '9eade3d8b8bf90f5165547917b1054d5033d5d4fb89016cf3ca957b3cb9b25635b8f716594dee12705d80c3193df9f22dcb4c6c33994a7e117d3dedbec03627e'
         '116ec92181c091e7e57f3c88b159a7080d3f3dfd05ed661da95811dd58209e4b83a69edfc47a57126524c014cdc0bb7b72f9be94294237c24461ac702e2b1206')
 
 if [ "$_use_kernel_org_llvm" = "yes" ]; then
