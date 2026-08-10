@@ -339,7 +339,8 @@ cp <downloaded-or-exported>.patch NNNN-short-description.patch
 Example: `1206-cpufreq-amd-pstate-Fix-EPP-return-type-and-handle-er.patch`.
 
 Then document in `PATCH_SOURCES.md` **before** adding to `PKGBUILD`.
-Run `updpkgsums` after any `source=()` change.
+Run `updpkgsums` after any `source=()` change. Write the entry and the
+triage report in Google doc style — see `.claude/style-guides/google-docguide/`.
 
 ## Step 8 — Mailing list patches (mbox format)
 

@@ -24,3 +24,6 @@ grep_output*.txt
 config-7.2.*
 # Local tool state
 .kiro/
+
+# Downloaded Google doc style guides (tooling state, not part of the project)
+.claude/style-guides/

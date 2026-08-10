@@ -16,6 +16,13 @@ build is verified — not before.
 
 ## Google developer style — apply to every doc edit
 
+Consult the local Google documentation style guides before editing:
+`.claude/style-guides/google-docguide/` (index in
+`.claude/style-guides/README.md`). They are gitignored tooling state, not
+project files. Read `style.md` (Markdown formatting), `best_practices.md`, and
+`philosophy.md`, and apply them to every README/GUIDE/PATCH_SOURCES edit and
+every commit message. Quick rules that always apply:
+
 - **Second person**: "You can build with ..." — never "One can build".
 - **Active voice**: "Run `makepkg`" — never "makepkg should be run".
 - **Imperative for instructions**: "Run:", "Add:", "Verify:".
@@ -23,15 +30,18 @@ build is verified — not before.
 
 ## 1. Keep README.md sections accurate
 
-Two required sections must reflect the current series:
+The per-patch manifest lives **only** in `PATCH_SOURCES.md` — never duplicate
+per-patch rows into README.md or GUIDE.md. Keep the remaining README sections
+in sync:
 
 - **"Target audience"** — one machine: Ryzen 9 7950X (Zen 4), RX 9070 XT
   (Navi 48 / RDNA 4), RTL8125B NIC; not a general-purpose distro kernel.
 - **"What this kernel adds"** — subsections "Over vanilla Linux 7.2-rcN" and
   "Over stock CachyOS", listing every category the series now carries.
 
-On any patch add/remove/renumber, also update the "Patch series" range table
-and the "PROFILE_PEAK behavior" section.
+On any patch add/remove/renumber, update `PATCH_SOURCES.md` (mandatory). Touch
+README.md / GUIDE.md only when a category range changes (their compact "Patch
+series" range tables) or the PROFILE_PEAK behavior section changes.
 
 ## 2. Record provenance in PATCH_SOURCES.md
 

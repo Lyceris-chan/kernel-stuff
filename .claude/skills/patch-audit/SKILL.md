@@ -219,7 +219,8 @@ Run these in order. Copy the commands exactly — do not improvise.
 6. **Document Provenance**: Update `PATCH_SOURCES.md` **BEFORE** modifying
    `PKGBUILD`. Include file name, author, subject, and source URL or commit
    hash. A patch that is in `PKGBUILD` but not in `PATCH_SOURCES.md` is a
-   provenance failure.
+   provenance failure. Write the entry in Google doc style — see
+   `.claude/style-guides/google-docguide/`.
 
 7. **Update PKGBUILD & Checksums**: Add the patch to the `source=()` array in
    `PKGBUILD` in the correct numeric order, then:

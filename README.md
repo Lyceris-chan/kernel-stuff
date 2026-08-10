@@ -68,8 +68,9 @@ Here's what `linux-sleepy` gives you on top of each baseline.
   **retry-fault handling v3 series** (`9011`–`9024`, Timur Kristóf), and the
   **amd-drm-next-7.3-2026-08-06 backports** (`9030`–`9032`: smu_v14_0_0 DCLK metric,
   DCEFCLK, and `find_clk_level()` DPM fixes), the amdgpu CS/VM correctness
-  series (`9033`–`9035`: FENCE-chunk leak, VM overrun, BO-VA kmap offset), and
-  the gfx12 userq sub-page VA-validation fix (`9036`).
+  series (`9033`–`9035`: FENCE-chunk leak, VM overrun, BO-VA kmap offset), the
+  gfx12 userq sub-page VA-validation fix (`9036`), and the RDNA4/gfx1201
+  prefer-default-discovery-offset fix (`9037`).
   The Exit-idle-optimizations series merged upstream into rc6 and was dropped.
   The SMU14 PPT-limits framework rework from the same tag is **deferred to 7.3**
   (does not apply cleanly to the rc7 series state).
@@ -173,11 +174,15 @@ The kernel bakes the following parameters into `CONFIG_CMDLINE`, so you do not
 need them on your boot command line:
 
 ```
-cpuidle.governor=nap amd_pstate.epp_boost=1
+cpuidle.governor=nap amd_pstate.epp_boost=1 elevator=kyber pcie_aspm=off
 ```
 
 - `cpuidle.governor=nap` activates the NAP cpuidle governor.
 - `amd_pstate.epp_boost=1` enables per-core EPP boost for recently busy cores.
+- `elevator=kyber` selects the kyber I/O scheduler as default.
+- `pcie_aspm=off` disables PCIe Active State Power Management entirely — the
+  drm/amd !5538 SMU bus-drop stopgap (see the ASPM note under "What this kernel
+  adds").
 
 ### sched-ext scheduler (optional)
 
@@ -257,179 +262,22 @@ echo profile_peak | sudo tee /sys/class/drm/card0/device/power_dpm_force_perform
 
 ## Patch series
 
-Per-patch manifest of the full 140-patch series. See `PATCH_SOURCES.md` for full
-provenance (authors, commit hashes, Message-IDs).
+The series carries 140 patches in the ranges below. `PATCH_SOURCES.md` is the
+authoritative per-patch manifest — authors, commit hashes, Message-IDs, and every
+dropped or deferred entry — so it is not duplicated here.
 
-### Local / upstream SMU14 + DCN401 (0001–0034)
-
-| Patch | What it does | Source |
+| Range | Category | Source |
 |---|---|---|
-| `0001` | Fixes a typo in `smu_v14_0_set_irq_state()` (SMU14 IRQ `type` param). | Handmade (Antigravity) |
-| `0002` | Fixes a memory leak in `smu_v14_0_fini_smc_tables()`. | Handmade (Antigravity) |
-| `0003` | Lets the GFXCLK ceiling float in PROFILE_PEAK on SMU14. | Handmade (Antigravity) |
-| `0004` | Disables GPU deep sleep while PROFILE_PEAK is forced; re-enables it at other levels and keeps it off under COMPUTE. | Handmade (Antigravity) |
-| `0005` | Disables SMU14 mode1 reset under SR-IOV. | Handmade (Antigravity) |
-| `0006` | Adds bounds checking to SMU14 I2C commands. | Handmade (Antigravity) |
-| `0007` | Removes a redundant mutex lock in the SMU14 I2C update path. | Handmade (Antigravity) |
-| `0008` | Fixes SMU14 power-limit reporting logic (unlocks max PPT). | Handmade (Sleepy/Antigravity) |
-| `0010` | Fixes named-barrier restore in the gfx12.1 trap handler. | amd-gfx ML |
-| `0030` | Proactively shrinks DET for pipes losing bandwidth. | Handmade (Antigravity) |
-| `0031` | Fixes a memory leak in DCN20 link-encoder resource init. | Handmade (Antigravity) |
-| `0032` | Fixes an OOB array access in the HPO FRL link encoder. | Handmade (Antigravity) |
-| `0033` | Adds missing HPO FRL link-encoder register init. | Handmade (Antigravity) |
-| `0034` | Prevents a memory leak during IRQ-service destroy. | Handmade (Antigravity) |
-
-### Upstream EDID / HDMI (0050–0058)
-
-| Patch | What it does | Source |
-|---|---|---|
-| `0050` | Parses the AMD VSDB for the FreeSync refresh range. | amd-gfx ML |
-| `0055` | Parses HDMI 2.1 gaming (ALLM/VRR) caps from the HF-VSDB. | amd-gfx ML |
-| `0058` | Restores the FRL cap on non-destructive HDMI link verify. | amd-gfx ML |
-
-### CachyOS branches (0101–0113)
-
-| Patch | What it does | Source |
-|---|---|---|
-| `0101` | Backports BBRv3 TCP congestion control; sets it as the compiled default. | CachyOS (sirlucjan) |
-| `0102` | Allows `-O3` in kbuild. | CachyOS (sirlucjan) |
-| `0103` | Adds x86_64 Zen 4 ISA optimizations (`-march=znver4`). | CachyOS (sirlucjan) |
-| `0104` | Adds VRAM cgroup accounting for drm/ttm. | CachyOS (sirlucjan) |
-| `0105` | Squashes the full 26-patch fixes branch, including off-target hardware. | CachyOS (sirlucjan) |
-| `0106` | Reverts the off-target hardware changes carried in the full fixes squash (i915, btusb, rtw89, laptop audio, SOF, iwlwifi, nouveau). | CachyOS (sirlucjan) |
-| `0107` | Backports the HDMI 2.1 FreeSync/VRR/PCON series (26 patches, excludes `0151`). | CachyOS (sirlucjan) |
-| `0108` | Adds SMP preemption + TLB flush (14 patches). | CachyOS (sirlucjan) |
-| `0109` | Adds EDID DSC BPP parsing (8 patches). | CachyOS (sirlucjan) |
-| `0110` | CONFIG_CACHY config hooks — sched EEVDF latency tuning, THP defrag, lru-gen working-set, compaction/watermark off, bus_lock SLD. | CachyOS/linux fork (curated) |
-| `0111` | Disable the legacy ACPI bus-master poll on AMD C3 (Zen 4 idle). | CachyOS/linux fork |
-| `0112` | Skip VRAM eviction at S4/S5 poweroff (faster GPU shutdown). | CachyOS/linux fork |
-| `0113` | Micro-opts: readahead 256K, sched/readdir hints, `list.h` inline, evdev `call_rcu`. | CachyOS/linux fork |
-
-### GPU core (1000–1026)
-
-| Patch | What it does | Source |
-|---|---|---|
-| `1000` | Converts gfx12.1 invalid-SDMA-engine `BUG()` to `WARN()`. | drm-next |
-| `1001` | Converts gfx12 invalid-SDMA-engine `BUG()` to `WARN()`. | drm-next |
-| `1002` | Allocates enough space for HPD info on gfx11. | drm-next |
-| `1003` | Only remaps KCQs when reset via MMIO on gfx12. | drm-next |
-| `1004` | Disallows GFXOFF around TLB flushes on GMC9. | drm-next |
-| `1005` | Disallows GFXOFF around TLB flushes on GMC10. | drm-next |
-| `1006` | Disallows GFXOFF around TLB flushes on GMC11. | drm-next |
-| `1007` | Disallows GFXOFF around TLB flushes on GMC12. | drm-next |
-| `1008` | Adds a buffer-funcs callback for TLB invalidation. | drm-next |
-| `1009` | Adds a TLB-invalidation buffer-func callback to SDMA 5.0. | drm-next |
-| `1010` | Adds a TLB-invalidation buffer-func callback to SDMA 5.2. | drm-next |
-| `1011` | Adds a TLB-invalidation buffer-func callback to SDMA 6. | drm-next |
-| `1012` | Adds a TLB-invalidation buffer-func callback to SDMA 7. | drm-next |
-| `1013` | Adds a core helper for SDMA-based TLB invalidation. | drm-next |
-| `1014` | Adds more GMC TLB-invalidation helpers. | drm-next |
-| `1015` | Switches GMC10 to the new TLB-invalidation helpers. | drm-next |
-| `1016` | Switches GMC11 to the new TLB-invalidation helpers. | drm-next |
-| `1017` | Switches GMC12 to the new TLB-invalidation helpers. | drm-next |
-| `1018` | Switches the order of GC and Display IP blocks (DCN42B). | drm-next |
-| `1019` | Updates the mmhub 4.2.0 client list. | drm-next |
-| `1020` | Fixes the MMHUB0 check in the gmc12.1 pasid TLB flush (copy-paste typo). | amd-gfx ML |
-| `1023` | `amdgpu.ignore_min_pcap=1` module param — override the SMU min power cap (Liquorix, CachyOS backport). | CachyOS/linux fork |
-| `1024` | Fixes dropped MES dispatches under queue oversubscription (GFX12 MES). | drm-next `288cc4a54` (7.3 last-round backport) |
-| `1026` | Fixes a GFX12 KFD CRIU-restore NULL-deref panic (implemented `restore_mqd`/`checkpoint_mqd` callbacks + NULL guards). | amd-gfx ML 2026-08-04 (reconstructed from mbox) |
-
-(`1020`–`1022` merged upstream in 7.2-rc7 and were dropped on the bump; `1025`
-gfx12 priv-fault recovery dropped — needs gfx11 priv-fault infra absent from rc7.)
-
-### Display (1100–1136)
-
-| Patch | What it does | Source |
-|---|---|---|
-| `1100` | Enables PSR and Replay on DCN4 and fixes the AUX instance. | drm-next |
-| `1101` | Enables pstate for DCN4 non-emulation builds; reverse-applied to keep `.pstate_enabled = false`. | drm-next |
-| `1102` | Increases the dcn42b UCLK value. | drm-next |
-| `1103` | Adds a dcn42b-specific SMU clock-table read. | drm-next |
-| `1104` | Adds MALL status readback for DCN 4.0.1. | drm-next |
-| `1105` | Adds DCN42B `VID_CRC_CONTROL` and `HBLANK_CONTROL` registers. | drm-next |
-| `1106` | Updates the memclk clock-table read for dcn42. | drm-next |
-| `1107` | Enables `hdmistreamclk_rcg` by default for dcn42. | drm-next |
-| `1108` | Adds MCIF ARB programming structures (DCN401/DCN42). | drm-next |
-| `1109` | Adds updated MCIF ARB register definitions. | drm-next |
-| `1110` | Ports DCN4+ MCIF ARB programming to the new format. | drm-next |
-| `1111` | Fixes `dc_stream_remove_writeback()` dropping wrong writeback entries. | drm-next |
-| `1113` | Fixes DSC-over-HDMI-FRL mode pruning (compressed FRL cap check dispatch). | drm-next |
-| `1114` | Ensures `dtbclk` clk_src is selected before `hdmistream_clk_en` (DCN42B HDMI clock sequence). | drm-next |
-| `1115` | Fixes a wrong register field in `dccg35_set_hdmistreamclk_src_new` (`HDMISTREAMCLK0_SRC_SEL`). | drm-next |
-| `1116` | Adds the dcn42b SOC/IP translator (DML2 prereq for 1117). | drm-next |
-| `1117` | Fixes `dcn42b_soc_bb.h` (gpuvm_min_page_size 256→4 for 4K pages). | drm-next |
-| `1118` | Adds the replay-residency function (DC/debugfs). | drm-next |
-| `1119` | Fixes the force-FRL-rate debug setting. | drm-next |
-| `1120` | **PSR/Replay Part 2** — actually enables PSR/Replay on DCN42B (completes 1100). | drm-next |
-| `1121` | Enables IPS support for the DCN4 variant. | drm-next |
-| `1122` | Enables zstate support and fixes DCN42B clk-src masks. | drm-next |
-| `1123` | Enables HUBP/DPP driver power gating for DCN42. | drm-next |
-| `1124` | Corrects the `vblank_end` calc for the FAMS cmd packet. | agd5f |
-| `1125` | Fixes rounding errors in `CalculatePrefetchSchedule`. | agd5f |
-| `1126` | Fixes debug-flag assignment in `dmub_replay.c`. | agd5f |
-| `1127` | Adds block-sequence support for bandwidth programming (prereq for 1128/1129). | drm-next |
-| `1128` | Registers DCN as a PMFW DF C-state client on DCN42 (DCN42B boot-hang fix). | drm-next |
-| `1129` | Ensures `dtbclk` is enabled (DCN42). | amd-gfx ML (Roman.Li DC batch) |
-| `1130` | Updates the VRR info packet to support 12-bit refresh rates. | amd-gfx ML (Roman.Li DC batch) |
-| `1131` | Adds missing DCN42B register defines. | amd-gfx ML (Roman.Li DC batch) |
-| `1132` | Adds missing DMUB CACP and PR definitions. | amd-gfx ML (Roman.Li DC batch) |
-| `1133` | Adds FFE level defaults (DCN6 hunks stripped — absent from rc7). | amd-gfx ML (Roman.Li DC batch) |
-| `1134` | Fixes BT.2020 YCbCr limited-output CSC matrix (too-bright HDR on calibrated panels; author-tested on 9070 XT). | amd-gfx ML (Nathan Lucas, 2026-08-02; P2 DCE copy rejected — off-target) |
-| `1135` | Fixes DCN42B HPD toggle-filter unit programming (wrong HW unit → extremely long connection time). | amd-gfx ML (Tom Chung series 12/34, 2026-08-05) |
-| `1136` | Updates/reverts FRL LT timeout: polls on no-timeout and bounds the ≥16 Gbps LT timer. | amd-gfx ML (Tom Chung series 20/34, 2026-08-05) |
-
-### Power management (1200–1209)
-
-| Patch | What it does | Source |
-|---|---|---|
-| `1200` | Documents missing kernel-doc members in amd-pstate. | linux-pm |
-| `1201` | Updates `cppc_req_cached` before writing the MSR. | linux-pm |
-| `1202` | Adds per-core EPP boost for recently-busy CPUs. | linux-pm |
-| `1203` | Documents the `epp_boost` parameter. | linux-pm |
-| `1205` | Skips amd-pstate-ut tests when the driver is inactive. | linux-pm |
-| `1206` | Fixes the EPP return type and init error handling. | linux-pm |
-| `1207` | Toggles `auto_sel` in active mode on shared-memory systems. | linux-pm |
-| `1208` | Caches the firmware-programmed EPP value. | linux-pm |
-| `1209` | Handles a missing policy in dynamic EPP callbacks. | linux-pm |
-
-`1204`, `1210`–`1213` merged upstream in 7.2-rc6 and dropped from the series.
-
-### Block / I/O (2000–2004)
-
-| Patch | What it does | Source |
-|---|---|---|
-| `2000` | Passes the queue directly to `dd_insert_request()`. | CachyOS (sirlucjan) |
-| `2001` | Skips expensive merge lookups in mq-deadline when contended. | CachyOS (sirlucjan) |
-| `2002` | Passes the queue directly to `bfq_insert_request()`. | CachyOS (sirlucjan) |
-| `2003` | Serializes request dispatching in BFQ. | CachyOS (sirlucjan) |
-| `2004` | Skips expensive merge lookups in BFQ when contended. | CachyOS (sirlucjan) |
-
-### Memory (2100–2101)
-
-| Patch | What it does | Source |
-|---|---|---|
-| `2100` | Merges zstd changes from the dev tree for 7.2. | CachyOS (sirlucjan) |
-| `2101` | Introduces LRU-MARIE 0.9.3 page eviction (orphaned-L1-bit self-heal fix; `vma_flags` fix kept). | firelzrd/lru_marie commit `0e08603` (2026-08-07) |
-
-### CPU idle (2200)
-
-| Patch | What it does | Source |
-|---|---|---|
-| `2200` | NAP cpuidle governor v0.5.0 for 7.2. | CachyOS (sirlucjan) |
-
-### agd5f/staging backports (9001–9024)
-
-| Patch | What it does | Source |
-|---|---|---|
-| `9001` | Drops all `BUG()`s in gfx12. | agd5f staging |
-| `9002` | Drops all `BUG()`s in gfx12.1. | agd5f staging |
-| `9003` | Replaces a PSP14 `BUG()` with an error. | agd5f staging |
-| `9006` | Uses more optimal copy-packet sizes for copy/fill in TTM. | agd5f staging |
-| `9007` | Programs DB_RING_CONTROL on gfx12. | agd5f staging |
-| `9008` | Reads `TA_CNTL2.TRUNCATE_COORD_MODE` on gfx12 (conformant truncation flag). | amd-gfx ML |
-| `9009` | Drops all `BUG()`s in mes12.1. | drm-next |
-| `9010` | Turns imu12 `BUG()`s into `WARN()`s. | drm-next |
-| `9011`–`9024` | **Retry-fault handling v3** (14 patches, Timur Kristóf): respects `noretry` on GFX12.1, enables retry-fault interrupts, IH soft-ring + `retry_cam_ack`, gmc11/12 `cam_index` passthrough, NOALLOC fault handling, IH6.0/7.0 MMIO ACK, **retry CAM on Navi 3/4 dGPUs**. | amd-gfx ML |
+| `0001–0049` | Handmade local patches (SMU14, DCN401, GFX12) | Sleepy/Antigravity |
+| `0050–0099` | Upstream EDID/display ML patches not yet landed | amd-gfx / dri-devel ML |
+| `0101–0113` | CachyOS branch squashes (0106 = off-target drops; 0110–0113 = fork backports) | sirlucjan / CachyOS fork |
+| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | drm-next / agd5f |
+| `1100–1199` | AMD Display (DCN4, DCN42B, PSR, Replay, pstate, MCIF ARB) | drm-next |
+| `1200–1299` | AMD Power Management (amd-pstate, cpufreq) | linux-pm / sirlucjan |
+| `2000–2099` | Block / I/O schedulers (bfq, mq-deadline) | sirlucjan |
+| `2100–2199` | Memory management (zstd, LRU-MARIE) | sirlucjan |
+| `2200–2299` | CPU idle (NAP governor) | sirlucjan |
+| `9000–9099` | agd5f staging backports | `git format-patch` from agd5f/linux |
 
 ## Repository layout
 

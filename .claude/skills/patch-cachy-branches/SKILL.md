@@ -213,4 +213,5 @@ This is an in-tree source edit only, not a new patch file.
 updpkgsums
 ```
 
-Document every change in `PATCH_SOURCES.md` before committing.
+Document every change in `PATCH_SOURCES.md` before committing, in Google doc
+style — see `.claude/style-guides/google-docguide/`.

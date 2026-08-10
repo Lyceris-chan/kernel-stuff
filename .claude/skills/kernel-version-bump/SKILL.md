@@ -47,7 +47,9 @@ git -C repos/linux-7.2-rcN apply --check -R <patch>.patch  # already-applied che
   content is unchanged with the sirlucjan repo's HEAD date.
 
 Report every dropped or regenerated patch, with reasons, before moving to
-step 4 — never add or remove a patch silently.
+step 4 — never add or remove a patch silently. Write the report and any
+PATCH_SOURCES entries in Google doc style — see
+`.claude/style-guides/google-docguide/`.
 
 ## 4. Refresh CachyOS per-branch patches
 

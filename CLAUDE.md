@@ -27,6 +27,10 @@ base, with additional upstream and local patches filtered to this hardware.
 | `PATCH_SOURCES.md` | Per-patch provenance ledger — authors, commit hashes, source URLs, revisions |
 | `LESSONS.md` | Full incident log ("do not repeat") — the durable rules are below; the context is there |
 
+Local Google documentation style guides are downloaded (gitignored, not in the
+repo) to `.claude/style-guides/`; the documentation skills consult them — see
+`.claude/style-guides/README.md`.
+
 ## Repository layout
 
 | Path | Purpose |
@@ -120,7 +124,7 @@ scripts/config -d CC_OPTIMIZE_FOR_PERFORMANCE -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
 # TCP congestion (BBR3 only — old BBR causes BTF symbol collision)
 scripts/config -d TCP_CONG_BBR -e TCP_CONG_BBR3 -e DEFAULT_BBR3 --set-str DEFAULT_TCP_CONG "bbr3"
 # Kernel command line (appended to bootloader params, does not override)
-scripts/config -e CMDLINE_BOOL --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 elevator=kyber" -d CMDLINE_OVERRIDE
+scripts/config -e CMDLINE_BOOL --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 elevator=kyber pcie_aspm=off" -d CMDLINE_OVERRIDE
 # BTF / debug (Clang 23 requires DWARF5)
 scripts/config -e DEBUG_KERNEL -d DEBUG_INFO_NONE -d DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT -e DEBUG_INFO_DWARF5 -e DEBUG_INFO_BTF
 # BPF infrastructure (bpftune, sched-ext)

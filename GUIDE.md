@@ -6,7 +6,7 @@ A custom Arch Linux kernel package (`linux-sleepy`) based on Linux 7.2-rc7, targ
 
 This kernel is written for one specific hardware configuration:
 
-- **CPU**: AMD Ryzen Threadripper Pro 7950X (Zen 4)
+- **CPU**: AMD Ryzen 9 7950X (Zen 4)
 - **GPU**: AMD Radeon RX 9070 XT (Navi 48, RDNA 4, gfx1201)
 - **NIC**: Realtek RTL8125B 2.5 GbE
 - **Storage**: Phison E16 NVMe (PCIe 4.0)
@@ -51,90 +51,22 @@ The following patches come from the [CachyOS linux-cachyos](https://github.com/C
 
 ### Additional out-of-tree patches
 
-These patches are applied on top of the CachyOS base, numbered `1xxx` (upstream mailing list / development trees) and `0xxx` (local patches).
+Per-patch provenance — authors, commit hashes, Message-IDs, and every dropped
+or deferred entry — lives in `PATCH_SOURCES.md` and is not duplicated here. The
+series is grouped by range:
 
-<details>
-<summary>SMU14 / power management (0001–0003, 0012)</summary>
-
-| File | Source | Description |
-|------|--------|-------------|
-| `0001-drm-amd-pm-Fix-typo-in-smu_v14_0_set_irq_state.patch` | Upstream | Fix typo in `smu_v14_0_set_irq_state` |
-| `0002-drm-amd-pm-Fix-memory-leaks-in-smu_v14_0_fini_smc_ta.patch` | Upstream | Fix memory leaks in `smu_v14_0_fini_smc_tables` |
-| `0003-drm-amd-pm-Allow-PROFILE_PEAK-GFXCLK-ceiling-to-floa.patch` | **Local** | PROFILE_PEAK GFXCLK float (see below) |
-| `0012-drm-amd-pm-Fix-SMU14-power-limit-reporting-logic.patch` | Upstream | Fix SMU14 power limit reporting |
-
-</details>
-
-<details>
-<summary>DCN401 / display (0004–0011)</summary>
-
-| File | Source | Description |
-|------|--------|-------------|
-| `0004–0006` | Upstream | SMU14 SR-IOV, I2C bounds checking, mutex fixes |
-| `0007` | Upstream | DCN401: proactively shrink DET for pipes losing planes |
-| `0008–0011` | Upstream | DCN401 resource: memory leak, OOB, HPO, IRQ fixes |
-
-</details>
-
-<details>
-<summary>amd-pstate / Zen 4 (0016–0019, 1070–1076)</summary>
-
-| File | Source | Description |
-|------|--------|-------------|
-| `0016` | Upstream | Document missing kernel-doc members |
-| `0017` | Upstream | Update `cppc_req_cached` before writing EPP |
-| `0018` | Upstream | Per-core EPP boost for `recalibrate` mode |
-| `0019` | Upstream | Document `epp_boost` parameter |
-| `1070` | linux-pm | Bail early if `!X86_FEATURE_HW_PSTATE` |
-| `1071` | linux-pm | Skip unit tests when driver is not active |
-| `1072` | linux-pm | Fix EPP return type and init errors |
-| `1073` | linux-pm | Toggle `auto_sel` in active mode on shared memory systems |
-| `1074` | linux-pm | Cache firmware-programmed EPP value |
-| `1075` | linux-pm | Handle missing policy in dynamic EPP callbacks |
-| `1076` | linux-pm | Loosen requirement on lowest nonlinear frequency |
-
-</details>
-
-<details>
-<summary>RDNA 4 / amdgpu (1002–1003, 1025–1065)</summary>
-
-| File | Source | Description |
-|------|--------|-------------|
-| `1002–1003` | amd-gfx | gfx12: warn (not BUG) for invalid SDMA engine |
-| `1025` | amd-gfx | DCN4: enable PSR and Replay on DCN4 variants |
-| `1031` | amd-gfx | DCN4: enable pstate for non-emulation builds |
-| `1033` | amd-gfx | DCN42b: increase uclk value |
-| `1039` | amd-gfx | gfx11: allocate enough space for HPD info |
-| `1041` | amd-gfx | gfx12: only remap KCQs when reset via MMIO |
-| `1050–1053` | amd-gfx | GMC 9/10/11/12: disallow GFXOFF around TLB flushes |
-| `1054–1058` | amd-gfx | SDMA 5.0/5.2/6/7: TLB invalidation buffer func callbacks |
-| `1059–1060` | amd-gfx | GMC: core TLB invalidation helper via SDMA |
-| `1061–1063` | amd-gfx | GMC 10/11/12: switch to new TLB inv helpers |
-| `1064` | amd-gfx | amdgpu: switch order of GC and Display IP blocks |
-| `1065` | amd-gfx | DCN42b: add SMU clock table read |
-
-</details>
-
-<details>
-<summary>Block I/O (1077–1081)</summary>
-
-| File | Source | Description |
-|------|--------|-------------|
-| `1077–1078` | Upstream (Jens Axboe) | mq-deadline: direct queue pass-in, skip merges if contended |
-| `1079–1081` | Upstream (Jens Axboe) | bfq: direct queue pass-in, serialize dispatch, skip merges |
-
-</details>
-
-<details>
-<summary>Memory management and cpuidle (1082–1084)</summary>
-
-| File | Source | Description |
-|------|--------|-------------|
-| `1082` | sirlucjan | zstd 7.2: merge changes from dev tree |
-| `1083` | sirlucjan | mm 7.2: introduce LRU MARIE |
-| `1084` | Masahito S | nap v0.5.0 cpuidle governor |
-
-</details>
+| Range | Category | Source |
+|---|---|---|
+| `0001–0049` | Handmade local patches (SMU14, DCN401, GFX12) | Sleepy/Antigravity |
+| `0050–0099` | Upstream EDID/display ML patches not yet landed | amd-gfx / dri-devel ML |
+| `0101–0113` | CachyOS branch squashes (0106 = off-target drops; 0110–0113 = fork backports) | sirlucjan / CachyOS fork |
+| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | drm-next / agd5f |
+| `1100–1199` | AMD Display (DCN4, DCN42B, PSR, Replay, pstate, MCIF ARB) | drm-next |
+| `1200–1299` | AMD Power Management (amd-pstate, cpufreq) | linux-pm / sirlucjan |
+| `2000–2099` | Block / I/O schedulers (bfq, mq-deadline) | sirlucjan |
+| `2100–2199` | Memory management (zstd, LRU-MARIE) | sirlucjan |
+| `2200–2299` | CPU idle (NAP governor) | sirlucjan |
+| `9000–9099` | agd5f staging backports | `git format-patch` from agd5f/linux |
 
 ### Realtek RTL8125B NIC
 
@@ -165,11 +97,13 @@ The following options differ from the CachyOS base `.config` (which itself diffe
 **Embedded kernel command line** (`CONFIG_CMDLINE`):
 
 ```
-cpuidle.governor=nap amd_pstate.epp_boost=1
+cpuidle.governor=nap amd_pstate.epp_boost=1 elevator=kyber pcie_aspm=off
 ```
 
 - `cpuidle.governor=nap` — activates the NAP cpuidle governor by default; without this the module loads but does not activate.
-- `amd_pstate.epp_boost=1` — enables per-core EPP boost for recently-busy CPUs on Zen 4. Requires the `epp_boost` patch series (patches 0018–0019).
+- `amd_pstate.epp_boost=1` — enables per-core EPP boost for recently-busy CPUs on Zen 4. Requires the `epp_boost` patch series (`1202`).
+- `elevator=kyber` — selects the kyber I/O scheduler as default.
+- `pcie_aspm=off` — disables PCIe Active State Power Management entirely. This is the drm/amd !5538 SMU bus-drop stopgap (see the ASPM note in README "What this kernel adds").
 
 ---
 
@@ -254,9 +188,9 @@ can create the ingress path, and the service will log
 
 - **BTF symbol conflict**: `CONFIG_TCP_CONG_BBR` (old BBRv1/v2) and `CONFIG_TCP_CONG_BBR3` both define `BTF_KFUNCS_START(tcp_bbr_check_kfunc_ids)`. Having both built-in causes `resolve_btfids` to exit 255 silently, which presents as `Failed to generate BTF for vmlinux`. This build disables the old BBR.
 - **DWARF5 required with Clang 23**: `DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT` produces DWARF output that `pahole` 1.31 cannot convert to BTF. This build uses `DEBUG_INFO_DWARF5` explicitly.
-- **LRU MARIE conflict with vm_swappiness**: The MARIE patch (`1083`) was sourced from the CachyOS-rebased version rather than the raw sirlucjan tree to avoid a `CONFIG_CACHY` vm_swappiness conflict.
+- **LRU MARIE conflict with vm_swappiness**: The MARIE patch (`2101`) was sourced from the CachyOS-rebased version rather than the raw sirlucjan tree to avoid a `CONFIG_CACHY` vm_swappiness conflict.
 - **NAP governor**: NAP requires the `cpuidle.governor=nap` kernel parameter to activate. This build bakes it into `CONFIG_CMDLINE` so it is not needed on the boot command line.
-- **Patches 1025, 1031, 1033 reverse-applied**: `1025` (PSR/Replay), `1031` (DCN4 pstate enable), and `1033` (dcn42b uclk increase) are applied then immediately reverse-applied in `prepare()` because they cause display freezes and UCLK switching glitches on the RX 9070 XT. Restoring the vanilla `.pstate_enabled = false` setting keeps the GPU cool and power-efficient in `auto` mode without screen glitches.
+- **Patch `1101` is reverse-applied**: the DCN4 pstate-enable patch is applied then immediately reverse-applied in `prepare()` so `.pstate_enabled = false` avoids UCLK-switching display freezes on the RX 9070 XT. Restoring the vanilla setting keeps the GPU cool and power-efficient in `auto` mode without screen glitches.
 - **Patch 0003 is not upstream**: The PROFILE_PEAK patch modifies SMU14 power management in ways that have not been reviewed by AMD or the upstream community.
 
 ---
@@ -268,9 +202,9 @@ PKGBUILD                  Build script (Arch Linux makepkg format)
 config                    Base kernel .config (from CachyOS)
 disable_configs.py        Script to strip CachyOS-specific symbols before olddefconfig
 0001-0058-*.patch         Local and upstream SMU14/DCN401/EDID/HDMI patches
-0101-0109-cachy-*.patch   Squashed CachyOS branch patches (one per branch)
+0101-0113-cachy-*.patch   CachyOS branch squashes + fork backports
 1000-2200-*.patch         Upstream patches (amd-gfx, drm-next, linux-pm, block, mm, cpuidle)
-9001-9007-*.patch         agd5f staging backports
+9001-9037-*.patch         agd5f staging backports
 net-tune/                 Unified CAKE SQM + latency tuning systemd service
 PATCH_SOURCES.md          Per-patch source URLs and commit hashes
 GUIDE.md                  Developer notes (build, patch workflow, CI)

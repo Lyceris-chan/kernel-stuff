@@ -47,7 +47,8 @@ reverse-applied with `patch -Np1 --forward -R` to keep `.pstate_enabled = false`
   cat <path/to/file.c.rej>
   ```
 - "Already applied" by an earlier patch or a CachyOS branch → remove the
-  conflicting patch, note it in `PATCH_SOURCES.md`.
+  conflicting patch, note it in `PATCH_SOURCES.md` (Google doc style — see
+  `.claude/style-guides/google-docguide/`).
 - Context lines shifted → regenerate from the source repo (see `patch-audit`).
 - Test a patch independently against the clean tree:
   ```bash
