@@ -34,7 +34,7 @@ The per-patch manifest lives **only** in `PATCH_SOURCES.md` — never duplicate
 per-patch rows into README.md or GUIDE.md. Keep the remaining README sections
 in sync:
 
-- **"Target audience"** — one machine: Ryzen 9 7950X (Zen 4), RX 9070 XT
+- **"Target audience"** — one machine: Ryzen 7 7700 (Zen 4), RX 9070 XT
   (Navi 48 / RDNA 4), RTL8125B NIC; not a general-purpose distro kernel.
 - **"What this kernel adds"** — subsections "Over vanilla Linux 7.2-rcN" and
   "Over stock CachyOS", listing every category the series now carries.

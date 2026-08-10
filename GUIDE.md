@@ -6,7 +6,7 @@ A custom Arch Linux kernel package (`linux-sleepy`) based on Linux 7.2-rc7, targ
 
 This kernel is written for one specific hardware configuration:
 
-- **CPU**: AMD Ryzen 9 7950X (Zen 4)
+- **CPU**: AMD Ryzen 7 7700 (Zen 4)
 - **GPU**: AMD Radeon RX 9070 XT (Navi 48, RDNA 4, gfx1201)
 - **NIC**: Realtek RTL8125B 2.5 GbE
 - **Storage**: Phison E16 NVMe (PCIe 4.0)

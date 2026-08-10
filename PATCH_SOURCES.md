@@ -748,7 +748,7 @@ attempted and dropped at build — see the 1000-range section above for the
 missing-symbol reason.
 
 **Phoronix-flagged items audited (2026-08-10):**
-- **Safe RET interrupt vuln** (SRSO, affects Zen 1–4 incl. our 7950X): fix
+- **Safe RET interrupt vuln** (SRSO, affects Zen 1–4 incl. our 7700): fix
   merged via `f5fdd6665ac4` → `7e7f81cf6f5c` "x86/bugs: Make Safe-RET robust
   against interrupt injection" — **already in rc7 base**, no patch needed.
 - **Zapscape** (KVM x86 shadow-MMU UAF, CVE-2026-64561): fix `2abd5287f083`

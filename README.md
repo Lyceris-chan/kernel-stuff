@@ -13,7 +13,7 @@ hardware below.
 
 ## Target audience
 
-This kernel is built for a single AMD desktop: a Ryzen 9 7950X (Zen 4) CPU, a
+This kernel is built for a single AMD desktop: a Ryzen 7 7700 (Zen 4) CPU, a
 Radeon RX 9070 XT (Navi 48 / RDNA 4) GPU, and a Realtek RTL8125B NIC. It is not
 a general-purpose distro kernel. It targets enthusiasts who want the latest AMD
 display and power fixes on top of a CachyOS base, value low-latency networking
@@ -24,7 +24,7 @@ hardware is unsupported.
 
 | Component | Hardware | Kernel support |
 |---|---|---|
-| CPU | AMD Ryzen 9 7950X (Zen 4) | `MZEN4`, `amd-pstate`, `CPPC`, `k10temp` |
+| CPU | AMD Ryzen 7 7700 (Zen 4) | `MZEN4`, `amd-pstate`, `CPPC`, `k10temp` |
 | GPU | AMD Radeon RX 9070 XT (Navi 48, RDNA 4) | `gfx1201`, `DCN401`, `DCN42B`, `SMU14`, `PSP14` |
 | NIC | Realtek RTL8125B 2.5 GbE | In-kernel `r8169` driver |
 | NVMe | Phison E16 PCIe 4.0 | `bfq`, `mq-deadline` schedulers |

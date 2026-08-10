@@ -141,7 +141,7 @@ ls repos/sirlucjan-kernel-patches/7.2-rc/ | grep -E "fixes-v|lru-marie-v|preempt
 ## Step 2b — x86/security scan (Zen 4 CPU mitigations)
 
 Added 2026-08-10 after the Phoronix Safe-RET / Zapscape disclosures. The
-GPU/drm sweep misses CPU-side security fixes that affect our Zen 4 7950X.
+GPU/drm sweep misses CPU-side security fixes that affect our Zen 4 7700.
 Scan torvalds mainline (repos/linux-7.2-rc6 holds full history to the rc7
 tag; fetch it in Step 1) for speculative-execution / SRSO / MCE / entry
 fixes since the last sweep:

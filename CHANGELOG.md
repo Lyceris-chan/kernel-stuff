@@ -1,7 +1,7 @@
 # Changelog
 
 All notable changes to **sleepy-kernel**, the custom Arch Linux kernel for a
-Ryzen 9 7950X (Zen 4) + Radeon RX 9070 XT (RDNA 4 / gfx1201) desktop.
+Ryzen 7 7700 (Zen 4) + Radeon RX 9070 XT (RDNA 4 / gfx1201) desktop.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/) and the
 [Google developer style guide](https://developers.google.com/style). Versioned
