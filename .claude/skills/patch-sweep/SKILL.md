@@ -34,7 +34,7 @@ description: >
 - **Use absolute patch paths with `git -C`.** `git -C <repo> apply --check`
   changes the process directory to the repo, so a relative patch path like
   `NNNN-....patch` resolves against the repo and errors "can't open patch".
-  Always write `git -C repos/linux-7.2-rc6 apply --check "$PWD/NNNN-....patch"`.
+  Always write `git -C repos/linux-7.2-rc7 apply --check "$PWD/NNNN-....patch"`.
 - **Capture real exit codes, never `| head && echo OK`.** `git apply --check f 2>&1 |
   head -3 && echo CLEAN` always prints CLEAN because `head`'s exit status wins.
   Use `git apply --check f > log 2>&1; echo "exit: $?"` and read `log`.
@@ -42,7 +42,7 @@ description: >
   must also survive `patch -p1 --forward --dry-run`, the exact tool `prepare()`
   uses. Git-apply tolerates offset/ambiguity that GNU patch rejects (a hunk whose
   leading `if (r)` context appears many times, or a hunk touching `dcn60_resource.c`
-  — DCN6, absent from rc6). For a file absent from rc6, strip that file's hunks +
+  — DCN6, absent from rc7). For a file absent from rc7, strip that file's hunks +
   its stats line + fix the "N files changed" summary as a documented adjustment.
 
 # Six-Source Patch Sweep
@@ -183,7 +183,7 @@ challenge page, you likely used a browser UA — retry with no UA.
 Use `git apply --check` (not `patch --dry-run`) against the clean reference tree:
 
 ```bash
-TREE="repos/linux-7.2-rc6"
+TREE="repos/linux-7.2-rc7"
 
 check_commit() {
   local repo="$1" sha="$2"
@@ -216,23 +216,23 @@ i915, xe, nouveau, Intel WiFi, Bluetooth dongles, or laptop audio is REJECTED
 immediately.
 
 **Check 2 — Symbol existence.** Every function/macro the patch references must
-already exist in the clean rc6 tree (not just in a staging branch). If the
+already exist in the clean rc7 tree (not just in a staging branch). If the
 patch fails here it depends on staging infrastructure and must be dropped.
 ```bash
 # For GPU/display patches:
-grep -r "<unique_symbol>" repos/linux-7.2-rc6/drivers/gpu/drm/amd/ | head
+grep -r "<unique_symbol>" repos/linux-7.2-rc7/drivers/gpu/drm/amd/ | head
 # For PM patches:
-grep -r "<unique_symbol>" repos/linux-7.2-rc6/drivers/cpufreq/ | head
+grep -r "<unique_symbol>" repos/linux-7.2-rc7/drivers/cpufreq/ | head
 # For block patches:
-grep -r "<unique_symbol>" repos/linux-7.2-rc6/block/ | head
+grep -r "<unique_symbol>" repos/linux-7.2-rc7/block/ | head
 ```
 If `grep` returns nothing for any referenced symbol, DROP the candidate.
 
 **Check 3 — Applies cleanly.** Use `git apply --check` (NOT `patch --dry-run`)
 against the clean reference tree:
 ```bash
-git -C repos/linux-7.2-rc6 apply --check <candidate>.patch       # forward check
-git -C repos/linux-7.2-rc6 apply --check -R <candidate>.patch    # already-applied check
+git -C repos/linux-7.2-rc7 apply --check <candidate>.patch       # forward check
+git -C repos/linux-7.2-rc7 apply --check -R <candidate>.patch    # already-applied check
 ```
 - Forward check passes → CLEAN, proceed to Check 4.
 - Reverse check passes (forward fails) → already applied upstream, DROP it.

@@ -148,15 +148,23 @@ Run these in order. Copy the commands exactly — do not improvise.
 
 2. **Check Symbol Presence**:
    ```bash
-   grep -r "<unique_symbol>" repos/linux-7.2-rc6/drivers/gpu/drm/amd/
+   grep -r "<unique_symbol>" repos/linux-7.2-rc7/drivers/gpu/drm/amd/
    ```
    Run this for EVERY function/macro the patch references. If any symbol is
-   absent from the clean rc6 tree, the patch depends on staging infrastructure
+   absent from the clean rc7 tree, the patch depends on staging infrastructure
    and must be DROPPED (see the agd5f staging lesson in `LESSONS.md`).
+   **Cover struct members too** (learned 2026-08-10, patch `1025`): a patch can
+   apply cleanly yet not compile when it references a `struct` field an
+   upstream prerequisite series adds (e.g. `adev->gfx.userq_priv_fault_work` /
+   `userq_priv_fault_slots`, added by the gfx11 priv-fault worker in drm-next
+   AFTER rc7). For every `adev->xxx.field` / `->member` the patch touches, grep
+   that member name in the clean tree's `.h`/`.c` (`grep -rn "userq_priv_fault_work" repos/linux-7.2-rc7/drivers/gpu/drm/amd/amdgpu/`). Absent member
+   → DROP and defer to the next version move; do not backport the prerequisite
+   series during a bump.
 
-3. **Forward apply check** — patch must apply to the clean rc6 tree:
+3. **Forward apply check** — patch must apply to the clean rc7 tree:
    ```bash
-   git -C repos/linux-7.2-rc6 apply --check "$PWD/<NNNN-short-description.patch>"   # use ABSOLUTE path
+   git -C repos/linux-7.2-rc7 apply --check "$PWD/<NNNN-short-description.patch>"   # use ABSOLUTE path
    patch -p1 --forward --dry-run < <NNNN-short-description.patch>                  # authoritative — matches prepare()
    ```
    - No output = clean, proceeds to step 4.
@@ -164,16 +172,16 @@ Run these in order. Copy the commands exactly — do not improvise.
      regenerate from source, or drop the patch. Do not silently force it.
    - **`git apply --check` can pass while GNU `patch -p1 --forward` rejects**
      (learned 2026-08-03): ambiguous leading context (e.g. `if (r)` appears many
-     times in `gfx_v12_0_sw_init`) or a hunk touching a file absent from rc6
+     times in `gfx_v12_0_sw_init`) or a hunk touching a file absent from rc7
      (DCN6 `dcn60_resource.c`) both fool `git apply`. ALWAYS confirm with
-     `patch -p1 --forward --dry-run`. For a file absent from rc6, strip that
+     `patch -p1 --forward --dry-run`. For a file absent from rc7, strip that
      file's hunks + its stats line + fix the "N files changed" summary as a
      documented backport adjustment. Capture git's real exit code —
      `git apply ... > log 2>&1; echo $?` — never `| head && echo OK`.
 
 4. **Already-applied check** — confirm it is NOT already in the tree:
    ```bash
-   git -C repos/linux-7.2-rc6 apply --check -R <NNNN-short-description.patch>
+   git -C repos/linux-7.2-rc7 apply --check -R <NNNN-short-description.patch>
    ```
    - If this REVERSE check passes (no output), the patch is already merged —
      DROP it and report why.
@@ -188,7 +196,7 @@ Run these in order. Copy the commands exactly — do not improvise.
    exactly this way: `f8ee6447e` (drm/amdgpu/discovery: Fix device family for DCN42),
    `7e1b4bdb0` (Fix flip-done timeouts on mode1 reset), `c936b8126`,
    `198663d03`, `183bbded9`, `85453fb4f`. When the reverse check passes clean,
-   the patch is ALREADY in the base tree (currently rc6) — DO NOT add it and
+   the patch is ALREADY in the base tree (currently rc7) — DO NOT add it and
    DO NOT try to force it. Record it in the sweep report as "already in base".
 
 5. **Number Assignment**: The prefix MUST match the category. Copy the file in
@@ -244,8 +252,8 @@ cp ~/Downloads/<new-revision>.patch NNNN-short-description.patch
 updpkgsums
 
 # 3. Re-validate the swapped patch against the clean tree (forward + reverse):
-git -C repos/linux-7.2-rc6 apply --check NNNN-short-description.patch
-git -C repos/linux-7.2-rc6 apply --check -R NNNN-short-description.patch
+git -C repos/linux-7.2-rc7 apply --check NNNN-short-description.patch
+git -C repos/linux-7.2-rc7 apply --check -R NNNN-short-description.patch
 
 # 4. Re-validate the FULL series. A revision swap can shift context for LATER
 #    patches. The authoritative in-order apply check is prepare() — run it:

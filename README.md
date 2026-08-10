@@ -2,11 +2,11 @@
 
 `linux-sleepy` is a custom Arch Linux kernel package built for one machine: an
 AMD Zen 4 desktop with an RDNA 4 graphics card. It is based on Linux mainline
-`7.2-rc6` and layers a sanitized [CachyOS](https://github.com/CachyOS/linux-cachyos)
+`7.2-rc7` and layers a sanitized [CachyOS](https://github.com/CachyOS/linux-cachyos)
 patchset plus targeted local and upstream patches on top.
 
-**Base version:** `7.2.0-rc6-3-sleepy`
-**Artifact:** `linux-sleepy-7.2.rc6-3-x86_64.pkg.tar.zst`
+**Base version:** `7.2.0-rc7-1-sleepy`
+**Artifact:** `linux-sleepy-7.2.rc7-1-x86_64.pkg.tar.zst`
 
 This is not a general-purpose kernel; the configuration is opinionated for the
 hardware below.
@@ -53,7 +53,7 @@ hardware is unsupported.
 
 Here's what `linux-sleepy` gives you on top of each baseline.
 
-**Over vanilla Linux 7.2-rc6:**
+**Over vanilla Linux 7.2-rc7:**
 
 - The hardware-relevant subset of CachyOS: BBRv3 TCP, `-O3` + Zen 4 ISA, VRAM
   cgroups, sched-ext preemption, HDMI 2.1 FreeSync/VRR, and EDID DSC BPP.
@@ -103,8 +103,8 @@ makepkg -f -s -c
 
 The build produces these packages:
 
-- `linux-sleepy-7.2.rc6-1-x86_64.pkg.tar.zst`
-- `linux-sleepy-headers-7.2.rc6-1-x86_64.pkg.tar.zst`
+- `linux-sleepy-7.2.rc7-1-x86_64.pkg.tar.zst`
+- `linux-sleepy-headers-7.2.rc7-1-x86_64.pkg.tar.zst`
 
 During the build you are prompted whether to enable CAKE SQM shaping (via the
 `net-tune` service); in non-interactive environments (CI, piped input) the
@@ -138,8 +138,8 @@ against — not with your distro's compiler.
 Install the kernel and headers:
 
 ```bash
-sudo pacman -U linux-sleepy-7.2.rc6-1-x86_64.pkg.tar.zst \
-              linux-sleepy-headers-7.2.rc6-1-x86_64.pkg.tar.zst
+sudo pacman -U linux-sleepy-7.2.rc7-1-x86_64.pkg.tar.zst \
+              linux-sleepy-headers-7.2.rc7-1-x86_64.pkg.tar.zst
 ```
 
 Regenerate your bootloader config (for GRUB):
@@ -313,11 +313,12 @@ provenance (authors, commit hashes, Message-IDs).
 | `1018` | Switches the order of GC and Display IP blocks (DCN42B). | drm-next |
 | `1019` | Updates the mmhub 4.2.0 client list. | drm-next |
 | `1020` | Fixes the MMHUB0 check in the gmc12.1 pasid TLB flush (copy-paste typo). | amd-gfx ML |
-| `1021` | Adds a TLB-invalidation semaphore for gmc12.1 (locks the interface). | amd-gfx ML |
-| `1022` | Rejects oversized IBs with per-ring packet limits in `amdgpu_cs.c` (CS hardening). | amd-gfx ML |
 | `1023` | `amdgpu.ignore_min_pcap=1` module param — override the SMU min power cap (Liquorix, CachyOS backport). | CachyOS/linux fork |
+| `1024` | Fixes dropped MES dispatches under queue oversubscription (GFX12 MES). | drm-next `288cc4a54` (7.3 last-round backport) |
 
-### Display (1100–1134)
+(`1020`–`1022` merged upstream in 7.2-rc7 and were dropped on the bump.)
+
+### Display (1100–1136)
 
 | Patch | What it does | Source |
 |---|---|---|
@@ -353,8 +354,10 @@ provenance (authors, commit hashes, Message-IDs).
 | `1130` | Updates the VRR info packet to support 12-bit refresh rates. | amd-gfx ML (Roman.Li DC batch) |
 | `1131` | Adds missing DCN42B register defines. | amd-gfx ML (Roman.Li DC batch) |
 | `1132` | Adds missing DMUB CACP and PR definitions. | amd-gfx ML (Roman.Li DC batch) |
-| `1133` | Adds FFE level defaults (DCN6 hunks stripped — absent from rc6). | amd-gfx ML (Roman.Li DC batch) |
+| `1133` | Adds FFE level defaults (DCN6 hunks stripped — absent from rc7). | amd-gfx ML (Roman.Li DC batch) |
 | `1134` | Fixes BT.2020 YCbCr limited-output CSC matrix (too-bright HDR on calibrated panels; author-tested on 9070 XT). | amd-gfx ML (Nathan Lucas, 2026-08-02; P2 DCE copy rejected — off-target) |
+| `1135` | Fixes DCN42B HPD toggle-filter unit programming (wrong HW unit → extremely long connection time). | amd-gfx ML (Tom Chung series 12/34, 2026-08-05) |
+| `1136` | Updates/reverts FRL LT timeout: polls on no-timeout and bounds the ≥16 Gbps LT timer. | amd-gfx ML (Tom Chung series 20/34, 2026-08-05) |
 
 ### Power management (1200–1209)
 
@@ -387,7 +390,7 @@ provenance (authors, commit hashes, Message-IDs).
 | Patch | What it does | Source |
 |---|---|---|
 | `2100` | Merges zstd changes from the dev tree for 7.2. | CachyOS (sirlucjan) |
-| `2101` | Introduces LRU-MARIE v12 page eviction. | CachyOS (sirlucjan) |
+| `2101` | Introduces LRU-MARIE 0.9.3 page eviction (orphaned-L1-bit self-heal fix; `vma_flags` fix kept). | firelzrd/lru_marie commit `0e08603` (2026-08-07) |
 
 ### CPU idle (2200)
 

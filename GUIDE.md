@@ -1,6 +1,6 @@
 # linux-sleepy
 
-A custom Arch Linux kernel package (`linux-sleepy`) based on Linux 7.2-rc6, targeting AMD Zen 4 CPUs and RDNA 4 (Navi 48 / gfx1201) GPUs.
+A custom Arch Linux kernel package (`linux-sleepy`) based on Linux 7.2-rc7, targeting AMD Zen 4 CPUs and RDNA 4 (Navi 48 / gfx1201) GPUs.
 
 ## Target audience
 
@@ -15,7 +15,7 @@ It is not a general-purpose distribution kernel. Configuration choices are inten
 
 ---
 
-## Differences from vanilla linux-7.2-rc6
+## Differences from vanilla linux-7.2-rc7
 
 ### Build toolchain
 
@@ -31,7 +31,7 @@ The LLVM toolchain is downloaded automatically from [mirrors.edge.kernel.org/pub
 
 ### Scheduler and core patches
 
-The following patches come from the [CachyOS linux-cachyos](https://github.com/CachyOS/linux-cachyos) patchset, squashed to one patch per branch (`0101`–`0109`), rebased onto 7.2-rc6:
+The following patches come from the [CachyOS linux-cachyos](https://github.com/CachyOS/linux-cachyos) patchset, squashed to one patch per branch (`0101`–`0109`), rebased onto 7.2-rc7:
 
 <details>
 <summary>CachyOS patch subsystems included</summary>

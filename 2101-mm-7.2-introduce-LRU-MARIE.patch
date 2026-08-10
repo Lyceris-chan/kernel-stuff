@@ -5,73 +5,6 @@ Subject: [PATCH] mm-7.2: introduce LRU MARIE
 
 Signed-off-by: Piotr Gorski <lucjan.lucjanov@gmail.com>
 ---
- include/linux/lru_marie.h      |  498 +++++
- include/linux/memcontrol.h     |   26 +-
- include/linux/mm_inline.h      |  103 +-
- include/linux/mmzone.h         |   15 +
- include/linux/swap.h           |   18 +
- mm/Kconfig                     |   72 +
- mm/Makefile                    |    1 +
- mm/compaction.c                |   32 +-
- mm/huge_memory.c               |   39 +-
- mm/internal.h                  |   68 +
- mm/lru_marie/Makefile          |   21 +
- mm/lru_marie/account.h         |  106 ++
- mm/lru_marie/bitmap.c          |  118 ++
- mm/lru_marie/bitmap.h          |  221 +++
- mm/lru_marie/core.c            | 1201 ++++++++++++
- mm/lru_marie/defrag.c          | 1199 ++++++++++++
- mm/lru_marie/defrag.h          |   85 +
- mm/lru_marie/defrag_compat.h   |   53 +
- mm/lru_marie/pfn_install.h     |  139 ++
- mm/lru_marie/prefetch.h        |  111 ++
- mm/lru_marie/simd.h            |   73 +
- mm/lru_marie/simd_generic.c    |   34 +
- mm/lru_marie/simd_x86.c        |  243 +++
- mm/lru_marie/simd_x86_avx2.S   |  170 ++
- mm/lru_marie/simd_x86_avx512.S |  220 +++
- mm/lru_marie/simd_x86_sse2.S   |  158 ++
- mm/lru_marie/state.c           | 3112 ++++++++++++++++++++++++++++++++
- mm/lru_marie/state.h           |  987 ++++++++++
- mm/lru_marie/state_compat.h    |   94 +
- mm/lru_marie/version.h         |   22 +
- mm/lru_marie/walker.c          |  923 ++++++++++
- mm/lru_marie/walker_compat.h   |   82 +
- mm/memcontrol-v1.c             |   11 +
- mm/memcontrol.c                |   21 +
- mm/mm_init.c                   |    3 +
- mm/oom_kill.c                  |  323 ++++
- mm/page_alloc.c                |  120 +-
- mm/page_io.c                   |  331 ++++
- mm/rmap.c                      |    6 +
- mm/swap.c                      |  258 ++-
- mm/swap.h                      |    4 +
- mm/vmscan.c                    |  341 +++-
- 42 files changed, 11634 insertions(+), 28 deletions(-)
- create mode 100644 include/linux/lru_marie.h
- create mode 100644 mm/lru_marie/Makefile
- create mode 100644 mm/lru_marie/account.h
- create mode 100644 mm/lru_marie/bitmap.c
- create mode 100644 mm/lru_marie/bitmap.h
- create mode 100644 mm/lru_marie/core.c
- create mode 100644 mm/lru_marie/defrag.c
- create mode 100644 mm/lru_marie/defrag.h
- create mode 100644 mm/lru_marie/defrag_compat.h
- create mode 100644 mm/lru_marie/pfn_install.h
- create mode 100644 mm/lru_marie/prefetch.h
- create mode 100644 mm/lru_marie/simd.h
- create mode 100644 mm/lru_marie/simd_generic.c
- create mode 100644 mm/lru_marie/simd_x86.c
- create mode 100644 mm/lru_marie/simd_x86_avx2.S
- create mode 100644 mm/lru_marie/simd_x86_avx512.S
- create mode 100644 mm/lru_marie/simd_x86_sse2.S
- create mode 100644 mm/lru_marie/state.c
- create mode 100644 mm/lru_marie/state.h
- create mode 100644 mm/lru_marie/state_compat.h
- create mode 100644 mm/lru_marie/version.h
- create mode 100644 mm/lru_marie/walker.c
- create mode 100644 mm/lru_marie/walker_compat.h
-
 diff --git a/include/linux/lru_marie.h b/include/linux/lru_marie.h
 new file mode 100644
 index 000000000..27fd38ed4
@@ -577,7 +510,7 @@ index 000000000..27fd38ed4
 +
 +#endif /* _LINUX_LRU_MARIE_H */
 diff --git a/include/linux/memcontrol.h b/include/linux/memcontrol.h
-index 5407e4200..70454844c 100644
+index 8170bb806..8aca823b0 100644
 --- a/include/linux/memcontrol.h
 +++ b/include/linux/memcontrol.h
 @@ -893,14 +893,38 @@ static inline bool mem_cgroup_online(struct mem_cgroup *memcg)
@@ -964,7 +897,7 @@ index eff9f9e7e..b82d9b6ac 100644
  obj-$(CONFIG_HAS_DMA)	+= dmapool.o
  obj-$(CONFIG_HUGETLBFS)	+= hugetlb.o hugetlb_sysfs.o hugetlb_sysctl.o
 diff --git a/mm/compaction.c b/mm/compaction.c
-index f08765ade..059123e02 100644
+index 3a94cef84..dbd697dba 100644
 --- a/mm/compaction.c
 +++ b/mm/compaction.c
 @@ -24,6 +24,7 @@
@@ -975,7 +908,7 @@ index f08765ade..059123e02 100644
  #include "internal.h"
  
  #ifdef CONFIG_COMPACTION
-@@ -3096,6 +3097,23 @@ static void kcompactd_do_work(pg_data_t *pgdat)
+@@ -3100,6 +3101,23 @@ static void kcompactd_do_work(pg_data_t *pgdat)
  							cc.highest_zoneidx);
  	count_compact_event(KCOMPACTD_WAKE);
  
@@ -999,7 +932,7 @@ index f08765ade..059123e02 100644
  	for (zoneid = 0; zoneid <= cc.highest_zoneidx; zoneid++) {
  		int status;
  
-@@ -3232,7 +3250,19 @@ static int kcompactd(void *p)
+@@ -3236,7 +3254,19 @@ static int kcompactd(void *p)
  			unsigned int prev_score, score;
  
  			prev_score = fragmentation_score_node(pgdat);
@@ -1021,7 +954,7 @@ index f08765ade..059123e02 100644
  			/*
  			 * Defer proactive compaction if the fragmentation
 diff --git a/mm/huge_memory.c b/mm/huge_memory.c
-index b5d1e9d44..0d04d96c4 100644
+index 346c72119..1a3bcb7bc 100644
 --- a/mm/huge_memory.c
 +++ b/mm/huge_memory.c
 @@ -6,6 +6,7 @@
@@ -1032,7 +965,7 @@ index b5d1e9d44..0d04d96c4 100644
  #include <linux/sched.h>
  #include <linux/sched/mm.h>
  #include <linux/sched/numa_balancing.h>
-@@ -3500,14 +3501,48 @@ static void lru_add_split_folio(struct folio *folio, struct folio *new_folio,
+@@ -3547,14 +3548,48 @@ static void lru_add_split_folio(struct folio *folio, struct folio *new_folio,
  		/* page reclaim is reclaiming a huge page */
  		VM_WARN_ON(folio_test_lru(folio));
  		folio_get(new_folio);
@@ -1667,10 +1600,10 @@ index 000000000..e55cccd32
 +#endif	/* _MM_LRU_MARIE_BITMAP_H */
 diff --git a/mm/lru_marie/core.c b/mm/lru_marie/core.c
 new file mode 100644
-index 000000000..1a16cdd12
+index 000000000..539ee5f42
 --- /dev/null
 +++ b/mm/lru_marie/core.c
-@@ -0,0 +1,1201 @@
+@@ -0,0 +1,1204 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * mm/lru_marie/core.c — Marie LRU.
@@ -2428,7 +2361,8 @@ index 000000000..1a16cdd12
 +			  "reclaimed anon %ld file %ld\n"
 +			  "gen_growth_live anon %lu file %lu\n"
 +			  "concede_pressure_mode %u\n"
-+			  "concede floor %ld free %ld refault %ld memcg %ld\n",
++			  "concede floor %ld free %ld refault %ld memcg %ld\n"
++			  "orphan_bit anon %ld file %ld\n",
 +			  percpu_counter_sum(&marie_nr_folios),
 +			  atomic_long_read(&marie_dbg_pick[0]),
 +			  atomic_long_read(&marie_dbg_pick[1]),
@@ -2443,7 +2377,9 @@ index 000000000..1a16cdd12
 +			  atomic_long_read(&marie_dbg_concede[0]),
 +			  atomic_long_read(&marie_dbg_concede[1]),
 +			  atomic_long_read(&marie_dbg_concede[2]),
-+			  atomic_long_read(&marie_dbg_concede[3]));
++			  atomic_long_read(&marie_dbg_concede[3]),
++			  atomic_long_read(&marie_dbg_orphan_bit[0]),
++			  atomic_long_read(&marie_dbg_orphan_bit[1]));
 +}
 +
 +static struct kobj_attribute marie_stats_attr = __ATTR_RO(stats);
@@ -5425,10 +5361,10 @@ index 000000000..b86381ab5
 +SYM_FUNC_END(lru_marie_simd_scan_sse2)
 diff --git a/mm/lru_marie/state.c b/mm/lru_marie/state.c
 new file mode 100644
-index 000000000..d59d0b5fa
+index 000000000..556a0776c
 --- /dev/null
 +++ b/mm/lru_marie/state.c
-@@ -0,0 +1,3112 @@
+@@ -0,0 +1,3141 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Marie per-PFN state array — allocation, init, and global counters.
@@ -6242,8 +6178,27 @@ index 000000000..d59d0b5fa
 +			}
 +
 +			s = READ_ONCE(marie_state[pfn]);
-+			if ((s & mask) != target)
-+				continue;
++			if ((s & mask) != target) {
++				/*
++				 * Orphaned L1 bit: set at (type, oldest_gen, tier) but this
++				 * PFN state byte no longer encodes it (inc_tier / move_to_gen
++				 * / publish_at_gen moved it, or the folio was dropped and the
++				 * PFN reused). The bitmap move is not atomic with the byte CAS
++				 * that commits it, so a bit can be left behind at a coordinate
++				 * the byte has since moved past.
++				 *
++				 * Previously a silent continue: the bit stayed set and
++				 * gen_occupied stayed incremented forever, so under a hot
++				 * single-type burst an entire gen can fill with orphaned bits
++				 * and reclaim wedges permanently for that type. Clear + retire
++				 * it here.
++				 */
++				if (marie_bm_clear(&marie_track_bm[type][oldest_gen]
++						    [tier & 0x3], pfn)) {
++					marie_gen_occ_dec(pfn, oldest_gen, type);
++					atomic_long_inc(&marie_dbg_orphan_bit[type]);
++				}
++			}
 +			z = (s & MARIE_PFN_ZONE_MASK)
 +				>> MARIE_PFN_ZONE_SHIFT;
 +			if ((int)z > max_zone)
@@ -6848,6 +6803,16 @@ index 000000000..d59d0b5fa
 +
 +/* Concede-trigger attribution: [0]=floor [1]=free-pressure [2]=refault [3]=memcg. */
 +atomic_long_t marie_dbg_concede[4];
++
++/*
++ * Orphaned-bit self-heal count, per type [0]=anon [1]=file. See the
++ * byte-mismatch branch in marie_state_isolate_scan_l2lock: counts L1 bits
++ * the scanner found set at a (type, gen, tier) the PFN state byte no
++ * longer encodes, and therefore cleared + retired from gen_occupied on the
++ * spot. A climbing count during a hot single-type burst is the signature
++ * of the walker/isolate/putback race that produces these orphans.
++ */
++atomic_long_t marie_dbg_orphan_bit[2];
 +
 +/*
 + * GLOBAL anon-vs-file proportional pick bias (desktop/global-only). Signed:
@@ -8543,10 +8508,10 @@ index 000000000..d59d0b5fa
 +}
 diff --git a/mm/lru_marie/state.h b/mm/lru_marie/state.h
 new file mode 100644
-index 000000000..585bea9c8
+index 000000000..c0b233e42
 --- /dev/null
 +++ b/mm/lru_marie/state.h
-@@ -0,0 +1,987 @@
+@@ -0,0 +1,988 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#ifndef _MM_LRU_MARIE_STATE_H
 +#define _MM_LRU_MARIE_STATE_H
@@ -8569,6 +8534,7 @@ index 000000000..585bea9c8
 +#define MARIE_CONCEDE_REFAULT	0x2
 +extern unsigned int marie_concede_pressure_mode;
 +extern atomic_long_t marie_dbg_concede[4];	/* [floor,free,refault,memcg] */
++extern atomic_long_t marie_dbg_orphan_bit[2];	/* orphaned scan-bit self-heal */
 +
 +/*
 + * Marie per-PFN state array — paradigm specification.
@@ -9636,7 +9602,7 @@ index 000000000..4d07cedd9
 +#endif /* _MM_LRU_MARIE_STATE_COMPAT_H */
 diff --git a/mm/lru_marie/version.h b/mm/lru_marie/version.h
 new file mode 100644
-index 000000000..7d3631898
+index 000000000..ffde9ba9a
 --- /dev/null
 +++ b/mm/lru_marie/version.h
 @@ -0,0 +1,22 @@
@@ -9659,7 +9625,7 @@ index 000000000..7d3631898
 +#define MARIE_PROGNAME	"Marie LRU"
 +#define MARIE_AUTHOR	"Masahito Suzuki"
 +
-+#define MARIE_VERSION	"0.9.2"
++#define MARIE_VERSION	"0.9.3"
 +
 +#endif /* _MM_LRU_MARIE_VERSION_H */
 diff --git a/mm/lru_marie/walker.c b/mm/lru_marie/walker.c
@@ -10748,7 +10714,7 @@ index 6dc4888a9..b00c2ee52 100644
  	}
  
 diff --git a/mm/mm_init.c b/mm/mm_init.c
-index 0f64909e8..b8c8f2698 100644
+index 498d62c4e..43a59db77 100644
 --- a/mm/mm_init.c
 +++ b/mm/mm_init.c
 @@ -1395,6 +1395,9 @@ static void __meminit pgdat_init_internals(struct pglist_data *pgdat)
@@ -11114,7 +11080,7 @@ index 5f372f6e2..5636b2a16 100644
 +}
 +late_initcall(thrash_wd_init);
 diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index ee902a468..04c93a3b9 100644
+index f5290d209..b184a49fc 100644
 --- a/mm/page_alloc.c
 +++ b/mm/page_alloc.c
 @@ -16,6 +16,7 @@
@@ -11125,7 +11091,7 @@ index ee902a468..04c93a3b9 100644
  #include <linux/highmem.h>
  #include <linux/interrupt.h>
  #include <linux/jiffies.h>
-@@ -1326,6 +1327,28 @@ static __always_inline bool __free_pages_prepare(struct page *page,
+@@ -1330,6 +1331,28 @@ static __always_inline bool __free_pages_prepare(struct page *page,
  	trace_mm_page_free(page, order);
  	kmsan_free_page(page, order);
  
@@ -11154,7 +11120,7 @@ index ee902a468..04c93a3b9 100644
  	if (memcg_kmem_online() && PageMemcgKmem(page))
  		__memcg_kmem_uncharge_page(page, order);
  
-@@ -4580,25 +4603,97 @@ bool gfp_pfmemalloc_allowed(gfp_t gfp_mask)
+@@ -4584,25 +4607,97 @@ bool gfp_pfmemalloc_allowed(gfp_t gfp_mask)
  static inline bool
  should_reclaim_retry(gfp_t gfp_mask, unsigned order,
  		     struct alloc_context *ac, int alloc_flags,
@@ -11255,7 +11221,7 @@ index ee902a468..04c93a3b9 100644
  
  	/*
  	 * Keep reclaiming pages while there is a chance this will lead
-@@ -4757,6 +4852,20 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
+@@ -4761,6 +4856,20 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
  		WARN_ON_ONCE(current->flags & PF_MEMALLOC);
  	}
  
@@ -11276,7 +11242,7 @@ index ee902a468..04c93a3b9 100644
  restart:
  	compaction_retries = 0;
  	no_progress_loops = 0;
-@@ -4764,6 +4873,9 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
+@@ -4768,6 +4877,9 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
  	compact_priority = DEF_COMPACT_PRIORITY;
  	cpuset_mems_cookie = read_mems_allowed_begin();
  	zonelist_iter_cookie = zonelist_iter_begin();
@@ -11286,7 +11252,7 @@ index ee902a468..04c93a3b9 100644
  
  	/*
  	 * For costly allocations, try direct compaction first, as it's likely
-@@ -4934,7 +5046,7 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
+@@ -4938,7 +5050,7 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
  		goto restart;
  
  	if (should_reclaim_retry(gfp_mask, order, ac, alloc_flags,
@@ -11684,7 +11650,7 @@ index b23f494fc..35bf16ef3 100644
  		struct swap_info_struct *sis)
  {
 diff --git a/mm/rmap.c b/mm/rmap.c
-index 1c77d5dc0..898b893c0 100644
+index d0d595a35..7656b1fec 100644
 --- a/mm/rmap.c
 +++ b/mm/rmap.c
 @@ -75,6 +75,7 @@
@@ -12138,7 +12104,7 @@ index 77d2d14ed..4b915f45e 100644
  /* linux/mm/swap_state.c */
  extern struct address_space swap_space __read_mostly;
 diff --git a/mm/vmscan.c b/mm/vmscan.c
-index 35c3bb15a..5c149b940 100644
+index 23e8481b9..a2e637dcd 100644
 --- a/mm/vmscan.c
 +++ b/mm/vmscan.c
 @@ -39,6 +39,7 @@
@@ -12189,7 +12155,7 @@ index 35c3bb15a..5c149b940 100644
  #ifdef ARCH_HAS_PREFETCHW
  #define prefetchw_prev_lru_folio(_folio, _base, _field)			\
  	do {								\
-@@ -456,6 +490,44 @@ static int reclaimer_offset(struct scan_control *sc)
+@@ -462,6 +496,44 @@ static int reclaimer_offset(struct scan_control *sc)
  	return PGSTEAL_DIRECT - PGSTEAL_KSWAPD;
  }
  
@@ -12234,7 +12200,7 @@ index 35c3bb15a..5c149b940 100644
  /*
   * We detected a synchronous write error writing a folio out.  Probably
   * -ENOSPC.  We need to propagate that into the address_space for a subsequent
-@@ -874,10 +946,7 @@ static enum folio_references folio_check_references(struct folio *folio,
+@@ -886,10 +958,7 @@ static enum folio_references folio_check_references(struct folio *folio,
  		return FOLIOREF_ACTIVATE;
  
  	/*
@@ -12246,7 +12212,7 @@ index 35c3bb15a..5c149b940 100644
  	 */
  	if (referenced_ptes == -1)
  		return FOLIOREF_KEEP;
-@@ -891,6 +960,30 @@ static enum folio_references folio_check_references(struct folio *folio,
+@@ -903,6 +972,30 @@ static enum folio_references folio_check_references(struct folio *folio,
  
  	referenced_folio = folio_test_clear_referenced(folio);
  
@@ -12277,7 +12243,7 @@ index 35c3bb15a..5c149b940 100644
  	if (referenced_ptes) {
  		/*
  		 * All mapped folios start out with page table
-@@ -1050,9 +1143,13 @@ static bool may_enter_fs(struct folio *folio, gfp_t gfp_mask)
+@@ -1062,9 +1155,13 @@ static bool may_enter_fs(struct folio *folio, gfp_t gfp_mask)
  }
  
  /*
@@ -12293,7 +12259,7 @@ index 35c3bb15a..5c149b940 100644
  		struct pglist_data *pgdat, struct scan_control *sc,
  		struct reclaim_stat *stat, bool ignore_references,
  		struct mem_cgroup *memcg)
-@@ -1913,7 +2010,29 @@ static unsigned int move_folios_to_lru(struct list_head *list)
+@@ -1925,7 +2022,29 @@ static unsigned int move_folios_to_lru(struct list_head *list)
  			continue;
  		}
  
@@ -12324,7 +12290,7 @@ index 35c3bb15a..5c149b940 100644
  		nr_pages = folio_nr_pages(folio);
  		nr_moved += nr_pages;
  		if (folio_test_active(folio))
-@@ -5262,6 +5381,55 @@ static bool drain_evictable(struct lruvec *lruvec)
+@@ -5283,6 +5402,55 @@ static bool drain_evictable(struct lruvec *lruvec)
  	return true;
  }
  
@@ -12380,7 +12346,7 @@ index 35c3bb15a..5c149b940 100644
  static void lru_gen_change_state(bool enabled)
  {
  	static DEFINE_MUTEX(state_mutex);
-@@ -5783,7 +5951,15 @@ void lru_gen_init_lruvec(struct lruvec *lruvec)
+@@ -5804,7 +5972,15 @@ void lru_gen_init_lruvec(struct lruvec *lruvec)
  	struct lru_gen_mm_state *mm_state = get_mm_state(lruvec);
  
  	lrugen->max_seq = MIN_NR_GENS + 1;
@@ -12397,7 +12363,7 @@ index 35c3bb15a..5c149b940 100644
  
  	for (i = 0; i <= MIN_NR_GENS + 1; i++)
  		lrugen->timestamps[i] = jiffies;
-@@ -5883,7 +6059,23 @@ static void shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
+@@ -5904,7 +6080,23 @@ static void shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
  	unsigned long nr_to_reclaim = sc->nr_to_reclaim;
  	bool proportional_reclaim;
  	struct blk_plug plug;
@@ -12421,7 +12387,7 @@ index 35c3bb15a..5c149b940 100644
  	if ((lru_gen_enabled() || lru_gen_switching()) && !root_reclaim(sc)) {
  		lru_gen_shrink_lruvec(lruvec, sc);
  
-@@ -5894,6 +6086,29 @@ static void shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
+@@ -5915,6 +6107,29 @@ static void shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
  
  	get_scan_count(lruvec, sc, nr);
  
@@ -12451,10 +12417,11 @@ index 35c3bb15a..5c149b940 100644
  	/* Record the original scan target for proportional adjustments later */
  	memcpy(targets, nr, sizeof(nr));
  
-@@ -6149,14 +6364,32 @@ static void shrink_node(pg_data_t *pgdat, struct scan_control *sc)
+@@ -6170,14 +6385,32 @@ static void shrink_node(pg_data_t *pgdat, struct scan_control *sc)
  	struct lruvec *target_lruvec;
  	bool reclaimable = false;
  
+-	if ((lru_gen_enabled() || lru_gen_switching()) && root_reclaim(sc)) {
 +#ifdef CONFIG_LRU_MARIE
 +	/*
 +	 * MGLRU's root-reclaim shortcut bypasses shrink_node_memcgs entirely,
@@ -12466,26 +12433,25 @@ index 35c3bb15a..5c149b940 100644
 +	 */
 +	if (!lru_marie_enabled() &&
 +	    (lru_gen_enabled() || lru_gen_switching()) && root_reclaim(sc)) {
-+		memset(&sc->nr, 0, sizeof(sc->nr));
-+		lru_gen_shrink_node(pgdat, sc);
-+
-+		if (!lru_gen_switching())
-+			return;
-+	}
-+#else
- 	if ((lru_gen_enabled() || lru_gen_switching()) && root_reclaim(sc)) {
  		memset(&sc->nr, 0, sizeof(sc->nr));
  		lru_gen_shrink_node(pgdat, sc);
  
  		if (!lru_gen_switching())
  			return;
--
++	}
++#else
++	if ((lru_gen_enabled() || lru_gen_switching()) && root_reclaim(sc)) {
++		memset(&sc->nr, 0, sizeof(sc->nr));
++		lru_gen_shrink_node(pgdat, sc);
+ 
++		if (!lru_gen_switching())
++			return;
  	}
 +#endif
  
  	target_lruvec = mem_cgroup_lruvec(sc->target_mem_cgroup, pgdat);
  
-@@ -6425,6 +6658,17 @@ static void snapshot_refaults(struct mem_cgroup *target_memcg, pg_data_t *pgdat)
+@@ -6446,6 +6679,17 @@ static void snapshot_refaults(struct mem_cgroup *target_memcg, pg_data_t *pgdat)
  	struct lruvec *target_lruvec;
  	unsigned long refaults;
  
@@ -12503,7 +12469,7 @@ index 35c3bb15a..5c149b940 100644
  	if (lru_gen_enabled() && !lru_gen_switching())
  		return;
  
-@@ -6815,6 +7059,21 @@ static void kswapd_age_node(struct pglist_data *pgdat, struct scan_control *sc)
+@@ -6836,6 +7080,21 @@ static void kswapd_age_node(struct pglist_data *pgdat, struct scan_control *sc)
  	struct mem_cgroup *memcg;
  	struct lruvec *lruvec;
  
@@ -12525,7 +12491,7 @@ index 35c3bb15a..5c149b940 100644
  	if (lru_gen_enabled() || lru_gen_switching()) {
  		lru_gen_age_node(pgdat, sc);
  
-@@ -7593,6 +7852,9 @@ unsigned long shrink_all_memory(unsigned long nr_to_reclaim)
+@@ -7614,6 +7873,9 @@ unsigned long shrink_all_memory(unsigned long nr_to_reclaim)
  void __meminit kswapd_run(int nid)
  {
  	pg_data_t *pgdat = NODE_DATA(nid);
@@ -12535,7 +12501,7 @@ index 35c3bb15a..5c149b940 100644
  
  	pgdat_kswapd_lock(pgdat);
  	if (!pgdat->kswapd) {
-@@ -7606,7 +7868,32 @@ void __meminit kswapd_run(int nid)
+@@ -7627,7 +7889,32 @@ void __meminit kswapd_run(int nid)
  		} else {
  			wake_up_process(pgdat->kswapd);
  		}
@@ -12568,7 +12534,7 @@ index 35c3bb15a..5c149b940 100644
  	pgdat_kswapd_unlock(pgdat);
  }
  
-@@ -7625,16 +7912,52 @@ void __meminit kswapd_stop(int nid)
+@@ -7646,16 +7933,52 @@ void __meminit kswapd_stop(int nid)
  		kthread_stop(kswapd);
  		pgdat->kswapd = NULL;
  	}
@@ -12621,6 +12587,3 @@ index 35c3bb15a..5c149b940 100644
  		.extra1		= SYSCTL_ZERO,
  		.extra2		= SYSCTL_TWO_HUNDRED,
  	},
--- 
-2.55.0
-

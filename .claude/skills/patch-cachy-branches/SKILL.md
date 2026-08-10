@@ -100,14 +100,14 @@ Off-target groups reverted by `0106-cachy-drops.patch`:
 Do **not** copy each `-sep` file individually. Apply each branch's patches
 **in order** to the series tree, then emit the cumulative `git diff` as one
 `format-patch`. The squash must be generated against the **actual series
-state** (rc6 + the `0001`–`0058` local/upstream patches), because those
+state** (rc7 + the `0001`–`0058` local/upstream patches), because those
 pre-CachyOS patches touch shared files like `drm_edid.c`.
 
 ```bash
 BASE="repos/sirlucjan-kernel-patches/7.2-rc"
 
 # Example: squash the bbr3 branch into 0101-cachy-bbr3.patch
-# (run inside a working tree at the correct series state: rc6 + 0001–0058)
+# (run inside a working tree at the correct series state: rc7 + 0001–0058)
 for f in "$BASE/bbr3-cachyos-patches-sep"/00*.patch; do
   patch -p1 --forward < "$f" || echo "FAILED: $f"   # apply in order
 done
@@ -127,7 +127,7 @@ Repeat for each branch with the squash numbers from Step 3. For `fixes`,
 squash the full branch into `0105-cachy-fixes.patch`, then build
 `0106-cachy-drops.patch` as the reverse diff of the off-target groups (Step 4).
 Verify each squash with `git apply --check 01xx-cachy-*.patch` against a clean
-`repos/linux-7.2-rc6` tree.
+`repos/linux-7.2-rc7` tree.
 
 After regenerating ANY `01xx` squash, re-validate the FULL series in order —
 a changed `01xx` sits mid-series and can shift context for the later `10xx`/
@@ -150,7 +150,7 @@ the series (Fangzhi Zuo 2/4), then the `0151`
 **Exclude `0151` from the `0107-cachy-hdmi.patch` squash.** Check with:
 
 ```bash
-git -C repos/linux-7.2-rc6 apply --check -R "$BASE/hdmi-patches-sep/0151-...patch" 2>&1
+git -C repos/linux-7.2-rc7 apply --check -R "$BASE/hdmi-patches-sep/0151-...patch" 2>&1
 ```
 
 If the reverse check passes, `0151` is already present — drop it from the

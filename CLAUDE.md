@@ -61,7 +61,7 @@ Each range is a category; use the next unused number in the correct range.
 | Range | Category | Source / how to obtain |
 |---|---|---|
 | `0001–0049` | Handmade local patches (Sleepy/Antigravity) | SMU14, DCN401, GFX12 hand-written fixes for this hardware |
-| `0050–0099` | Upstream EDID/display ML patches not yet landed | `b4` mbox or freedesktop archives — verify with `git apply --check` against `repos/linux-7.2-rc6` |
+| `0050–0099` | Upstream EDID/display ML patches not yet landed | `b4` mbox or freedesktop archives — verify with `git apply --check` against `repos/linux-7.2-rc7` |
 | `0101–0113` | CachyOS branch squashes (0106 = off-target drops; 0110–0113 = CachyOS/linux-fork backports) | sirlucjan `-sep` dirs (see `patch-cachy-branches`); 0110–0113 from CachyOS/linux fork |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | drm-next / agd5f |
 | `1100–1199` | AMD Display (DCN4, DCN42B, PSR, Replay, pstate, MCIF ARB) | drm-next |
@@ -72,7 +72,7 @@ Each range is a category; use the next unused number in the correct range.
 | `9000–9099` | agd5f staging backports | `git format-patch` from agd5f/linux — **verify all symbols exist in rc mainline first** |
 
 All sirlucjan directories live under `repos/sirlucjan-kernel-patches/7.2-rc/`.
-The CachyOS squashes are generated **against the actual series state** (rc6 + the `00xx` local/upstream patches), not a clean rc — the pre-CachyOS patches touch shared files like `drm_edid.c`. Two known conflicts handled inside the squashes: `0151` duplicates `0055`, and `0053` must be dropped when the hdmi branch is present.
+The CachyOS squashes are generated **against the actual series state** (rc7 + the `00xx` local/upstream patches), not a clean rc — the pre-CachyOS patches touch shared files like `drm_edid.c`. Two known conflicts handled inside the squashes: `0151` duplicates `0055`, and `0053` must be dropped when the hdmi branch is present.
 
 ## Full maintenance cycle
 
@@ -174,7 +174,7 @@ echo "-${pkgbase#linux-}" > localversion.20-pkgname
 scripts/config --set-str LOCALVERSION ""
 ```
 
-Result: `uname -r` → `7.2.0-rc6-3-sleepy`.
+Result: `uname -r` → `7.2.0-rc7-1-sleepy`.
 
 ## Local model routing
 

@@ -140,7 +140,7 @@ The `0105` fixes squash carries the full 26-patch branch; `0106` reverses the of
 
 ---
 
-## 1000–1023 — AMDGPU GPU core
+## 1000–1025 — AMDGPU GPU core
 
 Source: drm-next (`https://gitlab.freedesktop.org/drm/kernel.git`) / amd-gfx. Formerly numbered `1002`–`1065`.
 
@@ -166,16 +166,19 @@ Source: drm-next (`https://gitlab.freedesktop.org/drm/kernel.git`) / amd-gfx. Fo
 | `1017` | Alex Deucher | gmc12: switch to new gmc tlb inv helpers |
 | `1018` | Matthew Stewart | Switch order of GC and Display IP blocks (DCN42B) |
 | `1019` | Alex Deucher | update mmhub 4.2.0 client list — drm-next `658422c7b` |
-| `1020` | Alex Deucher | gmc12.1: fix MMHUB0 check in pasid tlb flush — amd-gfx ML `<20260728153930.1531949-1-alexander.deucher@amd.com>` (not yet upstream) |
-| `1021` | Alex Deucher | gmc12.1: implement tlb inv semaphore — amd-gfx ML `<20260730172740.1268133-1-alexander.deucher@amd.com>` (not yet upstream) |
-| `1022` | Candice Li | reject oversized IBs with per-ring packet limits — amd-gfx ML `<20260803102416.3776005-1-candice.li@amd.com>` (v2, not yet upstream). Per-ring 20-bit IB packet-size limit checked before IB allocation in `amdgpu_cs.c`; applies to GFX/compute/SDMA/VPE rings (RDNA4). CLEAN on rc6 (`git apply --check` + `patch -p1 --forward --dry-run`, offset 5). |
 | `1023` | Steven Barrett (Liquorix) | drm/amdgpu/pm: Allow override of min_power_limit with `ignore_min_pcap` — backport from CachyOS/linux fork commit `16cd15654cc6` (2024, carried by CachyOS in every release). Adds an opt-in module param (`amdgpu.ignore_min_pcap=1`) that reads the min power cap as 0 and bypasses the SMU min-power-limit floor in `amdgpu_pm.c`/`amdgpu_smu.c` (swsmu, incl. SMU14). Default 0 = unchanged behavior. Adopted 2026-08-04 after the linux-cachyos-rc 7.2-rc6-2 release audit (the one fork-direct change relevant to our SMU14 power handling). CLEAN on rc6 (`git apply --check` forward, reverse fails). |
+| `1024` | Jesse Zhang | drm/amdgpu/mes12: fix dropped dispatches under queue oversubscription — drm-next `288cc4a54` (amd-drm-next-7.3-2026-08-06 merge, 08-08). GFX12 MES: pads/spaces the MES queue dispatch so concurrent queue oversubscription no longer drops dispatches. **Added 2026-08-10** (AMDGPU 7.3 last-round backport). CLEAN on rc7 series. |
+~~`1025`~~ (gfx12 priv-fault user-queue recovery worker, Jesse Zhang, drm-next `30f07c06`) — **DROPPED 2026-08-10 at build**: applies cleanly but does NOT compile on rc7 — references `adev->gfx.userq_priv_fault_work`/`userq_priv_fault_slots`, fields that live in `struct amdgpu_gfx` only via the gfx11 priv-fault worker infra which is in drm-next (post-rc7), not rc7 (`amdgpu_gfx.h` has only `userq_sch_*`). Requires the whole gfx11 priv-fault prerequisite series — defer to the 7.3 move. Symbol-existence check failed; do not re-add without the prerequisite.
+
+~~`1020`~~ (gmc12.1 fix MMHUB0 check in pasid tlb flush, Alex Deucher) — **DROPPED 2026-08-10**: merged upstream in rc7 (`5227c2c77c38`).
+~~`1021`~~ (gmc12.1 implement tlb inv semaphore, Alex Deucher) — **DROPPED 2026-08-10**: merged upstream in rc7 (`cda6ab11c1a2`).
+~~`1022`~~ (reject oversized IBs with per-ring packet limits, Candice Li) — **DROPPED 2026-08-10**: merged upstream in rc7 (`fd37f9dd5b5a`). All three verified: content present in clean rc7 tree + upstream commits confirmed in torvalds history.
 
 ---
 
-## 1100–1113 — AMD display
+## 1100–1136 — AMD display
 
-Source: drm-next, confirmed CLEAN-APPLY on v7.2-rc5 via `git apply --check`. `1100`–`1103` were formerly `1025`, `1031`, `1033`, `1065`.
+Source: drm-next, confirmed CLEAN-APPLY on v7.2-rc5 via `git apply --check`. `1100`–`1103` were formerly `1025`, `1031`, `1033`, `1065`. Later members (`1114`–`1134`) are documented in the 2026-08-03/04 sweep sections below.
 
 | File | Commit | Author | Subject |
 |------|--------|--------|---------|
@@ -192,8 +195,12 @@ Source: drm-next, confirmed CLEAN-APPLY on v7.2-rc5 via `git apply --check`. `11
 | `1110` | `e324cce52` | Dillon Varone | Port DCN4+ MCIF ARB programming to new format |
 | `1111` | `5a22cc7c7` | Bhuvanachandra Pinninti | Fix dc_stream_remove_writeback dropping wrong writeback entries |
 | `1113` | `9afc6186f` | Fangzhi Zuo | dispatch compressed FRL cap check inside dml1_frl_cap_chk_inter (fixes DSC-over-HDMI-FRL mode pruning, e.g. 4k144) — drm-next `9afc6186f` |
+| `1135` | Charlene Liu | fix HPD program filter programming — Tom Chung "DC Patches Aug 10 2026" 12/34, amd-gfx ML `<20260805063937.2145774-13-chiahsuan.chung@amd.com>` (08-05). DCN42B DIO: `DC_HPD_TOGGLE_FILT_CNTL` delay fields were written in ms but the HW register unit is 10 ms (÷10), which made connection time extremely long. **Added 2026-08-10** (unmerged ML member). CLEAN on rc7 series. |
+| `1136` | Relja Vojvodic | Update and revert FRL LT Timeout — Tom Chung "DC Patches Aug 10 2026" 20/34, amd-gfx ML `<20260805063937.2145774-21-chiahsuan.chung@amd.com>` (08-05). `link_hdmi_frl.c`: fall back to polling when LT-no-timeout is set and bound the FRL LT timer (155 polls at ≥16 Gbps ≈ 300 ms) for appropriate link rates. **Added 2026-08-10** (unmerged ML member). CLEAN on rc7 series. |
 
 ~~`1112`~~ (`334cbfa3c`, dcn401 GPIO lookup tables) — **DROPPED**: requires `DC_GPIO_GENERIC_A`/`DC_GPIO_HPD_A` type defs from a prerequisite GPIO infrastructure patch not in rc5.
+
+**Deferred from the Tom Chung 34-patch series** (reviewed 2026-08-10, not taken): 10/34 DCN42B `force_min_dcfclk` clamp (`[200,600]` MHz) — debug-option-only sanitization, no normal-path effect; 16/34 zstate_support rework; 29/34 SopCount workaround — touches `dcn60_clk_mgr.c`, absent from rc7; 33/34 unify fast-update classification — series-dependent. **31/34** (restore FRL cap on non-destructive HDMI link verify) is the upstream submission of our `0058`/`1113` — no separate action.
 
 Only `1101` is reverse-applied in `prepare()` (PKGBUILD line 551). If you renumber patches, update that reverse-apply line to match the current filename.
 
@@ -250,7 +257,7 @@ Source: sirlucjan `7.2-rc/block-patches-sep/`. Formerly numbered `1300`–`1304`
 | File | Source | Author | Subject |
 |------|--------|--------|---------|
 | `2100` | `repos/sirlucjan-kernel-patches/7.2-rc/zstd-dev-patches/` | Piotr Gorski | zstd-7.2: merge changes from dev tree (formerly `1400`) |
-| `2101` | `repos/sirlucjan-kernel-patches/7.2-rc/lru-marie-patches-v12/` | Piotr Gorski | mm-7.2: introduce LRU MARIE v12 (formerly `1401`; `vma_flags` fix baked in) |
+| `2101` | `repos/firelzrd-lru-marie/patches/testing/0001-linux7.2-rc1-lru_marie-0.9.3.patch` (firelzrd/lru_marie commit `0e08603`, 2026-08-07) | Masahito S (firelzrd) | mm-7.2: introduce LRU MARIE **0.9.3** (formerly `1401`, `2101` was 0.9.2). Updated 2026-08-10: applied the 0.9.2→0.9.3 delta onto our series-adjusted 2101 — orphaned-L1-bit self-heal fix in `marie_state_isolate_scan_l2lock` (reclaim no longer wedges under hot single-type bursts), `marie_dbg_orphan_bit[2]` counters, concede-floor debug line, `MARIE_VERSION "0.9.3"`. Kept our `vma_flags_test(&vma_flags, VMA_EXEC_BIT)` fix (the firelzrd rc1-based patch still uses the old `vm_flags & VM_EXEC` API and must NOT be adopted wholesale). Verified CLEAN on the rc7 series. |
 
 ## 2200 — CPU idle (NAP governor)
 
@@ -639,6 +646,69 @@ commits. **Adopted** (`0111`–`0113`, all apply cleanly, real authors):
 - `unprivileged_userns_clone` — security policy, not hardware.
 - `znver5` RDSEED fix — Zen 5 only.
 - swap-in readahead disable — low value, conflicts with LRU-MARIE.
+
+---
+
+## 2026-08-10 sweep results — 7.2-rc7 bump + Phoronix audit + MARIE 0.9.3
+
+**Version bump to 7.2-rc7** (`_rcver=rc7`, pkgrel reset to 1). rc7 tag verified at
+`git.kernel.org/torvalds/t/linux-7.2-rc7.tar.gz` (sha256 `aa217866eea669da8d84212161131a7315bb94dafcd739a9e9e294d65e748c10`).
+Full 128-patch series rebased: 124 apply cleanly, 3 dropped (below), and the
+CachyOS `0105`/`0106` squashes were regenerated against the rc7 series state
+(fixes branch still v10; off-target drop list unchanged — net applied effect
+byte-for-byte the same hunks, re-contextualized). All other `01xx` squashes and
+the `0110`–`0113` CachyOS/linux-fork backports apply unchanged (fork untouched
+since the 06-19 tag; the fork's April–May reverts — `sched_move_task`,
+`dmub_srv_wait_for_idle`, CACHY timer_slack — predate our 08-04 curation and
+were already excluded).
+
+**Dropped (merged upstream in rc7):** `1020` (`5227c2c77c38`), `1021`
+(`cda6ab11c1a2`), `1022` (`fd37f9dd5b5a`). All three verified — exact content
+present in the clean rc7 tree and upstream commits confirmed in torvalds
+history (not needlessly dropped).
+
+**Added (3):** `1024` mes12 dropped-dispatches fix (drm-next `288cc4a54`),
+`1135` DCN42B HPD filter unit fix, `1136` FRL LT timeout update/revert
+(1135/1136 = Tom Chung "DC Patches Aug 10 2026" 12/34 + 20/34, amd-gfx ML
+08-05, unmerged). `1025` (gfx12 priv-fault recovery, drm-next `30f07c06`) was
+attempted and dropped at build — see the 1000-range section above for the
+missing-symbol reason.
+
+**Phoronix-flagged items audited (2026-08-10):**
+- **Safe RET interrupt vuln** (SRSO, affects Zen 1–4 incl. our 7950X): fix
+  merged via `f5fdd6665ac4` → `7e7f81cf6f5c` "x86/bugs: Make Safe-RET robust
+  against interrupt injection" — **already in rc7 base**, no patch needed.
+- **Zapscape** (KVM x86 shadow-MMU UAF, CVE-2026-64561): fix `2abd5287f083`
+  "KVM: x86: Check for invalid/obsolete root..." landed 07-21 — **already in
+  rc5**, no action (and no KVM guests on this desktop anyway).
+- **HDMI 2.1 VRR/ALLM v2** (Fangzhi Zuo, `[PATCH v2 0/4]`, amd-gfx 08-06,
+  MID `20260806205449.16806-1-jerry.zuo@amd.com`): **deferred** — v2 rebases on
+  amd-staging-drm-next (base `c4f76bf5e107`) where `amdgpu_dm_connector.c` and
+  `amdgpu_dm_freesync.c` exist; **rc7 mainline has neither** (connector logic
+  still in `amdgpu_dm.c`). Our `0050`/`0055`/`0058` (v1 lineage) remain the
+  correct mainline form. v2's `drm/edid` member (2/4, now authored by Tomasz
+  Pakuła) can be re-examined when the connector split lands.
+- **Aggressive TTM** (Valve dmemcg protect series v8, Natalie Vock/Timur
+  Kristóf, dri-devel `20260804-dmemcg-aggressive-protect-v8`): **deferred** —
+  targets the 7.3 merge window; needs the DMEMCG aggressive-allocation split
+  (`ttm_bo_attempt_alloc`) not present in our `0104`-carried dmem base.
+- **AMDGPU 7.3 last round** (Deucher `amd-drm-next-7.3-2026-08-06`): took the
+  GFX12-core members (`1024`, `1025`). Deferred: `4195148` MCM color-manager
+  migration (29 files, touches `dcn60*` absent from rc7), `6411a35`
+  hwss_set_output_transfer_func NULL check (fixes **Vega/DCE** GPUs — off-target
+  for RDNA4), `9d07a6e` native-cursor-mode (needs `amdgpu_dm_cursor.c` split).
+
+**Blackscreen log analysis (2026-08-10):** no kernel panic, oops, or GPU reset
+in `log1.txt`/`log2.txt`; all six shutdowns clean. The blackscreen signature is
+a display-death burst (xdg-desktop-portal-cosmic "Broken pipe" → compositor
+loses its display connection) with the rest of the system alive. Recurring
+`REG_WAIT timeout - optc401_disable_crtc` during boot and
+`clocksource: Watchdog remote CPU N read timed out` at every boot. See
+LESSONS.md. This points at a DCN401 display-path hang (silent, no fence
+timeout), not a compute/thermal failure — the 1135/1136 display fixes and rc7's
+DCN/JPEG-reset fixes are the relevant mitigations. Consider the drm/amd
+work-items !4753 (FAMS2 memclk-change pipeline stall on gfx1201) and !5596
+(flip_done timeout on 9070 XT) as follow-ups.
 
 ---
 
