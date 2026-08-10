@@ -18,8 +18,9 @@ build is verified — not before.
 
 Consult the local Google documentation style guides before editing:
 `.claude/style-guides/google-docguide/` (index in
-`.claude/style-guides/README.md`). They are gitignored tooling state, not
-project files. Read `style.md` (Markdown formatting), `best_practices.md`, and
+`.claude/style-guides/README.md`). They are committed reference copies (CC-By
+3.0, attribution in the index). Read `style.md` (Markdown formatting),
+`best_practices.md`, and
 `philosophy.md`, and apply them to every README/GUIDE/PATCH_SOURCES edit and
 every commit message. Quick rules that always apply:
 

@@ -27,9 +27,10 @@ base, with additional upstream and local patches filtered to this hardware.
 | `PATCH_SOURCES.md` | Per-patch provenance ledger — authors, commit hashes, source URLs, revisions |
 | `LESSONS.md` | Full incident log ("do not repeat") — the durable rules are below; the context is there |
 
-Local Google documentation style guides are downloaded (gitignored, not in the
-repo) to `.claude/style-guides/`; the documentation skills consult them — see
-`.claude/style-guides/README.md`.
+Local Google documentation style guides (committed reference copies, CC-By 3.0
+with attribution in `.claude/style-guides/README.md`) live in
+`.claude/style-guides/`; the documentation skills consult them before editing
+docs.
 
 ## Repository layout
 
