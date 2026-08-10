@@ -36,8 +36,9 @@ description: >
   previous step and verify before proceeding.
 - **Use absolute patch paths with `git -C`.** `git -C <repo> apply --check`
   changes the process directory to the repo, so a relative patch path like
-  `NNNN-....patch` resolves against the repo and errors "can't open patch".
-  Always write `git -C repos/linux-7.2-rc7 apply --check "$PWD/NNNN-....patch"`.
+  `patches/1100-1199/NNNN-....patch` resolves against the repo and errors
+  "can't open patch". Always write
+  `git -C repos/linux-7.2-rc7 apply --check "$PWD/patches/<range>/NNNN-....patch"`.
 - **Capture real exit codes, never `| head && echo OK`.** `git apply --check f 2>&1 |
   head -3 && echo CLEAN` always prints CLEAN because `head`'s exit status wins.
   Use `git apply --check f > log 2>&1; echo "exit: $?"` and read `log`.
@@ -332,11 +333,11 @@ correct range — never reuse, never skip:
 | `2200–2299` | CPU idle (NAP governor) | sirlucjan `nap-patches/` |
 | `9000–9099` | agd5f staging backports | `git format-patch` from agd5f/linux |
 
-Copy the file in with a descriptive name:
+Copy the file into its range folder with a descriptive name:
 ```bash
-cp <downloaded-or-exported>.patch NNNN-short-description.patch
+cp <downloaded-or-exported>.patch patches/<range>/NNNN-short-description.patch
 ```
-Example: `1206-cpufreq-amd-pstate-Fix-EPP-return-type-and-handle-er.patch`.
+Example: `patches/1200-1299/1206-cpufreq-amd-pstate-Fix-EPP-return-type-and-handle-er.patch`.
 
 Then document in `PATCH_SOURCES.md` **before** adding to `PKGBUILD`.
 Run `updpkgsums` after any `source=()` change. Write the entry and the
