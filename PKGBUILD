@@ -409,6 +409,8 @@ source=(
   "9035-drm-amdgpu-add-the-BO-va-mapping-offset-when-kmapping-an-IB.patch"
   # 9036: gfx12 userq VA validation for sub-page buffers (c0122bf2c, drm-next 08-06) — symbol-clean on rc7
   "9036-drm-amdgpu-fix-userq-VA-validation-for-sub-page-buffers.patch"
+  # 9037: Prefer default discovery offset (46a0df99a, 08-06 tag) — RDNA4/gfx1201 IP-discovery regression fix (Fixes 01bdc7e219c4)
+  "9037-drm-amdgpu-prefer-default-discovery-offset.patch"
 )
 
 validpgpkeys=(
@@ -1098,6 +1100,7 @@ b2sums=('4299f17dac88bd1aacf58f1ba0b7061859c1723845925b0efc36e09248f74fa5eb57fa9
         '0c25491212274500756b31955cafa5f757480985f21d616ab179df8773f1d8a869ab5eb319add233c5f998ec286e12e0fbaf40c1f01cc4f6d577c799cd0a40a7'
         '2f6ecc84e0141cbee5ce379a2959550cb4830e923afa3d5275283d74d69b8e3bba51f84af96df329d1ea30af0a26f320678907833b40172cbff4a751de3682a7'
         '9eade3d8b8bf90f5165547917b1054d5033d5d4fb89016cf3ca957b3cb9b25635b8f716594dee12705d80c3193df9f22dcb4c6c33994a7e117d3dedbec03627e'
+        '03a88456bc0cce7827d41786ea28847eb82315b41d85db92b9ae35f1e1f72add3eeb8a37ec15fc568c754e7b9b6f57377406e8d51b30df9107e1a049ffd7d1eb'
         '116ec92181c091e7e57f3c88b159a7080d3f3dfd05ed661da95811dd58209e4b83a69edfc47a57126524c014cdc0bb7b72f9be94294237c24461ac702e2b1206')
 
 if [ "$_use_kernel_org_llvm" = "yes" ]; then

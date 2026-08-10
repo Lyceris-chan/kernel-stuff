@@ -321,6 +321,7 @@ The full 5-commit series applies cleanly to a **clean** rc7 tree, but **`9026` f
 All three CLEAN on the rc7 series (git + GNU `patch`). Applied upstream by Deucher 08-06 (7.3-merge). `9035` uses the 08-08 v2 revision. `0035` is deliberately NOT used (sparse `00xx` gap would suggest a local DCN patch); these live in the `90xx` backport range.
 
 | `9036` | `c0122bf2c` | drm-next 08-06 — Fix userq VA validation for sub-page buffers — **Added 2026-08-10**. `amdgpu_userq.c`: span-check via `amdgpu_vm_bo_lookup_mapping()` for sub-page VA ranges (symbol-clean on rc7; the userq fence/mapping path exists). gfx12 userq correctness. |
+| `9037` | `46a0df99a` | drm-next 08-06 — Prefer default discovery offset — **Added 2026-08-10** (final sweep). `amdgpu_discovery.c`: use the default IP-discovery binary offset when a valid signature is present (regression fix `Fixes: 01bdc7e219c4`, closes work_items !5447) — protects RDNA4/gfx1201 IP-block discovery. 13-line clean fix. Final-sweep re-checks confirmed skips: `ef45aaf73` (debug-only CRC, DCN31x), `48f1d2a10` (no-op KFD prep), `9ad81600b` (dead fields, absent priv-fault infra). |
 
 **Not taken from the userq/priv-fault family:** `9ad81600b` (track faulted gfx user-queue slots) references `userq_priv_fault_slots`/`userq_priv_fault_work` — the same `struct amdgpu_gfx` fields absent from rc7 that dropped `1025` (LESSONS #69). Defer the whole recovery-worker set to 7.3.
 
