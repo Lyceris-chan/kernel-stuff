@@ -286,7 +286,7 @@ dropped or deferred entry — so it is not duplicated here.
 | `PKGBUILD` | Arch Linux build script |
 | `config` | Base `.config` (from CachyOS) |
 | `disable_configs.py` | Strips unwanted driver configs before `olddefconfig` |
-| `patches/<range>/` | Patch series, one folder per number range (see ranges above) |
+| `NNNN-*.patch` | Patch series (see ranges above) |
 | `net-tune/` | Unified CAKE SQM + latency tuning systemd service |
 | `repos/` | Cloned upstream git repos for patch extraction |
 | `GUIDE.md` | End-user guide with build details and PROFILE_PEAK notes |

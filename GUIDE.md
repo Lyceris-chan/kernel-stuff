@@ -201,16 +201,10 @@ can create the ingress path, and the service will log
 PKGBUILD                  Build script (Arch Linux makepkg format)
 config                    Base kernel .config (from CachyOS)
 disable_configs.py        Script to strip CachyOS-specific symbols before olddefconfig
-patches/0001-0049/       Handmade local SMU14/DCN401/GFX12 patches
-patches/0050-0099/       Upstream EDID/HDMI ML patches
-patches/0101-0113/       CachyOS branch squashes + fork backports
-patches/1000-1099/       AMDGPU GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB)
-patches/1100-1199/       AMD Display (DCN4, DCN42B, PSR)
-patches/1200-1299/       AMD Power Management (amd-pstate, cpufreq)
-patches/2000-2099/       Block / I/O schedulers (bfq, mq-deadline)
-patches/2100-2199/       Memory management (zstd, LRU-MARIE)
-patches/2200-2299/       CPU idle (NAP governor)
-patches/9000-9099/       agd5f staging backports
+0001-0058-*.patch         Local and upstream SMU14/DCN401/EDID/HDMI patches
+0101-0113-cachy-*.patch   CachyOS branch squashes + fork backports
+1000-2200-*.patch         Upstream patches (amd-gfx, drm-next, linux-pm, block, mm, cpuidle)
+9001-9037-*.patch         agd5f staging backports
 net-tune/                 Unified CAKE SQM + latency tuning systemd service
 PATCH_SOURCES.md          Per-patch source URLs and commit hashes
 GUIDE.md                  Developer notes (build, patch workflow, CI)

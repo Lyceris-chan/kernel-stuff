@@ -120,7 +120,7 @@ for f in "$BASE/bbr3-cachyos-patches-sep"/00*.patch; do
 done
 find . -name '*.orig' -delete    # patch leaves .orig/.rej backups — never commit them
 find . -name '*.rej' -delete
-git diff --binary > ../../patches/0101-0113/0101-cachy-bbr3.patch   # cumulative diff = the squash
+git diff --binary > ../../0101-cachy-bbr3.patch      # cumulative diff = the squash
 ```
 
 **Purge `.orig`/`.rej` after EVERY patch phase and BEFORE `git add`/`git diff`**
@@ -131,11 +131,10 @@ overlapping local patches like `0003`/`0004` fail strict sequential `git apply`
 but apply cleanly under `patch` fuzz — exactly what `prepare()` uses.
 
 Repeat for each branch with the squash numbers from Step 3. For `fixes`,
-squash the full branch into `patches/0101-0113/0105-cachy-fixes.patch`, then
-build `patches/0101-0113/0106-cachy-drops.patch` as the reverse diff of the
-off-target groups (Step 4). Verify each squash with
-`git apply --check "$PWD/patches/0101-0113"/01xx-cachy-*.patch` against a clean
-`repos/linux-7.2-rc7` tree (absolute path — `git -C` changes CWD).
+squash the full branch into `0105-cachy-fixes.patch`, then build
+`0106-cachy-drops.patch` as the reverse diff of the off-target groups (Step 4).
+Verify each squash with `git apply --check 01xx-cachy-*.patch` against a clean
+`repos/linux-7.2-rc7` tree.
 
 After regenerating ANY `01xx` squash, re-validate the FULL series in order —
 a changed `01xx` sits mid-series and can shift context for the later `10xx`/

@@ -39,7 +39,7 @@ docs.
 | `PKGBUILD` | Arch build script — version vars, `source=()`, `prepare()` applies the series + config overrides |
 | `config` | Base `.config` (from CachyOS) |
 | `disable_configs.py` | Strips unwanted driver configs before `olddefconfig` |
-| `patches/<range>/NNNN-*.patch` | The patch series, one folder per number range (see Patch numbering) |
+| `NNNN-*.patch` | The patch series (see Patch numbering) |
 | `net-tune/` | Unified CAKE SQM + latency tuning systemd service |
 | `repos/` | Cloned upstream git repos for patch extraction (gitignored; never clone into `/tmp`) |
 | `src/`, `pkg/` | Build artifacts — never commit |

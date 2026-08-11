@@ -37,11 +37,11 @@ Extract every patch filename that `PKGBUILD` references, and list every `.patch`
 file on disk. (Files must be `sort`-ed for the diff below.)
 
 ```bash
-# 1a. Patch paths referenced by PKGBUILD source=() (patches/<range>/<file>)
-grep -oE 'patches/[0-9]+-[0-9]+/[^"]+\.patch' PKGBUILD | sort -u > /tmp/pkgsrc.txt
+# 1a. Filenames referenced by PKGBUILD source=()
+grep -oE '"[0-9]{4}-[^"]+\.patch"' PKGBUILD | tr -d '"' | sort -u > /tmp/pkgsrc.txt
 
-# 1b. Patch files physically present under patches/
-find patches -name '*.patch' 2>/dev/null | sort -u > /tmp/ondisk.txt
+# 1b. Patch files physically present in the workspace root
+ls *.patch 2>/dev/null | sort -u > /tmp/ondisk.txt
 
 # 1c. Show both for review
 echo "=== in PKGBUILD source=() ==="; cat /tmp/pkgsrc.txt
@@ -49,8 +49,7 @@ echo "=== on disk ==="; cat /tmp/ondisk.txt
 ```
 
 If `1a` printed nothing, the regex did not match — inspect the actual `source=()`
-format first (patch entries look like `patches/<range>/NNNN-...patch`; the array
-spans ~lines 227–419 of PKGBUILD) before continuing.
+format first (line numbers ~370–395 of PKGBUILD) before continuing.
 
 ## Step 2 — Find orphaned patches (on disk, NOT in source=())
 
@@ -65,8 +64,8 @@ as "dropped"/"deferred" is safe to remove the file; an active entry means
 investigate):
 
 ```bash
-grep -c "<candidate>" PKGBUILD               # full patches/<range>/<file> path — must print 0
-grep -n "<candidate-file>" PATCH_SOURCES.md  # read the context line (ledger uses the bare filename)
+grep -c "<candidate>.patch" PKGBUILD        # must print 0
+grep -n "<candidate>.patch" PATCH_SOURCES.md # read the context line
 ```
 
 Examples of candidates that legitimately appear here: files using an old naming
@@ -77,19 +76,19 @@ patch, or a patch you regenerated under a new number leaving the old copy behind
 
 ```bash
 # One file at a time — never a wildcard that could hit an active patch:
-rm <candidate1> <candidate2>    # each candidate is a patches/<range>/<file> path
+rm <candidate1>.patch <candidate2>.patch
 ```
 
 After deleting, regenerate both lists and confirm no active patch was removed:
 
 ```bash
-find patches -name '*.patch' 2>/dev/null | sort -u > /tmp/ondisk2.txt
+ls *.patch 2>/dev/null | sort -u > /tmp/ondisk2.txt
 echo "=== still orphaned (should now be empty) ==="
 comm -23 /tmp/ondisk2.txt /tmp/pkgsrc.txt
 ```
 
 If a file you deleted still shows in `comm -13` output (see Step 5) it means it
-was actually referenced — restore it immediately from git: `git checkout -- <candidate>`.
+was actually referenced — restore it immediately from git: `git checkout -- <file>.patch`.
 
 ## Step 4 — Remove scratch scripts and build artifacts
 
@@ -115,7 +114,7 @@ scratch files go.
 ## Step 5 — Final verification (both directions)
 
 ```bash
-find patches -name '*.patch' 2>/dev/null | sort -u > /tmp/ondisk2.txt
+ls *.patch 2>/dev/null | sort -u > /tmp/ondisk2.txt
 
 echo "=== patches on disk MISSING from PKGBUILD (must be EMPTY) ==="
 comm -23 /tmp/ondisk2.txt /tmp/pkgsrc.txt
@@ -127,7 +126,7 @@ comm -13 /tmp/ondisk2.txt /tmp/pkgsrc.txt
 Both directions must be empty. If either prints a file:
 - "on disk missing from PKGBUILD" → you have an orphan left; repeat Steps 2–3.
 - "in PKGBUILD missing on disk" → you deleted an active patch; restore with
-  `git checkout -- <candidate>` (the full `patches/<range>/<file>` path).
+  `git checkout -- <file>.patch`.
 
 ## Step 6 — Wrap up
 

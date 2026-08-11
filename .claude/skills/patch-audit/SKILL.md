@@ -87,7 +87,7 @@ Never scrape `lore.kernel.org` — its anti-bot protection blocks agents.
   headers (mbox format is fine; preserve author and `Signed-off-by`). **Sanitize the
   filename**: a `Subject:` with a folded header line embeds a literal `\n` in the name —
   strip it (e.g. `subj.split('] ',1)[-1].replace('\n',' ').replace('/','-')`) or rename to a
-  clean `NNNN-short-desc.patch` before copying into the `patches/<range>/` folder.
+  clean `NNNN-short-desc.patch` before copying into the repo.
 - **Series-order check:** a candidate whose trailing context matches content that an
   earlier *backported* patch adds (e.g. `9008`'s DB_RING_CONTROL context comes from `9007`)
   must be numbered to apply **after** that patch. Test sequentially in a scratch tree, not
@@ -164,8 +164,8 @@ Run these in order. Copy the commands exactly — do not improvise.
 
 3. **Forward apply check** — patch must apply to the clean rc7 tree:
    ```bash
-   git -C repos/linux-7.2-rc7 apply --check "$PWD/patches/<range>/<NNNN-short-description.patch>"   # use ABSOLUTE path
-   patch -p1 --forward --dry-run < patches/<range>/<NNNN-short-description.patch>                  # authoritative — matches prepare()
+   git -C repos/linux-7.2-rc7 apply --check "$PWD/<NNNN-short-description.patch>"   # use ABSOLUTE path
+   patch -p1 --forward --dry-run < <NNNN-short-description.patch>                  # authoritative — matches prepare()
    ```
    - No output = clean, proceeds to step 4.
    - Error output = context shifted or prereqs missing. Fix hunk offsets,
@@ -181,7 +181,7 @@ Run these in order. Copy the commands exactly — do not improvise.
 
 4. **Already-applied check** — confirm it is NOT already in the tree:
    ```bash
-   git -C repos/linux-7.2-rc7 apply --check -R "$PWD/patches/<range>/<NNNN-short-description.patch>"
+   git -C repos/linux-7.2-rc7 apply --check -R <NNNN-short-description.patch>
    ```
    - If this REVERSE check passes (no output), the patch is already merged —
      DROP it and report why.
@@ -204,7 +204,7 @@ Run these in order. Copy the commands exactly — do not improvise.
    | Prefix | Category |
    |--------|----------|
    | `00xx` | Local / hand-selected (0001–0049) or EDID/display ML (0050–0099) |
-   | `01xx` | CachyOS branch squashes (0101–0113, one per branch) |
+   | `01xx` | CachyOS branch squashes (0101–0109, one per branch) |
    | `10xx` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) |
    | `11xx` | AMD Display (DCN4, DCN42B, PSR) |
    | `12xx` | AMD Power Management (amd-pstate, cpufreq) |
@@ -213,7 +213,7 @@ Run these in order. Copy the commands exactly — do not improvise.
    | `22xx` | CPU idle (NAP governor) |
    | `90xx` | agd5f staging backports |
    ```bash
-   cp <source.patch> patches/<range>/NNNN-short-description.patch
+   cp <source.patch> NNNN-short-description.patch
    ```
 
 6. **Document Provenance**: Update `PATCH_SOURCES.md` **BEFORE** modifying
@@ -245,18 +245,16 @@ a fresh `git format-patch` export, or a mailing-list re-read — not necessarily
 from a fetched repo):
 
 ```bash
-# 1. Overwrite the existing patch file IN PLACE (same name/number, in its
-#    patches/<range>/ folder):
-cp ~/Downloads/<new-revision>.patch patches/<range>/NNNN-short-description.patch
+# 1. Overwrite the existing patch file IN PLACE (same name/number):
+cp ~/Downloads/<new-revision>.patch NNNN-short-description.patch
 
 # 2. Refresh the checksum — updpkgsums recomputes the BLAKE2 (b2sums) entry in
 #    PKGBUILD for every file whose content changed. ALWAYS run this after a swap:
 updpkgsums
 
-# 3. Re-validate the swapped patch against the clean tree (forward + reverse,
-#    ABSOLUTE path — git -C changes CWD):
-git -C repos/linux-7.2-rc7 apply --check "$PWD/patches/<range>/NNNN-short-description.patch"
-git -C repos/linux-7.2-rc7 apply --check -R "$PWD/patches/<range>/NNNN-short-description.patch"
+# 3. Re-validate the swapped patch against the clean tree (forward + reverse):
+git -C repos/linux-7.2-rc7 apply --check NNNN-short-description.patch
+git -C repos/linux-7.2-rc7 apply --check -R NNNN-short-description.patch
 
 # 4. Re-validate the FULL series. A revision swap can shift context for LATER
 #    patches. The authoritative in-order apply check is prepare() — run it:

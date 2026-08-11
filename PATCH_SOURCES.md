@@ -2,15 +2,13 @@
 
 This file documents the origin, author, and upstream commit or message ID for every patch in this repository.
 
-Patch files are stored in the `patches/<range>/` folder matching their number prefix (see the table below), e.g. `patches/1100-1199/1134-drm-amd-display-fix-BT.2020-YCbCr-limited-output-CSC-matrix.patch`.
-
 Patch numbering conventions:
 
 | Prefix | Meaning |
 |--------|---------|
 | `0001`–`0049` | Handmade local patches (Sleepy/Antigravity) — SMU14, DCN401, GFX12 fixes |
 | `0050`–`0099` | Upstream EDID/display parser patches (mailing list, not yet in mainline) |
-| `0101`–`0113` | CachyOS branches (squashed, one patch per branch) + fork backports — bbr3, kbuild, cpu-isa, cgroup-vram, fixes, drops, hdmi, preempt-ipi, vesa-dsc-bpp, config hooks, ACPI BM, S5 eviction, micro-opts |
+| `0101`–`0109` | CachyOS branches (squashed, one patch per branch) — bbr3, kbuild, cpu-isa, cgroup-vram, fixes, drops, hdmi, preempt-ipi, vesa-dsc-bpp |
 | `1000`–`1099` | AMDGPU GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) |
 | `1100`–`1199` | AMD Display (DCN4, DCN42B, PSR, Replay, pstate quirk, MCIF ARB) |
 | `1200`–`1299` | AMD Power Management (amd-pstate, cpufreq, ACPI CPPC) |
@@ -912,13 +910,12 @@ are our `1205`–`1209`. No gaps.
 
 ## Adding new patches
 
-1. Place the patch file in the `patches/<range>/` folder for its number range
-   (e.g. `patches/1100-1199/1137-drm-...patch`).
-2. Use the correct numeric prefix (see the conventions table): `0001`–`0099` local/upstream display, `0101`–`0113` CachyOS (squashed per branch) + fork backports, `1000`–`1099` GPU core, `1100`–`1199` display, `1200`–`1299` PM, `2000`–`2099` block, `2100`–`2199` MM, `2200`–`2299` cpuidle, `9000`–`9099` agd5f.
+1. Place the patch file in the root of this repository.
+2. Use the correct numeric prefix (see the conventions table): `0001`–`0099` local/upstream display, `0101`–`0109` CachyOS (squashed per branch), `1000`–`1099` GPU core, `1100`–`1199` display, `1200`–`1299` PM, `2000`–`2099` block, `2100`–`2199` MM, `2200`–`2299` cpuidle, `9000`–`9099` agd5f.
 3. Verify it applies cleanly with BOTH tools (use absolute paths — `git -C` changes CWD):
    ```bash
-   git -C repos/linux-7.2-rc6 apply --check "$PWD/patches/<range>/<file>"   # forward
-   git -C repos/linux-7.2-rc6 apply --check -R "$PWD/patches/<range>/<file>" # reverse-clean = already applied → drop it
+   git -C repos/linux-7.2-rc6 apply --check "$PWD/<file>"     # forward
+   git -C repos/linux-7.2-rc6 apply --check -R "$PWD/<file>"  # reverse-clean = already applied → drop it
    patch -p1 --forward --dry-run < <file>                     # authoritative — matches prepare()'s tool
    ```
    **`git apply --check` can pass while GNU `patch` rejects** (2026-08-03): a hunk with
@@ -927,8 +924,8 @@ are our `1205`–`1209`. No gaps.
    If a patch spans a file that does not exist in rc6, strip that file's hunks (document the
    strip here). If a patch's context references a symbol/field another carried patch adds,
    number it AFTER that patch.
-4. Add `patches/<range>/<filename>` to the `source=()` array in `PKGBUILD` in the correct
-   sorted position (dependencies first — e.g. 1127/1128 must precede 1129).
+4. Add the filename to the `source=()` array in `PKGBUILD` in the correct sorted position
+   (dependencies first — e.g. 1127/1128 must precede 1129).
 5. Run `updpkgsums` after any `source=()` change — checksums must match 1:1.
 6. Add an entry to the appropriate section in this file with author and source URL or commit hash.
 7. Do **not** access `lore.kernel.org` — it has anti-scraping protections. Use the source Git repositories directly (drm-next, linux-pm, sirlucjan GitHub, freedesktop.org mailing list archives, and the gitlab drm/amd work_items via no-UA curl).
