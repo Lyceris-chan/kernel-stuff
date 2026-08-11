@@ -6,6 +6,10 @@
 *.zip
 *.log
 
+# Root-level patch symlinks auto-created by PKGBUILD for makepkg 7.1.0
+# basename resolution. Real patches live in patches/<range>/ subfolders.
+/*.patch
+
 # Build directories
 src/
 pkg/

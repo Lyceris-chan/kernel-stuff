@@ -34,6 +34,15 @@ There is **no** special `git apply` case for `90xx` patches. If you see a `90xx`
 patch fail, diagnose it exactly like any other patch — do not invent a `git apply`
 bypass.
 
+**Patch layout (2026-08-11):** patches live in `patches/<range>/NNNN-*.patch`
+folders. makepkg 7.1.0 cannot resolve subdirectory local sources (it strips the
+directory prefix), so the PKGBUILD body auto-creates **root-level symlinks**
+`NNNN-*.patch -> patches/<range>/NNNN-*.patch` when it is sourced, before source
+resolution. These symlinks are gitignored (`/*.patch`). If a build reports a
+patch source "not found in the build directory", re-run `updpkgsums` (or source
+the PKGBUILD) — the symlinks may be missing after a fresh clone. Never commit
+root-level `*.patch` files; they are always symlinks.
+
 The only special-case reverse-apply in `prepare()` is for `1101`
 (`drm-amd-display-enable-pstate-for-dcn4-non-emulation-builds.patch`), which is
 reverse-applied with `patch -Np1 --forward -R` to keep `.pstate_enabled = false`.
