@@ -303,6 +303,10 @@ source=(
   #   amd-gfx ML 2026-08-04, Message-ID SA1PR12MB8600...). ML-only, not yet merged;
   #   reconstructed from the mbox after Outlook stripped whitespace. See PATCH_SOURCES.
   "1026-drm-amdkfd-fix-NULL-pointer-dereference-in-GFX12-CRIU.patch"
+  # 1027: GFX12 MES scheduler ring fence force-completion on reset (Jesse Zhang/AMD,
+  #   amd-gfx ML 2026-08-06, Message-ID 20260806075653.711275). Prevents post-reset
+  #   submission poll-forever wedge when MES stopped responding. ML-only.
+  "1027-drm-amdgpu-force-complete-the-MES-scheduler-ring-fence-on-reset.patch"
   "1100-drm-amd-display-enable-psr-and-replay-on-dcn4-variant-and-fi.patch"
   "1101-drm-amd-display-enable-pstate-for-dcn4-non-emulation-builds.patch"
   "1102-drm-amd-display-increase-dcn42b-uclk-value.patch"
@@ -373,6 +377,20 @@ source=(
   "2004-block-bfq-skip-expensive-merge-lookups-if-contended.patch"
   "2100-zstd-7.2-merge-changes-from-dev-tree.patch"
   "2101-mm-7.2-introduce-LRU-MARIE.patch"
+  # 2102-2104: zram zstd param/error-path fixes (Haoqin Huang/Tencent, linux-next
+  #   via akpm-mm 2026-08-04). MM bugfixes; ZRAM+ZSTD built-in. 3 of 5 series patches
+  #   (pr_fmt + per-backend validation hunks don't apply to rc7 deflate backend).
+  "2102-zram-do-not-release-zstd-global-params-from-error-paths.patch"
+  "2103-zram-reject-zero-size-dictionary.patch"
+  "2104-zram-reset-per-priority-params-when-changing-algorithm-before-init.patch"
+  # 2105-2108: zram stability fixes (Longlong Xia/Kylin + Sergey Senozhatsky,
+  #   linux-next via akpm-mm 2026-08-04, Cc: stable). OOB reads in the block-state /
+  #   writeback debugfs paths after a reset with smaller disksize; missing winbits
+  #   range validation; NULL primary compressor after destroy.
+  "2105-zram-fix-out-of-bounds-access-in-read_block_state.patch"
+  "2106-zram-fix-out-of-bounds-access-in-writeback_store.patch"
+  "2107-zram-validate-deflate-params.patch"
+  "2108-zram-set-default-primary-compressor-in-zram_destroy_comps.patch"
   "2200-7.2-nap-v0.5.0.patch"
   # 9000, 9004, 9005 dropped: merged upstream in 7.2-rc6
   "9001-drm-amdgpu-gfx12-drop-all-BUG-s.patch"
@@ -416,6 +434,14 @@ source=(
   "9036-drm-amdgpu-fix-userq-VA-validation-for-sub-page-buffers.patch"
   # 9037: Prefer default discovery offset (46a0df99a, 08-06 tag) — RDNA4/gfx1201 IP-discovery regression fix (Fixes 01bdc7e219c4)
   "9037-drm-amdgpu-prefer-default-discovery-offset.patch"
+  # 9038-9040: GFX12 userq/HMM fixes (Junrui Luo, amd-gfx ML 2026-08-11, series
+  #   20260811-amdgpu-fixes-v1). Reject PRT mappings as userq buffer VAs (NULL-bo
+  #   deref on GEM unmap); bound the eviction-fence rearm retry loop; free userptr
+  #   HMM ranges on the CS error path. ML-only; same author as 9033-9035; must
+  #   apply after 9036 (userq VA validation rewrite).
+  "9038-drm-amdgpu-reject-PRT-mappings-as-user-queue-buffer-VAs.patch"
+  "9039-drm-amdgpu-userq-bound-the-eviction-fence-rearm-retry-loop.patch"
+  "9040-drm-amdgpu-free-userptr-HMM-ranges-on-the-CS-error-path.patch"
 )
 
 validpgpkeys=(
@@ -1020,6 +1046,7 @@ b2sums=('4299f17dac88bd1aacf58f1ba0b7061859c1723845925b0efc36e09248f74fa5eb57fa9
         '492fe63e48d54f7c7d5fbcd614d937f71116bfe823588b0c8dbad53cae920cc8ce10468135382c55effcea8d57f8fff91b2b640c75e620b53a597f2af416fa2b'
         'ff999bfa1fe6de439f05c9a44b4a023443dc373b30b1817e2cfdbdbac4e9418de13e6644fc0e0d08c9ee3b7fc3f54ab283450a5512f546699c7b8e86f3c9156b'
         '85028ee0b1271d0bb1f1618a46c28984ef605c9b4f05f3b686f0362ecb10f391712ebec321c47a2220761e1497077869d694c47fce7a74074e5d5270693744b7'
+        '9c6b0d66c4d9d73cfb1b8d6902ce2477a8ff59a2ca59eb277489dc28157c1bc8d8b709ad4a0c19abd04ad3dc6171c6ce8644717fe03dbb921769f3aba693a178'
         '02803704ce3fe311f9bc88e0cdeae545829023a7c3c241a00f4a2bc07ffd27fe5089010b4fc0456c56898bbd09ab93ab3d764cfa97080a5aaf114df1bd91680b'
         '692244e62c6d34c7aca8fda750d18befaefdc02a3be11632aeb6a69327645e6814efb00a4c475bfc407c0dabbce0b5d88c86262acbf32b29111c5e99e2acabd6'
         '9395fc7d168c7cd6cb6b13edbedc2adc58a4a18cd024ae259345034b06bac84e8f9a34334508cd3571aaedb22e85aa2c9a01cd11e5c5336be148e07d63230bd8'
@@ -1076,6 +1103,13 @@ b2sums=('4299f17dac88bd1aacf58f1ba0b7061859c1723845925b0efc36e09248f74fa5eb57fa9
         '2b9bad240296578ddb6a81629263d046b7e2d9ba063faaae38279c98556749b1b1ae6ccc3036a551fabea3d01ce916cffad1f1e56a65b3eab31faaa37de96211'
         '26a27c3771496e964810ad07ba7f05a84af2a8b469736a0c43b443e5c4160567c70fa294e45ec799f2422086767696683a99c6837295776c78c646517e56326e'
         'c386d54f596d047bcc5df7c4838a803ea83a9421e381dc3d68f8293c0664ee9f06e90d5c705c7d55a827a425d147d03499dd9d9352a952b40270bf28876301ef'
+        'ae6a1099a8addf12b8bbb5c4e2e549a77bbf7b535452876476abf5039b76504c327fbb06ec2f9542aa0146578309fe5b34370500f944f873b04ec223e143285e'
+        '125440b453f7284e3edbe328cff8750a3a4aeea0b424d470353f0659bbeba0ec2570625ccb234f69cff6908ef3bf7e332511e3be00e2d04f0cba5137b1c7d8e0'
+        '71c0bcd0d1692e18d27c0f70a8d9b8dc8fa1374585f05b36a24fdbe16233ffb3db4c1acc64d4dc8c667c4b0a73845d8730dfbfce5eb72c822372e935d071986e'
+        '8f4a5b8dc2ae46d131a98d5bed260b9e99cb35d0df74031b3fc1926df56654ff7343a29e48584928d63c8b622321380c124c68f0047b3a97a9999b09ce8338f5'
+        'dcd694a8e21eb143b1f8d2f059787b014ad774454f240e9153a138cbb12215923e3943816ca58e9033e84e78c6bed386f4f2b2399f9c3cecf79d3946a05bfd4c'
+        'ca45b6f967557edcbee4d1d2721a70b12b38dcba27702fb11adfc09daba2156400ca4cba330b8d011f85f9cd11e1e998c608b68bf02c6046cd3e21264849ee6e'
+        '63bb83c66aac85fafb4ab319e1d74996bfce88a2850974ea9d200da98429768afe33ad8d0453e18c573c7e52d7ebb4df943ddf26b453b9b6b98f134ccd806fdd'
         'dc4e862e8f9fa7e8ead895908459757afd1027c24b960ae3d289a7212e29575bce3ce4627d5fd73edf211ee162dfa545e1642c5b16e8156f3dce50af8ef3c256'
         '4882cc909f5ee8e4c974f3849e4446656895fb8c5f0c10fa0992e5e7c7ae6ce1ded523326bb51c91ff161d15335968434fabb44cf822cb17fd6364c4d8eb24c5'
         '8a9f7682c746fd53536798e7110836059f982b3daa6b95a767249fe9888a3105d0be3dc9917924aba9bba45f0538436a9e3f67f5d958b63ee9288f391f3507ac'
@@ -1107,6 +1141,9 @@ b2sums=('4299f17dac88bd1aacf58f1ba0b7061859c1723845925b0efc36e09248f74fa5eb57fa9
         '2f6ecc84e0141cbee5ce379a2959550cb4830e923afa3d5275283d74d69b8e3bba51f84af96df329d1ea30af0a26f320678907833b40172cbff4a751de3682a7'
         '9eade3d8b8bf90f5165547917b1054d5033d5d4fb89016cf3ca957b3cb9b25635b8f716594dee12705d80c3193df9f22dcb4c6c33994a7e117d3dedbec03627e'
         '03a88456bc0cce7827d41786ea28847eb82315b41d85db92b9ae35f1e1f72add3eeb8a37ec15fc568c754e7b9b6f57377406e8d51b30df9107e1a049ffd7d1eb'
+        '203bd93e310b0795acf2d04a03de10bcfa4ee653b490c5cc3fb2f377119ce373dbf32c4ab4c8674d246ea8d8518d1a26ddd46f8c3dff085aa08022fa28d5144c'
+        '21ca802919183021abd12cfc782de48a895daddfa9b401700e4bef50e750537183bc3c7157e723bcae769d2bd72f9efd34e677d80d63d74eaa7344b8205eb1fe'
+        'f409b3525bfd04fa1b77adfcafb5d701e28c707619b6d71472d521b34926c40496b47a49b1c2c2404e83333a58a369d1be47517e99df1b1631d5a84a05e102b6'
         '116ec92181c091e7e57f3c88b159a7080d3f3dfd05ed661da95811dd58209e4b83a69edfc47a57126524c014cdc0bb7b72f9be94294237c24461ac702e2b1206')
 
 if [ "$_use_kernel_org_llvm" = "yes" ]; then

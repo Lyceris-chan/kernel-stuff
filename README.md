@@ -262,7 +262,7 @@ echo profile_peak | sudo tee /sys/class/drm/card0/device/power_dpm_force_perform
 
 ## Patch series
 
-The series carries 140 patches in the ranges below. `PATCH_SOURCES.md` is the
+The series carries 151 patches in the ranges below. `PATCH_SOURCES.md` is the
 authoritative per-patch manifest — authors, commit hashes, Message-IDs, and every
 dropped or deferred entry — so it is not duplicated here.
 

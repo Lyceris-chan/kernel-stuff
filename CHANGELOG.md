@@ -9,6 +9,57 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.2.0-rc7-1-sleepy] — 2026-08-11 (maintenance)
+
+Full six-source sweep (drm-next, drm-misc, linux-next, linux-pm, agd5f,
+amd-gfx + dri-devel ML, sirlucjan, GitLab drm/amd work-items, x86/security).
+The series grew from 140 to 144 patches. Reverted the untested patch-folder
+refactor (makepkg 7.1.0 cannot resolve local sources in subdirectories).
+
+### Added
+
+- **GFX12 MES scheduler ring fence force-completion** (`1027`, amd-gfx ML,
+  Jesse Zhang/AMD). The MES ring has no drm scheduler, so it is skipped by the
+  reset force-completion loop; its wb-backed polling fence survives a MODE1
+  reset while `sync_seq` keeps advancing, wedging the first post-resume
+  submission ("MES ring buffer is full"). Now force-completed alongside the
+  scheduler rings. ML-only; not yet in drm-next.
+- **GFX12 userq/HMM correctness fixes** (`9038`–`9040`, amd-gfx ML 08-11,
+  Junrui Luo): reject PRT mappings as user-queue buffer VAs (NULL-bo deref on
+  GEM unmap), bound the eviction-fence rearm retry loop, and free userptr HMM
+  ranges on the CS error path. Same author/series family as the carried
+  `9033`–`9035`. Apply after `9036` (userq VA-validation rewrite).
+- **zram zstd error-path + param fixes** (`2102`–`2104`, linux-next via
+  akpm-mm, Haoqin Huang/Tencent): no longer release zstd global params from
+  per-CPU error paths, reject zero-size dictionaries, and reset per-priority
+  params when the algorithm changes before init. 3 of 5 series patches carried;
+  the `pr_fmt` + per-backend validation hunks target a newer `backend_deflate.c`
+  absent from rc7.
+- **zram stability fixes** (`2105`–`2108`, linux-next via akpm-mm, `Cc:
+  stable`): OOB access in `read_block_state()`/`writeback_store()` after a
+  reset with smaller disksize (Longlong Xia/Kylin), deflate winbits range
+  validation (Sergey Senozhatsky), and a NULL primary compressor after
+  `zram_destroy_comps()` (Senozhatsky).
+
+### Changed
+
+- **Reverted the patch-folder refactor** (`16fd28b`). makepkg 7.1.0's local
+  source handler strips directory prefixes and resolves sources by basename in
+  the PKGBUILD directory, so `patches/<range>/NNNN-*.patch` source entries
+  could not be found (`updpkgsums`/`makepkg` both failed). Patches returned to
+  the flat repo-root layout; the refactor was never build-tested (last pkg
+  predates it).
+
+### Fixed
+
+- **DRM scheduler FAIR policy regression** (RX 9070 XT, amd-gfx + linux-kernel
+  ML 2026-08-08/10): tracked. No formal fix has landed (Tvrtko Ursulin proposed
+  a `min_vruntime` fix; maintainers leaning toward reverting the FAIR-default
+  switch). Our rc7 tree carries the FAIR-only scheduler, so this is a known
+  upstream issue to watch — not yet carryable without a merged patch.
+
+---
+
 ## [7.2.0-rc7-1-sleepy] — 2026-08-10
 
 Bump to **Linux 7.2-rc7** (tag `linux-7.2-rc7`). The series grew from 127 to
