@@ -213,7 +213,7 @@ Run these in order. Copy the commands exactly — do not improvise.
    | `22xx` | CPU idle (NAP governor) |
    | `90xx` | agd5f staging backports |
    ```bash
-   cp <source.patch> NNNN-short-description.patch
+   cp <source.patch> patches/<range>/NNNN-short-description.patch
    ```
 
 6. **Document Provenance**: Update `PATCH_SOURCES.md` **BEFORE** modifying
@@ -223,12 +223,15 @@ Run these in order. Copy the commands exactly — do not improvise.
    `.claude/style-guides/google-docguide/`.
 
 7. **Update PKGBUILD & Checksums**: Add the patch to the `source=()` array in
-   `PKGBUILD` in the correct numeric order, then:
+   `PKGBUILD` in the correct numeric order (entry is
+   `patches/<range>/NNNN-....patch`), then:
    ```bash
    updpkgsums
    ```
    Checksums must match 1:1 — forgetting `updpkgsums` makes makepkg refuse to
-   build. After this, hand off to the `kernel-build` skill.
+   build. `updpkgsums` also recreates the gitignored root symlinks makepkg needs
+   to resolve folder-stored patches. After this, hand off to the `kernel-build`
+   skill.
 
 ---
 

@@ -183,7 +183,7 @@ Source: drm-next (`https://gitlab.freedesktop.org/drm/kernel.git`) / amd-gfx. Fo
 
 ---
 
-## 1100–1136 — AMD display
+## 1100–1140 — AMD display
 
 Source: drm-next, confirmed CLEAN-APPLY on v7.2-rc5 via `git apply --check`. `1100`–`1103` were formerly `1025`, `1031`, `1033`, `1065`. Later members (`1114`–`1134`) are documented in the 2026-08-03/04 sweep sections below.
 
@@ -308,7 +308,7 @@ Dropped candidates (formerly `2008`/`2009`): Jesse Zhang `47862766d211` (gfx12 u
 
 ---
 
-## 9025–9032 — SMU14 PPT + DPM backports (amd-drm-next-7.3-2026-08-06)
+## 9025–9040 — SMU14 PPT + DPM + userq/HMM backports (amd-drm-next-7.3-2026-08-06, ML)
 
 **Added 2026-08-10** from the agd5f staging tag `amd-drm-next-7.3-2026-08-06` (commit `daaeec23`, the "AMDGPU last round for Linux 7.3" pull the Phoronix article covered). Tag fetched into `repos/agd5f-linux`. All 9 verified CLEAN on the rc7 series tree in dependency order (`patch -p1 --forward`, prepare()'s tool), and reverse-checked against the clean rc7 tree (not already upstream). These land in drm-next for 7.3 — the backports are pre-bumps; flag for `patch-cleanup` at the 7.3 move.
 
@@ -922,24 +922,69 @@ are our `1205`–`1209`. No gaps.
 
 ---
 
+## 2026-08-11 sweep results — next-20260811 + userq/HMM + zram fixes
+
+Six-source sweep (drm-next, drm-misc, linux-next, linux-pm, amd-gfx +
+dri-devel ML, sirlucjan, GitLab work-items, x86/security line). Also fetched
+**next-20260811** (today's snapshot). The series grew from 140 to 151 patches.
+
+**Adopted:**
+
+- `1027` — GFX12 MES scheduler ring fence force-completion (Jesse Zhang/AMD,
+  amd-gfx ML 08-06, `<20260806075653.711275-1-Jesse.Zhang@amd.com>`). MES ring
+  has no drm scheduler, so the reset force-completion loop skips it; its
+  wb-backed polling fence survives a MODE1 reset while `sync_seq` advances,
+  wedging the first post-resume submission. ML-only, not yet in drm-next.
+- `9038`–`9040` — GFX12 userq/HMM correctness (Junrui Luo, amd-gfx ML 08-11,
+  series `20260811-amdgpu-fixes-v1`): reject PRT mappings as userq buffer VAs,
+  bound the eviction-fence rearm retry loop, free userptr HMM ranges on the CS
+  error path. Same author as carried `9033`–`9035`; must apply after `9036`.
+  From the same series, `1/5` (free prt_va) and `4/5` (UVD handle ownership)
+  were not carried — context shifted / legacy UVD hardware.
+- `2102`–`2104` — zram zstd error-path + param fixes (Haoqin Huang/Tencent,
+  linux-next via akpm-mm 08-04).
+- `2105`–`2108` — zram stability fixes (`Cc: stable`, Longlong Xia/Kylin +
+  Sergey Senozhatsky, linux-next via akpm-mm 08-04): OOB in
+  `read_block_state()`/`writeback_store()`, deflate winbits validation, NULL
+  primary compressor after destroy.
+
+**Watch (no patch carried — no formal fix landed):** DRM scheduler FAIR-policy
+regression on RX 9070 XT under max GPU load (amd-gfx + linux-kernel ML
+08-08/10). Tvrtko Ursulin proposed an informal `min_vruntime` fix; maintainers
+leaning toward reverting the FAIR-default switch (`45c211ddf92a`). rc7 carries
+the FAIR-only scheduler. Adopt the merged fix/revert when it lands. Note:
+scx_sched (CPU scheduler) does not affect this GPU-side scheduler regression.
+
+**Not taken:** dmemcg aggressive-protect v8 (already merged drm-misc, arrives
+with next bump; also conflicts with our `0104` cgroup-vram squash); ACPI CPPC
+series (ARM-oriented, 7.3-targeted); PSR "multiple displays" patch
+(Canonical laptop fix, off-target); VRAM manager init-ordering + UAF fixes
+(init-failure-path only; init-ordering already in drm-next).
+
+---
+
 ## Adding new patches
 
-1. Place the patch file in the root of this repository.
-2. Use the correct numeric prefix (see the conventions table): `0001`–`0099` local/upstream display, `0101`–`0109` CachyOS (squashed per branch), `1000`–`1099` GPU core, `1100`–`1199` display, `1200`–`1299` PM, `2000`–`2099` block, `2100`–`2199` MM, `2200`–`2299` cpuidle, `9000`–`9099` agd5f.
+1. Place the patch file in its `patches/<range>/` folder (one folder per number
+   range; the PKGBUILD auto-creates gitignored root symlinks so makepkg can
+   resolve them — do not commit root-level `*.patch` files).
+2. Use the correct numeric prefix (see the conventions table): `0001`–`0049` local, `0050`–`0099` upstream display, `0101`–`0113` CachyOS (squashed per branch), `1000`–`1099` GPU core, `1100`–`1199` display, `1200`–`1299` PM, `2000`–`2099` block, `2100`–`2199` MM, `2200`–`2299` cpuidle, `9000`–`9099` agd5f/ML backports.
 3. Verify it applies cleanly with BOTH tools (use absolute paths — `git -C` changes CWD):
    ```bash
-   git -C repos/linux-7.2-rc6 apply --check "$PWD/<file>"     # forward
-   git -C repos/linux-7.2-rc6 apply --check -R "$PWD/<file>"  # reverse-clean = already applied → drop it
-   patch -p1 --forward --dry-run < <file>                     # authoritative — matches prepare()'s tool
+   git -C repos/linux-7.2-rc7 apply --check "$PWD/patches/<range>/<file>"     # forward
+   git -C repos/linux-7.2-rc7 apply --check -R "$PWD/patches/<range>/<file>"  # reverse-clean = already applied → drop it
+   patch -p1 --forward --dry-run < patches/<range>/<file>                     # authoritative — matches prepare()'s tool
    ```
    **`git apply --check` can pass while GNU `patch` rejects** (2026-08-03): a hunk with
-   ambiguous leading context, or one touching a file absent from rc6 (e.g. DCN6 `dcn60`),
+   ambiguous leading context, or one touching a file absent from rc7 (e.g. DCN6 `dcn60`),
    fools `git apply` but aborts prepare(). Always confirm with `patch -p1 --forward --dry-run`.
-   If a patch spans a file that does not exist in rc6, strip that file's hunks (document the
+   If a patch spans a file that does not exist in rc7, strip that file's hunks (document the
    strip here). If a patch's context references a symbol/field another carried patch adds,
-   number it AFTER that patch.
-4. Add the filename to the `source=()` array in `PKGBUILD` in the correct sorted position
+   number it AFTER that patch (e.g. `9038`–`9040` must follow `9036`).
+4. Add `patches/<range>/<file>` to the `source=()` array in `PKGBUILD` in the correct sorted position
    (dependencies first — e.g. 1127/1128 must precede 1129).
-5. Run `updpkgsums` after any `source=()` change — checksums must match 1:1.
+5. Run `updpkgsums` after any `source=()` change — checksums must match 1:1. This also
+   recreates the root symlinks; if a build later reports a patch source "not found in the
+   build directory", re-run `updpkgsums` (the symlinks may be missing after a fresh clone).
 6. Add an entry to the appropriate section in this file with author and source URL or commit hash.
 7. Do **not** access `lore.kernel.org` — it has anti-scraping protections. Use the source Git repositories directly (drm-next, linux-pm, sirlucjan GitHub, freedesktop.org mailing list archives, and the gitlab drm/amd work_items via no-UA curl).

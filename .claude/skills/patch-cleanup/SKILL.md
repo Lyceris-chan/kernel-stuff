@@ -36,12 +36,19 @@ deferred patches.
 Extract every patch filename that `PKGBUILD` references, and list every `.patch`
 file on disk. (Files must be `sort`-ed for the diff below.)
 
-```bash
-# 1a. Filenames referenced by PKGBUILD source=()
-grep -oE '"[0-9]{4}-[^"]+\.patch"' PKGBUILD | tr -d '"' | sort -u > /tmp/pkgsrc.txt
+**Folder layout (2026-08-11):** patches live in `patches/<range>/NNNN-*.patch`
+folders. The PKGBUILD auto-creates **gitignored root-level symlinks**
+(`NNNN-*.patch -> patches/<range>/NNNN-*.patch`) for makepkg basename
+resolution. Ignore the root symlinks in this comparison — compare against the
+real files under `patches/` only, and use the full `patches/<range>/...` path
+(both sides) so the diff matches.
 
-# 1b. Patch files physically present in the workspace root
-ls *.patch 2>/dev/null | sort -u > /tmp/ondisk.txt
+```bash
+# 1a. Full patch paths referenced by PKGBUILD source=()
+grep -oE '"patches/[0-9]+-[0-9]+/[0-9]+-[^"]+\.patch"' PKGBUILD | tr -d '"' | sort -u > /tmp/pkgsrc.txt
+
+# 1b. Real patch files physically present under patches/
+find patches -name '*.patch' -type f | sort > /tmp/ondisk.txt
 
 # 1c. Show both for review
 echo "=== in PKGBUILD source=() ==="; cat /tmp/pkgsrc.txt
@@ -49,7 +56,9 @@ echo "=== on disk ==="; cat /tmp/ondisk.txt
 ```
 
 If `1a` printed nothing, the regex did not match — inspect the actual `source=()`
-format first (line numbers ~370–395 of PKGBUILD) before continuing.
+format first (each entry is `patches/<range>/NNNN-....patch`) before continuing.
+Ignore `*.patch` symlinks at the repo root — they are build artifacts, not
+patches.
 
 ## Step 2 — Find orphaned patches (on disk, NOT in source=())
 
@@ -75,20 +84,23 @@ patch, or a patch you regenerated under a new number leaving the old copy behind
 ## Step 3 — Delete orphaned patches (only the confirmed ones)
 
 ```bash
-# One file at a time — never a wildcard that could hit an active patch:
-rm <candidate1>.patch <candidate2>.patch
+# One file at a time — never a wildcard that could hit an active patch.
+# Delete the REAL file under patches/<range>/ (the root symlink is transient;
+# if you delete only the symlink the PKGBUILD recreates it on next build).
+rm patches/<range>/<candidate1>.patch patches/<range>/<candidate2>.patch
 ```
 
 After deleting, regenerate both lists and confirm no active patch was removed:
 
 ```bash
-ls *.patch 2>/dev/null | sort -u > /tmp/ondisk2.txt
+find patches -name '*.patch' -type f | sort > /tmp/ondisk2.txt
 echo "=== still orphaned (should now be empty) ==="
 comm -23 /tmp/ondisk2.txt /tmp/pkgsrc.txt
 ```
 
 If a file you deleted still shows in `comm -13` output (see Step 5) it means it
-was actually referenced — restore it immediately from git: `git checkout -- <file>.patch`.
+was actually referenced — restore it immediately from git:
+`git checkout -- patches/<range>/<file>.patch`.
 
 ## Step 4 — Remove scratch scripts and build artifacts
 
@@ -114,7 +126,7 @@ scratch files go.
 ## Step 5 — Final verification (both directions)
 
 ```bash
-ls *.patch 2>/dev/null | sort -u > /tmp/ondisk2.txt
+find patches -name '*.patch' -type f | sort > /tmp/ondisk2.txt
 
 echo "=== patches on disk MISSING from PKGBUILD (must be EMPTY) ==="
 comm -23 /tmp/ondisk2.txt /tmp/pkgsrc.txt

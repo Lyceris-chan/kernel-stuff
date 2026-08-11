@@ -11,10 +11,10 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ## [7.2.0-rc7-1-sleepy] — 2026-08-11 (maintenance)
 
-Full six-source sweep (drm-next, drm-misc, linux-next, linux-pm, agd5f,
-amd-gfx + dri-devel ML, sirlucjan, GitLab drm/amd work-items, x86/security).
-The series grew from 140 to 144 patches. Reverted the untested patch-folder
-refactor (makepkg 7.1.0 cannot resolve local sources in subdirectories).
+Full six-source sweep (drm-next, drm-misc, linux-next — incl. the
+next-20260811 snapshot —, linux-pm, agd5f, amd-gfx + dri-devel ML, sirlucjan,
+GitLab drm/amd work-items, x86/security). The series grew from 140 to 151
+patches.
 
 ### Added
 
@@ -43,12 +43,14 @@ refactor (makepkg 7.1.0 cannot resolve local sources in subdirectories).
 
 ### Changed
 
-- **Reverted the patch-folder refactor** (`16fd28b`). makepkg 7.1.0's local
-  source handler strips directory prefixes and resolves sources by basename in
-  the PKGBUILD directory, so `patches/<range>/NNNN-*.patch` source entries
-  could not be found (`updpkgsums`/`makepkg` both failed). Patches returned to
-  the flat repo-root layout; the refactor was never build-tested (last pkg
-  predates it).
+- **Patches now live in `patches/<range>/` folders.** makepkg 7.1.0 resolves
+  local sources by basename only, so the PKGBUILD body auto-creates gitignored
+  root-level symlinks (`NNNN-*.patch -> patches/<range>/NNNN-*.patch`) when it
+  is sourced, before source resolution. This keeps the GitHub repo root clean
+  while the real patches stay organized in folders. (An earlier folder refactor
+  `16fd28b` was committed untested and broken; the working folder layout with
+  the symlink mechanism is verified — 151 patches apply with 0 rejects, build
+  passes with BTF present.)
 
 ### Fixed
 
@@ -56,7 +58,9 @@ refactor (makepkg 7.1.0 cannot resolve local sources in subdirectories).
   ML 2026-08-08/10): tracked. No formal fix has landed (Tvrtko Ursulin proposed
   a `min_vruntime` fix; maintainers leaning toward reverting the FAIR-default
   switch). Our rc7 tree carries the FAIR-only scheduler, so this is a known
-  upstream issue to watch — not yet carryable without a merged patch.
+  upstream issue to watch — not yet carryable without a merged patch. Note:
+  scx_sched (the CPU scheduler) does not affect this GPU-side scheduler
+  regression.
 
 ---
 

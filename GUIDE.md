@@ -139,7 +139,8 @@ No Clang or LLD packages are required. The PKGBUILD downloads a pre-built LLVM t
 ### Build and install
 
 ```bash
-makepkg -s
+rm -rf src pkg           # old patched files cause false conflicts
+makepkg -f -s -c
 sudo pacman -U linux-sleepy-*.pkg.tar.zst linux-sleepy-headers-*.pkg.tar.zst
 sudo grub-mkconfig -o /boot/grub/grub.cfg  # or equivalent
 ```
@@ -201,11 +202,13 @@ can create the ingress path, and the service will log
 PKGBUILD                  Build script (Arch Linux makepkg format)
 config                    Base kernel .config (from CachyOS)
 disable_configs.py        Script to strip CachyOS-specific symbols before olddefconfig
-0001-0058-*.patch         Local and upstream SMU14/DCN401/EDID/HDMI patches
-0101-0113-cachy-*.patch   CachyOS branch squashes + fork backports
-1000-2200-*.patch         Upstream patches (amd-gfx, drm-next, linux-pm, block, mm, cpuidle)
-9001-9037-*.patch         agd5f staging backports
+patches/<range>/NNNN-*.patch   The patch series, one folder per number range
 net-tune/                 Unified CAKE SQM + latency tuning systemd service
 PATCH_SOURCES.md          Per-patch source URLs and commit hashes
 GUIDE.md                  Developer notes (build, patch workflow, CI)
 ```
+
+The PKGBUILD auto-creates gitignored root-level symlinks
+(`NNNN-*.patch -> patches/<range>/NNNN-*.patch`) so makepkg can resolve the
+folder-stored patches by basename (a makepkg 7.1.0 limitation). You do not need
+to create them by hand; they are regenerated on every build.

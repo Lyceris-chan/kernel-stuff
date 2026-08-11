@@ -69,15 +69,18 @@ Here's what `linux-sleepy` gives you on top of each baseline.
   **amd-drm-next-7.3-2026-08-06 backports** (`9030`–`9032`: smu_v14_0_0 DCLK metric,
   DCEFCLK, and `find_clk_level()` DPM fixes), the amdgpu CS/VM correctness
   series (`9033`–`9035`: FENCE-chunk leak, VM overrun, BO-VA kmap offset), the
-  gfx12 userq sub-page VA-validation fix (`9036`), and the RDNA4/gfx1201
-  prefer-default-discovery-offset fix (`9037`).
+  gfx12 userq sub-page VA-validation fix (`9036`), the RDNA4/gfx1201
+  prefer-default-discovery-offset fix (`9037`), and the GFX12 userq/HMM
+  correctness set (`9038`–`9040`: PRT-mapping reject, eviction-fence rearm
+  bound, HMM range free on the CS error path).
   The Exit-idle-optimizations series merged upstream into rc6 and was dropped.
   The SMU14 PPT-limits framework rework from the same tag is **deferred to 7.3**
   (does not apply cleanly to the rc7 series state).
 - Local handmade SMU14/DCN401 patches, including the `PROFILE_PEAK` GFXCLK
   ceiling float.
 - BFQ/mq-deadline contention fixes, LRU-MARIE page eviction, the zstd 7.2
-  merge, and the NAP cpuidle governor.
+  merge, zram zstd + stability fixes (`2102`–`2108`), and the NAP cpuidle
+  governor.
 
 **Over stock CachyOS:**
 
@@ -111,7 +114,9 @@ pre-built LLVM toolchain from `mirrors.edge.kernel.org/pub/tools/llvm/`.
 ## Build
 
 In the repository root, remove stale build artifacts (old patched files cause
-false conflicts), refresh checksums after any `source=()` change, and build:
+false conflicts), refresh checksums after any `source=()` change, and build.
+Patches are stored in `patches/<range>/` folders; the PKGBUILD auto-creates the
+gitignored root symlinks makepkg needs, so no setup is required:
 
 ```bash
 rm -rf src pkg
