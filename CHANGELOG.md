@@ -9,6 +9,30 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.2.0-rc7-3-sleepy] — 2026-08-12 (DRM scheduler revert)
+
+Full revert of the 7.2 DRM scheduler **FAIR** series (Tvrtko Ursulin,
+`[PATCH v2 00/20] Revert switching default DRM scheduler policy to fair`,
+dri-devel ML 08-11). The FAIR default caused a performance regression on the
+RX 9070 XT under sustained 100% GPU load (foreground app drops to ~10 fps or
+freezes — 7.1.5 and FIFO both pass). This restores the pre-fair
+multi-run-queue FIFO/RR scheduler and makes **FIFO the default** again.
+
+### Changed
+
+- **DRM scheduler reverted to FIFO default** (`1029`–`1046`, replacing the
+  earlier `1028` `min_vruntime` partial fix, which is dropped as superseded).
+  `sched_policy` module param restored: 0=RR, 1=FIFO (default), 2=fair
+  (experimental). Series order is preserved in the numbering. `01/20` and
+  `11/20` of the upstream series were not carried (01's target commit absent
+  from rc7 = already reverted; 11 is the imagination/PVR driver, not built).
+  `1043` (Embed-rq revert) carries one rc7-adapted `amdgpu_xcp.c` hunk.
+- Not related to the SMU-IF blackscreen/bus-drop issue (work-item !5538,
+  `pcie.aspm=off` stopgap) — that is a separate firmware-side problem and
+  remains tracked separately.
+
+---
+
 ## [7.2.0-rc7-2-sleepy] — 2026-08-12 (maintenance)
 
 Six-source sweep (drm-next, drm-misc, agd5f, amd-staging, linux-next, linux-pm,

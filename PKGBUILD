@@ -181,7 +181,7 @@ _minor=
 _rcver=rc7
 pkgver=${_major}.${_rcver}
 _tagrel=1
-pkgrel=2
+pkgrel=3
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}-${_rcver}
@@ -307,11 +307,33 @@ source=(
   #   amd-gfx ML 2026-08-06, Message-ID 20260806075653.711275). Prevents post-reset
   #   submission poll-forever wedge when MES stopped responding. ML-only.
   "patches/1000-1099/1027-drm-amdgpu-force-complete-the-MES-scheduler-ring-fence-on-reset.patch"
-  # 1028: drm/sched Ensure monotonic min_vruntime (Tvrtko Ursulin, dri-devel ML
-  #   2026-08-11, Message-ID 20260811134223.96203-1-tvrtko.ursulin@igalia.com).
-  #   Fixes the FAIR-policy regression on RX 9070 XT under sustained GPU load
-  #   (unbounded vruntime growth for never-exiting entities). ML-only.
-  "patches/1000-1099/1028-drm-sched-ensure-monotonic-min_vruntime.patch"
+  # 1029-1046: Tvrtko Ursulin "Revert switching default DRM scheduler policy to
+  #   fair" v2 series (dri-devel ML 2026-08-11, Message-ID 20260811140738.96974-1-tvrtko.ursulin@igalia.com).
+  #   Reverts the 7.2 FAIR scheduler that causes the RX 9070 XT performance
+  #   regression under sustained GPU load (10 fps / desktop freeze); restores
+  #   FIFO as default with the sched_policy param (FIFO=1, RR=0, fair=2
+  #   experimental). Unrelated to the SMU-IF blackscreen/bus-drop issue
+  #   (pcie.aspm=off stopgap). Applied in series order; 1043 (Embed-rq revert)
+  #   carries an rc7-adapted amdgpu_xcp.c hunk; the min_vruntime fix (former
+  #   1028) is superseded/dropped.
+  "patches/1000-1099/1029-revert-drm-sched-remove-num_rqs.patch"
+  "patches/1000-1099/1030-revert-drm-xe-remove-num_rqs-usage.patch"
+  "patches/1000-1099/1031-revert-drm-v3d-remove-num_rqs-usage.patch"
+  "patches/1000-1099/1032-revert-drm-sched-remove-num_rqs-usage.patch"
+  "patches/1000-1099/1033-revert-drm-panthor-remove-num_rqs-usage.patch"
+  "patches/1000-1099/1034-revert-drm-panfrost-remove-num_rqs-usage.patch"
+  "patches/1000-1099/1035-revert-drm-nouveau-remove-num_rqs-usage.patch"
+  "patches/1000-1099/1036-revert-drm-msm-remove-num_rqs-usage.patch"
+  "patches/1000-1099/1037-revert-drm-lima-remove-num_rqs-usage.patch"
+  "patches/1000-1099/1038-revert-drm-etnaviv-remove-num_rqs-usage.patch"
+  "patches/1000-1099/1039-revert-drm-amdgpu-remove-num_rqs-usage.patch"
+  "patches/1000-1099/1040-revert-accel-ethosu-remove-num_rqs-usage.patch"
+  "patches/1000-1099/1041-revert-accel-rocket-remove-num_rqs-usage.patch"
+  "patches/1000-1099/1042-revert-accel-amdxdna-remove-num_rqs-usage.patch"
+  "patches/1000-1099/1043-revert-drm-sched-embed-run-queue-singleton.patch"
+  "patches/1000-1099/1044-revert-drm-sched-remove-fifo-and-rr.patch"
+  "patches/1000-1099/1045-revert-drm-sched-switch-default-policy-to-fair.patch"
+  "patches/1000-1099/1046-drm-sched-mark-fair-policy-experimental.patch"
   "patches/1100-1199/1100-drm-amd-display-enable-psr-and-replay-on-dcn4-variant-and-fi.patch"
   "patches/1100-1199/1101-drm-amd-display-enable-pstate-for-dcn4-non-emulation-builds.patch"
   "patches/1100-1199/1102-drm-amd-display-increase-dcn42b-uclk-value.patch"
@@ -1074,7 +1096,24 @@ b2sums=('4299f17dac88bd1aacf58f1ba0b7061859c1723845925b0efc36e09248f74fa5eb57fa9
         'ff999bfa1fe6de439f05c9a44b4a023443dc373b30b1817e2cfdbdbac4e9418de13e6644fc0e0d08c9ee3b7fc3f54ab283450a5512f546699c7b8e86f3c9156b'
         '85028ee0b1271d0bb1f1618a46c28984ef605c9b4f05f3b686f0362ecb10f391712ebec321c47a2220761e1497077869d694c47fce7a74074e5d5270693744b7'
         '9c6b0d66c4d9d73cfb1b8d6902ce2477a8ff59a2ca59eb277489dc28157c1bc8d8b709ad4a0c19abd04ad3dc6171c6ce8644717fe03dbb921769f3aba693a178'
-        'def7b531a785fbe9d33f51f9e66c7a135d5a444fd25c7c9e1fe250f51649bbbe655ed323ef1180a67a94db2da8fc6af3eebcf1fd1254bc52c95a5265256100d3'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
         '02803704ce3fe311f9bc88e0cdeae545829023a7c3c241a00f4a2bc07ffd27fe5089010b4fc0456c56898bbd09ab93ab3d764cfa97080a5aaf114df1bd91680b'
         '692244e62c6d34c7aca8fda750d18befaefdc02a3be11632aeb6a69327645e6814efb00a4c475bfc407c0dabbce0b5d88c86262acbf32b29111c5e99e2acabd6'
         '9395fc7d168c7cd6cb6b13edbedc2adc58a4a18cd024ae259345034b06bac84e8f9a34334508cd3571aaedb22e85aa2c9a01cd11e5c5336be148e07d63230bd8'
@@ -1174,7 +1213,7 @@ b2sums=('4299f17dac88bd1aacf58f1ba0b7061859c1723845925b0efc36e09248f74fa5eb57fa9
         '203bd93e310b0795acf2d04a03de10bcfa4ee653b490c5cc3fb2f377119ce373dbf32c4ab4c8674d246ea8d8518d1a26ddd46f8c3dff085aa08022fa28d5144c'
         '21ca802919183021abd12cfc782de48a895daddfa9b401700e4bef50e750537183bc3c7157e723bcae769d2bd72f9efd34e677d80d63d74eaa7344b8205eb1fe'
         'f409b3525bfd04fa1b77adfcafb5d701e28c707619b6d71472d521b34926c40496b47a49b1c2c2404e83333a58a369d1be47517e99df1b1631d5a84a05e102b6'
-        '116ec92181c091e7e57f3c88b159a7080d3f3dfd05ed661da95811dd58209e4b83a69edfc47a57126524c014cdc0bb7b72f9be94294237c24461ac702e2b1206')
+        'fb45c3c3df0e4f8738613511c47c4018b34cca4bf68c86db0da470e34d9751cd1da46bb0880f9e69b5284ebd09a16c37c8fbc577c9bcb4222736e9c4f9379666')
 
 if [ "$_use_kernel_org_llvm" = "yes" ]; then
     source+=("https://mirrors.edge.kernel.org/pub/tools/llvm/files/${_kernel_org_llvm_tarball}")

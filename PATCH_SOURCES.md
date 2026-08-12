@@ -144,7 +144,7 @@ no longer reverts `usb/core/config.c`/`usb/quirks.h` (obsolete drops removed).
 
 ---
 
-## 1000–1028 — AMDGPU GPU core
+## 1000–1046 — AMDGPU GPU core
 
 Source: drm-next (`https://gitlab.freedesktop.org/drm/kernel.git`) / amd-gfx. Formerly numbered `1002`–`1065`.
 
@@ -174,7 +174,9 @@ Source: drm-next (`https://gitlab.freedesktop.org/drm/kernel.git`) / amd-gfx. Fo
 | `1024` | Jesse Zhang | drm/amdgpu/mes12: fix dropped dispatches under queue oversubscription — drm-next `288cc4a54` (amd-drm-next-7.3-2026-08-06 merge, 08-08). GFX12 MES: pads/spaces the MES queue dispatch so concurrent queue oversubscription no longer drops dispatches. **Added 2026-08-10** (AMDGPU 7.3 last-round backport). CLEAN on rc7 series. |
 | `1026` | Vladimir Marioukhine (AMD) | drm/amdkfd: fix NULL pointer dereference in GFX12 CRIU queue restore — **amd-gfx ML 2026-08-04** (`Message-ID SA1PR12MB8600E8B1821FA7D76923FC259FD42@SA1PR12MB8600...`, mbox `amd-gfx-2026-August.txt`). GFX 12.0/12.1 MQD managers leave `restore_mqd`/`checkpoint_mqd` NULL; `create_queue_cpsch`/`create_queue_nocpsch` call them unconditionally during CRIU restore, so a `CAP_CHECKPOINT_RESTORE` user can trigger a kernel NULL-deref panic. Fix implements the callbacks (modeled after GFX 11) + adds NULL guards. **Added 2026-08-10.** **Reconstruction caveat:** the freedesktop mbox copy had context-line leading spaces stripped and tabs→spaces (Outlook sender), so the diff body could not be applied verbatim. Reconstructed byte-for-byte from the mbox `+` lines against the rc7 v11 MQD manager reference (verified content-identical modulo whitespace, incl. the `sdmax_rlcx_doorbell_offset` field + `CP_HQD_PQ_DOORBELL_CONTROL` shift that v11 also uses), kernel-standard tabs restored. Passes `git apply --check` (fwd) and GNU `patch -p1 --forward --dry-run` against rc7. **Not yet merged upstream; Alex Deucher requested brace-style revisions (v2 pending) — swap for the merged commit when it lands.** `Assisted-by: Claude`. **Deviation (compile fix):** the original used the GC 12.0 macro `SDMA0_QUEUE0_DOORBELL_OFFSET__OFFSET__SHIFT` in both files; rc7's v12_1.c (GC 12.1) has that macro undeclared, so the v12_1 hunk here uses `SDMA0_SDMA_QUEUE0_DOORBELL_OFFSET__OFFSET__SHIFT` (the v12_1 header's macro) — the original ML submission would not compile on v12_1.c either. |
 | `1027` | Jesse Zhang (AMD) | drm/amdgpu: force complete the MES scheduler ring fence on reset — **amd-gfx ML 2026-08-06** (`Message-ID 20260806075653.711275-1-Jesse.Zhang@amd.com`, mbox `amd-gfx-2026-August.txt`). The MES scheduler ring has no drm scheduler (`no_scheduler = true`), so it is skipped by the force-completion loop in `amdgpu_device_pre_asic_reset()`. Its polling fence lives in wb (GTT) memory and survives a MODE1 reset while `sync_seq` keeps advancing, so a reset triggered by MES itself wedges the first post-resume submission ("MES ring buffer is full", resume fails -110). Fix forces the MES ring fence alongside the scheduler rings. **Added 2026-08-11** (sweep). CLEAN on the rc7 series (`git apply` + GNU `patch -p1 --forward --dry-run`). ML-only; not yet in drm-next/agd5f. |
-| `1028` | Tvrtko Ursulin (Igalia) | drm/sched: Ensure monotonic `min_vruntime` — **dri-devel ML 2026-08-11** (`Message-ID 20260811134223.96203-1-tvrtko.ursulin@igalia.com`, mbox `dri-devel-2026-August.txt`). Generic DRM scheduler fix that resolves the mechanism behind the FAIR-policy regression on RX 9070 XT: an entity that never exits the run-queue is penalized as its virtual runtime only grows, while periodically exiting/re-joining entities get repeatedly pulled ahead (sustained 100% GPU load degrades the foreground app to ~10 fps / freezes the desktop — report by Luke Wildhardt, 2026-08-08, `Message-ID TfhgV1W0W5LI6RWUO6J35B3R8QIYH_FN3Eihzdo_9PH39hfn1AVByT-QBPHmWiAR-L0Kqi2sppM_EhFPKwZPGmb5pFgpF2MrzeFzkZDmpG8=@proton.me`). Fix tracks `min_vruntime` strictly monotonically instead of reading the current top-of-tree. **Added 2026-08-12** (sweep). CLEAN on rc7 (`git apply` + GNU `patch --dry-run`). ML-only v1 partial fix (Tvrtko: "reportedly fixes the regression a bit but possibly not fully"); his full v2 20-patch revert series (`20260811140738.96974-1-tvrtko.ursulin@igalia.com`) does not apply cleanly to rc7 — 5+ hunks conflict on `sched_main.c`/`amdgpu_job.c`/`amdgpu_xcp.c`/`pvr_queue.c`. Swap for the merged revert/fix when upstream lands it. |
+| `1029`–`1046` | Tvrtko Ursulin (Igalia) | **`[PATCH v2 00/20] Revert switching default DRM scheduler policy to fair`** — dri-devel ML 2026-08-11 (`Message-ID 20260811140738.96974-1-tvrtko.ursulin@igalia.com`, mbox `dri-devel-2026-August.txt`). Reverts the 7.2 DRM scheduler FAIR series that causes the RX 9070 XT performance regression under sustained 100% GPU load (foreground app drops to ~10 fps / desktop freeze — report by Luke Wildhardt, 2026-08-08, `Message-ID TfhgV1W0W5LI6RWUO6J35B3R8QIYH_FN3Eihzdo_9PH39hfn1AVByT-QBPHmWiAR-L0Kqi2sppM_EhFPKwZPGmb5pFgpF2MrzeFzkZDmpG8=@proton.me`). **Not** related to the SMU-IF blackscreen/bus-drop issue (!5538, `pcie.aspm=off` stopgap). Restores the pre-fair multi-run-queue FIFO/RR scheduler with `gpu_sched.sched_policy` (0=RR, 1=FIFO, 2=fair-experimental) and **FIFO as default**. Series order preserved in numbering: `1029` Restore `num_rqs`, `1030`–`1042` restore per-driver `num_rqs` usage (xe, v3d, sched, panthor, panfrost, nouveau, msm, lima, etnaviv, amdgpu, ethosu, rocket, amdxdna), `1043` Revert "Embed run queue singleton", `1044` Revert "Remove FIFO and RR", `1045` Revert "Switch default policy to fair", `1046` Mark fair experimental. **Added 2026-08-12** (decision: full revert, replacing the earlier partial `1028`; the FAIR regression surfaced in real sustained-load sessions). All CLEAN on the rc7 series with GNU `patch -p1 --forward` in order. **Series-adapted:** `1043` carries an rc7-adapted `amdgpu_xcp.c` hunk (rc7's `amdgpu_xcp_release_sched()` lacks the `xcp_mgr` local var drm-next has — the revert is applied directly against `adev->xcp_mgr`); all other hunks apply as-authored. **Dropped from the series:** `01/20` (Revert "Remove redundant entity->rq init" — its target commit is absent from rc7, reverse-applies = already-reverted) and `11/20` (imagination/PVR `num_rqs` — hardware not present, `CONFIG_DRM_IMAGINATION` unset). ML-only; not yet merged upstream. |
+
+~~`1028`~~ (drm/sched: Ensure monotonic `min_vruntime`, Tvrtko Ursulin, dri-devel ML 2026-08-11 `<20260811134223.96203-1-tvrtko.ursulin@igalia.com>`) — **DROPPED 2026-08-12** (replaced by `1029`–`1046`). The one-patch fix was adopted the previous day as a minimal mitigation for the FAIR regression, but it only patches the fair scheduler's `min_vruntime` machinery; the full v2 revert series (adopted now) removes that machinery entirely (restores multi-rq FIFO/RR), so `1028` no longer applies and is superseded. Fair is now opt-in and experimental (`sched_policy=2`).
 
 ~~`1025`~~ (gfx12 priv-fault user-queue recovery worker, Jesse Zhang, drm-next `30f07c06`) — **DROPPED 2026-08-10 at build**: applies cleanly but does NOT compile on rc7 — references `adev->gfx.userq_priv_fault_work`/`userq_priv_fault_slots`, fields that live in `struct amdgpu_gfx` only via the gfx11 priv-fault worker infra which is in drm-next (post-rc7), not rc7 (`amdgpu_gfx.h` has only `userq_sch_*`). Requires the whole gfx11 priv-fault prerequisite series — defer to the 7.3 move. Symbol-existence check failed; do not re-add without the prerequisite.
 
@@ -983,17 +985,22 @@ archives — lore itself is Anubis-blocked). Series grew 151 → 154 patches.
 
 **Adopted:**
 
-- `1028` — drm/sched: Ensure monotonic `min_vruntime` (Tvrtko Ursulin,
-  dri-devel ML 08-11, `<20260811134223.96203-1-tvrtko.ursulin@igalia.com>`).
-  Adresses the **DRM scheduler FAIR-policy regression on RX 9070 XT**
-  (Luke Wildhardt, 08-08): since 7.2 made FAIR the scheduler default,
-  sustained 100% GPU load degrades the foreground app to ~10 fps or freezes
-  the desktop; 7.1.5 and FIFO both pass. Root cause is unbounded `vruntime`
-  growth for a run-queue entity that never exits — the fix tracks
-  `min_vruntime` strictly monotonically. ML-only v1 partial fix. The full
-  v2 20-patch revert series (also 08-11) was evaluated and does **not**
-  apply cleanly to rc7 (5+ hunks conflict) — not carried; swap for the
-  merged revert when upstream lands it.
+- `1028` → **superseded 2026-08-12** by the full revert series (`1029`–`1046`).
+  drm/sched: Ensure monotonic `min_vruntime` (Tvrtko Ursulin, dri-devel ML
+  08-11, `<20260811134223.96203-1-tvrtko.ursulin@igalia.com>`) was adopted as a
+  minimal mitigation for the **DRM scheduler FAIR-policy regression on RX 9070
+  XT** (Luke Wildhardt, 08-08): since 7.2 made FAIR the scheduler default,
+  sustained 100% GPU load degrades the foreground app to ~10 fps or freezes the
+  desktop; 7.1.5 and FIFO both pass. Root cause is unbounded `vruntime` growth
+  for a run-queue entity that never exits. ML-only v1 partial fix ("reportedly
+  fixes the regression a bit but possibly not fully"). **Follow-up (same day):**
+  adopted Tvrtko's full v2 20-patch revert series as `1029`–`1046` (see the
+  `1000` range table) — the definitive fix, restoring the pre-fair FIFO/RR
+  multi-run-queue scheduler with FIFO as default. `1028` no longer applies
+  (the revert removes the `min_vruntime` machinery it patches) and is dropped.
+  The revert series initially did not apply cleanly to rc7 in isolation
+  (5+ hunks conflict) but applies cleanly in series order with GNU `patch`
+  after one rc7-adapted hunk in `1043` (`amdgpu_xcp.c`).
 - `2109` — memcg: bypass reclaim/OOM for dying tasks once oom_reaper is done
   (Shakeel Butt, akpm-mm mm-unstable `fe59dda7cd93`). Fixes OOM-killed
   processes stuck for hours in the exit path when zswap holds their memory
