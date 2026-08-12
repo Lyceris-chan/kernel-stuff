@@ -9,6 +9,43 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.2.0-rc7-2-sleepy] — 2026-08-12 (maintenance)
+
+Six-source sweep (drm-next, drm-misc, agd5f, amd-staging, linux-next, linux-pm,
+amd-gfx + dri-devel ML, sirlucjan, firelzrd, GitLab drm/amd work-items,
+x86/security) plus the two user-flagged lore.kernel.org threads (fetched via
+the freedesktop mbox archives). The series grew from 151 to 154 patches.
+
+### Added
+
+- **DRM scheduler `min_vruntime` fix** (`1028`, dri-devel ML, Tvrtko Ursulin).
+  Addresses the FAIR-policy regression on the RX 9070 XT: since 7.2 made FAIR
+  the scheduler default, sustained 100% GPU load degraded the foreground app to
+  ~10 fps or froze the desktop (7.1.5 and FIFO both pass). A run-queue entity
+  that never exits is penalized as its virtual runtime only grows; the fix
+  tracks `min_vruntime` strictly monotonically. ML-only v1 partial fix — the
+  full v2 20-patch revert was evaluated and does not apply cleanly to rc7.
+- **memcg OOM exit-path fix** (`2109`, akpm-mm mm-unstable, Shakeel Butt). An
+  OOM-killed process could be stuck in the exit path for hours when zswap held
+  its memory (nothing left on the LRUs, and swapin re-charges re-triggered
+  OOM); dying tasks now bypass reclaim/OOM once oom_reaper is done. Matches
+  this build's zswap-default-on + memory.max setup.
+- **zsmalloc size-class lookup fix** (`2110`, akpm-mm mm-unstable, Longlong
+  Xia). zram recompression misjudged size-class movement near boundaries
+  because class lookup ignored `ZS_HANDLE_SIZE`; class selection is now shared
+  between lookup and allocation.
+
+### Reviewed, not taken
+
+- Rik van Riel's `[RFC PATCH v3 0/8] batch lookups in follow_page_mask()` (gup
+  perf series, 2.2–5.9× on mTHP) — RFC, not merged, not adoptable as-is.
+- Full Tvrtko v2 scheduler revert series — 5+ hunks conflict with rc7.
+- mm/swap single-folio revert (needs unmerged swap_ops prereqs), DCN42
+  DCHVM↔rIOMMU series (display virtualization), zram big-endian slot-lock fix,
+  zswap memcg-disabled shrinker fix (`CONFIG_MEMCG=y` here).
+
+---
+
 ## [7.2.0-rc7-1-sleepy] — 2026-08-11 (maintenance)
 
 Full six-source sweep (drm-next, drm-misc, linux-next — incl. the

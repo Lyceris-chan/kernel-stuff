@@ -181,7 +181,7 @@ _minor=
 _rcver=rc7
 pkgver=${_major}.${_rcver}
 _tagrel=1
-pkgrel=1
+pkgrel=2
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}-${_rcver}
@@ -307,6 +307,11 @@ source=(
   #   amd-gfx ML 2026-08-06, Message-ID 20260806075653.711275). Prevents post-reset
   #   submission poll-forever wedge when MES stopped responding. ML-only.
   "patches/1000-1099/1027-drm-amdgpu-force-complete-the-MES-scheduler-ring-fence-on-reset.patch"
+  # 1028: drm/sched Ensure monotonic min_vruntime (Tvrtko Ursulin, dri-devel ML
+  #   2026-08-11, Message-ID 20260811134223.96203-1-tvrtko.ursulin@igalia.com).
+  #   Fixes the FAIR-policy regression on RX 9070 XT under sustained GPU load
+  #   (unbounded vruntime growth for never-exiting entities). ML-only.
+  "patches/1000-1099/1028-drm-sched-ensure-monotonic-min_vruntime.patch"
   "patches/1100-1199/1100-drm-amd-display-enable-psr-and-replay-on-dcn4-variant-and-fi.patch"
   "patches/1100-1199/1101-drm-amd-display-enable-pstate-for-dcn4-non-emulation-builds.patch"
   "patches/1100-1199/1102-drm-amd-display-increase-dcn42b-uclk-value.patch"
@@ -391,6 +396,13 @@ source=(
   "patches/2100-2199/2106-zram-fix-out-of-bounds-access-in-writeback_store.patch"
   "patches/2100-2199/2107-zram-validate-deflate-params.patch"
   "patches/2100-2199/2108-zram-set-default-primary-compressor-in-zram_destroy_comps.patch"
+  # 2109: memcg bypass reclaim/OOM for dying tasks once oom_reaper is done
+  #   (Shakeel Butt, akpm-mm mm-unstable fe59dda7cd93). Fixes OOM-killed procs
+  #   stuck in exit when zswap holds their memory.
+  "patches/2100-2199/2109-mm-memcg-bypass-reclaim-and-oom-killer-for-dying-tasks.patch"
+  # 2110: zsmalloc account for handle size in class lookup (Longlong Xia,
+  #   akpm-mm mm-unstable 63d76961f3bf). zram recompression size-class fix.
+  "patches/2100-2199/2110-mm-zsmalloc-account-for-handle-size-in-class-lookup.patch"
   "patches/2200-2299/2200-7.2-nap-v0.5.0.patch"
   # 9000, 9004, 9005 dropped: merged upstream in 7.2-rc6
   "patches/9000-9099/9001-drm-amdgpu-gfx12-drop-all-BUG-s.patch"
@@ -1062,6 +1074,7 @@ b2sums=('4299f17dac88bd1aacf58f1ba0b7061859c1723845925b0efc36e09248f74fa5eb57fa9
         'ff999bfa1fe6de439f05c9a44b4a023443dc373b30b1817e2cfdbdbac4e9418de13e6644fc0e0d08c9ee3b7fc3f54ab283450a5512f546699c7b8e86f3c9156b'
         '85028ee0b1271d0bb1f1618a46c28984ef605c9b4f05f3b686f0362ecb10f391712ebec321c47a2220761e1497077869d694c47fce7a74074e5d5270693744b7'
         '9c6b0d66c4d9d73cfb1b8d6902ce2477a8ff59a2ca59eb277489dc28157c1bc8d8b709ad4a0c19abd04ad3dc6171c6ce8644717fe03dbb921769f3aba693a178'
+        'def7b531a785fbe9d33f51f9e66c7a135d5a444fd25c7c9e1fe250f51649bbbe655ed323ef1180a67a94db2da8fc6af3eebcf1fd1254bc52c95a5265256100d3'
         '02803704ce3fe311f9bc88e0cdeae545829023a7c3c241a00f4a2bc07ffd27fe5089010b4fc0456c56898bbd09ab93ab3d764cfa97080a5aaf114df1bd91680b'
         '692244e62c6d34c7aca8fda750d18befaefdc02a3be11632aeb6a69327645e6814efb00a4c475bfc407c0dabbce0b5d88c86262acbf32b29111c5e99e2acabd6'
         '9395fc7d168c7cd6cb6b13edbedc2adc58a4a18cd024ae259345034b06bac84e8f9a34334508cd3571aaedb22e85aa2c9a01cd11e5c5336be148e07d63230bd8'
@@ -1125,6 +1138,8 @@ b2sums=('4299f17dac88bd1aacf58f1ba0b7061859c1723845925b0efc36e09248f74fa5eb57fa9
         'dcd694a8e21eb143b1f8d2f059787b014ad774454f240e9153a138cbb12215923e3943816ca58e9033e84e78c6bed386f4f2b2399f9c3cecf79d3946a05bfd4c'
         'ca45b6f967557edcbee4d1d2721a70b12b38dcba27702fb11adfc09daba2156400ca4cba330b8d011f85f9cd11e1e998c608b68bf02c6046cd3e21264849ee6e'
         '63bb83c66aac85fafb4ab319e1d74996bfce88a2850974ea9d200da98429768afe33ad8d0453e18c573c7e52d7ebb4df943ddf26b453b9b6b98f134ccd806fdd'
+        '7444b3c8feb69e1cb14669741356e005f3d22f5c630610de173261a9834ab9b35860c8afd13eb65b71a6119977ffac24884615aae8b9a277f1d108e159299861'
+        '046bb6d778b5a8e965382d41753d3f7d20e670ee5e47de09675cb7f0ee6cf2f5c8520207512ec9867d3ca21a4b3acb16c3a745d956b66797f5433b5b9d2c3e29'
         'dc4e862e8f9fa7e8ead895908459757afd1027c24b960ae3d289a7212e29575bce3ce4627d5fd73edf211ee162dfa545e1642c5b16e8156f3dce50af8ef3c256'
         '4882cc909f5ee8e4c974f3849e4446656895fb8c5f0c10fa0992e5e7c7ae6ce1ded523326bb51c91ff161d15335968434fabb44cf822cb17fd6364c4d8eb24c5'
         '8a9f7682c746fd53536798e7110836059f982b3daa6b95a767249fe9888a3105d0be3dc9917924aba9bba45f0538436a9e3f67f5d958b63ee9288f391f3507ac'

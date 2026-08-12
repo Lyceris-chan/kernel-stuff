@@ -144,7 +144,7 @@ no longer reverts `usb/core/config.c`/`usb/quirks.h` (obsolete drops removed).
 
 ---
 
-## 1000–1027 — AMDGPU GPU core
+## 1000–1028 — AMDGPU GPU core
 
 Source: drm-next (`https://gitlab.freedesktop.org/drm/kernel.git`) / amd-gfx. Formerly numbered `1002`–`1065`.
 
@@ -174,6 +174,7 @@ Source: drm-next (`https://gitlab.freedesktop.org/drm/kernel.git`) / amd-gfx. Fo
 | `1024` | Jesse Zhang | drm/amdgpu/mes12: fix dropped dispatches under queue oversubscription — drm-next `288cc4a54` (amd-drm-next-7.3-2026-08-06 merge, 08-08). GFX12 MES: pads/spaces the MES queue dispatch so concurrent queue oversubscription no longer drops dispatches. **Added 2026-08-10** (AMDGPU 7.3 last-round backport). CLEAN on rc7 series. |
 | `1026` | Vladimir Marioukhine (AMD) | drm/amdkfd: fix NULL pointer dereference in GFX12 CRIU queue restore — **amd-gfx ML 2026-08-04** (`Message-ID SA1PR12MB8600E8B1821FA7D76923FC259FD42@SA1PR12MB8600...`, mbox `amd-gfx-2026-August.txt`). GFX 12.0/12.1 MQD managers leave `restore_mqd`/`checkpoint_mqd` NULL; `create_queue_cpsch`/`create_queue_nocpsch` call them unconditionally during CRIU restore, so a `CAP_CHECKPOINT_RESTORE` user can trigger a kernel NULL-deref panic. Fix implements the callbacks (modeled after GFX 11) + adds NULL guards. **Added 2026-08-10.** **Reconstruction caveat:** the freedesktop mbox copy had context-line leading spaces stripped and tabs→spaces (Outlook sender), so the diff body could not be applied verbatim. Reconstructed byte-for-byte from the mbox `+` lines against the rc7 v11 MQD manager reference (verified content-identical modulo whitespace, incl. the `sdmax_rlcx_doorbell_offset` field + `CP_HQD_PQ_DOORBELL_CONTROL` shift that v11 also uses), kernel-standard tabs restored. Passes `git apply --check` (fwd) and GNU `patch -p1 --forward --dry-run` against rc7. **Not yet merged upstream; Alex Deucher requested brace-style revisions (v2 pending) — swap for the merged commit when it lands.** `Assisted-by: Claude`. **Deviation (compile fix):** the original used the GC 12.0 macro `SDMA0_QUEUE0_DOORBELL_OFFSET__OFFSET__SHIFT` in both files; rc7's v12_1.c (GC 12.1) has that macro undeclared, so the v12_1 hunk here uses `SDMA0_SDMA_QUEUE0_DOORBELL_OFFSET__OFFSET__SHIFT` (the v12_1 header's macro) — the original ML submission would not compile on v12_1.c either. |
 | `1027` | Jesse Zhang (AMD) | drm/amdgpu: force complete the MES scheduler ring fence on reset — **amd-gfx ML 2026-08-06** (`Message-ID 20260806075653.711275-1-Jesse.Zhang@amd.com`, mbox `amd-gfx-2026-August.txt`). The MES scheduler ring has no drm scheduler (`no_scheduler = true`), so it is skipped by the force-completion loop in `amdgpu_device_pre_asic_reset()`. Its polling fence lives in wb (GTT) memory and survives a MODE1 reset while `sync_seq` keeps advancing, so a reset triggered by MES itself wedges the first post-resume submission ("MES ring buffer is full", resume fails -110). Fix forces the MES ring fence alongside the scheduler rings. **Added 2026-08-11** (sweep). CLEAN on the rc7 series (`git apply` + GNU `patch -p1 --forward --dry-run`). ML-only; not yet in drm-next/agd5f. |
+| `1028` | Tvrtko Ursulin (Igalia) | drm/sched: Ensure monotonic `min_vruntime` — **dri-devel ML 2026-08-11** (`Message-ID 20260811134223.96203-1-tvrtko.ursulin@igalia.com`, mbox `dri-devel-2026-August.txt`). Generic DRM scheduler fix that resolves the mechanism behind the FAIR-policy regression on RX 9070 XT: an entity that never exits the run-queue is penalized as its virtual runtime only grows, while periodically exiting/re-joining entities get repeatedly pulled ahead (sustained 100% GPU load degrades the foreground app to ~10 fps / freezes the desktop — report by Luke Wildhardt, 2026-08-08, `Message-ID TfhgV1W0W5LI6RWUO6J35B3R8QIYH_FN3Eihzdo_9PH39hfn1AVByT-QBPHmWiAR-L0Kqi2sppM_EhFPKwZPGmb5pFgpF2MrzeFzkZDmpG8=@proton.me`). Fix tracks `min_vruntime` strictly monotonically instead of reading the current top-of-tree. **Added 2026-08-12** (sweep). CLEAN on rc7 (`git apply` + GNU `patch --dry-run`). ML-only v1 partial fix (Tvrtko: "reportedly fixes the regression a bit but possibly not fully"); his full v2 20-patch revert series (`20260811140738.96974-1-tvrtko.ursulin@igalia.com`) does not apply cleanly to rc7 — 5+ hunks conflict on `sched_main.c`/`amdgpu_job.c`/`amdgpu_xcp.c`/`pvr_queue.c`. Swap for the merged revert/fix when upstream lands it. |
 
 ~~`1025`~~ (gfx12 priv-fault user-queue recovery worker, Jesse Zhang, drm-next `30f07c06`) — **DROPPED 2026-08-10 at build**: applies cleanly but does NOT compile on rc7 — references `adev->gfx.userq_priv_fault_work`/`userq_priv_fault_slots`, fields that live in `struct amdgpu_gfx` only via the gfx11 priv-fault worker infra which is in drm-next (post-rc7), not rc7 (`amdgpu_gfx.h` has only `userq_sch_*`). Requires the whole gfx11 priv-fault prerequisite series — defer to the 7.3 move. Symbol-existence check failed; do not re-add without the prerequisite.
 
@@ -263,7 +264,7 @@ Source: sirlucjan `7.2-rc/block-patches-sep/`. Formerly numbered `1300`–`1304`
 | `2003` | Jens Axboe | block/bfq: serialize request dispatching |
 | `2004` | Jens Axboe | block/bfq: skip expensive merge lookups if contended |
 
-## 2100–2108 — Memory management
+## 2100–2110 — Memory management
 
 | File | Source | Author | Subject |
 |------|--------|--------|---------|
@@ -276,6 +277,15 @@ Source: sirlucjan `7.2-rc/block-patches-sep/`. Formerly numbered `1300`–`1304`
 Note: `2102`–`2104` are 3 of 5 from Haoqin Huang's "zram: fix zstd error paths and add parameter validation" v6 series. The remaining two (`add pr_fmt to backend files`, `validate parameters in each backend's setup_params`) do not apply cleanly to rc7 — their `backend_deflate.c` hunks assume a newer deflate backend not in the rc7 base — and were not carried. `2107` (`validate deflate params`, Sergey Senozhatsky) is a separate later fix that DOES apply — it validates winbits in `deflate_setup_params()` with hunks compatible with the rc7 backend.
 
 `2105`–`2108` are `Cc: stable` zram stability fixes (Longlong Xia/Kylin + Sergey Senozhatsky, linux-next via akpm-mm, all `Reviewed-by: Sergey Senozhatsky`, `Signed-off-by: Andrew Morton`). `2105`/`2106` fix OOB access in the `read_block_state()`/`writeback_store()` debugfs paths when the device is reset with a smaller disksize between `nr_pages` computation and lock acquisition. `2107` adds winbits range validation to the deflate backend (missing validation → possible `BUG_ON()` in zlib). `2108` sets the default primary compressor in `zram_destroy_comps()` (all compressors NULL is invalid device state; `comp_algorithm_show()->strcmp()` can deref NULL). **Added 2026-08-11** (next-20260811 sweep follow-up). All CLEAN on the full rc7 series.
+
+`2109`–`2110` are new MM fixes from akpm-mm `mm-unstable` (7.3-targeted, not in rc7), **Added 2026-08-12** (sweep), both CLEAN on the rc7 series (`git apply` + GNU `patch --dry-run`):
+
+| File | Source | Author | Subject |
+|------|--------|--------|---------|
+| `2109` | akpm-mm mm-unstable `fe59dda7cd93` (2026-07-28) | Shakeel Butt (Meta) | memcg: bypass the reclaim and oom killer for dying tasks once oom_reaper is done — an OOM-killed process can be stuck in the exit path for hours when zswap holds nearly all of its memory (nothing is left on the LRUs to reclaim and swapin re-charges re-trigger OOM). Fix skips reclaim/OOM for dying tasks once oom_reaper has torn down the mm. Directly matches this build (zswap default-on + systemd memory.max). |
+| `2110` | akpm-mm mm-unstable `63d76961f3bf` (2026-08-09) | Longlong Xia (Kylin) | zsmalloc: account for handle size in class lookup — `zs_lookup_class_index()` classifies the payload size directly while `zs_malloc()` adds `ZS_HANDLE_SIZE`, so zram recompression misjudges size-class movement near boundaries (accepts replacements with no allocation benefit or rejects memory-saving ones, potentially marking an object incompressible). Factors class selection into `lookup_size_class()` shared by lookup and allocation. `Assisted-by: Codex:gpt-5.6-sol`. ZRAM+ZSMALLOC built-in. |
+
+Not carried this sweep: the `mm/swap: revert to single-folio writes for synchronous swap devices` candidate (Christoph Hellwig, part 1 of the "swap_ops updates" series) does not apply to rc7 — it depends on the earlier unmerged swap_ops series that reworked `mm/page_io.c`.
 
 ## 2200 — CPU idle (NAP governor)
 
@@ -960,6 +970,53 @@ with next bump; also conflicts with our `0104` cgroup-vram squash); ACPI CPPC
 series (ARM-oriented, 7.3-targeted); PSR "multiple displays" patch
 (Canonical laptop fix, off-target); VRAM manager init-ordering + UAF fixes
 (init-failure-path only; init-ordering already in drm-next).
+
+---
+
+## 2026-08-12 sweep results — DRM scheduler FAIR regression fix + MM fixes
+
+Six-source sweep (drm-next, drm-misc, agd5f, amd-staging, linux-next
+`next-20260811` unchanged, linux-pm, amd-gfx + dri-devel ML, sirlucjan,
+firelzrd, GitLab drm/amd work-items, x86/security line) plus the two
+user-flagged lore.kernel.org threads (fetched via the freedesktop mbox
+archives — lore itself is Anubis-blocked). Series grew 151 → 154 patches.
+
+**Adopted:**
+
+- `1028` — drm/sched: Ensure monotonic `min_vruntime` (Tvrtko Ursulin,
+  dri-devel ML 08-11, `<20260811134223.96203-1-tvrtko.ursulin@igalia.com>`).
+  Adresses the **DRM scheduler FAIR-policy regression on RX 9070 XT**
+  (Luke Wildhardt, 08-08): since 7.2 made FAIR the scheduler default,
+  sustained 100% GPU load degrades the foreground app to ~10 fps or freezes
+  the desktop; 7.1.5 and FIFO both pass. Root cause is unbounded `vruntime`
+  growth for a run-queue entity that never exits — the fix tracks
+  `min_vruntime` strictly monotonically. ML-only v1 partial fix. The full
+  v2 20-patch revert series (also 08-11) was evaluated and does **not**
+  apply cleanly to rc7 (5+ hunks conflict) — not carried; swap for the
+  merged revert when upstream lands it.
+- `2109` — memcg: bypass reclaim/OOM for dying tasks once oom_reaper is done
+  (Shakeel Butt, akpm-mm mm-unstable `fe59dda7cd93`). Fixes OOM-killed
+  processes stuck for hours in the exit path when zswap holds their memory
+  (nothing on LRUs; swapin re-charges re-trigger OOM). Matches this build's
+  zswap default-on + memory.max setup.
+- `2110` — zsmalloc: account for handle size in class lookup (Longlong Xia,
+  akpm-mm mm-unstable `63d76961f3bf`). zram recompression misjudges size-class
+  movement near boundaries because lookup classifies payload size while
+  allocation adds `ZS_HANDLE_SIZE`.
+
+**Reviewed, not taken:** Rik van Riel's `[RFC PATCH v3 0/8] batch lookups in
+follow_page_mask()` (lkml 08-11, `<20260811025157.1632867-1-riel@surriel.com>`)
+— gup perf series (2.2–5.9× on mTHP), RFC not merged, not adoptable as-is.
+mm/swap single-folio revert (Hellwig) — needs the unmerged swap_ops series
+prereqs in `mm/page_io.c`. DCN42 DCHVM↔rIOMMU SDP port series (James Lin,
+amd-gfx 08-11) — display-virtualization, off-target for a desktop. zram
+big-endian slot-lock fix — x86_64 LE unaffected. zswap global-shrinker fix
+(memcg-disabled) — `CONFIG_MEMCG=y` here.
+
+**Not taken this sweep:** drm-next/agd5f/amd-staging/drm-misc/linux-pm had no
+new commits since 08-11; linux-next unchanged at `next-20260811`; sirlucjan
+(fixes v11) and firelzrd (BORE 6.8.0 / LRU-MARIE 0.9.3) unchanged; x86/security
+line clean; GitLab work-items tracker had no new adoptable driver-fix commits.
 
 ---
 
