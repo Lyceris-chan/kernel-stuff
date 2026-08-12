@@ -179,7 +179,7 @@ The kernel bakes the following parameters into `CONFIG_CMDLINE`, so you do not
 need them on your boot command line:
 
 ```
-cpuidle.governor=nap amd_pstate.epp_boost=1 elevator=kyber pcie_aspm=off
+cpuidle.governor=nap amd_pstate.epp_boost=1 elevator=kyber pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0
 ```
 
 - `cpuidle.governor=nap` activates the NAP cpuidle governor.
@@ -188,6 +188,10 @@ cpuidle.governor=nap amd_pstate.epp_boost=1 elevator=kyber pcie_aspm=off
 - `pcie_aspm=off` disables PCIe Active State Power Management entirely — the
   drm/amd !5538 SMU bus-drop stopgap (see the ASPM note under "What this kernel
   adds").
+- `amdgpu.aspm=0` and `amdgpu.runpm=0` (added 2026-08-12) disable the GPU's own
+  ASPM handling and runtime power-management (BACO) transitions — conservative
+  amdgpu-side stopgaps for the silent gaming freeze (SMU IF mismatch 0x2e vs
+  0x33). DPM stays enabled, so clocks still downclock at idle.
 
 ### sched-ext scheduler (optional)
 

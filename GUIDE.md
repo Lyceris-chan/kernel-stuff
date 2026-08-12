@@ -97,13 +97,14 @@ The following options differ from the CachyOS base `.config` (which itself diffe
 **Embedded kernel command line** (`CONFIG_CMDLINE`):
 
 ```
-cpuidle.governor=nap amd_pstate.epp_boost=1 elevator=kyber pcie_aspm=off
+cpuidle.governor=nap amd_pstate.epp_boost=1 elevator=kyber pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0
 ```
 
 - `cpuidle.governor=nap` — activates the NAP cpuidle governor by default; without this the module loads but does not activate.
 - `amd_pstate.epp_boost=1` — enables per-core EPP boost for recently-busy CPUs on Zen 4. Requires the `epp_boost` patch series (`1202`).
 - `elevator=kyber` — selects the kyber I/O scheduler as default.
 - `pcie_aspm=off` — disables PCIe Active State Power Management entirely. This is the drm/amd !5538 SMU bus-drop stopgap (see the ASPM note in README "What this kernel adds").
+- `amdgpu.aspm=0` / `amdgpu.runpm=0` — disable the GPU's own ASPM and runtime-PM (BACO) transitions (added 2026-08-12, `7.2.0-rc7-4`). Conservative stopgaps for the silent gaming freeze (SMU IF mismatch 0x2e vs 0x33); DPM stays on.
 
 ---
 

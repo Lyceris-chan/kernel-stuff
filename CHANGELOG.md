@@ -9,6 +9,18 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.2.0-rc7-4-sleepy] — 2026-08-12 (conservative SMU/ASPM stopgaps)
+
+Same patch set as `7.2.0-rc7-3`; the built-in CMDLINE gains two conservative
+amdgpu-side stopgaps for the silent gaming freeze (SMU IF mismatch 0x2e vs
+0x33, work-item !5538): **`amdgpu.aspm=0`** and **`amdgpu.runpm=0`** (no GPU
+ASPM or BACO/runtime-PM power transitions; DPM stays enabled so clocks still
+downclock at idle). Diagnostic step — if the freeze is SMU power-transition
+related, this removes the transition source without running the GPU pinned
+at fixed high clocks.
+
+---
+
 ## [7.2.0-rc7-3-sleepy] — 2026-08-12 (DRM scheduler revert)
 
 Full revert of the 7.2 DRM scheduler **FAIR** series (Tvrtko Ursulin,

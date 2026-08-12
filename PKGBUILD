@@ -181,7 +181,7 @@ _minor=
 _rcver=rc7
 pkgver=${_major}.${_rcver}
 _tagrel=1
-pkgrel=3
+pkgrel=4
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}-${_rcver}
@@ -682,9 +682,12 @@ EOF
     scripts/config -d CC_OPTIMIZE_FOR_PERFORMANCE -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
     scripts/config -e CACHY   # gates the 0110 CachyOS config-hooks backport
     # pcie_aspm=off: disable PCIe ASPM entirely — the !5538 SMU bus-drop stopgap.
+    # amdgpu.aspm=0 / amdgpu.runpm=0: conservative amdgpu-side stopgaps for the
+    # silent gaming freeze (SMU IF mismatch 0x2e vs 0x33, !5538) — no GPU ASPM or
+    # BACO/runtime-PM power transitions. DPM stays on so clocks still downclock.
     # Appended to the bootloader params (CMDLINE_OVERRIDE is off); boots this kernel
     # with ASPM off regardless of the platform/BIOS default.
-    scripts/config -e CMDLINE_BOOL --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 elevator=kyber pcie_aspm=off" -d CMDLINE_OVERRIDE
+    scripts/config -e CMDLINE_BOOL --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 elevator=kyber pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0" -d CMDLINE_OVERRIDE
     scripts/config -e DEBUG_KERNEL -d DEBUG_INFO_NONE -d DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT -e DEBUG_INFO_DWARF5 -e DEBUG_INFO_BTF
     scripts/config -d SECURITY_APPARMOR -d SECURITY_APPARMOR_DEBUG -d SECURITY_APPARMOR_INTROSPECT_POLICY
     scripts/config -d AUDIT -d AUDITSYSCALL -d AUDIT_ARCH -d SLUB_DEBUG
