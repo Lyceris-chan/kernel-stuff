@@ -144,7 +144,7 @@ no longer reverts `usb/core/config.c`/`usb/quirks.h` (obsolete drops removed).
 
 ---
 
-## 1000–1053 — AMDGPU GPU core
+## 1000–1055 — AMDGPU GPU core
 
 Source: drm-next (`https://gitlab.freedesktop.org/drm/kernel.git`) / amd-gfx. Formerly numbered `1002`–`1065`.
 
@@ -191,6 +191,8 @@ Source: drm-next (`https://gitlab.freedesktop.org/drm/kernel.git`) / amd-gfx. Fo
 | `1051` | Yifan Zhang (AMD) | drm/amdgpu: skip BOs being torn down during GTT recovery — **agd5f drm-next, amd-drm-next-7.3-2026-08-12 tag** (`24775b2e8bce`). GTT recovery / reset race fix. **Added 2026-08-14** (sweep). CLEAN on rc7 series. |
 | `1052` | Candice Li (AMD) | drm/amdgpu: validate GEM_CREATE domain combinations — **agd5f drm-next, amd-drm-next-7.3-2026-08-12 tag** (`db39852d0c39`). Hardening vs userspace BUG_ON. **Added 2026-08-14** (sweep). CLEAN on rc7 series. |
 | `1053` | Tvrtko Ursulin (Igalia), AI-suggested fix | drm/sched: Cache and update run-queue `min_vruntime` — **dri-devel ML regression thread** (`[REGRESSION] drm/sched: FAIR policy...9070XT`, Luke Wildhardt's AI-proposed fix, tested/refined in-thread). Replaces per-op `drm_sched_rq_get_min_vruntime()` tree scan with a cached `rq->min_vruntime`, saving/restoring against it. Applies to the **7.2-rc7 vruntime tree scheduler** (matches our kernel, unlike the later full-fair 1047/1048 ML fixups). **Added 2026-08-14** (manual rebase onto our rc7 series). |
+| `1054` | Prike Liang (AMD) | drm/amdgpu/userq: fix lock missing for userq fence error set — **amd-gfx ML 08-07** (`<20260807061422.365929-1-Prike.Liang@amd.com>`). `amdgpu_userq_fence_driver_destroy()` sets the error/signals the fence without holding the fence spinlock; takes `dma_fence_spinlock()` around `dma_fence_set_error()`/`dma_fence_signal()` (locked variants). GFX12 userq fence correctness. **Added 2026-08-15** (sweep). CLEAN on rc7 series. ML-only; not in drm-next/agd5f. |
+| `1055` | Boqun Feng (Kernel.org) | drm/amd/pm: Fix incorrect avg vcn utilization in gpu_metrics — **amd-gfx ML 08-05** (`<20260805140227.44868-1-boqun@kernel.org>`). `smu_v14_0_0_get_gpu_metrics()` reported `metrics.VcnActivity` (permyriad) directly; now `/100` → percentage. Our GPU is `smu_v14_0_0`. **Added 2026-08-15** (sweep). CLEAN on rc7 series. ML-only. |
 
 ---
 
@@ -275,7 +277,7 @@ Source: sirlucjan `7.2-rc/block-patches-sep/`. Formerly numbered `1300`–`1304`
 | `2003` | Jens Axboe | block/bfq: serialize request dispatching |
 | `2004` | Jens Axboe | block/bfq: skip expensive merge lookups if contended |
 
-## 2100–2110 — Memory management
+## 2100–2113 — Memory management
 
 | File | Source | Author | Subject |
 |------|--------|--------|---------|
@@ -295,6 +297,9 @@ Note: `2102`–`2104` are 3 of 5 from Haoqin Huang's "zram: fix zstd error paths
 |------|--------|--------|---------|
 | `2109` | akpm-mm mm-unstable `fe59dda7cd93` (2026-07-28) | Shakeel Butt (Meta) | memcg: bypass the reclaim and oom killer for dying tasks once oom_reaper is done — an OOM-killed process can be stuck in the exit path for hours when zswap holds nearly all of its memory (nothing is left on the LRUs to reclaim and swapin re-charges re-trigger OOM). Fix skips reclaim/OOM for dying tasks once oom_reaper has torn down the mm. Directly matches this build (zswap default-on + systemd memory.max). |
 | `2110` | akpm-mm mm-unstable `63d76961f3bf` (2026-08-09) | Longlong Xia (Kylin) | zsmalloc: account for handle size in class lookup — `zs_lookup_class_index()` classifies the payload size directly while `zs_malloc()` adds `ZS_HANDLE_SIZE`, so zram recompression misjudges size-class movement near boundaries (accepts replacements with no allocation benefit or rejects memory-saving ones, potentially marking an object incompressible). Factors class selection into `lookup_size_class()` shared by lookup and allocation. `Assisted-by: Codex:gpt-5.6-sol`. ZRAM+ZSMALLOC built-in. |
+| `2111` | akpm-mm mm-unstable `b0b8621d` (2026-08-12) | Kairui Song (Tencent) | mm/mglru: fix and remove redundant unevictable folio handling — drops a redundant mlock/unevictable branch in the MGLRU scan path. We run `CONFIG_LRU_GEN=y`. **Added 2026-08-15** (sweep). CLEAN on the rc7 series (incl. LRU-MARIE `2101`). |
+| `2112` | akpm-mm mm-unstable `bad68884` (2026-08-12) | Hui Zhu (Kylin) | mm/mglru: fix young counter undercount for large folios — `lru_gen_look_around()` counted the triggering folio as `young = 1` regardless of size (a leftover from before PTE batching); now counts the full PTE batch like other folios. `Reviewed-by: Baolin Wang`. Prevents under-aging hot PMDs. **Added 2026-08-15** (sweep). CLEAN on the rc7 series. |
+| `2113` | akpm-mm mm-unstable `93379b08` (2026-07-02) | Yunzhao Li (Cloudflare) | mm/zswap: use ratelimited stats flush in `zswap_shrinker_count()` — `mem_cgroup_flush_stats()` under the global cgroup rstat lock caused 2.88% osq_lock contention in the kswapd reclaim path on many-NUMA machines; use `mem_cgroup_flush_stats_ratelimited()`. We have `CONFIG_ZSWAP=y`. **Added 2026-08-15** (sweep). CLEAN on the rc7 series. |
 
 Not carried this sweep: the `mm/swap: revert to single-folio writes for synchronous swap devices` candidate (Christoph Hellwig, part 1 of the "swap_ops updates" series) does not apply to rc7 — it depends on the earlier unmerged swap_ops series that reworked `mm/page_io.c`.
 
@@ -1033,6 +1038,32 @@ big-endian slot-lock fix — x86_64 LE unaffected. zswap global-shrinker fix
 new commits since 08-11; linux-next unchanged at `next-20260811`; sirlucjan
 (fixes v11) and firelzrd (BORE 6.8.0 / LRU-MARIE 0.9.3) unchanged; x86/security
 line clean; GitLab work-items tracker had no new adoptable driver-fix commits.
+
+---
+
+## 2026-08-15 sweep results — userq fence + SMU14 VCN + MGLRU/zswap
+
+Six-source sweep + akpm-mm. Fetched `next-20260814` (newest snapshot;
+`next-20260815` not yet published, Saturday). The series grew from 179 to 184
+patches.
+
+**Adopted:** `1054` (userq fence error-set spinlock, Prike Liang, amd-gfx ML
+08-07), `1055` (SMU14 VCN utilization permyriad→%, Boqun Feng, amd-gfx ML
+08-05), `2111` (MGLRU redundant unevictable-folio handling, Kairui Song,
+akpm-mm 08-12), `2112` (MGLRU young-counter undercount for large folios, Hui
+Zhu, akpm-mm 08-12), `2113` (zswap ratelimited stats flush, Yunzhao Li, akpm-mm
+07-02). All CLEAN on the full rc7 series.
+
+**Not taken:** gfx12 dynamic-VGPR trap handler (08-14 v1, large generated-hex,
+conflicts on series); bind-imported-BOs v3/v4 (competing same-day revisions,
+still in review); TTM LRU bulk-move nested-sublist refactor (08-14 v2 under
+rapid revision, invasive); Infinity Scheduler (sirlucjan — EEVDF mod conflicts
+with sched-ext); HDMI 2.1 VRR/ALLM v4 (overlaps `0055`, needs absent
+`amdgpu_dm_connector.c` split); `drm/sched: Fair policy fixups` (08-14, targets
+the full-fair 7.3 codebase, not our FIFO-reverted rc7 scheduler — already
+evaluated 08-14). Work-items tracker: open reports are firmware/user-space
+(AV1 artifacts from `linux-firmware` 20260810; VRR/blanking compositor-side)
+— no driver-side kernel patch.
 
 ---
 

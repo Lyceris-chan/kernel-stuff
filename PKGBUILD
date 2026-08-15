@@ -181,7 +181,7 @@ _minor=
 _rcver=rc7
 pkgver=${_major}.${_rcver}
 _tagrel=1
-pkgrel=6
+pkgrel=7
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}-${_rcver}
@@ -342,6 +342,10 @@ source=(
   "patches/1000-1099/1051-drm-amdgpu-skip-BOs-being-torn-down-during-GTT-recovery.patch"
   "patches/1000-1099/1052-drm-amdgpu-validate-GEM_CREATE-domain-combinations.patch"
   "patches/1000-1099/1053-drm-sched-cache-min-vruntime.patch"
+  # 1054-1055: 08-15 sweep (amd-gfx ML 08-05/08-07) — userq fence error-set
+  #   lock fix + SMU14 VCN utilization permyriad→percentage fix.
+  "patches/1000-1099/1054-drm-amdgpu-userq-fix-lock-missing-for-userq-fence-error-set.patch"
+  "patches/1000-1099/1055-drm-amd-pm-fix-incorrect-avg-vcn-utilization-in-gpu_metrics.patch"
   "patches/1100-1199/1100-drm-amd-display-enable-psr-and-replay-on-dcn4-variant-and-fi.patch"
   "patches/1100-1199/1101-drm-amd-display-enable-pstate-for-dcn4-non-emulation-builds.patch"
   "patches/1100-1199/1102-drm-amd-display-increase-dcn42b-uclk-value.patch"
@@ -434,6 +438,11 @@ source=(
   # 2110: zsmalloc account for handle size in class lookup (Longlong Xia,
   #   akpm-mm mm-unstable 63d76961f3bf). zram recompression size-class fix.
   "patches/2100-2199/2110-mm-zsmalloc-account-for-handle-size-in-class-lookup.patch"
+  # 2111-2113: 08-15 sweep MM (akpm-mm mm-unstable, 08-12/07-02) — MGLRU
+  #   unevictable-folio + young-counter fixes; zswap ratelimited stats flush.
+  "patches/2100-2199/2111-mm-mglru-fix-and-remove-redundant-unevictable-folio-handling.patch"
+  "patches/2100-2199/2112-mm-mglru-fix-young-counter-undercount-for-large-folios.patch"
+  "patches/2100-2199/2113-mm-zswap-use-ratelimited-stats-flush-in-zswap_shrinker_count.patch"
   "patches/2200-2299/2200-7.2-nap-v0.5.0.patch"
   # 9000, 9004, 9005 dropped: merged upstream in 7.2-rc6
   "patches/9000-9099/9001-drm-amdgpu-gfx12-drop-all-BUG-s.patch"
@@ -1133,6 +1142,8 @@ b2sums=('4299f17dac88bd1aacf58f1ba0b7061859c1723845925b0efc36e09248f74fa5eb57fa9
         'cf93f17cdf6176057c9d7dcce4043002fd0f9ef32f207823dedc28a552b9f1818c0931e9f170b3254660e3917930c9bbc1c5f2622edd9b2ed50b16c539cd8c3e'
         '763e2ec7ca768201d4bd058698665226bc2bbece14300e6bc30ba155d00c041cd2d89e8840b450c221efc63e74303c788a5b25d2add7262586d0450da24bb20a'
         '97dcb0826c9c84d8d36c912c3e66a5370888dd7083ed1a0f06f163def1bb9a3dc09893a652f46b6e244ee5419400550ad3d515f92351c5843d8e2ed6f6b389f6'
+        '3f65d7b36c536e57bd95154bda0a880b89cd94ff24b2135571a1d6cf4d5532714717b6d9c9e334d31934f5aa78d6c40fd34071a7ef3c6640d45bbe9a00b3c71b'
+        'eae2d25e806290eb9d55096bc7b9e08077a1d8f1b32da50d3075b1663357995d49796cb45a55175ed2fb2be8809d10d44ecf03a55716c79d045810b51c675790'
         '02803704ce3fe311f9bc88e0cdeae545829023a7c3c241a00f4a2bc07ffd27fe5089010b4fc0456c56898bbd09ab93ab3d764cfa97080a5aaf114df1bd91680b'
         '692244e62c6d34c7aca8fda750d18befaefdc02a3be11632aeb6a69327645e6814efb00a4c475bfc407c0dabbce0b5d88c86262acbf32b29111c5e99e2acabd6'
         '9395fc7d168c7cd6cb6b13edbedc2adc58a4a18cd024ae259345034b06bac84e8f9a34334508cd3571aaedb22e85aa2c9a01cd11e5c5336be148e07d63230bd8'
@@ -1199,6 +1210,9 @@ b2sums=('4299f17dac88bd1aacf58f1ba0b7061859c1723845925b0efc36e09248f74fa5eb57fa9
         '63bb83c66aac85fafb4ab319e1d74996bfce88a2850974ea9d200da98429768afe33ad8d0453e18c573c7e52d7ebb4df943ddf26b453b9b6b98f134ccd806fdd'
         '7444b3c8feb69e1cb14669741356e005f3d22f5c630610de173261a9834ab9b35860c8afd13eb65b71a6119977ffac24884615aae8b9a277f1d108e159299861'
         '046bb6d778b5a8e965382d41753d3f7d20e670ee5e47de09675cb7f0ee6cf2f5c8520207512ec9867d3ca21a4b3acb16c3a745d956b66797f5433b5b9d2c3e29'
+        '833835e9b40bd0242f2389de4957cf0a1509d06d738427823ac64f4d75ba07c080c550aa83b90679db0c1973565a75b9bbc6c0524cd6db5fcbf7cb8e2758c1ed'
+        '79e03fb05b89a46cbe5281b3f061d15c001d80ee54ec3980e3dd17e8ebb41aef2ce309cee1773f7818754e34d73d056769783ea112659f67921e82e5dc65ee2e'
+        'df6982c9f400944ab4c3597f146896c6d30424d3e419bc98bda0ce8321e5f24b04d447bd84573556b10c097882c9a1be3a0a1756d644295ab3eb80c5c7558af5'
         'dc4e862e8f9fa7e8ead895908459757afd1027c24b960ae3d289a7212e29575bce3ce4627d5fd73edf211ee162dfa545e1642c5b16e8156f3dce50af8ef3c256'
         '4882cc909f5ee8e4c974f3849e4446656895fb8c5f0c10fa0992e5e7c7ae6ce1ded523326bb51c91ff161d15335968434fabb44cf822cb17fd6364c4d8eb24c5'
         '8a9f7682c746fd53536798e7110836059f982b3daa6b95a767249fe9888a3105d0be3dc9917924aba9bba45f0538436a9e3f67f5d958b63ee9288f391f3507ac'

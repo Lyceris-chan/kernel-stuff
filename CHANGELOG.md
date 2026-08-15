@@ -9,6 +9,44 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.2.0-rc7-7-sleepy] — 2026-08-15 (six-source sweep)
+
+Six-source sweep (drm-next, drm-misc, linux-next `next-20260814`, linux-pm,
+agd5f, amd-gfx + dri-devel ML, sirlucjan, GitLab drm/amd work-items,
+x86/security, akpm-mm). The series grew from 179 to 184 patches.
+
+### Added
+
+- **GFX12 userq fence error-set lock fix** (`1054`, amd-gfx ML, Prike Liang):
+  `amdgpu_userq_fence_driver_destroy()` now takes the fence spinlock around
+  `dma_fence_set_error()`/`dma_fence_signal()` (locked variants).
+- **SMU14 VCN utilization fix** (`1055`, amd-gfx ML, Boqun Feng): `gpu_metrics`
+  now reports VCN activity as a percentage (`/100`) instead of raw permyriad.
+  Our GPU is `smu_v14_0_0`.
+- **MGLRU fixes** (`2111`–`2112`, akpm-mm, Kairui Song + Hui Zhu): drop
+  redundant unevictable-folio handling; fix young-counter undercount for large
+  folios (under-aging hot PMDs). We run `CONFIG_LRU_GEN=y`.
+- **zswap reclaim lock contention** (`2113`, akpm-mm, Yunzhao Li/Cloudflare):
+  ratelimited cgroup stats flush in `zswap_shrinker_count()` removes 2.88%
+  osq_lock contention in the kswapd path.
+
+### Deferred / not taken
+
+- `drm/amdkfd` gfx12 dynamic-VGPR trap handler (08-14, v1, large generated-hex
+  change; conflicts on the series).
+- `drm/amdgpu` bind-imported-BOs (v3/v4, 08-12/14) — two competing
+  same-day revisions still in review.
+- `drm/ttm` LRU bulk-move nested-sublist refactor (08-14, v2 under rapid
+  revision) — invasive core-TTM change.
+- Infinity Scheduler (sirlucjan) — EEVDF mod that conflicts with our sched-ext.
+- HDMI 2.1 VRR/ALLM v4 — overlaps carried `0055`; needs the absent
+  `amdgpu_dm_connector.c` split.
+- Work-items tracker: open reports are firmware/user-space (AV1 artifacts from
+  `linux-firmware` 20260810, VRR/blanking via compositor) — no driver-side
+  kernel patch to adopt.
+
+---
+
 ## [7.2.0-rc7-6-sleepy] — 2026-08-14 (AI-proposed DRM scheduler min_vruntime fix)
 
 Adds `1053` — the **AI-proposed DRM scheduler fix** from the 9070XT fair-policy
