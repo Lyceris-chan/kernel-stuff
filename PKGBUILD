@@ -181,7 +181,7 @@ _minor=
 _rcver=rc7
 pkgver=${_major}.${_rcver}
 _tagrel=1
-pkgrel=7
+pkgrel=8
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}-${_rcver}
@@ -415,7 +415,7 @@ source=(
   "patches/2000-2099/2002-block-bfq-pass-in-queue-directly-to-bfq_insert_reque.patch"
   "patches/2000-2099/2003-block-bfq-serialize-request-dispatching.patch"
   "patches/2000-2099/2004-block-bfq-skip-expensive-merge-lookups-if-contended.patch"
-  "patches/2100-2199/2100-zstd-7.2-merge-changes-from-dev-tree.patch"
+  "patches/2100-2199/2100-zstd-7.2-merge-v1.6.0-into-kernel-tree.patch"
   "patches/2100-2199/2101-mm-7.2-introduce-LRU-MARIE.patch"
   # 2102-2104: zram zstd param/error-path fixes (Haoqin Huang/Tencent, linux-next
   #   via akpm-mm 2026-08-04). MM bugfixes; ZRAM+ZSTD built-in. 3 of 5 series patches
@@ -1199,7 +1199,7 @@ b2sums=('4299f17dac88bd1aacf58f1ba0b7061859c1723845925b0efc36e09248f74fa5eb57fa9
         '8bff27696075ec53ca042b0c9e0deae345712e652b3b66bab1da82c4deefdf35533d04c00d59de70cbf968380236131bc819e0eeaa8aa40edfd84df3bd0972ef'
         '48c6c8a299d0d5341475936ea8e1974fc933de81fa710c483c0fa54d7d7a70ccb15c56da1b4cf66bc0c4fe486f78f6b74816b38f602ed219e5dd7f679fba2662'
         '2b9bad240296578ddb6a81629263d046b7e2d9ba063faaae38279c98556749b1b1ae6ccc3036a551fabea3d01ce916cffad1f1e56a65b3eab31faaa37de96211'
-        '26a27c3771496e964810ad07ba7f05a84af2a8b469736a0c43b443e5c4160567c70fa294e45ec799f2422086767696683a99c6837295776c78c646517e56326e'
+        '1d8d63086f1d7ee562047c5e126276b98452daf4cf5146d9a80030abd4832d6fab97c91c01678c301ec9d830a210952715b852c1c9a6783001633ca2f313fa1d'
         'c386d54f596d047bcc5df7c4838a803ea83a9421e381dc3d68f8293c0664ee9f06e90d5c705c7d55a827a425d147d03499dd9d9352a952b40270bf28876301ef'
         'ae6a1099a8addf12b8bbb5c4e2e549a77bbf7b535452876476abf5039b76504c327fbb06ec2f9542aa0146578309fe5b34370500f944f873b04ec223e143285e'
         '125440b453f7284e3edbe328cff8750a3a4aeea0b424d470353f0659bbeba0ec2570625ccb234f69cff6908ef3bf7e332511e3be00e2d04f0cba5137b1c7d8e0'

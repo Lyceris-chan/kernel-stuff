@@ -5,8 +5,8 @@ AMD Zen 4 desktop with an RDNA 4 graphics card. It is based on Linux mainline
 `7.2-rc7` and layers a sanitized [CachyOS](https://github.com/CachyOS/linux-cachyos)
 patchset plus targeted local and upstream patches on top.
 
-**Base version:** `7.2.0-rc7-7-sleepy`
-**Artifact:** `linux-sleepy-7.2.rc7-7-x86_64.pkg.tar.zst`
+**Base version:** `7.2.0-rc7-8-sleepy`
+**Artifact:** `linux-sleepy-7.2.rc7-8-x86_64.pkg.tar.zst`
 
 This is not a general-purpose kernel; the configuration is opinionated for the
 hardware below.
@@ -78,9 +78,10 @@ Here's what `linux-sleepy` gives you on top of each baseline.
   (does not apply cleanly to the rc7 series state).
 - Local handmade SMU14/DCN401 patches, including the `PROFILE_PEAK` GFXCLK
   ceiling float.
-- BFQ/mq-deadline contention fixes, LRU-MARIE page eviction, the zstd 7.2
-  merge, zram zstd + stability fixes (`2102`–`2108`), MGLRU fixes + zswap
-  reclaim tuning (`2111`–`2113`), and the NAP cpuidle governor.
+- BFQ/mq-deadline contention fixes, LRU-MARIE page eviction, the **zstd 1.6.0**
+  merge (with the gcc-BMI2 segfault guard), zram zstd + stability fixes
+  (`2102`–`2108`), MGLRU fixes + zswap reclaim tuning (`2111`–`2113`), and the
+  NAP cpuidle governor.
 
 **Over stock CachyOS:**
 
@@ -126,8 +127,8 @@ makepkg -f -s -c
 
 The build produces these packages:
 
-- `linux-sleepy-7.2.rc7-7-x86_64.pkg.tar.zst`
-- `linux-sleepy-headers-7.2.rc7-7-x86_64.pkg.tar.zst`
+- `linux-sleepy-7.2.rc7-8-x86_64.pkg.tar.zst`
+- `linux-sleepy-headers-7.2.rc7-8-x86_64.pkg.tar.zst`
 
 During the build you are prompted whether to enable CAKE SQM shaping (via the
 `net-tune` service); in non-interactive environments (CI, piped input) the
@@ -161,8 +162,8 @@ against — not with your distro's compiler.
 Install the kernel and headers:
 
 ```bash
-sudo pacman -U linux-sleepy-7.2.rc7-7-x86_64.pkg.tar.zst \
-              linux-sleepy-headers-7.2.rc7-7-x86_64.pkg.tar.zst
+sudo pacman -U linux-sleepy-7.2.rc7-8-x86_64.pkg.tar.zst \
+              linux-sleepy-headers-7.2.rc7-8-x86_64.pkg.tar.zst
 ```
 
 Regenerate your bootloader config (for GRUB):

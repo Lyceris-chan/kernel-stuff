@@ -9,6 +9,30 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.2.0-rc7-8-sleepy] — 2026-08-15 (zstd 1.6.0 + work-items recheck)
+
+### Changed
+
+- **zstd upgraded to 1.6.0** (`2100`): swapped the carried "dev tree" merge for
+  the newer sirlucjan `zstd-7.2: merge v1.6.0 into kernel tree` revision — the
+  same 1.6.0 code plus the Nick Terrell **gcc-BMI2 segfault guard** (DYNAMIC_BMI2
+  gated on gcc ≥ 11.4; avoids a `HUF_compress1X_usingCTable_internal_body` crash
+  on older gcc). Same 18 files, applies cleanly to rc7.
+
+### Unchanged (evaluated)
+
+- **HDMI 2.1 VRR/ALLM v4 (upstream)** is not backportable to rc7: patches 1/3/4
+  target `amdgpu_dm_connector.c`/`amdgpu_dm_freesync.c` (post-rc7 split absent
+  here); only 2/4 (drm_edid HF-VSDB) applies — already carried as `0055`. The
+  CachyOS `0107` branch is the only HDMI implementation that works on rc7
+  (targets the pre-split `amdgpu_dm.c`) and already excludes the `0055`
+  duplicate (`0151`). Switch to the upstream series at the 7.3 bump.
+- **GitLab work-items**: open reports are firmware/user-space/Mesa-side (VCN5
+  decode needs a firmware update; flip_done is compositor/VRR; artifacts are
+  FreeSync/Plasma). No new adoptable driver-side kernel patch.
+
+---
+
 ## [7.2.0-rc7-7-sleepy] — 2026-08-15 (six-source sweep)
 
 Six-source sweep (drm-next, drm-misc, linux-next `next-20260814`, linux-pm,

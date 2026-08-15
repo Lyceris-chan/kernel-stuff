@@ -1,7 +1,7 @@
-From 61c7be22f0359e956bfb25ac74002e304f7eac64 Mon Sep 17 00:00:00 2001
+From 4d96a5c62121acd25ad7c0dc2075a4ca922a6e54 Mon Sep 17 00:00:00 2001
 From: Piotr Gorski <lucjan.lucjanov@gmail.com>
-Date: Mon, 29 Jun 2026 21:23:04 +0200
-Subject: [PATCH 1/2] zstd-7.2: merge changes from dev tree
+Date: Mon, 29 Jun 2026 21:24:00 +0200
+Subject: [PATCH] zstd-7.2: merge v1.6.0 into kernel tree
 
 Signed-off-by: Piotr Gorski <lucjan.lucjanov@gmail.com>
 ---
@@ -10,7 +10,7 @@ Signed-off-by: Piotr Gorski <lucjan.lucjanov@gmail.com>
  lib/zstd/common/bits.h                      |   2 +-
  lib/zstd/common/bitstream.h                 |   4 +-
  lib/zstd/common/compiler.h                  |  12 +-
- lib/zstd/common/portability_macros.h        |  21 +-
+ lib/zstd/common/portability_macros.h        |  25 +-
  lib/zstd/common/zstd_common.c               |   9 +
  lib/zstd/common/zstd_internal.h             |   6 +-
  lib/zstd/compress/hist.c                    | 261 ++++++++-
@@ -23,7 +23,7 @@ Signed-off-by: Piotr Gorski <lucjan.lucjanov@gmail.com>
  lib/zstd/compress/zstd_opt.c                |  12 +-
  lib/zstd/decompress/huf_decompress.c        | 101 ++--
  lib/zstd/decompress/zstd_decompress_block.c | 232 +++++---
- 18 files changed, 1166 insertions(+), 191 deletions(-)
+ 18 files changed, 1169 insertions(+), 192 deletions(-)
 
 diff --git a/include/linux/zstd_lib.h b/include/linux/zstd_lib.h
 index e295d4125..3cf5ea133 100644
@@ -219,19 +219,27 @@ index dc9bd15e1..d985659ea 100644
  
  /* Issue #3240 reports an ASAN failure on an llvm-mingw build. Out of an
 diff --git a/lib/zstd/common/portability_macros.h b/lib/zstd/common/portability_macros.h
-index e1890b32d..c9c509fe7 100644
+index e1890b32d..ec1b26358 100644
 --- a/lib/zstd/common/portability_macros.h
 +++ b/lib/zstd/common/portability_macros.h
-@@ -61,7 +61,7 @@
+@@ -56,12 +56,14 @@
+ 
+ 
+ /* Enable runtime BMI2 dispatch based on the CPU.
+- * Enabled for clang & gcc >=4.8 on x86 when BMI2 isn't enabled by default.
++ * Enabled for clang & gcc >= 11.4 on x86 when BMI2 isn't enabled by default.
++ * Disabled for gcc < 11.4 because of a segfault while compiling
++ * HUF_compress1X_usingCTable_internal_body().
+  */
  #ifndef DYNAMIC_BMI2
  #  if ((defined(__clang__) && __has_attribute(__target__)) \
        || (defined(__GNUC__) \
 -          && (__GNUC__ >= 11))) \
-+          && (__GNUC__ >= 5 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 8)))) \
++          && (__GNUC__ >= 12 || (__GNUC__ == 11 && __GNUC_MINOR__ >= 4)))) \
        && (defined(__i386__) || defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64)) \
        && !defined(__BMI2__)
  #    define DYNAMIC_BMI2 1
-@@ -115,4 +115,23 @@
+@@ -115,4 +117,23 @@
  # define ZSTD_CET_ENDBRANCH
  #endif
  
