@@ -9,6 +9,44 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.2.0-rc7-6-sleepy] — 2026-08-14 (AI-proposed DRM scheduler min_vruntime fix)
+
+Adds `1053` — the **AI-proposed DRM scheduler fix** from the 9070XT fair-policy
+regression thread (Luke Wildhardt's AI suggestion, refined by Tvrtko Ursulin):
+cache `rq->min_vruntime` on the run-queue instead of re-scanning the entity tree
+per add/pop (`drm_sched_rq_get_min_vruntime` removed). Applies to our 7.2-rc7
+vruntime tree scheduler — unlike the later full-fair 1047/1048 ML fixups (which
+target the 7.3 fair-policy codebase and are not backportable here).
+
+---
+
+## [7.2.0-rc7-5-sleepy] — 2026-08-14 (drm-next 08-12 backports)
+
+Seven new clean backports from the `amd-drm-next-7.3-2026-08-12` tag, surfaced by
+the 2026-08-14 six-source sweep (linux-next has no new amdgpu/drm-sched commits
+as of `next-20260814`; the GitLab SMU-IF #5538 / RDNA4 MES #5274/#5294 / display
+#5343 items remain OPEN with no driver-side fix):
+
+- `1047` drm/amdgpu: don't disable ttm buffer funcs on reset (Pelloux-Prayer).
+- `1048` drm/amdgpu: fix missing check in vm_flush() (gfx12 SPM, Deucher).
+- `1049` drm/amdgpu: fix nbif 6.3.1 l1 low power not functional (Yang Wang;
+  effect muted by our `pcie_aspm=off` !5538 stopgap).
+- `1050` drm/amdgpu: keep PRT mappings off the vm_bo state lists (Jesse Zhang;
+  fixes the gfx12 userq NULL-bo deref on reset — complements `9038`).
+- `1051` drm/amdgpu: skip BOs being torn down during GTT recovery (Yifan Zhang).
+- `1052` drm/amdgpu: validate GEM_CREATE domain combinations (Candice Li).
+- `1141` drm/amd/display: fix NULL ptr deref in `amdgpu_dm_crtc_set_vblank()`
+  (Pitoiset; DCN401 vblank path).
+
+**Not merged:** Tvrtko Ursulin's `[PATCH 0/2] drm/sched: Fair policy fixups`
+(2026-08-14) — the two vruntime fixes target the full fair-scheduler codebase
+(`drm_sched_policy`, `update_fifo_locked`, `submit_ts`) that 7.2-rc7 and our
+carried revert (`1029`–`1046`, FIFO default) do not contain; they do not apply.
+Re-enabling fair would require re-applying the whole fair series — deferred,
+watching the maintainer direction (fixups vs revert v3).
+
+---
+
 ## [7.2.0-rc7-4-sleepy] — 2026-08-12 (conservative SMU/ASPM stopgaps)
 
 Same patch set as `7.2.0-rc7-3`; the built-in CMDLINE gains two conservative

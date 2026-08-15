@@ -144,7 +144,7 @@ no longer reverts `usb/core/config.c`/`usb/quirks.h` (obsolete drops removed).
 
 ---
 
-## 1000–1046 — AMDGPU GPU core
+## 1000–1053 — AMDGPU GPU core
 
 Source: drm-next (`https://gitlab.freedesktop.org/drm/kernel.git`) / amd-gfx. Formerly numbered `1002`–`1065`.
 
@@ -184,9 +184,17 @@ Source: drm-next (`https://gitlab.freedesktop.org/drm/kernel.git`) / amd-gfx. Fo
 ~~`1021`~~ (gmc12.1 implement tlb inv semaphore, Alex Deucher) — **DROPPED 2026-08-10**: merged upstream in rc7 (`cda6ab11c1a2`).
 ~~`1022`~~ (reject oversized IBs with per-ring packet limits, Candice Li) — **DROPPED 2026-08-10**: merged upstream in rc7 (`fd37f9dd5b5a`). All three verified: content present in clean rc7 tree + upstream commits confirmed in torvalds history.
 
+| `1047` | Pierre-Eric Pelloux-Prayer (AMD) | drm/amdgpu: don't disable ttm buffer funcs on reset — **agd5f drm-next, amd-drm-next-7.3-2026-08-12 tag** (`fb8379680c82`). TTM buffer funcs stay active across GPU reset. **Added 2026-08-14** (sweep). CLEAN on rc7 series. |
+| `1048` | Alex Deucher (AMD) | drm/amdgpu: fix missing check in vm_flush() — **agd5f drm-next, amd-drm-next-7.3-2026-08-12 tag** (`54a118f1d7e1`). gfx12 SPM emission correctness. **Added 2026-08-14** (sweep). CLEAN on rc7 series. |
+| `1049` | Yang Wang (AMD) | drm/amdgpu: fix nbif 6.3.1 l1 low power not functional — **agd5f drm-next, amd-drm-next-7.3-2026-08-12 tag** (`c2417f9fd704`). NBIF 6.3.1 (RDNA4/soc24) PCIe L1 low-power programming. Effect muted by our `pcie_aspm=off` !5538 stopgap. **Added 2026-08-14** (sweep). CLEAN on rc7 series. |
+| `1050` | Jesse Zhang (AMD) | drm/amdgpu: keep PRT mappings off the vm_bo state lists — **agd5f drm-next, amd-drm-next-7.3-2026-08-12 tag** (`04b48274e985`). Fixes NULL-bo deref in `amdgpu_userq_restore_worker` during GPU reset — the gfx12 userq crash class (complements our `9038`). **Added 2026-08-14** (sweep). CLEAN on rc7 series. |
+| `1051` | Yifan Zhang (AMD) | drm/amdgpu: skip BOs being torn down during GTT recovery — **agd5f drm-next, amd-drm-next-7.3-2026-08-12 tag** (`24775b2e8bce`). GTT recovery / reset race fix. **Added 2026-08-14** (sweep). CLEAN on rc7 series. |
+| `1052` | Candice Li (AMD) | drm/amdgpu: validate GEM_CREATE domain combinations — **agd5f drm-next, amd-drm-next-7.3-2026-08-12 tag** (`db39852d0c39`). Hardening vs userspace BUG_ON. **Added 2026-08-14** (sweep). CLEAN on rc7 series. |
+| `1053` | Tvrtko Ursulin (Igalia), AI-suggested fix | drm/sched: Cache and update run-queue `min_vruntime` — **dri-devel ML regression thread** (`[REGRESSION] drm/sched: FAIR policy...9070XT`, Luke Wildhardt's AI-proposed fix, tested/refined in-thread). Replaces per-op `drm_sched_rq_get_min_vruntime()` tree scan with a cached `rq->min_vruntime`, saving/restoring against it. Applies to the **7.2-rc7 vruntime tree scheduler** (matches our kernel, unlike the later full-fair 1047/1048 ML fixups). **Added 2026-08-14** (manual rebase onto our rc7 series). |
+
 ---
 
-## 1100–1140 — AMD display
+## 1100–1141 — AMD display
 
 Source: drm-next, confirmed CLEAN-APPLY on v7.2-rc5 via `git apply --check`. `1100`–`1103` were formerly `1025`, `1031`, `1033`, `1065`. Later members (`1114`–`1134`) are documented in the 2026-08-03/04 sweep sections below.
 
@@ -211,6 +219,7 @@ Source: drm-next, confirmed CLEAN-APPLY on v7.2-rc5 via `git apply --check`. `11
 | `1138` | `73efd24e2` | Karthi Kandasamy — Fix seamless mode switch not triggering for HDR to SDR transition — **Added 2026-08-10** (drm-next 08-06). Touches `dcn401_hwseq.c` (our DCN401). CLEAN on rc7 series. |
 | `1139` | `261e0fe4e` | Harry Wentland — Resize MST HDCP per-connector arrays to 32 — **Added 2026-08-10** (drm-next 08-06). Companion to `1137`: sizes `hdcp_workqueue` arrays to the DRM connector index range so the bounds check is complete. CLEAN on rc7 series. |
 | `1140` | Tom Chung 10/34 `20260805063937.2145774-11` | Gabe Teeger — Clamp `force_min_dcfclk` to dcn42b range — **Added 2026-08-10** (was the previous session's planned `1137`; numbered 1140 after the 08-06-tag display members). `dcn42b_clk_mgr.c`: clamps the debug-only `force_min_dcfclk_mhz` override to [200,600] MHz. Debug-option sanitization (no normal-path effect) but DCN42B-safe and clean on rc7 series. |
+| `1141` | Samuel Pitoiset | drm/amd/display: Fix NULL pointer dereference in `amdgpu_dm_crtc_set_vblank()` — **agd5f drm-next, amd-drm-next-7.3-2026-08-12 tag** (`7b1b31bf6942`). DCN401 vblank path NULL-deref fix (1 line). **Added 2026-08-14** (sweep). CLEAN on rc7 series. |
 
 ~~`1112`~~ (`334cbfa3c`, dcn401 GPIO lookup tables) — **DROPPED**: requires `DC_GPIO_GENERIC_A`/`DC_GPIO_HPD_A` type defs from a prerequisite GPIO infrastructure patch not in rc5.
 

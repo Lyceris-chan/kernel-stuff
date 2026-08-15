@@ -1,0 +1,110 @@
+From 04b48274e985250a0f14b57245391560f8073246 Mon Sep 17 00:00:00 2001
+From: Jesse Zhang <Jesse.Zhang@amd.com>
+Date: Wed, 5 Aug 2026 13:42:32 +0800
+Subject: [PATCH] drm/amdgpu: keep PRT mappings off the vm_bo state lists
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+A PRT/sparse mapping has no backing BO, so its bo_va->base.bo is NULL.
+amdgpu_vm_bo_base_init() deliberately keeps such a bo_va off the vm_bo
+state lists, but the tail of amdgpu_vm_bo_update() unconditionally called
+amdgpu_vm_bo_idle() for the !always_valid case, putting the NULL-bo PRT
+bo_va onto the individual.idle list.
+
+On a GPU reset amdgpu_vm_bo_reset_state_machine() moves individual.idle
+to individual.needs_update with moved=true, and amdgpu_vm_handle_moved()
+then dereferences bo_va->base.bo to read its reservation object,
+crashing on the NULL bo (e.g. the userq eviction restore worker running
+during a reset while a user queue is torn down):
+
+  BUG: kernel NULL pointer dereference, address: 0000000000000158
+  RIP: 0010:amdgpu_vm_handle_moved+0x17a/0x200 [amdgpu]
+  Call Trace:
+   amdgpu_userq_vm_validate_and_restore_queue+0x2ce/0x920 [amdgpu]
+   amdgpu_userq_restore_worker+0xce/0x210 [amdgpu]
+
+Skip amdgpu_vm_bo_idle() when bo is NULL so a PRT mapping never lands on
+a state list in the first place, and refresh the PRT page tables
+explicitly in the userq restore path (as the CS path already does) so
+sparse mappings survive a VRAM-lost reset. Because the PRT bo_va is off
+the state lists, its PTE update fence lands in prt_va->last_pt_update
+rather than vm->last_update, so wait on it explicitly before restarting
+the queues (mirroring how the CS path syncs that fence).
+
+v2:
+ - keep the PRT bo_va off the vm_bo state lists instead of NULL-guarding
+   bo inside amdgpu_vm_handle_moved(); a PRT mapping should never be on
+   the moved list in the first place (Christian)
+
+v3:
+ - the PRT PTEs are updated separately, so their fence is in
+   prt_va->last_pt_update, not vm->last_update; wait on it in the userq
+   restore path before restarting queues, otherwise the queues could
+   restart before the sparse PTEs are written (Christian)
+
+Suggested-by: Christian König <christian.koenig@amd.com>
+Reviewed-by: Christian König <christian.koenig@amd.com>
+Signed-off-by: Jesse Zhang <Jesse.Zhang@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c | 16 ++++++++++++++++
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c    |  8 +++++++-
+ 2 files changed, 23 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+index 6d3ed55e9ab4..bcfbd7213dd6 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+@@ -1070,6 +1070,16 @@ amdgpu_userq_vm_validate_and_restore_queue(struct amdgpu_userq_mgr *uq_mgr)
+ 	if (ret)
+ 		goto unlock_all;
+ 
++	/*
++	 * PRT/sparse mappings are kept off the vm_bo state lists, so
++	 * amdgpu_vm_handle_moved() does not touch them. Refresh their PTEs
++	 * explicitly here (as the CS path does) so sparse mappings survive a
++	 * VRAM-lost reset.
++	 */
++	ret = amdgpu_vm_bo_update(adev, fpriv->prt_va, false);
++	if (ret)
++		goto unlock_all;
++
+ 	key = 0;
+ 	/* Validate User Ptr BOs */
+ 	list_for_each_entry(bo_va, &vm->always_valid.idle, base.vm_status) {
+@@ -1127,6 +1137,12 @@ amdgpu_userq_vm_validate_and_restore_queue(struct amdgpu_userq_mgr *uq_mgr)
+ 	 */
+ 	list_for_each_entry(bo_va, &vm->always_valid.idle, base.vm_status)
+ 		dma_fence_wait(bo_va->last_pt_update, false);
++	/*
++	 * The PRT bo_va is kept off the state lists, so its PTE update fence
++	 * lands in prt_va->last_pt_update rather than vm->last_update; wait on
++	 * it explicitly (as the CS path syncs it) before restarting queues.
++	 */
++	dma_fence_wait(fpriv->prt_va->last_pt_update, false);
+ 	dma_fence_wait(vm->last_update, false);
+ 
+ 	xa_for_each(&uq_mgr->userq_xa, tmp_key, queue) {
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+index 86aab37cbdc4..71050a86bcc3 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+@@ -1408,7 +1408,13 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
+ 			amdgpu_vm_bo_evicted(&bo_va->base);
+ 		else
+ 			amdgpu_vm_bo_idle(&bo_va->base);
+-	} else {
++	} else if (bo) {
++		/*
++		 * A PRT/sparse mapping has no BO and is kept off the vm_bo
++		 * state lists (see amdgpu_vm_bo_base_init()); putting it on the
++		 * idle list here would let amdgpu_vm_handle_moved() dereference
++		 * the NULL bo after a reset.
++		 */
+ 		amdgpu_vm_bo_idle(&bo_va->base);
+ 	}
+ 
+-- 
+2.55.0
+
