@@ -13403,7 +13403,7 @@ index f00ef1e5b..56802b831 100644
 +		if (hot_votes >= 2 || referenced_ptes > 1)
 +			return FOLIOREF_ACTIVATE;
 +
-+		if (referenced_ptes > 0 && vma_flags_test(&vm_flags, VMA_EXEC_BIT) &&
++		if (referenced_ptes > 0 && vma_flags_test(&vma_flags, VMA_EXEC_BIT) &&
 +		    						folio_is_file_lru(folio))
 +			return FOLIOREF_ACTIVATE;
 +
