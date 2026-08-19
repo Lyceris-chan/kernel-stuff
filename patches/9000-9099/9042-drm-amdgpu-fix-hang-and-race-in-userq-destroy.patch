@@ -1,0 +1,109 @@
+From@ lingshan.zhu@amd.com  Fri Aug 14 10:30:05 2026
+From: lingshan.zhu@amd.com (Zhu Lingshan)
+Date: Fri, 14 Aug 2026 18:30:05 +0800
+Subject: [PATCH] drm/amdgpu: fix hang and race in userq destroy
+Message-ID: <20260814103005.9924-1-lingshan.zhu@amd.com>
+
+When a queue is hung, the hang_detect_work is the
+only way to recover it. However in amdgpu_userq_destroy(),
+the hang_detect_work is cancelled too early,
+resulting in amdgpu_userq_wait_for_last_fence()
+may never return, leaving an uninterruptible dma_fence_wait()
+hang there.
+
+To fix this problem, this commit moves the cancelling of
+hang_detect_work after amdgpu_userq_wait_for_last_fence(), and it has
+to be before the unmap helper, because hang_detect_work resets the
+queue, so it races with amdgpu_userq_unmap_helper() for MES operations
+and queue state.
+
+This commit splits amdgpu_userq_cleanup() into two parts:
+
+1) amdgpu_userq_detach_doorbell(), which detaches the queue from
+userq_doorbell_xa. This has to be called before the cancel, otherwise
+the IRQ handlers (for example amdgpu_userq_process_fence_irq)
+can re-schedule the hang_detect_work and the cancel is not final.
+
+2) amdgpu_userq_fence_driver_free(), this has to be called after the
+unmap helper, because it can release the seq64 slot that the GPU
+writes fence values to.
+
+Only one cancel_delayed_work_sync(&queue->hang_detect_work) is needed,
+so other redundancies are removed.
+
+Signed-off-by: Zhu Lingshan <lingshan.zhu@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c | 23 ++++++++---------------
+ 1 file changed, 8 insertions(+), 15 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+index 17cc48d87c4d..24adad7be251 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+@@ -418,19 +418,12 @@ static void amdgpu_userq_wait_for_last_fence(struct amdgpu_usermode_queue *queue
+ 	dma_fence_wait(f, false);
+ }
+ 
+-static void amdgpu_userq_cleanup(struct amdgpu_usermode_queue *queue)
++static void amdgpu_userq_detach_doorbell(struct amdgpu_usermode_queue *queue)
+ {
+-	struct amdgpu_userq_mgr *uq_mgr = queue->userq_mgr;
+-	struct amdgpu_device *adev = uq_mgr->adev;
++	struct amdgpu_device *adev = queue->userq_mgr->adev;
+ 
+-	/* Wait for mode-1 reset to complete */
+ 	down_read(&adev->reset_domain->sem);
+-
+-	/* Use interrupt-safe locking since IRQ handlers may access these XArrays */
+ 	xa_erase_irq(&adev->userq_doorbell_xa, queue->doorbell_index);
+-	amdgpu_userq_fence_driver_free(queue);
+-	queue->fence_drv = NULL;
+-
+ 	up_read(&adev->reset_domain->sem);
+ }
+ 
+@@ -551,18 +544,19 @@ amdgpu_userq_destroy(struct amdgpu_userq_mgr *uq_mgr, struct amdgpu_usermode_que
+ 
+ 	cancel_delayed_work_sync(&uq_mgr->resume_work);
+ 
+-	/* Cancel any pending hang detection work and cleanup */
+-	cancel_delayed_work_sync(&queue->hang_detect_work);
+-
+ 	mutex_lock(&uq_mgr->userq_mutex);
+ 	amdgpu_userq_wait_for_last_fence(queue);
+ 
++	amdgpu_userq_detach_doorbell(queue);
++	cancel_delayed_work_sync(&queue->hang_detect_work);
++
+ #if defined(CONFIG_DEBUG_FS)
+ 	debugfs_remove_recursive(queue->debugfs_queue);
+ #endif
+ 	r = amdgpu_userq_unmap_helper(queue);
+ 	atomic_dec(&uq_mgr->userq_count[queue->queue_type]);
+-	amdgpu_userq_cleanup(queue);
++	amdgpu_userq_fence_driver_free(queue);
++	queue->fence_drv = NULL;
+ 	mutex_unlock(&uq_mgr->userq_mutex);
+ 
+ 	/*
+@@ -574,7 +568,6 @@ amdgpu_userq_destroy(struct amdgpu_userq_mgr *uq_mgr, struct amdgpu_usermode_que
+ 	if (r)
+ 		queue_work(adev->reset_domain->wq, &uq_mgr->reset_work);
+ 
+-	cancel_delayed_work_sync(&queue->hang_detect_work);
+ 	uq_funcs->mqd_destroy(queue);
+ 	queue->userq_mgr = NULL;
+ 
+@@ -748,7 +741,7 @@ amdgpu_userq_create(struct drm_file *filp, union drm_amdgpu_userq *args)
+ 	    ((queue->queue_type != AMDGPU_HW_IP_GFX) &&
+ 	     (queue->queue_type != AMDGPU_HW_IP_COMPUTE))) {
+ 		/* Serialize the map against an in-progress GPU reset (MES is
+-		 * unresponsive during recovery), matching amdgpu_userq_cleanup().
++		 * unresponsive during recovery), matching amdgpu_userq_detach_doorbell().
+ 		 */
+ 		down_read(&adev->reset_domain->sem);
+ 		r = amdgpu_userq_map_helper(queue);
+-- 
+2.53.0
+
+

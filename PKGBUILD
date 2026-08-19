@@ -319,6 +319,12 @@ source=(
   #   lock fix + SMU14 VCN utilization permyriad→percentage fix.
   "patches/1000-1099/1054-drm-amdgpu-userq-fix-lock-missing-for-userq-fence-error-set.patch"
   "patches/1000-1099/1055-drm-amd-pm-fix-incorrect-avg-vcn-utilization-in-gpu_metrics.patch"
+  # 1056-1058: 08-19 sweep GPU-core (drm-misc 08-13 + pixelcluster fork). drm/sched
+  #   entity_is_idle lock (correctness); TTM grab-BO-ref-before-lock; amdgpu
+  #   soft-evicted tracking for always-valid BOs (complements carried 1050/9038-40).
+  "patches/1000-1099/1056-drm-sched-lock-drm_sched_entity_is_idle.patch"
+  "patches/1000-1099/1057-drm-ttm-grab-bo-reference-before-locking.patch"
+  "patches/1000-1099/1058-drm-amdgpu-track-suboptimal-always-valid-bos.patch"
   "patches/1100-1199/1100-drm-amd-display-enable-psr-and-replay-on-dcn4-variant-and-fi.patch"
   "patches/1100-1199/1101-drm-amd-display-enable-pstate-for-dcn4-non-emulation-builds.patch"
   "patches/1100-1199/1102-drm-amd-display-increase-dcn42b-uclk-value.patch"
@@ -414,6 +420,16 @@ source=(
   "patches/2100-2199/2111-mm-mglru-fix-and-remove-redundant-unevictable-folio-handling.patch"
   "patches/2100-2199/2112-mm-mglru-fix-young-counter-undercount-for-large-folios.patch"
   "patches/2100-2199/2113-mm-zswap-use-ratelimited-stats-flush-in-zswap_shrinker_count.patch"
+  # 2114-2119: 08-19 sweep MM (linux-next + akpm-mm). RCU-tasks quiescent in
+  #   shrink_lruvec; swap bad-entry ratelimit; khugepaged pte-unmap ordering;
+  #   zswap batch writeback; shmem fallocate overflow reject; memcontrol
+  #   vmstats/events false-sharing. Each touches a distinct file.
+  "patches/2100-2199/2114-mm-vmscan-report-rcu-tasks-quiescent-states-in-shrink_lruvec.patch"
+  "patches/2100-2199/2115-mm-swap-ratelimit-bad-swap-entry-reports.patch"
+  "patches/2100-2199/2116-mm-khugepaged-unmap-pte-before-releasing-vma-write-lock.patch"
+  "patches/2100-2199/2117-mm-zswap-support-batch-writeback-in-shrink_memcg.patch"
+  "patches/2100-2199/2118-mm-shmem-reject-page-aligned-fallocate-end-overflow.patch"
+  "patches/2100-2199/2119-mm-memcontrol-avoid-false-sharing-between-vmstats-and-events.patch"
   "patches/2200-2299/2200-7.2-nap-v0.5.0.patch"
   # 9000, 9004, 9005 dropped: merged upstream in 7.2-rc6
   "patches/9000-9099/9001-drm-amdgpu-gfx12-drop-all-BUG-s.patch"
@@ -461,6 +477,21 @@ source=(
   "patches/9000-9099/9038-drm-amdgpu-reject-PRT-mappings-as-user-queue-buffer-VAs.patch"
   "patches/9000-9099/9039-drm-amdgpu-userq-bound-the-eviction-fence-rearm-retry-loop.patch"
   "patches/9000-9099/9040-drm-amdgpu-free-userptr-HMM-ranges-on-the-CS-error-path.patch"
+  # 9041-9048: 08-19 sweep backports (amd-gfx ML 08-14..08-19). userq doorbell
+  #   xa-lock (Junrui Luo 2/2); userq destroy hang/race (Zhu Lingshan); userq
+  #   wptr-BO lock/validate on restore (Jesse Zhang v2); userq skip-unmapped in
+  #   wait_for_signal (Jesse Zhang); KFD CU-occupancy GFX12 (Belanger);
+  #   amdkfd ring-buffer size overflow (Marioukhine, reconstructed);
+  #   amdkfd SVM migrate error-path 1/2 + vm-range-hole 2/2 (Xiaogang Chen,
+  #   apply in order).
+  "patches/9000-9099/9041-drm-amdgpu-userq-hold-doorbell-xa-lock-during-hang-reset.patch"
+  "patches/9000-9099/9042-drm-amdgpu-fix-hang-and-race-in-userq-destroy.patch"
+  "patches/9000-9099/9043-drm-amdgpu-userq-lock-and-validate-wptr-bos-on-restore.patch"
+  "patches/9000-9099/9044-drm-amdgpu-userq-skip-unmapped-queues-in-wait_for_signal.patch"
+  "patches/9000-9099/9045-drm-amdgpu-kfd-cu-occupancy-support-to-gfx12.patch"
+  "patches/9000-9099/9046-amdkfd-fix-integer-overflow-in-queue-ring-buffer-size.patch"
+  "patches/9000-9099/9047-amdkfd-fix-error-path-at-svm_migrate_copy_to_ram.patch"
+  "patches/9000-9099/9048-amdkfd-fix-vm-range-hole-at-svm_migrate_copy_to_vram.patch"
 )
 
 # makepkg 7.1.0 resolves local sources by basename in the PKGBUILD directory
@@ -1089,6 +1120,9 @@ b2sums=('82262b58b43fad0e011da209b85d97d77b147c4dba361696298680bea4d6dd550dcd4a1
         'cf93f17cdf6176057c9d7dcce4043002fd0f9ef32f207823dedc28a552b9f1818c0931e9f170b3254660e3917930c9bbc1c5f2622edd9b2ed50b16c539cd8c3e'
         '3f65d7b36c536e57bd95154bda0a880b89cd94ff24b2135571a1d6cf4d5532714717b6d9c9e334d31934f5aa78d6c40fd34071a7ef3c6640d45bbe9a00b3c71b'
         'eae2d25e806290eb9d55096bc7b9e08077a1d8f1b32da50d3075b1663357995d49796cb45a55175ed2fb2be8809d10d44ecf03a55716c79d045810b51c675790'
+        'c2f5bb96636f1a471ec1899249b198335fdd7f19cfb53ec95f4f743e758cfd8f558e83a36536aad6e3f0a3a641a5ac5053998587c898ae26cbde3ce819d5b75f'
+        'f80b29d606f7a5a4a395952ab4994a10e8005831544d88c7e59621b61f0bfadc6b863314337e7183843cc3fd8018d975703ddd14bb62e3c8bc738df5c7e63d5d'
+        '498ac5d39faa626f9e55902e7b2eb7993937893c2d1a20c9532001983a296cee648460a547c7b57142c9010995b34bfc49d3050e6eac69a6c55a137ce6424fff'
         '02803704ce3fe311f9bc88e0cdeae545829023a7c3c241a00f4a2bc07ffd27fe5089010b4fc0456c56898bbd09ab93ab3d764cfa97080a5aaf114df1bd91680b'
         '692244e62c6d34c7aca8fda750d18befaefdc02a3be11632aeb6a69327645e6814efb00a4c475bfc407c0dabbce0b5d88c86262acbf32b29111c5e99e2acabd6'
         '9395fc7d168c7cd6cb6b13edbedc2adc58a4a18cd024ae259345034b06bac84e8f9a34334508cd3571aaedb22e85aa2c9a01cd11e5c5336be148e07d63230bd8'
@@ -1156,6 +1190,12 @@ b2sums=('82262b58b43fad0e011da209b85d97d77b147c4dba361696298680bea4d6dd550dcd4a1
         '833835e9b40bd0242f2389de4957cf0a1509d06d738427823ac64f4d75ba07c080c550aa83b90679db0c1973565a75b9bbc6c0524cd6db5fcbf7cb8e2758c1ed'
         '79e03fb05b89a46cbe5281b3f061d15c001d80ee54ec3980e3dd17e8ebb41aef2ce309cee1773f7818754e34d73d056769783ea112659f67921e82e5dc65ee2e'
         'df6982c9f400944ab4c3597f146896c6d30424d3e419bc98bda0ce8321e5f24b04d447bd84573556b10c097882c9a1be3a0a1756d644295ab3eb80c5c7558af5'
+        '673307951783516404435de05c2f23cd6e9bacf4a442e718858fd9cea842e56449025625f9e28a2bec21613f82c5ae5996d4ce8d04b75f0a2c961a65aab45fbb'
+        '14a53f00cd921253503669ae73ad43e27937928fe660d6af49095b0e953b5f5a32acbbc474c3cc834effb81baedc164c44fd8b5c5f1d1b3e8abe4a6defb984eb'
+        '4b151126611abfb3d31290b0252573c7a7b279b6e6101674ed492f905a8b2d0f05bee882fd7699765340955350a91fc092f39673dfa4193c61d2985c2dd9289f'
+        'd83dcda9e2047e98a2d85fc1aa491ea2992bc8d994435216d4d06168c50b6c5ff52b362febe2a3ef932e1b78557d8245be076d0fedab4a6a63d6f8ed270547f5'
+        '7c61f5a26b9381c0b78f0c5741549ecf74d3839a750da84e933e0ae86af9a822dd96d3baa61e6d7d87fc273cf8e3092c5b6def35256c2d1a7fc10dd05d1276c9'
+        '202837df1d30fd3d6c61a8efe56ace4927cbbec6b835a191d53bc553e9cb75ee9c889849bc3626bf758127ebefa8fcef388921de1f9bb7d5de8754adb2048d38'
         'dc4e862e8f9fa7e8ead895908459757afd1027c24b960ae3d289a7212e29575bce3ce4627d5fd73edf211ee162dfa545e1642c5b16e8156f3dce50af8ef3c256'
         '4882cc909f5ee8e4c974f3849e4446656895fb8c5f0c10fa0992e5e7c7ae6ce1ded523326bb51c91ff161d15335968434fabb44cf822cb17fd6364c4d8eb24c5'
         '8a9f7682c746fd53536798e7110836059f982b3daa6b95a767249fe9888a3105d0be3dc9917924aba9bba45f0538436a9e3f67f5d958b63ee9288f391f3507ac'
@@ -1187,6 +1227,14 @@ b2sums=('82262b58b43fad0e011da209b85d97d77b147c4dba361696298680bea4d6dd550dcd4a1
         '203bd93e310b0795acf2d04a03de10bcfa4ee653b490c5cc3fb2f377119ce373dbf32c4ab4c8674d246ea8d8518d1a26ddd46f8c3dff085aa08022fa28d5144c'
         '21ca802919183021abd12cfc782de48a895daddfa9b401700e4bef50e750537183bc3c7157e723bcae769d2bd72f9efd34e677d80d63d74eaa7344b8205eb1fe'
         'f409b3525bfd04fa1b77adfcafb5d701e28c707619b6d71472d521b34926c40496b47a49b1c2c2404e83333a58a369d1be47517e99df1b1631d5a84a05e102b6'
+        '90c5cbd4682198724e2559ee92369c7b88f76bf29cfcd81f736451a98f0793cf6a9ad9e491de90a1111c761e5b81577388322b74366b68d89933e80a58a10aa1'
+        '98249d1166af1b62a9ab6b9516f5a33b24c6de4db191d21e6342f4fae22644e0d1a6a5e151d83fbc5812d8ee7122546ec870c8f5244ffa42ba75bc720661cc96'
+        'd3ed5753cb2480725287f495abef8f2119d996d16b2598051b49e3eb5b3d83f0ec9c2dd468614b7a3181c8bb8c072124bf8a9ee3ff34f2bfa81939e1371aa9b7'
+        '69307106355483e423245a7e6f89c187254c8fd5a2ac8b503fa4fedaafdb8b0795b9ad3a04ff9226e70be267cb662fa8b492357e84b38379b208feabe567a249'
+        '6b2a99986c76bf094b81ca2d1fa149f717f03113b7f52d6c2b462fcca4df3a786a777921618ae1f4296e3883555a6cd318703a0333087a48102b0ff03ffde283'
+        '4b709d02832578271be2d4a180ba1002eb0dc120a4d4df2a149c2a320224791aea3dc64da520c3af53c4e7ca5ac2b906adae5e5f9ff003b7df3324b95d36b535'
+        '208fa81e6adfc96da33118ee8ba1e70955ee200616f261c82c6823d4eb32c29adc31f00559966db976e603c35be6e0a4e76d74266b3d7ba76862f4f57c9f8cef'
+        'dd7d9c9a51bdbdc9d7e8a5f88e0eb465a16a8c2f2953ffa4fef15265f809fde0c6bb9ad0f29a88a4106a669bdae9e252a44879badf00826b7590ff44354a5657'
         'fb45c3c3df0e4f8738613511c47c4018b34cca4bf68c86db0da470e34d9751cd1da46bb0880f9e69b5284ebd09a16c37c8fbc577c9bcb4222736e9c4f9379666')
 
 if [ "$_use_kernel_org_llvm" = "yes" ]; then
