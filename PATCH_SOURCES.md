@@ -144,7 +144,7 @@ no longer reverts `usb/core/config.c`/`usb/quirks.h` (obsolete drops removed).
 
 ---
 
-## 1000–1055 — AMDGPU GPU core
+## 1000–1058 — AMDGPU GPU core
 
 Source: drm-next (`https://gitlab.freedesktop.org/drm/kernel.git`) / amd-gfx. Formerly numbered `1002`–`1065`.
 
@@ -193,6 +193,9 @@ Source: drm-next (`https://gitlab.freedesktop.org/drm/kernel.git`) / amd-gfx. Fo
 | `1053` | Tvrtko Ursulin (Igalia), AI-suggested fix | drm/sched: Cache and update run-queue `min_vruntime` — **dri-devel ML regression thread** (`[REGRESSION] drm/sched: FAIR policy...9070XT`, Luke Wildhardt's AI-proposed fix, tested/refined in-thread). Replaces per-op `drm_sched_rq_get_min_vruntime()` tree scan with a cached `rq->min_vruntime`, saving/restoring against it. Applies to the **7.2-rc7 vruntime tree scheduler** (matches our kernel, unlike the later full-fair 1047/1048 ML fixups). **Added 2026-08-14** (manual rebase onto our rc7 series). |
 | `1054` | Prike Liang (AMD) | drm/amdgpu/userq: fix lock missing for userq fence error set — **amd-gfx ML 08-07** (`<20260807061422.365929-1-Prike.Liang@amd.com>`). `amdgpu_userq_fence_driver_destroy()` sets the error/signals the fence without holding the fence spinlock; takes `dma_fence_spinlock()` around `dma_fence_set_error()`/`dma_fence_signal()` (locked variants). GFX12 userq fence correctness. **Added 2026-08-15** (sweep). CLEAN on rc7 series. ML-only; not in drm-next/agd5f. |
 | `1055` | Boqun Feng (Kernel.org) | drm/amd/pm: Fix incorrect avg vcn utilization in gpu_metrics — **amd-gfx ML 08-05** (`<20260805140227.44868-1-boqun@kernel.org>`). `smu_v14_0_0_get_gpu_metrics()` reported `metrics.VcnActivity` (permyriad) directly; now `/100` → percentage. Our GPU is `smu_v14_0_0`. **Added 2026-08-15** (sweep). CLEAN on rc7 series. ML-only. |
+| `1056` | drm-misc `0e118b936` (2026-08-13) | Philipp Stanner | drm/sched: Lock `drm_sched_entity_is_idle()` — **Added 2026-08-19** (merge). Fixes an invalid lockless read of `entity->stopped`/`entity->list`; takes the entity lock around the idle check. `Reviewed-by` scheduler maintainers. CLEAN on the 7.2 series. |
+| `1057` | pixelcluster `vramstuff-rebase` `e8e6de2b8` (Natalie Vock) | drm/ttm: grab BO reference before locking it — **Added 2026-08-19** (merge). `__ttm_bo_lru_cursor_next` grabs a BO ref before locking to fix a lifetime race under the LRU refcount rework. Private-fork forward-port; not yet upstream. CLEAN on the 7.2 series. |
+| `1058` | pixelcluster `vramstuff-rebase` `eb1170e95` (Natalie Vock) | drm/amdgpu: Track suboptimal always-valid BOs in soft-evicted state — **Added 2026-08-19** (merge). Adds a soft-evicted state for VM_ALWAYS_VALID BOs so they aren't force-evicted; complements carried userq soft-evict work (9036/9038-40/1050). Private-fork forward-port. CLEAN on the 7.2 series. |
 
 ---
 
@@ -277,7 +280,7 @@ Source: sirlucjan `7.2/block-patches-sep/`. Formerly numbered `1300`–`1304`.
 | `2003` | Jens Axboe | block/bfq: serialize request dispatching |
 | `2004` | Jens Axboe | block/bfq: skip expensive merge lookups if contended |
 
-## 2100–2113 — Memory management
+## 2100–2119 — Memory management
 
 | File | Source | Author | Subject |
 |------|--------|--------|---------|
@@ -300,6 +303,12 @@ Note: `2102`–`2104` are 3 of 5 from Haoqin Huang's "zram: fix zstd error paths
 | `2111` | akpm-mm mm-unstable `b0b8621d` (2026-08-12) | Kairui Song (Tencent) | mm/mglru: fix and remove redundant unevictable folio handling — drops a redundant mlock/unevictable branch in the MGLRU scan path. We run `CONFIG_LRU_GEN=y`. **Added 2026-08-15** (sweep). CLEAN on the rc7 series (incl. LRU-MARIE `2101`). |
 | `2112` | akpm-mm mm-unstable `bad68884` (2026-08-12) | Hui Zhu (Kylin) | mm/mglru: fix young counter undercount for large folios — `lru_gen_look_around()` counted the triggering folio as `young = 1` regardless of size (a leftover from before PTE batching); now counts the full PTE batch like other folios. `Reviewed-by: Baolin Wang`. Prevents under-aging hot PMDs. **Added 2026-08-15** (sweep). CLEAN on the rc7 series. |
 | `2113` | akpm-mm mm-unstable `93379b08` (2026-07-02) | Yunzhao Li (Cloudflare) | mm/zswap: use ratelimited stats flush in `zswap_shrinker_count()` — `mem_cgroup_flush_stats()` under the global cgroup rstat lock caused 2.88% osq_lock contention in the kswapd reclaim path on many-NUMA machines; use `mem_cgroup_flush_stats_ratelimited()`. We have `CONFIG_ZSWAP=y`. **Added 2026-08-15** (sweep). CLEAN on the rc7 series. |
+| `2114` | linux-next `25f52e8` | Breno Leitao | mm/vmscan: report RCU-tasks quiescent states in `shrink_lruvec()` — calls `cond_resched_tasks_rcu_qs()` in the reclaim loop to lower RCU-tasks stall risk during long reclaim. **Added 2026-08-19** (merge). CLEAN on the 7.2 series. |
+| `2115` | akpm-mm `f6cc09d` | Breno Leitao | mm, swap: ratelimit bad swap entry reports — `pr_err` → `pr_err_ratelimited` on bad-file/offset paths in `get_swap_device`/`swap_dup_entry`. **Added 2026-08-19** (merge). CLEAN on the 7.2 series. |
+| `2116` | akpm-mm `855a68e` | Nico Pache (Red Hat) | mm/khugepaged: unmap pte before releasing vma write lock — reorders `pte_unmap()` before `anon_vma_unlock_write()` in `collapse_huge_page()` to avoid a use-after-unmap. **Added 2026-08-19** (merge). CLEAN on the 7.2 series. |
+| `2117` | akpm-mm `762b38e` | Hao Jia | mm/zswap: support batch writeback in `shrink_memcg()` — per-node zswap LRU walk in the memcg shrinker batched to `SWAP_CLUSTER_MAX`. **Added 2026-08-19** (merge). CLEAN on the 7.2 series. |
+| `2118` | akpm-mm `811f699` | Zhiling Zou | mm: shmem: reject page-aligned fallocate end overflow — `check_add_overflow()` guard in `shmem_fallocate()` so `offset+len+PAGE_SIZE-1` wraparound returns `-EINVAL`. **Added 2026-08-19** (merge). CLEAN on the 7.2 series. |
+| `2119` | akpm-mm `8303637` | Usama Arif | mm/memcontrol: avoid false sharing between vmstats and events — moves `vmstats_percpu` out of the `struct mem_cgroup` hot layout and marks it `____cacheline_aligned`. **Added 2026-08-19** (merge). CLEAN on the 7.2 series. |
 
 Not carried this sweep: the `mm/swap: revert to single-folio writes for synchronous swap devices` candidate (Christoph Hellwig, part 1 of the "swap_ops updates" series) does not apply to rc7 — it depends on the earlier unmerged swap_ops series that reworked `mm/page_io.c`.
 
@@ -334,7 +343,7 @@ Dropped candidates (formerly `2008`/`2009`): Jesse Zhang `47862766d211` (gfx12 u
 
 ---
 
-## 9025–9040 — SMU14 PPT + DPM + userq/HMM backports (amd-drm-next-7.3-2026-08-06, ML)
+## 9025–9048 — SMU14 PPT + DPM + userq/HMM backports (amd-drm-next-7.3-2026-08-06, ML)
 
 **Added 2026-08-10** from the agd5f staging tag `amd-drm-next-7.3-2026-08-06` (commit `daaeec23`, the "AMDGPU last round for Linux 7.3" pull the Phoronix article covered). Tag fetched into `repos/agd5f-linux`. All 9 verified CLEAN on the rc7 series tree in dependency order (`patch -p1 --forward`, prepare()'s tool), and reverse-checked against the clean rc7 tree (not already upstream). These land in drm-next for 7.3 — the backports are pre-bumps; flag for `patch-cleanup` at the 7.3 move.
 
@@ -365,6 +374,14 @@ All three CLEAN on the rc7 series (git + GNU `patch`). Applied upstream by Deuch
 | `9038` | amd-gfx ML `<20260811-amdgpu-fixes-v1-2-4954a417b8ff@outlook.com>` | drm/amdgpu: reject PRT mappings as user queue buffer VAs — **Added 2026-08-11** (sweep). `amdgpu_userq.c`: a PRT mapping has no backing BO, so it can't carry the eviction fence `amdgpu_userq_gem_va_unmap_validate()` waits on; rejecting it avoids a NULL `bo` deref on GEM unmap. Same author/series as `9033`–`9035`. ML-only; not in drm-next/agd5f/amd-staging. |
 | `9039` | amd-gfx ML `<20260811-amdgpu-fixes-v1-3-4954a417b8ff@outlook.com>` | drm/amdgpu/userq: bound the eviction fence rearm retry loop — **Added 2026-08-11** (sweep). `amdgpu_userq.c`/`amdgpu_userq_fence.c`: bound the restore-worker eviction-fence rearm loop so an unresolvable `-ENOMEM` can't spin forever; `amdgpu_userq_ensure_ev_fence()` now returns an error with the mutex released. |
 | `9040` | amd-gfx ML `<20260811-amdgpu-fixes-v1-5-4954a417b8ff@outlook.com>` | drm/amdgpu: free userptr HMM ranges on the CS error path — **Added 2026-08-11** (sweep). `amdgpu_cs.c`: release still-live userptr HMM ranges on CS error paths so the ranges aren't leaked when submit fails before invalidation. |
+| `9041` | amd-gfx ML `<20260817-amdgpu-fixes-v1-2-36d5298da646@outlook.com>` | Junrui Luo | drm/amdgpu/userq: hold the doorbell xa lock during hang reset — **Added 2026-08-19** (merge). `mes_userqueue.c`: take the doorbell xarray lock around the hang-reset path. ML-only, not in any tree. |
+| `9042` | amd-gfx ML `<20260814103005.9924-1-lingshan.zhu@amd.com>` | Zhu Lingshan | drm/amdgpu: fix hang and race in userq destroy — **Added 2026-08-19** (merge). `amdgpu_userq.c`: cancels `hang_detect_work` with proper fence ordering so destroy doesn't race the watchdog. ML-only. |
+| `9043` | amd-gfx ML `<20260819022138.3908141-1-Jesse.Zhang@amd.com>` (**v2**) | Jesse Zhang | drm/amdgpu/userq: lock and validate wptr BOs before reading their GPU offset on restore — **Added 2026-08-19** (merge). ML-only. |
+| `9044` | amd-gfx ML `<20260818072959.3356764-1-Jesse.Zhang@amd.com>` | Jesse Zhang | drm/amdgpu/userq: skip unmapped queues in `amdgpu_userq_wait_for_signal` — **Added 2026-08-19** (merge). ML-only. |
+| `9045` | amd-gfx ML `<20260817194953.97887-2-david.belanger@amd.com>` | David Belanger | drm/kfd: Add CU occupancy support to GFX12 — **Added 2026-08-19** (merge). Adds `kgd_gfx_v12_get_cu_occupancy` (gfx1201 = our GPU) using `soc24_grbm_select`. ML-only; the GFX12.1 sibling was dropped (off-target gfx1210). |
+| `9046` | amd-gfx ML `<SA1PR12MB8600DD7A487308741A4FDA6B9FA72@outlook.com>` | Vladimir Marioukhine | drm/amdkfd: fix integer overflow in queue ring buffer size calculation — **Added 2026-08-19** (merge, reconstructed from Outlook-mangled archive). Defensive hardening (`check_add_overflow`). ML-only. |
+| `9047` | amd-gfx ML `<20260817135918.228397-1-xiaogang.chen@amd.com>` | Xiaogang Chen | drm/amdkfd: Fix error path at `svm_migrate_copy_to_ram` — **Added 2026-08-19** (merge). SVM migration error-path fix. Series 1/3; must apply before `9048`. ML-only. |
+| `9048` | amd-gfx ML `<20260817135918.228397-2-xiaogang.chen@amd.com>` | Xiaogang Chen | drm/amdkfd: Fix the case that vm range is hole at `svm_migrate_copy_to_vram` — **Added 2026-08-19** (merge). SVM migration hole-range fix. Series 2/3; applies after `9047`. ML-only. |
 
 `9038`–`9040` must apply **after `9036`** (the userq VA-validation rewrite) — the `amdgpu_userq_input_va_validate()` hunk in `9038` depends on 9036's `amdgpu_vm_bo_lookup_mapping()` span-check shape. All three CLEAN on the full rc7 series (GNU `patch -p1 --forward`). From the same 5-patch 08-11 series: `9040` (1/5, free prt_va) does not apply to rc7 (context shifted), and 4/5 (enforce UVD handle ownership) targets legacy UVD hardware not present on RDNA4 — both not carried.
 

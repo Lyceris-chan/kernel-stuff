@@ -9,6 +9,38 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.2.0-2-sleepy] — 2026-08-19 (sweep candidates merged)
+
+Merged the 17 verified candidates from the 08-19 ultracode sweep onto the 7.2
+base. The series grew from 157 to 174 patches.
+
+### Added
+
+- **GPU core** (`1056`–`1058`): drm/sched `entity_is_idle()` lock (Philipp
+  Stanner), TTM grab-BO-ref-before-lock (Natalie Vock), amdgpu soft-evicted
+  tracking for always-valid BOs (Natalie Vock).
+- **Memory management** (`2114`–`2119`): RCU-tasks quiescent states in
+  `shrink_lruvec()` (Breno Leitao), swap bad-entry ratelimit, khugepaged
+  pte-unmap ordering (Nico Pache), zswap batch writeback (Hao Jia), shmem
+  fallocate overflow reject (Zhiling Zou), memcontrol vmstats/events
+  false-sharing (Usama Arif).
+- **Backports** (`9041`–`9048`): 4 userq fixes (doorbell xa-lock, destroy
+  hang/race, wptr-BO validate, wait_for_signal skip), KFD CU-occupancy GFX12
+  (David Belanger), KFD ring-buffer overflow (Vladimir Marioukhine), and 2
+  amdkfd SVM migration fixes (Xiaogang Chen).
+
+### Deferred / dropped
+
+- **Deferred:** pgrotate vmstat counters (standalone-inert, consumer not yet
+  rebased), AQL zero-size reject (awaiting v2 after Alex Deucher review).
+- **Dropped:** `MEMORY_FAILURE select MIGRATION` (no-op for our config),
+  KFD CU-occupancy GFX12.1 (off-target gfx1210).
+- **Not adopted:** pixelcluster "Don't evict page tables" — explicitly marked
+  `XXX super scuffed ... needs to be reworked` (hacky private-fork workaround);
+  work-items DDC fix requires the post-7.2 `amdgpu_dm_connector.c` split.
+
+---
+
 ## [7.2.0-1-sleepy] — 2026-08-19 (Linux 7.2 stable bump)
 
 Bumped the base from 7.2-rc7 to the **7.2 stable release**. Version is now
