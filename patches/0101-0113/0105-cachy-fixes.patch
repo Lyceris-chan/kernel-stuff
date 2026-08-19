@@ -1,19 +1,9 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From 3831154c2961e1450e22bfeb018c4553f98923b1 Mon Sep 17 00:00:00 2001
 From: squash <squash@local>
-Date: Mon, 10 Aug 2026 12:00:00 +0200
-Subject: [PATCH] cachyos-fixes: hardware-relevant fixes (full 25-patch v11 branch)
-
-CachyOS fixes branch v11 (25 patches) squashed against the rc7 series state
-(rc7 + 0001-0058). Includes the full branch incl. off-target hardware;
-0106-cachy-drops reverts the off-target groups so only the hardware-relevant
-fixes remain. v11 vs v10: renumbered to 25 patches (dropped usbcore 255-byte
-quirk), mm/mglru + mm/vmscan reworked to the vma_flags_t API, adds the PCI
-Skip Target Speed quirk (saves ~2s boot on empty/clamped PCIe slots).
-
-Signed-off-by: squash <squash@local>
----
+Date: Wed, 19 Aug 2026 12:00:00 +0200
+Subject: [PATCH] cachyos-fixes: hardware-relevant fixes (24-patch branch, excl 0012)
 diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
-index db2cb06aa..bebde469f 100644
+index db2cb06..bebde46 100644
 --- a/arch/arm/include/asm/mmu_context.h
 +++ b/arch/arm/include/asm/mmu_context.h
 @@ -80,7 +80,7 @@ static inline void check_and_switch_context(struct mm_struct *mm,
@@ -26,7 +16,7 @@ index db2cb06aa..bebde469f 100644
  	struct mm_struct *mm = current->mm;
  
 diff --git a/arch/riscv/include/asm/sync_core.h b/arch/riscv/include/asm/sync_core.h
-index 9153016da..2fe6b7fe6 100644
+index 9153016..2fe6b7f 100644
 --- a/arch/riscv/include/asm/sync_core.h
 +++ b/arch/riscv/include/asm/sync_core.h
 @@ -6,7 +6,7 @@
@@ -39,7 +29,7 @@ index 9153016da..2fe6b7fe6 100644
  	asm volatile ("fence.i" ::: "memory");
  }
 diff --git a/arch/s390/include/asm/mmu_context.h b/arch/s390/include/asm/mmu_context.h
-index bd1ef5e2d..95d03be2c 100644
+index bd1ef5e..95d03be 100644
 --- a/arch/s390/include/asm/mmu_context.h
 +++ b/arch/s390/include/asm/mmu_context.h
 @@ -93,7 +93,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
@@ -52,7 +42,7 @@ index bd1ef5e2d..95d03be2c 100644
  	struct task_struct *tsk = current;
  	struct mm_struct *mm = tsk->mm;
 diff --git a/arch/sparc/include/asm/mmu_context_64.h b/arch/sparc/include/asm/mmu_context_64.h
-index 78bbacc14..d1967214e 100644
+index 78bbacc..d196721 100644
 --- a/arch/sparc/include/asm/mmu_context_64.h
 +++ b/arch/sparc/include/asm/mmu_context_64.h
 @@ -160,7 +160,7 @@ static inline void arch_start_context_switch(struct task_struct *prev)
@@ -65,7 +55,7 @@ index 78bbacc14..d1967214e 100644
  	/* Restore the state of MCDPER register for the new process
  	 * just switched to.
 diff --git a/arch/x86/include/asm/sync_core.h b/arch/x86/include/asm/sync_core.h
-index 96bda4353..4b55fa353 100644
+index 96bda43..4b55fa3 100644
 --- a/arch/x86/include/asm/sync_core.h
 +++ b/arch/x86/include/asm/sync_core.h
 @@ -93,7 +93,7 @@ static __always_inline void sync_core(void)
@@ -78,7 +68,7 @@ index 96bda4353..4b55fa353 100644
  	/* With PTI, we unconditionally serialize before running user code. */
  	if (static_cpu_has(X86_FEATURE_PTI))
 diff --git a/arch/x86/kernel/cpu/amd.c b/arch/x86/kernel/cpu/amd.c
-index d61df70d6..45b660883 100644
+index d61df70..45b6608 100644
 --- a/arch/x86/kernel/cpu/amd.c
 +++ b/arch/x86/kernel/cpu/amd.c
 @@ -1042,11 +1042,8 @@ static const struct x86_cpu_id zen5_rdseed_microcode[] = {
@@ -96,7 +86,7 @@ index d61df70d6..45b660883 100644
  
  static void init_amd(struct cpuinfo_x86 *c)
 diff --git a/drivers/bluetooth/btusb.c b/drivers/bluetooth/btusb.c
-index 184e95c16..76e9bf00f 100644
+index 184e95c..76e9bf0 100644
 --- a/drivers/bluetooth/btusb.c
 +++ b/drivers/bluetooth/btusb.c
 @@ -566,6 +566,8 @@ static const struct usb_device_id quirks_table[] = {
@@ -117,126 +107,8 @@ index 184e95c16..76e9bf00f 100644
  	{ USB_DEVICE(0x13d3, 0x3585), .driver_info = BTUSB_MEDIATEK |
  						     BTUSB_WIDEBAND_SPEECH },
  	{ USB_DEVICE(0x13d3, 0x3610), .driver_info = BTUSB_MEDIATEK |
-diff --git a/drivers/gpu/drm/drm_displayid_internal.h b/drivers/gpu/drm/drm_displayid_internal.h
-index 4590d6a3d..dbdc20533 100644
---- a/drivers/gpu/drm/drm_displayid_internal.h
-+++ b/drivers/gpu/drm/drm_displayid_internal.h
-@@ -67,6 +67,7 @@ struct drm_edid;
- #define DATA_BLOCK_2_TILED_DISPLAY_TOPOLOGY	0x28
- #define DATA_BLOCK_2_CONTAINER_ID		0x29
- #define DATA_BLOCK_2_TYPE_10_FORMULA_TIMING	0x2a
-+#define DATA_BLOCK_2_ADAPTIVE_SYNC		0x2b
- #define DATA_BLOCK_2_VENDOR_SPECIFIC		0x7e
- #define DATA_BLOCK_2_CTA_DISPLAY_ID		0x81
- 
-diff --git a/drivers/gpu/drm/drm_edid.c b/drivers/gpu/drm/drm_edid.c
-index 5fa9afa28..0e049301a 100644
---- a/drivers/gpu/drm/drm_edid.c
-+++ b/drivers/gpu/drm/drm_edid.c
-@@ -6729,6 +6729,46 @@ static void drm_get_monitor_range(struct drm_connector *connector,
- 		    info->monitor_range.min_vfreq, info->monitor_range.max_vfreq);
- }
- 
-+#define DISPLAYID_ADAPTIVE_SYNC_DESC_SIZE 6
-+
-+static void drm_update_displayid_adaptive_sync_range(struct drm_connector *connector,
-+					     const struct displayid_block *block)
-+{
-+	struct drm_monitor_range_info *range = &connector->display_info.monitor_range;
-+	const u8 *data = (const u8 *)(block + 1);
-+	u16 best_min = 0, best_max = 0;
-+	unsigned int best_span = 0;
-+	int i;
-+
-+	if (block->rev != 0 || block->num_bytes < DISPLAYID_ADAPTIVE_SYNC_DESC_SIZE ||
-+	    block->num_bytes % DISPLAYID_ADAPTIVE_SYNC_DESC_SIZE)
-+		return;
-+
-+	for (i = 0; i < block->num_bytes; i += DISPLAYID_ADAPTIVE_SYNC_DESC_SIZE) {
-+		const u8 *desc = &data[i];
-+		u16 min_vfreq = desc[2];
-+		u16 max_vfreq = ((((u16)desc[4]) & 0x3) << 8) | desc[3];
-+		unsigned int span;
-+
-+		max_vfreq += 1;
-+		if (!min_vfreq || max_vfreq <= min_vfreq)
-+			continue;
-+
-+		span = max_vfreq - min_vfreq;
-+		if (span <= best_span)
-+			continue;
-+
-+		best_min = min_vfreq;
-+		best_max = max_vfreq;
-+		best_span = span;
-+	}
-+
-+	if (best_span) {
-+		range->min_vfreq = best_min;
-+		range->max_vfreq = best_max;
-+	}
-+}
-+
- static void drm_parse_vesa_mso_data(struct drm_connector *connector,
- 				    const struct displayid_block *block)
- {
-@@ -6851,26 +6891,41 @@ static void update_displayid_info(struct drm_connector *connector,
- {
- 	struct drm_display_info *info = &connector->display_info;
- 	const struct displayid_block *block;
-+	bool displayid_base_logged = false;
- 	struct displayid_iter iter;
- 
- 	displayid_iter_edid_begin(drm_edid, &iter);
- 	displayid_iter_for_each(block, &iter) {
--		drm_dbg_kms(connector->dev,
--			    "[CONNECTOR:%d:%s] DisplayID extension version 0x%02x, primary use 0x%02x\n",
--			    connector->base.id, connector->name,
--			    displayid_version(&iter),
--			    displayid_primary_use(&iter));
--		if (displayid_version(&iter) == DISPLAY_ID_STRUCTURE_VER_20 &&
--		    (displayid_primary_use(&iter) == PRIMARY_USE_HEAD_MOUNTED_VR ||
--		     displayid_primary_use(&iter) == PRIMARY_USE_HEAD_MOUNTED_AR))
--			info->non_desktop = true;
--
- 		/*
--		 * We're only interested in the base section here, no need to
--		 * iterate further.
-+		 * Primary use is a DisplayID base section property, but later
-+		 * blocks may still carry useful metadata like adaptive sync ranges.
- 		 */
--		break;
-+		if (!displayid_base_logged) {
-+			drm_dbg_kms(connector->dev,
-+				    "[CONNECTOR:%d:%s] DisplayID extension version 0x%02x, primary use 0x%02x\n",
-+				    connector->base.id, connector->name,
-+				    displayid_version(&iter),
-+				    displayid_primary_use(&iter));
-+			if (displayid_version(&iter) == DISPLAY_ID_STRUCTURE_VER_20 &&
-+			    (displayid_primary_use(&iter) == PRIMARY_USE_HEAD_MOUNTED_VR ||
-+			     displayid_primary_use(&iter) == PRIMARY_USE_HEAD_MOUNTED_AR))
-+				info->non_desktop = true;
-+
-+			displayid_base_logged = true;
-+		}
-+
-+		if (!info->monitor_range.min_vfreq && !info->monitor_range.max_vfreq &&
-+		    block->tag == DATA_BLOCK_2_ADAPTIVE_SYNC)
-+			drm_update_displayid_adaptive_sync_range(connector, block);
- 	}
-+
-+	if (info->monitor_range.min_vfreq && info->monitor_range.max_vfreq)
-+		drm_dbg_kms(connector->dev,
-+			    "[CONNECTOR:%d:%s] DisplayID adaptive sync refresh rate range is %d Hz - %d Hz\n",
-+			    connector->base.id, connector->name,
-+			    info->monitor_range.min_vfreq,
-+			    info->monitor_range.max_vfreq);
-+
- 	displayid_iter_end(&iter);
- }
- 
 diff --git a/drivers/gpu/drm/i915/display/intel_frontbuffer.c b/drivers/gpu/drm/i915/display/intel_frontbuffer.c
-index 705742e11..8bc1a88a1 100644
+index 705742e..8bc1a88 100644
 --- a/drivers/gpu/drm/i915/display/intel_frontbuffer.c
 +++ b/drivers/gpu/drm/i915/display/intel_frontbuffer.c
 @@ -97,6 +97,7 @@ static void frontbuffer_flush(struct intel_display *display,
@@ -248,7 +120,7 @@ index 705742e11..8bc1a88a1 100644
  	intel_fbc_flush(display, frontbuffer_bits, origin);
  }
 diff --git a/drivers/gpu/drm/i915/display/intel_psr.c b/drivers/gpu/drm/i915/display/intel_psr.c
-index beaa1d626..bc7842e9e 100644
+index beaa1d6..bc7842e 100644
 --- a/drivers/gpu/drm/i915/display/intel_psr.c
 +++ b/drivers/gpu/drm/i915/display/intel_psr.c
 @@ -714,8 +714,14 @@ static void _psr_init_dpcd(struct intel_dp *intel_dp, struct intel_connector *co
@@ -322,7 +194,7 @@ index beaa1d626..bc7842e9e 100644
 +	}
 +}
 diff --git a/drivers/gpu/drm/i915/display/intel_psr.h b/drivers/gpu/drm/i915/display/intel_psr.h
-index 29723e638..12a6b62fd 100644
+index 29723e6..12a6b62 100644
 --- a/drivers/gpu/drm/i915/display/intel_psr.h
 +++ b/drivers/gpu/drm/i915/display/intel_psr.h
 @@ -40,6 +40,7 @@ int intel_psr_debug_set(struct intel_dp *intel_dp, u64 value);
@@ -334,7 +206,7 @@ index 29723e638..12a6b62fd 100644
  		     unsigned frontbuffer_bits,
  		     enum fb_op_origin origin);
 diff --git a/drivers/gpu/drm/i915/gt/intel_rc6.c b/drivers/gpu/drm/i915/gt/intel_rc6.c
-index e91e5cdca..a0361f823 100644
+index e91e5cd..a0361f8 100644
 --- a/drivers/gpu/drm/i915/gt/intel_rc6.c
 +++ b/drivers/gpu/drm/i915/gt/intel_rc6.c
 @@ -2,9 +2,9 @@
@@ -367,7 +239,7 @@ index e91e5cdca..a0361f823 100644
  		return false;
  
 diff --git a/drivers/gpu/drm/nouveau/nouveau_ttm.c b/drivers/gpu/drm/nouveau/nouveau_ttm.c
-index ad01f922a..860bca7e3 100644
+index ad01f92..860bca7 100644
 --- a/drivers/gpu/drm/nouveau/nouveau_ttm.c
 +++ b/drivers/gpu/drm/nouveau/nouveau_ttm.c
 @@ -188,6 +188,11 @@ nouveau_ttm_init_vram(struct nouveau_drm *drm)
@@ -383,7 +255,7 @@ index ad01f922a..860bca7e3 100644
  					  drm->gem.vram_available >> PAGE_SHIFT);
  		ttm_set_driver_manager(&drm->ttm.bdev, TTM_PL_VRAM, man);
 diff --git a/drivers/i2c/i2c-core-acpi.c b/drivers/i2c/i2c-core-acpi.c
-index e5fddacae..405fa15c8 100644
+index e5fddac..405fa15 100644
 --- a/drivers/i2c/i2c-core-acpi.c
 +++ b/drivers/i2c/i2c-core-acpi.c
 @@ -373,6 +373,7 @@ static const struct acpi_device_id i2c_acpi_force_100khz_device_ids[] = {
@@ -395,7 +267,7 @@ index e5fddacae..405fa15c8 100644
  	{ "ELAN0678", 0 },
  	{ "ELAN06FA", 0 },
 diff --git a/drivers/net/wireless/intel/iwlwifi/mld/mac80211.c b/drivers/net/wireless/intel/iwlwifi/mld/mac80211.c
-index 9ac17be30..3d3e956b6 100644
+index 9ac17be..3d3e956 100644
 --- a/drivers/net/wireless/intel/iwlwifi/mld/mac80211.c
 +++ b/drivers/net/wireless/intel/iwlwifi/mld/mac80211.c
 @@ -516,6 +516,10 @@ iwl_mld_mac80211_tx(struct ieee80211_hw *hw,
@@ -410,7 +282,7 @@ index 9ac17be30..3d3e956b6 100644
  	 * so the FW can't translate the MLD addr to the link addr. Do it here
  	 */
 diff --git a/drivers/net/wireless/intel/iwlwifi/mld/tx.c b/drivers/net/wireless/intel/iwlwifi/mld/tx.c
-index 2df6643a5..7db7554ce 100644
+index 2df6643..7db7554 100644
 --- a/drivers/net/wireless/intel/iwlwifi/mld/tx.c
 +++ b/drivers/net/wireless/intel/iwlwifi/mld/tx.c
 @@ -987,6 +987,9 @@ void iwl_mld_tx_from_txq(struct iwl_mld *mld, struct ieee80211_txq *txq)
@@ -423,24 +295,8 @@ index 2df6643a5..7db7554ce 100644
  	/*
  	 * Don't transmit during firmware restart. The firmware is dead,
  	 * so iwl_trans_tx() would return -EIO for each frame. Avoid the
-diff --git a/drivers/net/wireless/mediatek/mt76/dma.c b/drivers/net/wireless/mediatek/mt76/dma.c
-index 322041859..f8c2fe5f2 100644
---- a/drivers/net/wireless/mediatek/mt76/dma.c
-+++ b/drivers/net/wireless/mediatek/mt76/dma.c
-@@ -1189,10 +1189,7 @@ void mt76_dma_cleanup(struct mt76_dev *dev)
- 	mt76_for_each_q_rx(dev, i) {
- 		struct mt76_queue *q = &dev->q_rx[i];
- 
--		if (!mt76_queue_is_wed_rro(q)) {
--			napi_disable(&dev->napi[i]);
--			netif_napi_del(&dev->napi[i]);
--		}
-+		netif_napi_del(&dev->napi[i]);
- 		mt76_dma_rx_cleanup(dev, q);
- 
- 		page_pool_destroy(q->page_pool);
 diff --git a/drivers/net/wireless/realtek/rtw89/fw.c b/drivers/net/wireless/realtek/rtw89/fw.c
-index d6a594b75..c6f175041 100644
+index d6a594b..c6f1750 100644
 --- a/drivers/net/wireless/realtek/rtw89/fw.c
 +++ b/drivers/net/wireless/realtek/rtw89/fw.c
 @@ -11780,7 +11780,7 @@ static void rtw89_fw_cmd_ofld_write_rf(struct rtw89_dev *rtwdev,
@@ -462,7 +318,7 @@ index d6a594b75..c6f175041 100644
  		.value = ms * 1000,
  	};
 diff --git a/drivers/net/wireless/realtek/rtw89/fw.h b/drivers/net/wireless/realtek/rtw89/fw.h
-index 20721d520..3fcb3ac8c 100644
+index 20721d5..3fcb3ac 100644
 --- a/drivers/net/wireless/realtek/rtw89/fw.h
 +++ b/drivers/net/wireless/realtek/rtw89/fw.h
 @@ -3142,7 +3142,6 @@ enum rtw89_fw_cmd_ofld_arg_src {
@@ -474,7 +330,7 @@ index 20721d520..3fcb3ac8c 100644
  
  enum rtw89_fw_cmd_ofld_arg_type {
 diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-index b09f27f78..9e407c449 100644
+index b09f27f..9e407c4 100644
 --- a/drivers/pci/quirks.c
 +++ b/drivers/pci/quirks.c
 @@ -108,7 +108,11 @@ int pcie_failed_link_retrain(struct pci_dev *dev)
@@ -491,7 +347,7 @@ index b09f27f78..9e407c449 100644
  		ret = pcie_set_target_speed(dev, PCIE_SPEED_2_5GT, false);
  		if (ret)
 diff --git a/drivers/usb/core/message.c b/drivers/usb/core/message.c
-index 75e2bfd74..1d83f8be0 100644
+index 75e2bfd..1d83f8b 100644
 --- a/drivers/usb/core/message.c
 +++ b/drivers/usb/core/message.c
 @@ -1052,6 +1052,25 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
@@ -521,7 +377,7 @@ index 75e2bfd74..1d83f8be0 100644
  		dev_dbg(&dev->dev,
  			"wrong descriptor type %02x for string %d (\"%s\")\n",
 diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-index 48d851fbd..7c1dac8da 100644
+index 48d851f..7c1dac8 100644
 --- a/include/linux/perf_event.h
 +++ b/include/linux/perf_event.h
 @@ -1632,7 +1632,7 @@ static inline void perf_event_task_migrate(struct task_struct *task)
@@ -534,7 +390,7 @@ index 48d851fbd..7c1dac8da 100644
  {
  	if (static_branch_unlikely(&perf_sched_events))
 diff --git a/include/linux/rmap.h b/include/linux/rmap.h
-index 8dc0871e5..e090aa098 100644
+index 8dc0871..e090aa0 100644
 --- a/include/linux/rmap.h
 +++ b/include/linux/rmap.h
 @@ -843,7 +843,7 @@ static inline int folio_try_share_anon_rmap_pmd(struct folio *folio,
@@ -560,7 +416,7 @@ index 8dc0871e5..e090aa098 100644
  }
  
 diff --git a/include/linux/sched/mm.h b/include/linux/sched/mm.h
-index 95d0040df..a17730d63 100644
+index 95d0040..a17730d 100644
 --- a/include/linux/sched/mm.h
 +++ b/include/linux/sched/mm.h
 @@ -32,7 +32,7 @@ extern struct mm_struct *mm_alloc(void);
@@ -647,10 +503,10 @@ index 95d0040df..a17730d63 100644
  	/*
  	 * The atomic_read() below prevents CSE. The following should
 diff --git a/include/linux/tick.h b/include/linux/tick.h
-index 1cf4651f0..2f91eccd2 100644
+index 47750cc..7009813 100644
 --- a/include/linux/tick.h
 +++ b/include/linux/tick.h
-@@ -173,7 +173,7 @@ extern cpumask_var_t tick_nohz_full_mask;
+@@ -175,7 +175,7 @@ extern cpumask_var_t tick_nohz_full_mask;
  #ifdef CONFIG_NO_HZ_FULL
  extern bool tick_nohz_full_running;
  
@@ -659,7 +515,7 @@ index 1cf4651f0..2f91eccd2 100644
  {
  	if (!context_tracking_enabled())
  		return false;
-@@ -297,7 +297,7 @@ static inline void __tick_nohz_task_switch(void) { }
+@@ -299,7 +299,7 @@ static inline void __tick_nohz_task_switch(void) { }
  static inline void tick_nohz_full_setup(cpumask_var_t cpumask) { }
  #endif
  
@@ -669,7 +525,7 @@ index 1cf4651f0..2f91eccd2 100644
  	if (tick_nohz_full_enabled())
  		__tick_nohz_task_switch();
 diff --git a/include/linux/vtime.h b/include/linux/vtime.h
-index 82825e775..ce83fc743 100644
+index 82825e7..ce83fc7 100644
 --- a/include/linux/vtime.h
 +++ b/include/linux/vtime.h
 @@ -89,24 +89,24 @@ static __always_inline void vtime_account_guest_exit(void)
@@ -702,7 +558,7 @@ index 82825e775..ce83fc743 100644
  	if (vtime_accounting_enabled_this_cpu())
  		vtime_task_switch_generic(prev);
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index 96226707c..85f215e7d 100644
+index 6994911..e55a8f2 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
 @@ -3732,6 +3732,9 @@ static inline void ttwu_do_wakeup(struct task_struct *p)
@@ -770,10 +626,10 @@ index 96226707c..85f215e7d 100644
  {
  	struct rq *rq = this_rq();
 diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index d78467ec6..c324882e5 100644
+index b15251c..bf5c9a0 100644
 --- a/kernel/sched/fair.c
 +++ b/kernel/sched/fair.c
-@@ -13336,12 +13336,15 @@ static int sched_balance_rq(int this_cpu, struct rq *this_rq,
+@@ -13347,12 +13347,15 @@ static int sched_balance_rq(int this_cpu, struct rq *this_rq,
  		 * still unbalanced. ld_moved simply stays zero, so it is
  		 * correctly treated as an imbalance.
  		 */
@@ -792,7 +648,7 @@ index d78467ec6..c324882e5 100644
  		 * cur_ld_moved - load moved in current iteration
  		 * ld_moved     - cumulative load moved across iterations
 diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
-index 56acf502b..c7135879f 100644
+index 5fac34a..a4a1eb5 100644
 --- a/kernel/sched/sched.h
 +++ b/kernel/sched/sched.h
 @@ -1457,12 +1457,12 @@ static inline struct cpumask *sched_group_span(struct sched_group *sg);
@@ -892,10 +748,10 @@ index 56acf502b..c7135879f 100644
  {
  	raw_spin_rq_unlock(rq);
 diff --git a/mm/rmap.c b/mm/rmap.c
-index 1c77d5dc0..d0d595a35 100644
+index 898b893..7656b1f 100644
 --- a/mm/rmap.c
 +++ b/mm/rmap.c
-@@ -907,7 +907,7 @@ pmd_t *mm_find_pmd(struct mm_struct *mm, unsigned long address)
+@@ -908,7 +908,7 @@ pmd_t *mm_find_pmd(struct mm_struct *mm, unsigned long address)
  struct folio_referenced_arg {
  	int mapcount;
  	int referenced;
@@ -904,7 +760,7 @@ index 1c77d5dc0..d0d595a35 100644
  	struct mem_cgroup *memcg;
  };
  
-@@ -926,7 +926,7 @@ static bool folio_referenced_one(struct folio *folio,
+@@ -927,7 +927,7 @@ static bool folio_referenced_one(struct folio *folio,
  		address = pvmw.address;
  		nr = 1;
  
@@ -913,7 +769,7 @@ index 1c77d5dc0..d0d595a35 100644
  			ptes++;
  			pra->mapcount--;
  
-@@ -947,7 +947,7 @@ static bool folio_referenced_one(struct folio *folio,
+@@ -948,7 +948,7 @@ static bool folio_referenced_one(struct folio *folio,
  			/* Restore the mlock which got missed */
  			mlock_vma_folio(folio, vma);
  			page_vma_mapped_walk_done(&pvmw);
@@ -922,7 +778,7 @@ index 1c77d5dc0..d0d595a35 100644
  			return false; /* To break the loop */
  		}
  
-@@ -1015,8 +1015,11 @@ static bool folio_referenced_one(struct folio *folio,
+@@ -1021,8 +1021,11 @@ static bool folio_referenced_one(struct folio *folio,
  		referenced++;
  
  	if (referenced) {
@@ -935,7 +791,7 @@ index 1c77d5dc0..d0d595a35 100644
  	}
  
  	if (!pra->mapcount)
-@@ -1054,7 +1057,7 @@ static bool invalid_folio_referenced_vma(struct vm_area_struct *vma, void *arg)
+@@ -1060,7 +1063,7 @@ static bool invalid_folio_referenced_vma(struct vm_area_struct *vma, void *arg)
   * @folio: The folio to test.
   * @is_locked: Caller holds lock on the folio.
   * @memcg: target memory cgroup
@@ -944,7 +800,7 @@ index 1c77d5dc0..d0d595a35 100644
   *
   * Quick test_and_clear_referenced for all mappings of a folio,
   *
-@@ -1062,7 +1065,7 @@ static bool invalid_folio_referenced_vma(struct vm_area_struct *vma, void *arg)
+@@ -1068,7 +1071,7 @@ static bool invalid_folio_referenced_vma(struct vm_area_struct *vma, void *arg)
   * the function bailed out due to rmap lock contention.
   */
  int folio_referenced(struct folio *folio, int is_locked,
@@ -953,7 +809,7 @@ index 1c77d5dc0..d0d595a35 100644
  {
  	bool we_locked = false;
  	struct folio_referenced_arg pra = {
-@@ -1078,7 +1081,7 @@ int folio_referenced(struct folio *folio, int is_locked,
+@@ -1084,7 +1087,7 @@ int folio_referenced(struct folio *folio, int is_locked,
  	};
  
  	VM_WARN_ON_ONCE_FOLIO(folio_is_zone_device(folio), folio);
@@ -962,7 +818,7 @@ index 1c77d5dc0..d0d595a35 100644
  	if (!pra.mapcount)
  		return 0;
  
-@@ -1092,7 +1095,7 @@ int folio_referenced(struct folio *folio, int is_locked,
+@@ -1098,7 +1101,7 @@ int folio_referenced(struct folio *folio, int is_locked,
  	}
  
  	rmap_walk(folio, &rwc);
@@ -972,10 +828,10 @@ index 1c77d5dc0..d0d595a35 100644
  	if (we_locked)
  		folio_unlock(folio);
 diff --git a/mm/vmscan.c b/mm/vmscan.c
-index 56708d1d2..c17f84d4f 100644
+index 552a7a4..06a0971 100644
 --- a/mm/vmscan.c
 +++ b/mm/vmscan.c
-@@ -267,6 +267,12 @@ static int sc_swappiness(struct scan_control *sc, struct mem_cgroup *memcg)
+@@ -301,6 +301,12 @@ static int sc_swappiness(struct scan_control *sc, struct mem_cgroup *memcg)
  }
  #endif
  
@@ -988,7 +844,7 @@ index 56708d1d2..c17f84d4f 100644
  static void set_task_reclaim_state(struct task_struct *task,
  				   struct reclaim_state *rs)
  {
-@@ -835,10 +841,16 @@ enum folio_references {
+@@ -907,10 +913,16 @@ enum folio_references {
   * with PG_active set. In contrast, the aging (page table walk) path uses
   * folio_update_gen().
   */
@@ -1006,7 +862,7 @@ index 56708d1d2..c17f84d4f 100644
  		set_mask_bits(&folio->flags.f, LRU_REFS_MASK, BIT(PG_referenced));
  		return false;
  	}
-@@ -851,7 +863,7 @@ static bool lru_gen_set_refs(struct folio *folio)
+@@ -923,7 +935,7 @@ static bool lru_gen_set_refs(struct folio *folio)
  	return true;
  }
  #else
@@ -1015,7 +871,7 @@ index 56708d1d2..c17f84d4f 100644
  {
  	return false;
  }
-@@ -861,16 +873,16 @@ static enum folio_references folio_check_references(struct folio *folio,
+@@ -933,16 +945,16 @@ static enum folio_references folio_check_references(struct folio *folio,
  						  struct scan_control *sc)
  {
  	int referenced_ptes, referenced_folio;
@@ -1035,7 +891,7 @@ index 56708d1d2..c17f84d4f 100644
  		return FOLIOREF_ACTIVATE;
  
  	/*
-@@ -886,7 +898,7 @@ static enum folio_references folio_check_references(struct folio *folio,
+@@ -955,7 +967,7 @@ static enum folio_references folio_check_references(struct folio *folio,
  		if (!referenced_ptes)
  			return FOLIOREF_RECLAIM;
  
@@ -1044,7 +900,7 @@ index 56708d1d2..c17f84d4f 100644
  	}
  
  	referenced_folio = folio_test_clear_referenced(folio);
-@@ -914,7 +926,7 @@ static enum folio_references folio_check_references(struct folio *folio,
+@@ -1007,7 +1019,7 @@ static enum folio_references folio_check_references(struct folio *folio,
  		/*
  		 * Activate file-backed executable folios after first usage.
  		 */
@@ -1053,7 +909,7 @@ index 56708d1d2..c17f84d4f 100644
  			return FOLIOREF_ACTIVATE;
  
  		return FOLIOREF_KEEP;
-@@ -2072,7 +2084,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
+@@ -2191,7 +2203,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
  {
  	unsigned long nr_taken;
  	unsigned long nr_scanned;
@@ -1062,7 +918,7 @@ index 56708d1d2..c17f84d4f 100644
  	LIST_HEAD(l_hold);	/* The folios which were snipped off */
  	LIST_HEAD(l_active);
  	LIST_HEAD(l_inactive);
-@@ -2116,7 +2128,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
+@@ -2235,7 +2247,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
  
  		/* Referenced or rmap lock contention: rotate */
  		if (folio_referenced(folio, 0, sc->target_mem_cgroup,
@@ -1071,7 +927,7 @@ index 56708d1d2..c17f84d4f 100644
  			/*
  			 * Identify referenced, file-backed active folios and
  			 * give them one more trip around the active list. So
-@@ -2126,7 +2138,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
+@@ -2245,7 +2257,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
  			 * IO, plus JVM can create lots of anon VM_EXEC folios,
  			 * so we ignore them here.
  			 */
@@ -1080,7 +936,7 @@ index 56708d1d2..c17f84d4f 100644
  				nr_rotated += folio_nr_pages(folio);
  				list_add(&folio->lru, &l_active);
  				continue;
-@@ -3195,14 +3207,19 @@ static bool positive_ctrl_err(struct ctrl_pos *sp, struct ctrl_pos *pv)
+@@ -3314,14 +3326,19 @@ static bool positive_ctrl_err(struct ctrl_pos *sp, struct ctrl_pos *pv)
   ******************************************************************************/
  
  /* promote pages accessed through page tables */
@@ -1103,7 +959,7 @@ index 56708d1d2..c17f84d4f 100644
  		set_mask_bits(&folio->flags.f, LRU_REFS_MASK, BIT(PG_referenced));
  		return -1;
  	}
-@@ -3435,8 +3452,8 @@ static bool suitable_to_scan(int total, int young)
+@@ -3554,8 +3571,8 @@ static bool suitable_to_scan(int total, int young)
  	return young * n >= total;
  }
  
@@ -1114,7 +970,7 @@ index 56708d1d2..c17f84d4f 100644
  {
  	int old_gen;
  
-@@ -3449,10 +3466,10 @@ static void walk_update_folio(struct lru_gen_mm_walk *walk, struct folio *folio,
+@@ -3568,10 +3585,10 @@ static void walk_update_folio(struct lru_gen_mm_walk *walk, struct folio *folio,
  		folio_mark_dirty(folio);
  
  	if (walk) {
@@ -1127,7 +983,7 @@ index 56708d1d2..c17f84d4f 100644
  		old_gen = folio_lru_gen(folio);
  		if (old_gen >= 0 && old_gen != new_gen)
  			folio_activate(folio);
-@@ -3525,7 +3542,7 @@ static bool walk_pte_range(pmd_t *pmd, unsigned long start, unsigned long end,
+@@ -3644,7 +3661,7 @@ static bool walk_pte_range(pmd_t *pmd, unsigned long start, unsigned long end,
  			continue;
  
  		if (last != folio) {
@@ -1136,7 +992,7 @@ index 56708d1d2..c17f84d4f 100644
  
  			last = folio;
  			dirty = false;
-@@ -3538,7 +3555,7 @@ static bool walk_pte_range(pmd_t *pmd, unsigned long start, unsigned long end,
+@@ -3657,7 +3674,7 @@ static bool walk_pte_range(pmd_t *pmd, unsigned long start, unsigned long end,
  		walk->mm_stats[MM_LEAF_YOUNG] += nr;
  	}
  
@@ -1145,7 +1001,7 @@ index 56708d1d2..c17f84d4f 100644
  	last = NULL;
  
  	if (i < PTRS_PER_PTE && get_next_vma(PMD_MASK, PAGE_SIZE, args, &start, &end))
-@@ -3616,7 +3633,7 @@ static void walk_pmd_range_locked(pud_t *pud, unsigned long addr, struct vm_area
+@@ -3735,7 +3752,7 @@ static void walk_pmd_range_locked(pud_t *pud, unsigned long addr, struct vm_area
  			goto next;
  
  		if (last != folio) {
@@ -1154,7 +1010,7 @@ index 56708d1d2..c17f84d4f 100644
  
  			last = folio;
  			dirty = false;
-@@ -3630,7 +3647,7 @@ static void walk_pmd_range_locked(pud_t *pud, unsigned long addr, struct vm_area
+@@ -3749,7 +3766,7 @@ static void walk_pmd_range_locked(pud_t *pud, unsigned long addr, struct vm_area
  		i = i > MIN_LRU_BATCH ? 0 : find_next_bit(bitmap, MIN_LRU_BATCH, i) + 1;
  	} while (i <= MIN_LRU_BATCH);
  
@@ -1163,7 +1019,7 @@ index 56708d1d2..c17f84d4f 100644
  
  	lazy_mmu_mode_disable();
  	spin_unlock(ptl);
-@@ -4265,7 +4282,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw, unsigned int nr)
+@@ -4388,7 +4405,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw, unsigned int nr)
  			continue;
  
  		if (last != folio) {
@@ -1172,7 +1028,7 @@ index 56708d1d2..c17f84d4f 100644
  
  			last = folio;
  			dirty = false;
-@@ -4277,7 +4294,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw, unsigned int nr)
+@@ -4400,7 +4417,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw, unsigned int nr)
  		young += nr;
  	}
  
@@ -1182,7 +1038,7 @@ index 56708d1d2..c17f84d4f 100644
  	lazy_mmu_mode_disable();
  
 diff --git a/sound/hda/codecs/realtek/alc269.c b/sound/hda/codecs/realtek/alc269.c
-index 48a2e7f2e..70a029ea0 100644
+index 48a2e7f..70a029e 100644
 --- a/sound/hda/codecs/realtek/alc269.c
 +++ b/sound/hda/codecs/realtek/alc269.c
 @@ -4077,6 +4077,7 @@ enum {
@@ -1222,7 +1078,7 @@ index 48a2e7f2e..70a029ea0 100644
  	SND_PCI_QUIRK(0x1043, 0x12f0, "ASUS X541UV", ALC256_FIXUP_ASUS_MIC_NO_PRESENCE),
  	SND_PCI_QUIRK(0x1043, 0x1313, "Asus K42JZ", ALC269VB_FIXUP_ASUS_MIC_NO_PRESENCE),
 diff --git a/sound/soc/intel/boards/sof_sdw.c b/sound/soc/intel/boards/sof_sdw.c
-index c527d575d..454c608d7 100644
+index c527d57..454c608 100644
 --- a/sound/soc/intel/boards/sof_sdw.c
 +++ b/sound/soc/intel/boards/sof_sdw.c
 @@ -845,6 +845,15 @@ static const struct dmi_system_id sof_sdw_quirk_table[] = {

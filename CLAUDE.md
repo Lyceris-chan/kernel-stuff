@@ -77,7 +77,7 @@ Each range is a category; use the next unused number in the correct range.
 | `2200–2299` | CPU idle (NAP governor) | sirlucjan `nap-patches/` (firelzrd's repo is BORE-only) |
 | `9000–9099` | agd5f staging backports | `git format-patch` from agd5f/linux — **verify all symbols exist in rc mainline first** |
 
-All sirlucjan directories live under `repos/sirlucjan-kernel-patches/7.2-rc/`.
+All sirlucjan directories live under `repos/sirlucjan-kernel-patches/7.2/` (renamed from `7.2-rc/` when 7.2 released, 2026-08-19).
 The CachyOS squashes are generated **against the actual series state** (rc7 + the `00xx` local/upstream patches), not a clean rc — the pre-CachyOS patches touch shared files like `drm_edid.c`. Two known conflicts handled inside the squashes: `0151` duplicates `0055`, and `0053` must be dropped when the hdmi branch is present.
 
 ## Full maintenance cycle

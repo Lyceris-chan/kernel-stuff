@@ -38,7 +38,7 @@ description: >
   changes the process directory to the repo, so a relative patch path like
   `patches/<range>/NNNN-....patch` resolves against the repo and errors "can't
   open patch". Always write
-  `git -C repos/linux-7.2-rc7 apply --check "$PWD/patches/<range>/NNNN-....patch"`.
+  `git -C repos/linux-7.2 apply --check "$PWD/patches/<range>/NNNN-....patch"`.
   Patches live in `patches/<range>/` folders (2026-08-11); root-level
   `NNNN-*.patch` entries are gitignored build symlinks, not the source of truth.
 - **Capture real exit codes, never `| head && echo OK`.** `git apply --check f 2>&1 |
@@ -138,7 +138,7 @@ git -C repos/linux-pm log --since="$SINCE" --oneline --all -E \
 
 # sirlucjan: new/updated third-party performance patches (no --grep; list dirs)
 echo "=== sirlucjan 7.2-rc (new version dirs) ==="
-ls repos/sirlucjan-kernel-patches/7.2-rc/ | grep -E "fixes-v|lru-marie-v|preempt-ipi-v|nap"
+ls repos/sirlucjan-kernel-patches/7.2/ | grep -E "fixes-v|lru-marie-v|preempt-ipi-v|nap"
 ```
 
 ## Step 2b — x86/security scan (Zen 4 CPU mitigations)
@@ -249,7 +249,7 @@ that IS a candidate for our tree.
 Use `git apply --check` (not `patch --dry-run`) against the clean reference tree:
 
 ```bash
-TREE="repos/linux-7.2-rc7"
+TREE="repos/linux-7.2"
 
 check_commit() {
   local repo="$1" sha="$2"
@@ -286,19 +286,19 @@ already exist in the clean rc7 tree (not just in a staging branch). If the
 patch fails here it depends on staging infrastructure and must be dropped.
 ```bash
 # For GPU/display patches:
-grep -r "<unique_symbol>" repos/linux-7.2-rc7/drivers/gpu/drm/amd/ | head
+grep -r "<unique_symbol>" repos/linux-7.2/drivers/gpu/drm/amd/ | head
 # For PM patches:
-grep -r "<unique_symbol>" repos/linux-7.2-rc7/drivers/cpufreq/ | head
+grep -r "<unique_symbol>" repos/linux-7.2/drivers/cpufreq/ | head
 # For block patches:
-grep -r "<unique_symbol>" repos/linux-7.2-rc7/block/ | head
+grep -r "<unique_symbol>" repos/linux-7.2/block/ | head
 ```
 If `grep` returns nothing for any referenced symbol, DROP the candidate.
 
 **Check 3 — Applies cleanly.** Use `git apply --check` (NOT `patch --dry-run`)
 against the clean reference tree:
 ```bash
-git -C repos/linux-7.2-rc7 apply --check <candidate>.patch       # forward check
-git -C repos/linux-7.2-rc7 apply --check -R <candidate>.patch    # already-applied check
+git -C repos/linux-7.2 apply --check <candidate>.patch       # forward check
+git -C repos/linux-7.2 apply --check -R <candidate>.patch    # already-applied check
 ```
 - Forward check passes → CLEAN, proceed to Check 4.
 - Reverse check passes (forward fails) → already applied upstream, DROP it.

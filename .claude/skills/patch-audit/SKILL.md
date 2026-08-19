@@ -119,20 +119,20 @@ the "never access lore" rule stands unless separately verified.)
 - **Repository**: `https://github.com/sirlucjan/kernel-patches.git`
 - **Location**: `repos/sirlucjan-kernel-patches`
 - **Fetch**: `cd repos/sirlucjan-kernel-patches && git pull`
-- **Audit**: Inspect `7.2-rc/` directories. Current versions to expect:
+- **Audit**: Inspect `7.2/` directories. Current versions to expect:
   `lru-marie-patches-v12/`, `zstd-dev-patches/`, `block-patches-sep/`,
   `cachyos-fixes-patches-v10-sep/`, `preempt-ipi-patches-v3-sep/`, `nap-patches/`.
 - **Byte-check**: Verify `2000–2004` (block), `2100–2101` (MM) patches match source diffs.
 
 ### 6. `sirlucjan` NAP governor (NOT firelzrd)
 - **IMPORTANT (learned this session):** the NAP governor source is
-  `repos/sirlucjan-kernel-patches/7.2-rc/nap-patches/`, which contains
+  `repos/sirlucjan-kernel-patches/7.2/nap-patches/`, which contains
   `0001-7.2-nap-v0.5.0.patch`. firelzrd's repo
   (`repos/firelzrd-bore-scheduler`) has **NO** `nap-patches/` directory — its
   `patches/` only contains `additions/`, `legacy/`, `stable/`, `testing/` and is
   BORE-scheduler only. Do not look for NAP patches there.
 - Fetch: `git -C repos/sirlucjan-kernel-patches pull`
-- Audit: `ls repos/sirlucjan-kernel-patches/7.2-rc/nap-patches/` and compare
+- Audit: `ls repos/sirlucjan-kernel-patches/7.2/nap-patches/` and compare
   against the in-tree `2200-7.2-nap-v0.5.0.patch`.
 
 ---

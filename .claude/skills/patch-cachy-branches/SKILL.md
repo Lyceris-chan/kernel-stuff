@@ -18,14 +18,14 @@ description: >
 
 ## Source
 
-All patches come from `repos/sirlucjan-kernel-patches/7.2-rc/` (or the
+All patches come from `repos/sirlucjan-kernel-patches/7.2/` (or the
 matching version directory). Never use the monolithic mega-patch approach.
 
 **NAP governor source (learned this session):** the NAP governor is NOT in
 firelzrd's repo. firelzrd's `repos/firelzrd-bore-scheduler` has **no**
 `nap-patches/` directory — its `patches/` contains only `additions/`, `legacy/`,
 `stable/`, `testing/` and is BORE-scheduler only. The NAP source is
-`repos/sirlucjan-kernel-patches/7.2-rc/nap-patches/` (currently
+`repos/sirlucjan-kernel-patches/7.2/nap-patches/` (currently
 `0001-7.2-nap-v0.5.0.patch`, used as `2200-7.2-nap-v0.5.0.patch`).
 
 ## Step 1 — Update the repo
@@ -37,7 +37,7 @@ git -C repos/sirlucjan-kernel-patches pull
 ## Step 2 — Identify latest `-sep` directory for each branch
 
 ```bash
-ls repos/sirlucjan-kernel-patches/7.2-rc/ | grep -E "bbr3|cgroup|fixes|hdmi|preempt|vesa|kbuild|cpu-cachy|nap"
+ls repos/sirlucjan-kernel-patches/7.2/ | grep -E "bbr3|cgroup|fixes|hdmi|preempt|vesa|kbuild|cpu-cachy|nap"
 ```
 
 For versioned branches choose the highest-numbered version. **Current versions
@@ -134,7 +134,7 @@ Repeat for each branch with the squash numbers from Step 3. For `fixes`,
 squash the full branch into `0105-cachy-fixes.patch`, then build
 `0106-cachy-drops.patch` as the reverse diff of the off-target groups (Step 4).
 Verify each squash with `git apply --check 01xx-cachy-*.patch` against a clean
-`repos/linux-7.2-rc7` tree.
+`repos/linux-7.2` tree.
 
 After regenerating ANY `01xx` squash, re-validate the FULL series in order —
 a changed `01xx` sits mid-series and can shift context for the later `10xx`/
@@ -157,7 +157,7 @@ the series (Fangzhi Zuo 2/4), then the `0151`
 **Exclude `0151` from the `0107-cachy-hdmi.patch` squash.** Check with:
 
 ```bash
-git -C repos/linux-7.2-rc7 apply --check -R "$BASE/hdmi-patches-sep/0151-...patch" 2>&1
+git -C repos/linux-7.2 apply --check -R "$BASE/hdmi-patches-sep/0151-...patch" 2>&1
 ```
 
 If the reverse check passes, `0151` is already present — drop it from the

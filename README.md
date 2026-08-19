@@ -2,11 +2,11 @@
 
 `linux-sleepy` is a custom Arch Linux kernel package built for one machine: an
 AMD Zen 4 desktop with an RDNA 4 graphics card. It is based on Linux mainline
-`7.2-rc7` and layers a sanitized [CachyOS](https://github.com/CachyOS/linux-cachyos)
+`7.2` and layers a sanitized [CachyOS](https://github.com/CachyOS/linux-cachyos)
 patchset plus targeted local and upstream patches on top.
 
-**Base version:** `7.2.0-rc7-8-sleepy`
-**Artifact:** `linux-sleepy-7.2.rc7-8-x86_64.pkg.tar.zst`
+**Base version:** `7.2.0-1-sleepy`
+**Artifact:** `linux-sleepy-7.2.0-1-x86_64.pkg.tar.zst`
 
 This is not a general-purpose kernel; the configuration is opinionated for the
 hardware below.
@@ -53,7 +53,7 @@ hardware is unsupported.
 
 Here's what `linux-sleepy` gives you on top of each baseline.
 
-**Over vanilla Linux 7.2-rc7:**
+**Over vanilla Linux 7.2:**
 
 - The hardware-relevant subset of CachyOS: BBRv3 TCP, `-O3` + Zen 4 ISA, VRAM
   cgroups, sched-ext preemption, HDMI 2.1 FreeSync/VRR, and EDID DSC BPP.
@@ -127,8 +127,8 @@ makepkg -f -s -c
 
 The build produces these packages:
 
-- `linux-sleepy-7.2.rc7-8-x86_64.pkg.tar.zst`
-- `linux-sleepy-headers-7.2.rc7-8-x86_64.pkg.tar.zst`
+- `linux-sleepy-7.2.0-1-x86_64.pkg.tar.zst`
+- `linux-sleepy-headers-7.2.0-1-x86_64.pkg.tar.zst`
 
 During the build you are prompted whether to enable CAKE SQM shaping (via the
 `net-tune` service); in non-interactive environments (CI, piped input) the
@@ -162,8 +162,8 @@ against — not with your distro's compiler.
 Install the kernel and headers:
 
 ```bash
-sudo pacman -U linux-sleepy-7.2.rc7-8-x86_64.pkg.tar.zst \
-              linux-sleepy-headers-7.2.rc7-8-x86_64.pkg.tar.zst
+sudo pacman -U linux-sleepy-7.2.0-1-x86_64.pkg.tar.zst \
+              linux-sleepy-headers-7.2.0-1-x86_64.pkg.tar.zst
 ```
 
 Regenerate your bootloader config (for GRUB):
@@ -272,7 +272,7 @@ echo profile_peak | sudo tee /sys/class/drm/card0/device/power_dpm_force_perform
 
 ## Patch series
 
-The series carries 184 patches in the ranges below. `PATCH_SOURCES.md` is the
+The series carries 157 patches in the ranges below. `PATCH_SOURCES.md` is the
 authoritative per-patch manifest — authors, commit hashes, Message-IDs, and every
 dropped or deferred entry — so it is not duplicated here.
 

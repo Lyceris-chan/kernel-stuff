@@ -61,8 +61,8 @@ reverse-applied with `patch -Np1 --forward -R` to keep `.pstate_enabled = false`
 - Context lines shifted → regenerate from the source repo (see `patch-audit`).
 - Test a patch independently against the clean tree:
   ```bash
-  git -C repos/linux-7.2-rc7 apply --check "$PWD/<patch>"     # forward (use ABSOLUTE path — git -C changes CWD)
-  git -C repos/linux-7.2-rc7 apply --check -R "$PWD/<patch>"  # already-applied?
+  git -C repos/linux-7.2 apply --check "$PWD/<patch>"     # forward (use ABSOLUTE path — git -C changes CWD)
+  git -C repos/linux-7.2 apply --check -R "$PWD/<patch>"  # already-applied?
   patch -p1 --forward --dry-run < <patch>                     # THE authoritative check — matches prepare()'s tool
   ```
   **Lesson (2026-08-03):** `git apply --check` can PASS where GNU `patch -p1

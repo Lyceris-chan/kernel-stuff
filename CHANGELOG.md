@@ -9,6 +9,33 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.2.0-1-sleepy] — 2026-08-19 (Linux 7.2 stable bump)
+
+Bumped the base from 7.2-rc7 to the **7.2 stable release**. Version is now
+`7.2.0-1-sleepy`. The series dropped from 184 to 157 patches.
+
+### Changed
+
+- **Base → Linux 7.2 stable.** Reference tree `repos/linux-7.2`, source
+  tarball `linux-7.2.tar.gz`, version string `7.2.0-1-sleepy`.
+- **Dropped the DRM scheduler FAIR revert series (`1029`–`1046`) and the
+  min_vruntime fix (`1053`).** 7.2 stable upstream already reverted FAIR→FIFO
+  (commit `2bbea6b81`) and defaults to FIFO with multi-rq — our rc7 revert
+  series is now obsolete.
+- **Dropped 8 patches merged upstream in 7.2:** `1048`, `1049`, `1052`,
+  `1134`, `1141`, `9033`, `9037`, `9008`.
+- **Regenerated the CachyOS `0105`/`0106` fixes squashes** from the current
+  sirlucjan fixes branch (24-patch). The branch now carries the MM exec-folio
+  series (vma_flags_t, exec-folio helper, MGLRU promote-exec) inside `0105`.
+- **Upgraded LRU-MARIE to 0.10.5** (`2101`), with the `vma_flags_test` fix
+  preserved against the CachyOS vma_flags_t rename.
+- **MuQSS / CK patchset evaluated and rejected:** the new MuQSS v0.31 series is
+  mutually exclusive with sched-ext (the patch adds `scx_cpuperf_target()`/
+  `scx_switched_all()` stubs disabling SCX); our config uses
+  `CONFIG_SCHED_CLASS_EXT=y`, so it is not adoptable.
+
+---
+
 ## [7.2.0-rc7-8-sleepy] — 2026-08-15 (zstd 1.6.0 + work-items recheck)
 
 ### Changed
