@@ -185,7 +185,8 @@ pkgrel=1
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
-_srctag=linux-${_major}.${_minor}
+# torvalds tarballs are linux-7.2 (not linux-7.2.0) for stable releases
+_srctag=linux-${_major}
 _srcname=${_srctag}
 pkgdesc='Linux Clang ThinLTO + AutoFDO  + Cachy Sauce Kernel by CachyOS with other patches and improvements'
 _kernver="$pkgver-$pkgrel"
@@ -221,7 +222,7 @@ _nv_ver=610.43.02
 _nv_pkg="NVIDIA-Linux-x86_64-${_nv_ver}"
 _nv_open_pkg="NVIDIA-kernel-module-source-${_nv_ver}"
 source=(
-  "https://git.kernel.org/torvalds/t/linux-7.2-rc7.tar.gz"
+  "https://git.kernel.org/torvalds/t/linux-7.2.tar.gz"
   "config"
   # ── 00xx: Handmade local patches (Sleepy/Antigravity) ─────────────────────
   "patches/0001-0049/0001-drm-amd-pm-Fix-typo-in-smu_v14_0_set_irq_state.patch"
@@ -1027,7 +1028,7 @@ for _p in "${pkgname[@]}"; do
     }"
 done
 
-b2sums=('4299f17dac88bd1aacf58f1ba0b7061859c1723845925b0efc36e09248f74fa5eb57fa9a3d11f7699943713997f4449933f516f120c77d2eac7777d768f36345'
+b2sums=('82262b58b43fad0e011da209b85d97d77b147c4dba361696298680bea4d6dd550dcd4a1d9b8212150bdbeac736115078a0a0a9aaed75fcd2f4cf7b41cc4e0998'
         '23f570909d870d709e9b9f414d8a9f543da492085c0ed457e6896d995e5cd608f7e45f3bdc96a5f09b595fb04e24babd6b9811ed03ea8d9598996aea0e890a9b'
         'a7cefe36f18ea4390b41849e604ad6257cccdbf25c2af380d2353397858cba21f6eb02b0774ebc24ec26639539a8858a29262b02edb60eba5736cd172993480f'
         '458b2cb2413befbbd76c22bd541da17694965d535b486df65fc6b5c470a8b06ddbb0224f25dd966d53210de2d9559da04b7822f688e5f0034ec0094d2f276be8'
