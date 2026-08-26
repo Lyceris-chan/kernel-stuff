@@ -1,0 +1,50 @@
+From 89caac2e157317946378038a7b2f4d6e219c6c70 Mon Sep 17 00:00:00 2001
+From: Sleepy <sleepy@example.com>
+Date: Wed, 26 Aug 2026 12:30:27 +0200
+Subject: [PATCH 14/15] drm/amdkfd: mark queues as reset after a full GPU reset
+
+KFD post-reset fix (amd-gfx ML 151019/151314, 08-24): the reset wipes the
+MES queue table, so mark queues as reset so teardown does not try to remove
+them from MES again (avoids a double-remove path after Mode 1 reset on
+MES-based parts like gfx1201).
+
+ML WIP (08-24) - isolated in this commit, easy to drop when it lands
+upstream.
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+---
+ drivers/gpu/drm/amd/amdkfd/kfd_device.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_device.c b/drivers/gpu/drm/amd/amdkfd/kfd_device.c
+index 586e640f13dc..d326e41a8656 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_device.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_device.c
+@@ -1033,6 +1033,27 @@ int kgd2kfd_post_reset(struct kfd_dev *kfd)
+ 	if (!kfd->init_complete)
+ 		return 0;
+ 
++	/*
++	 * The reset wiped the MES queue table. Mark the queues as reset so
++	 * that teardown does not try to remove them from MES again.
++	 */
++	if (kfd->shared_resources.enable_mes) {
++		for (i = 0; i < kfd->num_nodes; i++) {
++			struct device_queue_manager *dqm = kfd->nodes[i]->dqm;
++			struct device_process_node *cur;
++			struct qcm_process_device *qpd;
++			struct queue *q;
++
++			dqm_lock(dqm);
++			list_for_each_entry(cur, &dqm->queues, list) {
++				qpd = cur->qpd;
++				list_for_each_entry(q, &qpd->queues_list, list)
++					q->properties.is_reset = true;
++			}
++			dqm_unlock(dqm);
++		}
++	}
++
+ 	for (i = 0; i < kfd->num_nodes; i++) {
+ 		ret = kfd_resume(kfd->nodes[i]);
+ 		if (ret)
