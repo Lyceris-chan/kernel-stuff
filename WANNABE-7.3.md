@@ -24,6 +24,35 @@ History (bottom → top):
 6. `cd4af3bd9966`, `9d45255b110d`, `89caac2e1573`, `2eeb9993b449` — **4 ML
    WIP merges** (userq GPU-reset 5-patch + BO-bind + KFD queues-reset +
    vm_init NULL-deref reorder).
+7. `d664528851e9` — **7.3 reconciliation** (fixes stale additive-layer hunks;
+   see "Build status" below).
+
+## Build status (2026-08-26)
+
+The wannabe tree **builds** with the LLVM 23.1.0-rc3 kernel.org toolchain
+(`CC=clang LD=ld.lld LLVM=1 LLVM_IAS=1`, O=/tmp/wb-build, 16 cores):
+`bzImage` ready, **BTF present** (`.BTF`/`.BTF_ids`), 131 modules, version
+`7.2.0-next-20260825-00015-g2eeb9993b449` (base + 15 commits before the
+reconciliation commit). Three stale 7.2 additive-layer hunks had to be
+reconciled (`d664528851e9`):
+
+- **LRU-MARIE 0.10.5 does not port to 7.3.** Its unguarded thrash-aware
+  no-progress block in `should_reclaim_retry()` references
+  `ac->last_refaults` (a `struct alloc_context` field the 7.3 header hunk
+  failed to add) and 12+ hunks across `huge_memory.c`/`rmap.c`/`vmscan.c`/
+  `page_io.c` fail. The preview builds with `CONFIG_LRU_MARIE` **disabled**
+  (base MGLRU instead) and the unguarded block reverted to base. A proper
+  7.3 port is tracked separately.
+- **9045** (KFD CU-occupancy) applied twice → duplicate function block removed.
+- **1116/1117** (dcn42b translator) duplicated the base `dml2_dcn42b_max_ip_caps`
+  → extra copy removed.
+
+To rebuild:
+```bash
+make -C wannabe-7.3-rc1 O=/tmp/wb-build olddefconfig CC=clang LD=ld.lld LLVM=1 LLVM_IAS=1
+make -C wannabe-7.3-rc1 O=/tmp/wb-build -j16 modules CC=clang LD=ld.lld LLVM=1 LLVM_IAS=1
+# bzImage: /tmp/wb-build/arch/x86/boot/bzImage; .config has the PKGBUILD overrides
+```
 
 ## What the base already contains
 

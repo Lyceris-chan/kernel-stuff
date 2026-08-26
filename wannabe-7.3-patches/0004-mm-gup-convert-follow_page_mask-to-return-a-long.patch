@@ -1,7 +1,7 @@
 From b283884f04a2c27bd19a7cdf351b912cc845b423 Mon Sep 17 00:00:00 2001
 From: Rik van Riel <riel@surriel.com>
 Date: Mon, 10 Aug 2026 22:51:51 -0400
-Subject: [PATCH 04/15] mm/gup: convert follow_page_mask() to return a long
+Subject: [PATCH 04/16] mm/gup: convert follow_page_mask() to return a long
 
 follow_page_mask() and its helpers return a struct page pointer: NULL,
 ERR_PTR(), or the page found. Change the return type to long instead:

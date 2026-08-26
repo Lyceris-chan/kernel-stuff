@@ -1,7 +1,7 @@
 From 89caac2e157317946378038a7b2f4d6e219c6c70 Mon Sep 17 00:00:00 2001
 From: Sleepy <sleepy@example.com>
 Date: Wed, 26 Aug 2026 12:30:27 +0200
-Subject: [PATCH 14/15] drm/amdkfd: mark queues as reset after a full GPU reset
+Subject: [PATCH 14/16] drm/amdkfd: mark queues as reset after a full GPU reset
 
 KFD post-reset fix (amd-gfx ML 151019/151314, 08-24): the reset wipes the
 MES queue table, so mark queues as reset so teardown does not try to remove

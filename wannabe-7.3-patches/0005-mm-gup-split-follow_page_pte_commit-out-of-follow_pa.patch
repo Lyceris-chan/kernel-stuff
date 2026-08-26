@@ -1,7 +1,7 @@
 From 9fbdbf16c2394d1b03501ce62c9d6a98bc427dd3 Mon Sep 17 00:00:00 2001
 From: Rik van Riel <riel@surriel.com>
 Date: Mon, 10 Aug 2026 22:51:52 -0400
-Subject: [PATCH 05/15] mm/gup: split follow_page_pte_commit() out of
+Subject: [PATCH 05/16] mm/gup: split follow_page_pte_commit() out of
  follow_page_pte()
 
 follow_page_pte() does two things once it has resolved a present PTE

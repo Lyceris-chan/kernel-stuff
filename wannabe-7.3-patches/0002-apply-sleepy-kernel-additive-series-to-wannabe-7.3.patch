@@ -1,7 +1,7 @@
 From 4834e3546e26ca4bb988cc4f70c24bb2e00ee4de Mon Sep 17 00:00:00 2001
 From: Sleepy <sleepy@local>
 Date: Wed, 26 Aug 2026 11:27:32 +0200
-Subject: [PATCH 02/15] apply sleepy-kernel additive series to wannabe 7.3
+Subject: [PATCH 02/16] apply sleepy-kernel additive series to wannabe 7.3
 
 Apply the 69 patches from our 7.2 series that are still additive on top of
 next-20260825 (the upstream 7.3 content already covers cgroup-vram/fixes/

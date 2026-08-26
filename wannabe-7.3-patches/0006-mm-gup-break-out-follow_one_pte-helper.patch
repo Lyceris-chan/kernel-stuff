@@ -1,7 +1,7 @@
 From d71a0f5b585faa81f0eef07ff9bdb5aa31cd7434 Mon Sep 17 00:00:00 2001
 From: Rik van Riel <riel@surriel.com>
 Date: Mon, 10 Aug 2026 22:51:53 -0400
-Subject: [PATCH 06/15] mm/gup: break out follow_one_pte() helper
+Subject: [PATCH 06/16] mm/gup: break out follow_one_pte() helper
 
 follow_page_pte() is 92 lines and does two separate things: work out
 which page a PTE maps, if any, and commit to the page it found. The

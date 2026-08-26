@@ -1,7 +1,7 @@
 From ef7d0a878a6ebece8f5bbb6187f9c954f681fe05 Mon Sep 17 00:00:00 2001
 From: Rik van Riel <riel@surriel.com>
 Date: Mon, 10 Aug 2026 22:51:55 -0400
-Subject: [PATCH 08/15] mm/gup: return a huge page's full count from
+Subject: [PATCH 08/16] mm/gup: return a huge page's full count from
  follow_page_mask()
 
 follow_huge_pud()/follow_huge_pmd() already know the huge page's full

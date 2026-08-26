@@ -1,7 +1,7 @@
 From 759b7fb8fbe9a5fae6f314e474d4c35b49e99f45 Mon Sep 17 00:00:00 2001
 From: Sleepy <sleepy@local>
 Date: Wed, 26 Aug 2026 11:23:42 +0200
-Subject: [PATCH 01/15] merge 7.3-window candidates: amd-staging (17) +
+Subject: [PATCH 01/16] merge 7.3-window candidates: amd-staging (17) +
  drm/sched lock
 
 Merge hardware-relevant 7.3-window commits not yet in next-20260825:

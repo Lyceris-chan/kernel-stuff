@@ -1,7 +1,7 @@
 From 6c2092bc8448ccac75d9f89b0216a6ca3ccf97d3 Mon Sep 17 00:00:00 2001
 From: Rik van Riel <riel@surriel.com>
 Date: Mon, 10 Aug 2026 22:51:57 -0400
-Subject: [PATCH 10/15] mm/gup: batch contiguous same-folio PTEs into one
+Subject: [PATCH 10/16] mm/gup: batch contiguous same-folio PTEs into one
  refcount grab
 
 follow_page_pte() now walks a whole page table in one call, but still

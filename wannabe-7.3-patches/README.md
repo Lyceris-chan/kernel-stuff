@@ -19,7 +19,7 @@ git am ../wannabe-7.3-patches/*.patch
 `git am` on this series reproduces the exact tree of branch `wannabe-7.3`
 (verified 2026-08-26: `git diff` vs the branch tip is empty).
 
-## Content (0001→0015)
+## Content (0001→0016)
 
 1. `0001` — 18 upstream merges (17 amd-staging + drm/sched lock)
 2. `0002` — 69 sleepy-kernel additive patches (CachyOS + local)
@@ -30,6 +30,12 @@ git am ../wannabe-7.3-patches/*.patch
 6. `0013` — BO-bind for imported user-queue BOs (v5)
 7. `0014` — KFD mark queues as reset after full GPU reset
 8. `0015` — amdgpu_vm_init error-path NULL-deref reorder
+9. `0016` — **7.3 reconciliation**: fixes stale 7.2 additive-layer hunks so
+   the tree compiles (MARIE 0.10.5 does NOT port to 7.3 — its unguarded
+   thrash-aware OOM block is reverted to base, so the preview builds without
+   LRU-MARIE; the 9045 KFD CU-occupancy and 1116 dcn42b patches overlapped
+   the base and their duplicate blocks are removed). See the commit message
+   and `WANNABE-7.3.md` for details.
 
 Each patch keeps its original `From:`/`Subject:`/`Signed-off-by:` headers
 (commit SHAs differ from the live branch because `git am` recreates them).

@@ -1,7 +1,7 @@
 From cd4af3bd9966e4dd187c7217f5681748db683b2e Mon Sep 17 00:00:00 2001
 From: Sleepy <sleepy@example.com>
 Date: Wed, 26 Aug 2026 12:28:16 +0200
-Subject: [PATCH 12/15] drm/amdgpu: merge userq GPU-reset crash + lockdep fixes
+Subject: [PATCH 12/16] drm/amdgpu: merge userq GPU-reset crash + lockdep fixes
  (Vitaly Prosyak)
 
 The 5-patch series from the amd-gfx ML (08-24, messages 151398-151403)

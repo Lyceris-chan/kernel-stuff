@@ -1,7 +1,7 @@
 From 5ea4142645e477181f9dfd3ba73fdbb6b0b404f9 Mon Sep 17 00:00:00 2001
 From: Sleepy <sleepy@example.com>
 Date: Wed, 26 Aug 2026 11:42:53 +0200
-Subject: [PATCH 11/15] drm/amd/display: merge upstream HDMI 2.1 VRR/ALLM v4
+Subject: [PATCH 11/16] drm/amd/display: merge upstream HDMI 2.1 VRR/ALLM v4
  (amdgpu-side)
 
 Cherry-picked the three amdgpu-side patches of the HDMI 2.1 VRR + ALLM

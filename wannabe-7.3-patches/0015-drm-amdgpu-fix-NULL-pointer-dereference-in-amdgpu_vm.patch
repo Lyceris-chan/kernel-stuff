@@ -1,7 +1,7 @@
 From 2eeb9993b4494cbe8736d885a6bc79f9c79f4864 Mon Sep 17 00:00:00 2001
 From: Sleepy <sleepy@example.com>
 Date: Wed, 26 Aug 2026 12:36:42 +0200
-Subject: [PATCH 15/15] drm/amdgpu: fix NULL pointer dereference in
+Subject: [PATCH 15/16] drm/amdgpu: fix NULL pointer dereference in
  amdgpu_vm_init error path
 
 Reorder the error path (dri-devel ML 591316, 08-25): free the root page

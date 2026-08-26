@@ -1,7 +1,7 @@
 From 053ce5bc0ed81985caca469dc8c8879bf18357c7 Mon Sep 17 00:00:00 2001
 From: Rik van Riel <riel@surriel.com>
 Date: Mon, 10 Aug 2026 22:51:56 -0400
-Subject: [PATCH 09/15] mm/gup: walk multiple PTEs per follow_page_pte() call
+Subject: [PATCH 09/16] mm/gup: walk multiple PTEs per follow_page_pte() call
 
 follow_page_pte() looks at one PTE per call, so __get_user_pages() calls
 it once per page, restarting the pgd/p4d/pud/pmd descent and retaking the

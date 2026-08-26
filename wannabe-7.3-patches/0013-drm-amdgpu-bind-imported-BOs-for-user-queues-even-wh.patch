@@ -1,7 +1,7 @@
 From 9d45255b110d4c2713dc1053964306aefc0d4623 Mon Sep 17 00:00:00 2001
 From: Sleepy <sleepy@example.com>
 Date: Wed, 26 Aug 2026 12:29:13 +0200
-Subject: [PATCH 13/15] drm/amdgpu: bind imported BOs for user queues even when
+Subject: [PATCH 13/16] drm/amdgpu: bind imported BOs for user queues even when
  eviction fence signaled
 
 Merge of the v5 fix (amd-gfx ML 151460, 08-25) into
