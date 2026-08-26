@@ -445,13 +445,21 @@ on mTHP; applies cleanly to next-20260825 (`git am`, no conflicts). Marked RFC
 isolated so it's easy to drop. Reverses the 08-15 "Reviewed, not taken"
 verdict **for the wannabe tree only**; still not part of the PKGBUILD series.
 
-*Layer 5 — ML WIP merges (3 commits, `cd4af3bd9966`, `9d45255b110d`,
-`89caac2e1573`):* amd-gfx ML series (08-24/08-25) that apply cleanly —
-userq GPU-reset crash + lockdep 5-patch (`151398`–`151403`, Vitaly Prosyak:
-dma_resv slot reserve, hang_detect_work cancel-before-mutex, reset-lock
-after halt_activities, psp firmware.mutex skip, drm_client_resume outside
-reset sem); BO-bind for imported BOs (v5, `151460`); KFD mark queues as
-reset after full GPU reset (`151019`). All isolated commits, easy to drop.
+*Layer 5 — ML WIP merges (4 commits, `cd4af3bd9966`, `9d45255b110d`,
+`89caac2e1573`, `2eeb9993b449`):* amd-gfx + dri-devel ML series
+(08-24/08-25) that apply cleanly — userq GPU-reset crash + lockdep 5-patch
+(`151398`–`151403`, Vitaly Prosyak: dma_resv slot reserve, hang_detect_work
+cancel-before-mutex, reset-lock after halt_activities, psp firmware.mutex
+skip, drm_client_resume outside reset sem); BO-bind for imported BOs (v5,
+`151460`); KFD mark queues as reset after full GPU reset (`151019`); vm_init
+error-path NULL-deref reorder (dri-devel `591316`). All isolated commits,
+easy to drop.
+
+dri-devel sweep (08-26) also checked: userq doorbell-xa-lock during hang
+reset (`150766`/`151309`) — stale context vs the newer mes_userqueue.c (the
+amdgpu_userq.c hang-detect side already holds the lock); MMIO-TLB fallback
+RFC — dropped by its author; is_idle removal — old-IP refactor, skip; KIQ
+init reserve-error propagation — minor candidate.
 
 **0107 vs clean ML HDMI (verified 08-26):** the ML VRR/ALLM v4 amdgpu-side
 patches (1/4, 3/4, 4/4) target `amdgpu_dm_connector.c` / `amdgpu_dm_freesync.c`

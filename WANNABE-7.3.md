@@ -21,8 +21,9 @@ History (bottom → top):
    WIP, Rik van Riel).
 5. `5ea4142645e4` — **3 upstream HDMI 2.1 VRR/ALLM v4 commits** (clean
    HDMI, amd-gfx ML).
-6. `cd4af3bd9966`, `9d45255b110d`, `89caac2e1573` — **3 ML WIP merges**
-   (userq GPU-reset 5-patch + BO-bind + KFD queues-reset).
+6. `cd4af3bd9966`, `9d45255b110d`, `89caac2e1573`, `2eeb9993b449` — **4 ML
+   WIP merges** (userq GPU-reset 5-patch + BO-bind + KFD queues-reset +
+   vm_init NULL-deref reorder).
 
 ## What the base already contains
 
@@ -183,6 +184,17 @@ amd-gfx and dri-devel MLs, work-items tracker, sirlucjan, and firelzrd:
 
 ## Repo + work-items re-check (08-26)
 
+- **Mailing lists enumerated**: amd-gfx + dri-devel are the only relevant
+  freedesktop lists (there is no separate "drm" or "amdgpu" list — those
+  names map to amd-gfx and dri-devel). lore-only lists (linux-pm, linux-mm,
+  linux-kernel, netdev) are covered via the git repos; never curl lore.
+- **dri-devel sweep**: merged the amdgpu_vm_init NULL-deref reorder
+  (`2eeb9993b449`, `591316`); the userq doorbell-xa-lock-during-hang-reset
+  series (`150766`/`151309`) has a stale context against the newer
+  mes_userqueue.c restructure (amdgpu_userq.c side already locks) — noted,
+  re-evaluate when it lands upstream; MMIO-TLB RFC dropped by its author;
+  is_idle removal targets old IPs (gmc_v6/jpeg_v5/vega20) — refactor, skip;
+  KIQ init reserve-error propagation — minor, candidate.
 - **Repos**: linux-next still at `next-20260825` (our base is current);
   drm-next HEAD 08-24 and linux-pm HEAD 08-18 are in base;
   amd-staging-drm-next tip `75a5e1b6b` (08-12) is exactly our Layer-1

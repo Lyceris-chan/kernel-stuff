@@ -99,6 +99,19 @@ Never scrape `lore.kernel.org` — its anti-bot protection blocks agents.
   while GNU `patch` in prepare() rejects it. When a `.rej` shows context lines that reference a
   symbol another carried patch adds, renumber so that patch comes FIRST (1127→1128→1129 order).
   The definitive check is `prepare()`/`makepkg -o` applying the whole series in order.
+- **Per-message extraction gotchas (learned 2026-08-26):** thread.html message links are
+  `<LI><A HREF="NNNNN.html">subject` (bare 6-digit msgid, not `msgNNNNN.html`) — grep with
+  `-oE '<LI><A HREF="[0-9]+\.html">[^<]*'` to find the ORIGINAL submission (replies quote the
+  patch and break spacing). dri-devel pages use U+00A0 nbsp for indentation
+  (`.replace('&nbsp;',' ').replace('\xa0',' ')`) and may carry a trailing HTML attachment
+  after the `-- ` diff terminator (truncate there). QP-encoded mboxes: `git am <mbox>` on a
+  scratch worktree decodes natively, then cherry-pick.
+- **Tree-target triage — amdgpu_dm split (learned 2026-08-26):** a patch touching
+  `amdgpu_dm_connector.c` / `amdgpu_dm_freesync.c` targets the 7.3+ amdgpu_dm split; the
+  same content on 7.2 lives in the MONOLITHIC `amdgpu_dm.c`. Verify `git apply --check`
+  against the right reference tree (`repos/linux-7.2` for the PKGBUILD series, the wannabe
+  next-worktree for 7.3 previews) BEFORE deciding applicability — "No such file" on
+  `amdgpu_dm_connector.c` means the patch is 7.3-only.
 
 ### 4b. drm/amd work items tracker (gitlab.freedesktop.org) — ACCESS WORKAROUND (learned 2026-08-03)
 

@@ -103,6 +103,25 @@ curl -s -A "$UA" "https://lists.freedesktop.org/archives/dri-devel/${MONTH}.txt.
 #   https://lists.freedesktop.org/archives/amd-gfx/2026-August/abcdef1234567890.html
 # Download one the same way, with the browser UA:
 #   curl -s -A "$UA" "https://lists.freedesktop.org/archives/dri-devel/${MONTH}/thread.html" -o /tmp/dri-thread.html
+# Message links in thread.html are <LI><A HREF="NNNNN.html">[PATCH n/N] subject
+# (msgid is a bare 6-digit number, NOT "msgNNNNN.html"). Extract subjects:
+#   grep -oE '<LI><A HREF="[0-9]+\.html">[^<]*' /tmp/dri-thread.html \
+#     | sed -E 's/<LI><A HREF="([0-9]+)\.html">/\1: /'
+# The date/subject/author indexes only contain navigation links — use thread.html.
+
+# ML message extraction (learned 2026-08-26) — per-message pages are unreliable
+# as raw patches. Known gotchas:
+#   * QP-encoded mboxes (patchew.org mirrors): `git am <mbox>` decodes them
+#     natively — use git am on a scratch worktree, then cherry-pick the commits.
+#   * dri-devel pages use U+00A0 non-breaking spaces for indentation AND wrap
+#     lines as <LI><A HREF=...>mailing-list links; always
+#     .replace('&nbsp;',' ').replace('\xa0',' ') before git apply.
+#   * Some messages are replies that quote the patch (broken spacing). Find the
+#     ORIGINAL [PATCH] message via the thread.html grep above instead.
+#   * Pages may carry a trailing "-------------- next part --------------" HTML
+#     attachment after the "-- 2.xx.x" diff terminator — truncate at "-- ".
+#   * After extraction always `git apply --check`; if a hunk is stale against a
+#     newer base, apply the change manually with Edit rather than forcing fuzz.
 
 # If a download produced an EMPTY file or a page containing "403 Forbidden",
 # stop — do not continue. Re-run with the UA above, or use the git repos.
@@ -209,6 +228,16 @@ events feeds return real JSON):
 curl -s "https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/issues?state=opened&per_page=100&sort=updated_desc" -o issues.json
 curl -s "https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/events?per_page=100" -o events.json
 ```
+
+**CAVEAT (learned 2026-08-26):** `sort=updated_desc&order_by=updated_at` can
+return a single error object instead of the array — if `.json` has one key or
+`len()==1` with a dict, drop the sort params (`?state=opened&per_page=100` is
+the reliable form). The tracker is **mostly bug reports, not fixes**: most open
+issues have no referenced fix yet. Treat each as "track / verify a referenced
+fix", not "merge". Watch the RX 9070 XT clusters: flip_done timeouts (#5616,
+#5625, #5647 — the Leo Li / amd-drm-next DCN fixes land in the base, see the
+7.3 section below) and the VCN-unigate + SMU-deadlock → Mode 1 reset (#5693,
+created 08-25, no fix referenced yet).
 
 Check issue titles/descriptions and events (comment bodies + referenced commit SHAs)
 for unmerged patch series relevant to our hardware. If a request returns an Anubis
@@ -388,3 +417,50 @@ rc7 `kfd_mqd_manager_v11.c` functions), rebuild the diff body from rc7 ground
 truth with proper tabs, and confirm content-identical modulo whitespace. Then
 pass BOTH `git apply --check` and GNU `patch -p1 --forward --dry-run` before
 adopting. Record the reconstruction in `PATCH_SOURCES.md` with the Message-ID.
+
+## Step 9 — Wannabe next-tree sweeps (pre-RC previews, learned 2026-08-26)
+
+When 7.3-rc1 doesn't exist yet, maintain the **wannabe preview tree** at
+`wannabe-7.3-rc1/` (git worktree from `repos/linux-next`, branch
+`wannabe-7.3`, gitignored). See `WANNABE-7.3.md` for the full history. For a
+"check everything" sweep against it:
+
+1. **Repos**: linux-next tags (`git tag -l 'next-*'`) — the snapshot is the
+   base; if the newest tag equals what the worktree is on, repos are covered.
+   drm-next / linux-pm / amd-staging tips before the snapshot date are in base.
+   amd-staging tip = our Layer-1 cherry-pick; post-tip content is GC 12.1 /
+   datacenter (off-target for gfx1201).
+2. **MLs**: amd-gfx + dri-devel are the ONLY relevant freedesktop lists
+   (there is no separate "drm" or "amdgpu" list — those names map to amd-gfx
+   and dri-devel). lore-only lists (linux-pm, linux-mm, linux-kernel, netdev)
+   are covered via the git repos; never curl lore.
+3. **Work items**: see Step 4 caveats — mostly bug reports, track don't merge.
+4. **WIP merge rule**: a series applies cleanly to next-YYYYMMDD AND is
+   on-target AND not a v1-major-rework / maintainer-rejected / author-dropped
+   → merge as ONE isolated commit ("ML WIP, easy to drop when it lands
+   upstream"), document in `WANNABE-7.3.md` + `PATCH_SOURCES.md`. Verify
+   `make defconfig` (cheap Kconfig sanity) and 0 `.orig`/`.rej` after.
+   Rejected-as-upstream: author-dropped (MMIO-TLB fallback), maintainer-rejected
+   (userq-manager keep-alive), v1-major-rework (Alex Deucher 30-patch GPU TLB
+   KIQ→SDMA rework — supersedes our TLB series, watch `agd5f tlb_inv_rework`).
+5. **amdgpu_dm split (7.2 vs 7.3)**: `amdgpu_dm_connector.c` +
+   `amdgpu_dm_freesync.c` exist only on 7.3+. The ML HDMI VRR/ALLM series
+   (Fangzhi Zuo / Tomasz Pakuła, v4 `150619`–`150623`) targets the split →
+   applies to 7.3, NOT 7.2 (`git apply --check` fails "No such file"). The
+   CachyOS `0107` hdmi squash wires dc_edid_parser into the MONOLITHIC
+   7.2 amdgpu_dm.c → **0107 is required on 7.2, superseded on 7.3** (base has
+   dc_edid_parser + update_freesync_caps + FRL fixes). Don't try to swap them
+   across versions.
+6. **Leo Li (`sunpeng.li@amd.com`) display fixes** (flip-done timeouts on
+   mode1 reset `82730dba0cf9`, DCN vblank/flip consolidation
+   `c87e6635d2db`, GRPH_FLIP status check `f64a9be56536`): ~400 commits in
+   the 7.3 base. They are the #5616 flip_done fixes — arrive with the 7.3
+   bump, do NOT backport to 7.2 (same amdgpu_dm-split reason).
+7. **MARIE LRU**: 0.10.5 is current (firelzrd `55d2c27`; sirlucjan has no 7.3
+   dir). zstd `2100` already has the gcc<11.4 workaround (sirlucjan's
+   `zstd-dev-patches-v2` is the same merge reorganized).
+
+Known-good WIP merges on the 7.3 tree (08-26): gup `follow_page_mask()`
+batching (Rik van Riel RFC v3, 8 commits, `git am`), HDMI VRR/ALLM v4
+amdgpu-side (3 commits), userq GPU-reset 5-patch (Vitaly Prosyak), BO-bind
+v5, KFD mark-queues-reset, vm_init NULL-deref reorder — all isolated commits.
