@@ -588,18 +588,9 @@ _package() {
     # Used by mkinitcpio to name the kernel
     echo "$pkgbase" | install -Dm644 /dev/stdin "$modulesdir/pkgbase"
 
-    # net-tune: unified CAKE SQM + low-latency ethernet tuning service.
-    echo "Installing net-tune service (SQM + latency tuning)..."
-    install -Dm755 "$startdir/net-tune/net-tune.sh" -t "$pkgdir/usr/local/bin/"
-    install -Dm644 "$startdir/net-tune/net-tune.service" -t "$pkgdir/usr/lib/systemd/system/"
-    if [ -f "$startdir/src/net-tune.conf" ]; then
-        install -Dm644 "$startdir/src/net-tune.conf" -t "$pkgdir/etc/"
-    else
-        install -Dm644 "$startdir/net-tune/net-tune.conf" -t "$pkgdir/etc/"
-    fi
-    install -d "$pkgdir/etc/systemd/system/multi-user.target.wants"
-    ln -s /usr/lib/systemd/system/net-tune.service "$pkgdir/etc/systemd/system/multi-user.target.wants/net-tune.service"
-
+    # net-tune is owned by the linux-sleepy package (the two kernels share the
+    # identical service); shipping it here too would conflict with pacman's
+    # file-ownership check when both kernels are installed side by side.
     echo "Installing modules..."
     ZSTD_CLEVEL=19 make "${BUILD_FLAGS[@]}" INSTALL_MOD_PATH="$pkgdir/usr" INSTALL_MOD_STRIP=1 \
         DEPMOD=/doesnt/exist  modules_install  # Suppress depmod
