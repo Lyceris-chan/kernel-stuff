@@ -179,16 +179,16 @@ pkgbase="linux-$_pkgsuffix"
 _major=7.2
 _minor=0
 _rcver=
-pkgver=20260825
+pkgver=20260826
 _tagrel=1
-pkgrel=5
+pkgrel=6
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
 # linux-next snapshot (the 7.3 merge-window content) for the wannabe 7.3 preview
-_srctag=next-20260825
+_srctag=next-20260826
 _srcname=${_srctag}
-pkgdesc='Wannabe Linux 7.3-next preview kernel: linux-next 20260825 + sleepy hardware merges (CachyOS optimizations included)'
+pkgdesc='Wannabe Linux 7.3-next preview kernel: linux-next 20260826 + sleepy hardware merges (CachyOS optimizations included)'
 _kernver="$pkgver-$pkgrel"
 _kernuname="${pkgver}-${_pkgsuffix}"
 arch=('x86_64')
@@ -222,7 +222,7 @@ _nv_ver=610.43.02
 _nv_pkg="NVIDIA-Linux-x86_64-${_nv_ver}"
 _nv_open_pkg="NVIDIA-kernel-module-source-${_nv_ver}"
 source=(
-  "https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20260825.tar.gz"
+  "https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20260826.tar.gz"
   "config"
   "patches/0001-0049/0001-drm-amd-pm-Fix-typo-in-smu_v14_0_set_irq_state.patch"
   "patches/0001-0049/0002-drm-amd-pm-Fix-memory-leaks-in-smu_v14_0_fini_smc_ta.patch"
@@ -582,7 +582,7 @@ EOF
     echo "-${pkgbase#linux-}-${_srctag#next-}" > localversion.20-pkgname
     rm -f localversion-next
     
-    # Apply the 7.2 sleepy series to next-20260825: dry-run first so a patch
+    # Apply the 7.2 sleepy series to next-20260826: dry-run first so a patch
     # that does not apply cleanly (e.g. LRU-MARIE 0.10.5, which needs a 7.3
     # port) is SKIPPED entirely instead of leaving a half-applied tree.
     # 0107-cachy-hdmi is not in source=() — the 7.3 base already has the clean
@@ -988,7 +988,7 @@ for _p in "${pkgname[@]}"; do
     }"
 done
 
-b2sums=('bc52438a4ed5dc71334ef07b0046da07eca032e86cc693a095eb9ac6618357c93f32e5bc5b0e38255f2dbecdf576a5e1231a8bd9f6e8c0ac0675b1c9c4308c9c'
+b2sums=('493c8d5c7a52f114084746f792525d7e5ba054ea198151cc7765b26250213bb9c26dea4027e3a6fc0b3add345eec28b7d4d408e938b34db7a63c08c2133e7361'
         '23f570909d870d709e9b9f414d8a9f543da492085c0ed457e6896d995e5cd608f7e45f3bdc96a5f09b595fb04e24babd6b9811ed03ea8d9598996aea0e890a9b'
         'a7cefe36f18ea4390b41849e604ad6257cccdbf25c2af380d2353397858cba21f6eb02b0774ebc24ec26639539a8858a29262b02edb60eba5736cd172993480f'
         '458b2cb2413befbbd76c22bd541da17694965d535b486df65fc6b5c470a8b06ddbb0224f25dd966d53210de2d9559da04b7822f688e5f0034ec0094d2f276be8'
