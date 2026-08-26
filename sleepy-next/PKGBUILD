@@ -562,7 +562,10 @@ EOF
         fi
     fi
     echo "-$pkgrel" > localversion.10-pkgrel
-    echo "-${pkgbase#linux-}" > localversion.20-pkgname
+    # kernel identity: sleepy-next-<nextdate> (single 'next'); the linux-next
+    # tree's localversion-next would otherwise double it (next-YYYYMMDD).
+    echo "-${pkgbase#linux-}-${_srctag#next-}" > localversion.20-pkgname
+    rm -f localversion-next
     
     # Apply the 7.2 sleepy series to next-20260825: dry-run first so a patch
     # that does not apply cleanly (e.g. LRU-MARIE 0.10.5, which needs a 7.3
@@ -615,7 +618,7 @@ EOF
     # BACO/runtime-PM power transitions. DPM stays on so clocks still downclock.
     # Appended to the bootloader params (CMDLINE_OVERRIDE is off); boots this kernel
     # with ASPM off regardless of the platform/BIOS default.
-    scripts/config -e CMDLINE_BOOL --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 elevator=kyber pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0" -d CMDLINE_OVERRIDE
+    scripts/config -e CMDLINE_BOOL --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0" -d CMDLINE_OVERRIDE
     scripts/config -e DEBUG_KERNEL -d DEBUG_INFO_NONE -d DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT -e DEBUG_INFO_DWARF5 -e DEBUG_INFO_BTF
     scripts/config -d SECURITY_APPARMOR -d SECURITY_APPARMOR_DEBUG -d SECURITY_APPARMOR_INTROSPECT_POLICY
     scripts/config -d AUDIT -d AUDITSYSCALL -d AUDIT_ARCH -d SLUB_DEBUG
