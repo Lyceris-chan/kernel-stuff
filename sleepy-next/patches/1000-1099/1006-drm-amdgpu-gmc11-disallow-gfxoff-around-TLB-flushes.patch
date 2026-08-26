@@ -1,0 +1,42 @@
+From a1efda0bc2eebc58b1eeeda8e80a7cbed3bac86c Mon Sep 17 00:00:00 2001
+From: Alex Deucher <alexander.deucher@amd.com>
+Date: Mon, 13 Jul 2026 14:27:21 -0400
+Subject: [PATCH 03/16] drm/amdgpu/gmc11: disallow gfxoff around TLB flushes
+
+We need to disallow gfxoff if we touch GC MMIO registers.
+At the moment we use KIQ or MES for TLB flushes so
+no intended functional change.
+
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/gmc_v11_0.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/gmc_v11_0.c b/drivers/gpu/drm/amd/amdgpu/gmc_v11_0.c
+index c40d9c4..e3d74dc 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gmc_v11_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/gmc_v11_0.c
+@@ -253,6 +253,10 @@ static void gmc_v11_0_flush_gpu_tlb(struct amdgpu_device *adev, uint32_t vmid,
+ 	/* This path is needed before KIQ/MES/GFXOFF are set up */
+ 	hub_ip = (vmhub == AMDGPU_GFXHUB(0)) ? GC_HWIP : MMHUB_HWIP;
+ 
++	/* disabllow gfxoff when we invalidate */
++	if (hub_ip == GC_HWIP)
++		amdgpu_gfx_off_ctrl(adev, false);
++
+ 	spin_lock(&adev->gmc.invalidate_lock);
+ 	/*
+ 	 * It may lose gpuvm invalidate acknowldege state across power-gating
+@@ -306,6 +310,9 @@ static void gmc_v11_0_flush_gpu_tlb(struct amdgpu_device *adev, uint32_t vmid,
+ 
+ 	spin_unlock(&adev->gmc.invalidate_lock);
+ 
++	if (hub_ip == GC_HWIP)
++		amdgpu_gfx_off_ctrl(adev, true);
++
+ 	if (i >= adev->usec_timeout)
+ 		dev_err(adev->dev, "Timeout waiting for VM flush ACK!\n");
+ }
+-- 
+2.55.0
+

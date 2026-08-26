@@ -1,0 +1,38 @@
+From 20260701161721.85681-12-timur.kristof@gmail.com Mon Sep 17 00:00:00 2001
+From: timur.kristof at gmail.com (=?UTF-8?q?Timur=20Krist=C3=B3f?=)
+Date: Wed,  1 Jul 2026 18:17:18 +0200
+Subject: [PATCH 11/14] drm/amdgpu/ih6.0: Use MMIO ACK for retry CAM on IH 6.0
+
+---
+ drivers/gpu/drm/amd/amdgpu/ih_v6_0.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c b/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c
+index 65e5d21753f9..a97c85b0cb99 100644
+--- a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c
+@@ -307,6 +307,11 @@ static int ih_v6_0_enable_ring(struct amdgpu_device *adev,
+ 	return 0;
+ }
+ 
++static void ih_v6_0_retry_cam_ack(struct amdgpu_device *adev, u32 cam_index)
++{
++	WREG32_SOC15(OSSSYS, 0, regIH_RETRY_CAM_ACK, cam_index);
++}
++
+ /**
+  * ih_v6_0_irq_init - init and enable the interrupt ring
+  *
+@@ -807,7 +812,8 @@ static const struct amdgpu_ih_funcs ih_v6_0_funcs = {
+ 	.get_wptr = ih_v6_0_get_wptr,
+ 	.decode_iv = amdgpu_ih_decode_iv_helper,
+ 	.decode_iv_ts = amdgpu_ih_decode_iv_ts_helper,
+-	.set_rptr = ih_v6_0_set_rptr
++	.set_rptr = ih_v6_0_set_rptr,
++	.retry_cam_ack = ih_v6_0_retry_cam_ack,
+ };
+ 
+ static void ih_v6_0_set_interrupt_funcs(struct amdgpu_device *adev)
+-- 
+2.54.0
+

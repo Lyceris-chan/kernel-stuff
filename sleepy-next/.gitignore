@@ -7,3 +7,4 @@ next-*.tar.gz
 config-7.2.*
 # Root patch symlinks (auto-created by PKGBUILD)
 /*.patch
+*.part

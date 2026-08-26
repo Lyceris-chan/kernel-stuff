@@ -1,0 +1,41 @@
+From 42f8da1167d8b70f37826d3e17217714e5f8f5e4 Mon Sep 17 00:00:00 2001
+From: Antigravity <antigravity@gemini.local>
+Date: Wed, 1 Jul 2026 13:00:00 +0200
+Subject: [PATCH 32/36] drm/amd/display: Fix memory leak in DCN20 link encoder
+ creation
+
+dcn401_link_encoder_create() kzalloc's enc20 and then returns NULL from
+a combined guard when hpd_source is out of range for link_enc_hpd_regs.
+That early return skips the kfree, leaking the encoder allocation every
+time an invalid hpd_source is passed in.
+
+Split the NULL check from the range check and kfree(enc20) before
+returning NULL on an out-of-range hpd_source.
+
+Signed-off-by: Antigravity <antigravity@gemini.local>
+---
+ .../drm/amd/display/dc/resource/dcn401/dcn401_resource.c    | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.c b/drivers/gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.c
+index e3ee792fb..8695f383a 100644
+--- a/drivers/gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.c
++++ b/drivers/gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.c
+@@ -1102,9 +1102,13 @@ static struct link_encoder *dcn401_link_encoder_create(
+ 	struct dcn20_link_encoder *enc20 =
+ 		kzalloc_obj(struct dcn20_link_encoder);
+ 
+-	if (!enc20 || enc_init_data->hpd_source >= ARRAY_SIZE(link_enc_hpd_regs))
++	if (!enc20)
+ 		return NULL;
+ 
++	if (enc_init_data->hpd_source >= ARRAY_SIZE(link_enc_hpd_regs)) {
++		kfree(enc20);
++		return NULL;
++	}
+ #undef REG_STRUCT
+ #define REG_STRUCT link_enc_aux_regs
+ 	aux_regs_init(0),
+-- 
+2.55.0
+

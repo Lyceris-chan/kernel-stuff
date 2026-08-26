@@ -1,0 +1,39 @@
+From 33a065acb38aeb3edb32a070f9f8a8f113bfafad Mon Sep 17 00:00:00 2001
+From: Antigravity <antigravity@gemini.local>
+Date: Wed, 1 Jul 2026 13:00:00 +0200
+Subject: [PATCH 35/36] drm/amd/display: Prevent memory leak during IRQ service
+ destroy
+
+dcn401_resource_destruct() calls dal_irq_service_destroy() inside the
+hubp cleanup loop, so the IRQ service is only torn down when that loop
+runs. The service is independent of the hubp array, and when the loop
+is skipped the IRQ context is leaked on every destruct.
+
+Move the destroy call out of the loop so it always runs exactly once.
+
+Signed-off-by: Antigravity <antigravity@gemini.local>
+---
+ .../drm/amd/display/dc/resource/dcn401/dcn401_resource.c    | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.c b/drivers/gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.c
+index f8a667452..82dbe3175 100644
+--- a/drivers/gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.c
++++ b/drivers/gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.c
+@@ -1571,10 +1571,10 @@ static void dcn401_resource_destruct(struct dcn401_resource_pool *pool)
+ 			kfree(TO_DCN20_HUBP(pool->base.hubps[i]));
+ 			pool->base.hubps[i] = NULL;
+ 		}
++	}
+ 
+-		if (pool->base.irqs != NULL) {
+-			dal_irq_service_destroy(&pool->base.irqs);
+-		}
++	if (pool->base.irqs != NULL) {
++		dal_irq_service_destroy(&pool->base.irqs);
+ 	}
+ 
+ 	for (i = 0; i < (unsigned int)pool->base.res_cap->num_ddc; i++) {
+-- 
+2.55.0
+

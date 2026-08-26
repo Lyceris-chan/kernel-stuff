@@ -1,0 +1,32 @@
+From f56d2422bc38147b4e3ca597298676af7ed523c6 Mon Sep 17 00:00:00 2001
+From: Gabe Teeger <gabe.teeger@amd.com>
+Date: Thu, 28 May 2026 17:33:16 -0400
+Subject: [PATCH] drm/amd/display: Increase dcn42b uclk value
+
+Increase uclk value in order to enable UHBR20.
+
+Reviewed-by: Dillon Varone <dillon.varone@amd.com>
+Signed-off-by: Gabe Teeger <gabe.teeger@amd.com>
+Signed-off-by: Chenyu Chen <chen-yu.chen@amd.com>
+Tested-by: Daniel Wheeler <daniel.wheeler@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ .../display/dc/dml2_0/dml21/inc/bounding_boxes/dcn42b_soc_bb.h  | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/inc/bounding_boxes/dcn42b_soc_bb.h b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/inc/bounding_boxes/dcn42b_soc_bb.h
+index ce4025591b87..eae4a37b0984 100644
+--- a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/inc/bounding_boxes/dcn42b_soc_bb.h
++++ b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/inc/bounding_boxes/dcn42b_soc_bb.h
+@@ -75,7 +75,7 @@ static const struct dml2_soc_bb dml2_socbb_dcn42b = {
+ 				.clk_values_khz = {2},
+ 		},
+ 		.uclk = {
+-				.clk_values_khz = {400000},
++				.clk_values_khz = {2400000},
+ 				.num_clk_values = 1,
+ 		},
+ 		.fclk = {
+-- 
+2.55.0
+

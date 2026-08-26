@@ -1,0 +1,259 @@
+From 98c692c5c41faff8da512bc2969e52d40abfd42a Mon Sep 17 00:00:00 2001
+From: Matthew Stewart <Matthew.Stewart2@amd.com>
+Date: Wed, 27 May 2026 14:39:47 -0400
+Subject: [PATCH] drm/amd/display: Add dcn42b_soc_and_ip_translator
+
+[why]
+
+DCN42B was not using its own max_ip_caps table. Need to create a
+separate soc_and_ip_translator in order to not reuse the DCN42 one.
+
+[how]
+
+Separate DCN42B into its own soc_and_ip_translator.c file to handle this.
+
+Reviewed-by: Dillon Varone <dillon.varone@amd.com>
+Signed-off-by: Matthew Stewart <Matthew.Stewart2@amd.com>
+Tested-by: Dan Wheeler <daniel.wheeler@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ .../dml21/inc/bounding_boxes/dcn42b_soc_bb.h  | 38 +++++++++++++++++
+ .../display/dc/soc_and_ip_translator/Makefile |  3 ++
+ .../dcn42/dcn42_soc_and_ip_translator.c       | 18 +++-----
+ .../dcn42/dcn42_soc_and_ip_translator.h       |  1 +
+ .../dcn42b/dcn42b_soc_and_ip_translator.c     | 42 +++++++++++++++++++
+ .../dcn42b/dcn42b_soc_and_ip_translator.h     | 17 ++++++++
+ .../soc_and_ip_translator.c                   |  5 ++-
+ 7 files changed, 111 insertions(+), 13 deletions(-)
+ create mode 100644 drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/dcn42b/dcn42b_soc_and_ip_translator.c
+ create mode 100644 drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/dcn42b/dcn42b_soc_and_ip_translator.h
+
+diff --git a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/inc/bounding_boxes/dcn42b_soc_bb.h b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/inc/bounding_boxes/dcn42b_soc_bb.h
+index eae4a37b0..60ef56419 100644
+--- a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/inc/bounding_boxes/dcn42b_soc_bb.h
++++ b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/inc/bounding_boxes/dcn42b_soc_bb.h
+@@ -224,4 +224,42 @@ static const struct dml2_soc_bb dml2_socbb_dcn42b = {
+ 	.max_fclk_for_uclk_dpm_khz = 2200 * 1000,
+ };
+ 
++static const struct dml2_ip_capabilities dml2_dcn42b_max_ip_caps = {
++	.pipe_count = 4,
++	.otg_count = 3,
++	.num_dsc = 3,
++	.max_num_dp2p0_streams = 3,
++	.max_num_hdmi_frl_outputs = 0,
++	.max_num_dp2p0_outputs = 2,
++	.rob_buffer_size_kbytes = 64,
++	.config_return_buffer_size_in_kbytes = 1792,
++	.config_return_buffer_segment_size_in_kbytes = 64,
++	.meta_fifo_size_in_kentries = 32,
++	.compressed_buffer_segment_size_in_kbytes = 64,
++	.cursor_buffer_size = 24,
++	.max_flip_time_us = 110,
++	.max_flip_time_lines = 50,
++	.hostvm_mode = 0,
++	.subvp_drr_scheduling_margin_us = 100,
++	.subvp_prefetch_end_to_mall_start_us = 15,
++	.subvp_fw_processing_delay = 15,
++	.max_vactive_det_fill_delay_us = 400,
++
++	.fams2 = {
++		.max_allow_delay_us = 100 * 1000,
++		.scheduling_delay_us = 550,
++		.vertical_interrupt_ack_delay_us = 40,
++		.allow_programming_delay_us = 18,
++		.min_allow_width_us = 20,
++		.subvp_df_throttle_delay_us = 100,
++		.subvp_programming_delay_us = 200,
++		.subvp_prefetch_to_mall_delay_us = 18,
++		.drr_programming_delay_us = 35,
++
++		.lock_timeout_us = 5000,
++		.recovery_timeout_us = 5000,
++		.flip_programming_delay_us = 300,
++	},
++};
++
+ #endif
+diff --git a/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/Makefile b/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/Makefile
+index d168fb1ea..8a9bb0aef 100644
+--- a/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/Makefile
++++ b/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/Makefile
+@@ -9,13 +9,16 @@ soc_and_ip_translator_rcflags := $(CC_FLAGS_NO_FPU)
+ 
+ CFLAGS_$(AMDDALPATH)/dc/soc_and_ip_translator/dcn401/dcn401_soc_and_ip_translator.o := $(soc_and_ip_translator_ccflags)
+ CFLAGS_$(AMDDALPATH)/dc/soc_and_ip_translator/dcn42/dcn42_soc_and_ip_translator.o := $(soc_and_ip_translator_ccflags)
++CFLAGS_$(AMDDALPATH)/dc/soc_and_ip_translator/dcn42b/dcn42b_soc_and_ip_translator.o := $(soc_and_ip_translator_ccflags)
+ 
+ CFLAGS_REMOVE_$(AMDDALPATH)/dc/soc_and_ip_translator/dcn401/dcn401_soc_and_ip_translator.o := $(soc_and_ip_translator_rcflags)
+ CFLAGS_REMOVE_$(AMDDALPATH)/dc/soc_and_ip_translator/dcn42/dcn42_soc_and_ip_translator.o := $(soc_and_ip_translator_rcflags)
++CFLAGS_REMOVE_$(AMDDALPATH)/dc/soc_and_ip_translator/dcn42b/dcn42b_soc_and_ip_translator.o := $(soc_and_ip_translator_rcflags)
+ 
+ soc_and_ip_translator := soc_and_ip_translator.o
+ soc_and_ip_translator += dcn401/dcn401_soc_and_ip_translator.o
+ soc_and_ip_translator += dcn42/dcn42_soc_and_ip_translator.o
++soc_and_ip_translator += dcn42b/dcn42b_soc_and_ip_translator.o
+ 
+ AMD_DAL_soc_and_ip_translator := $(addprefix $(AMDDALPATH)/dc/soc_and_ip_translator/, $(soc_and_ip_translator))
+ 
+diff --git a/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/dcn42/dcn42_soc_and_ip_translator.c b/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/dcn42/dcn42_soc_and_ip_translator.c
+index ae2c6a2f3..c6c1b19b7 100644
+--- a/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/dcn42/dcn42_soc_and_ip_translator.c
++++ b/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/dcn42/dcn42_soc_and_ip_translator.c
+@@ -5,22 +5,16 @@
+ #include "dcn42_soc_and_ip_translator.h"
+ #include "../dcn401/dcn401_soc_and_ip_translator.h"
+ #include "bounding_boxes/dcn42_soc_bb.h"
+-#include "bounding_boxes/dcn42b_soc_bb.h"
+ 
+ /* soc_and_ip_translator component used to get up-to-date values for bounding box.
+  * Bounding box values are stored in several locations and locations can vary with DCN revision.
+  * This component provides an interface to get DCN-specific bounding box values.
+  */
+ 
+-static void get_default_soc_bb(struct dml2_soc_bb *soc_bb, const struct dc *dc)
++static void get_default_soc_bb(struct dml2_soc_bb *soc_bb)
+ {
+-	if (dc->ctx->dce_version == DCN_VERSION_4_2B) {
+-		memcpy(soc_bb, &dml2_socbb_dcn42b, sizeof(struct dml2_soc_bb));
+-		memcpy(&soc_bb->qos_parameters, &dml_dcn42b_variant_a_soc_qos_params, sizeof(struct dml2_soc_qos_parameters));
+-	} else {
+-		memcpy(soc_bb, &dml2_socbb_dcn42, sizeof(struct dml2_soc_bb));
+-		memcpy(&soc_bb->qos_parameters, &dml_dcn42_variant_a_soc_qos_params, sizeof(struct dml2_soc_qos_parameters));
+-	}
++	memcpy(soc_bb, &dml2_socbb_dcn42, sizeof(struct dml2_soc_bb));
++	memcpy(&soc_bb->qos_parameters, &dml_dcn42_variant_a_soc_qos_params, sizeof(struct dml2_soc_qos_parameters));
+ }
+ 
+ /*
+@@ -165,7 +159,7 @@ static void dcn42_update_soc_bb_with_values_from_clk_mgr(struct dml2_soc_bb *soc
+ 	}
+ }
+ 
+-static void apply_soc_bb_updates(struct dml2_soc_bb *soc_bb, const struct dc *dc, const struct dml2_configuration_options *config)
++void dcn42_apply_soc_bb_updates(struct dml2_soc_bb *soc_bb, const struct dc *dc, const struct dml2_configuration_options *config)
+ {
+ 	(void)config;
+ 	/* Individual modification can be overwritten even if it was obtained by a previous function.
+@@ -181,9 +175,9 @@ static void apply_soc_bb_updates(struct dml2_soc_bb *soc_bb, const struct dc *dc
+ void dcn42_get_soc_bb(struct dml2_soc_bb *soc_bb, const struct dc *dc, const struct dml2_configuration_options *config)
+ {
+ 	//get default soc_bb with static values
+-	get_default_soc_bb(soc_bb, dc);
++	get_default_soc_bb(soc_bb);
+ 	//update soc_bb values with more accurate values
+-	apply_soc_bb_updates(soc_bb, dc, config);
++	dcn42_apply_soc_bb_updates(soc_bb, dc, config);
+ }
+ 
+ static void dcn42_get_ip_caps(struct dml2_ip_capabilities *ip_caps)
+diff --git a/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/dcn42/dcn42_soc_and_ip_translator.h b/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/dcn42/dcn42_soc_and_ip_translator.h
+index 1dded5426..8ac90655f 100644
+--- a/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/dcn42/dcn42_soc_and_ip_translator.h
++++ b/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/dcn42/dcn42_soc_and_ip_translator.h
+@@ -13,5 +13,6 @@
+ 
+ void dcn42_construct_soc_and_ip_translator(struct soc_and_ip_translator *soc_and_ip_translator);
+ void dcn42_get_soc_bb(struct dml2_soc_bb *soc_bb, const struct dc *dc, const struct dml2_configuration_options *config);
++void dcn42_apply_soc_bb_updates(struct dml2_soc_bb *soc_bb, const struct dc *dc, const struct dml2_configuration_options *config);
+ 
+ #endif /* _DCN42_SOC_AND_IP_TRANSLATOR_H_ */
+diff --git a/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/dcn42b/dcn42b_soc_and_ip_translator.c b/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/dcn42b/dcn42b_soc_and_ip_translator.c
+new file mode 100644
+index 000000000..50669f458
+--- /dev/null
++++ b/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/dcn42b/dcn42b_soc_and_ip_translator.c
+@@ -0,0 +1,42 @@
++// SPDX-License-Identifier: MIT
++//
++// Copyright 2026 Advanced Micro Devices, Inc.
++
++#include "../dcn42/dcn42_soc_and_ip_translator.h"
++#include "dcn42b_soc_and_ip_translator.h"
++#include "../dcn401/dcn401_soc_and_ip_translator.h"
++#include "bounding_boxes/dcn42b_soc_bb.h"
++
++/* soc_and_ip_translator component used to get up-to-date values for bounding box.
++ * Bounding box values are stored in several locations and locations can vary with DCN revision.
++ * This component provides an interface to get DCN-specific bounding box values.
++ */
++
++static void get_default_soc_bb(struct dml2_soc_bb *soc_bb)
++{
++	memcpy(soc_bb, &dml2_socbb_dcn42b, sizeof(struct dml2_soc_bb));
++	memcpy(&soc_bb->qos_parameters, &dml_dcn42b_variant_a_soc_qos_params, sizeof(struct dml2_soc_qos_parameters));
++}
++
++void dcn42b_get_soc_bb(struct dml2_soc_bb *soc_bb, const struct dc *dc, const struct dml2_configuration_options *config)
++{
++	//get default soc_bb with static values
++	get_default_soc_bb(soc_bb);
++	//update soc_bb values with more accurate values
++	dcn42_apply_soc_bb_updates(soc_bb, dc, config);
++}
++
++static void dcn42b_get_ip_caps(struct dml2_ip_capabilities *ip_caps)
++{
++	*ip_caps = dml2_dcn42b_max_ip_caps;
++}
++
++static struct soc_and_ip_translator_funcs dcn42b_translator_funcs = {
++	.get_soc_bb = dcn42b_get_soc_bb,
++	.get_ip_caps = dcn42b_get_ip_caps,
++};
++
++void dcn42b_construct_soc_and_ip_translator(struct soc_and_ip_translator *soc_and_ip_translator)
++{
++	soc_and_ip_translator->translator_funcs = &dcn42b_translator_funcs;
++}
+diff --git a/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/dcn42b/dcn42b_soc_and_ip_translator.h b/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/dcn42b/dcn42b_soc_and_ip_translator.h
+new file mode 100644
+index 000000000..0d4ea6134
+--- /dev/null
++++ b/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/dcn42b/dcn42b_soc_and_ip_translator.h
+@@ -0,0 +1,17 @@
++// SPDX-License-Identifier: MIT
++//
++// Copyright 2026 Advanced Micro Devices, Inc.
++
++#ifndef _DCN42B_SOC_AND_IP_TRANSLATOR_H_
++#define _DCN42B_SOC_AND_IP_TRANSLATOR_H_
++
++#include "core_types.h"
++#include "dc.h"
++#include "clk_mgr.h"
++#include "dml_top_soc_parameter_types.h"
++#include "soc_and_ip_translator.h"
++
++void dcn42b_construct_soc_and_ip_translator(struct soc_and_ip_translator *soc_and_ip_translator);
++void dcn42b_get_soc_bb(struct dml2_soc_bb *soc_bb, const struct dc *dc, const struct dml2_configuration_options *config);
++
++#endif /* _DCN42B_SOC_AND_IP_TRANSLATOR_H_ */
+diff --git a/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/soc_and_ip_translator.c b/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/soc_and_ip_translator.c
+index f99afb22d..1e3ee2573 100644
+--- a/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/soc_and_ip_translator.c
++++ b/drivers/gpu/drm/amd/display/dc/soc_and_ip_translator/soc_and_ip_translator.c
+@@ -5,6 +5,7 @@
+ #include "soc_and_ip_translator.h"
+ #include "soc_and_ip_translator/dcn401/dcn401_soc_and_ip_translator.h"
+ #include "soc_and_ip_translator/dcn42/dcn42_soc_and_ip_translator.h"
++#include "soc_and_ip_translator/dcn42b/dcn42b_soc_and_ip_translator.h"
+ 
+ static void dc_construct_soc_and_ip_translator(struct soc_and_ip_translator *soc_and_ip_translator,
+ 		enum dce_version dc_version)
+@@ -14,9 +15,11 @@ static void dc_construct_soc_and_ip_translator(struct soc_and_ip_translator *soc
+ 		dcn401_construct_soc_and_ip_translator(soc_and_ip_translator);
+ 		break;
+ 	case DCN_VERSION_4_2:
+-	case DCN_VERSION_4_2B:
+ 		dcn42_construct_soc_and_ip_translator(soc_and_ip_translator);
+ 		break;
++	case DCN_VERSION_4_2B:
++		dcn42b_construct_soc_and_ip_translator(soc_and_ip_translator);
++		break;
+ 	default:
+ 		break;
+ 	}
+-- 
+2.55.0
+

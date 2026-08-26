@@ -1,0 +1,287 @@
+From SA1PR12MB8600E8B1821FA7D76923FC259FD42@SA1PR12MB8600.namprd12.prod.outlook.com Tue Aug 04 19:14:18 2026
+From: Vladimir Marioukhine <Vladimir.Marioukhine@amd.com>
+Date: Tue, 4 Aug 2026 19:14:18 +0000
+Subject: [PATCH] drm/amdkfd: fix NULL pointer dereference in GFX12 CRIU queue restore
+Message-ID: <SA1PR12MB8600E8B1821FA7D76923FC259FD42@SA1PR12MB8600.namprd12.prod.outlook.com>
+
+AMD General
+
+kfd_mqd_manager_v12.c (GFX 12.0) and kfd_mqd_manager_v12_1.c (GFX 12.1)
+initialize their MQD managers without assigning restore_mqd or checkpoint_mqd
+callbacks, leaving both function pointers NULL.
+
+Both create_queue_cpsch() and create_queue_nocpsch() in
+kfd_device_queue_manager.c unconditionally call mqd_mgr->restore_mqd() when
+a CRIU restore is in progress (qd != NULL), with no NULL guard. On any system
+with a GFX 12.x GPU, a user holding CAP_CHECKPOINT_RESTORE can trigger a
+kernel NULL pointer dereference and panic the machine by issuing
+KFD_IOC_CRIU_OP_RESTORE with a crafted queue restore object.
+
+Fix this by:
+1. Implementing restore_mqd and checkpoint_mqd callbacks for both compute
+   and SDMA queues in kfd_mqd_manager_v12.c and kfd_mqd_manager_v12_1.c,
+   modeled after the GFX 11 implementation.
+2. Adding a NULL guard at both call sites in kfd_device_queue_manager.c
+   as a defensive measure against future regressions.
+
+Fixes: 48f0bdf4e38e ("drm/amdkfd: Added MQD manager files for GFX12.")
+Fixes: 01bbc4a4b947 ("drm/amdkfd: Add MQD manager for GFX 12.1.0")
+Signed-off-by: Vladimir Marioukhine <Vladimir.Marioukhine@amd.com>
+
+NOTE (reconstructed 2026-08-10): the lists.freedesktop.org mbox copy of this
+patch had leading whitespace stripped and tabs converted to spaces by the
+Outlook sender, so the diff body could not be applied verbatim. Reconstructed
+byte-for-byte from the mbox + lines against the rc7 v11 MQD manager reference
+(modeled after GFX 11), with kernel-standard tabs restored. Content verified
+identical to the ML submission modulo whitespace. Pending upstream review
+(Alex Deucher requested brace style revisions on 2026-08-04; a v2 may supersede).
+
+Assisted-by: Claude:claude-opus-5
+
+DEV-IATION from the mbox submission (2026-08-10, compile fix): the original
+patch used SDMA0_QUEUE0_DOORBELL_OFFSET__OFFSET__SHIFT (GC 12.0 macro) in BOTH
+v12.c and v12_1.c restore_mqd_sdma(). On rc7, kfd_mqd_manager_v12_1.c is GC
+12.1 and that macro is undeclared there (it lives in gc_12_0_0_sh_mask.h);
+v12_1.c's own code uses SDMA0_SDMA_QUEUE0_DOORBELL_OFFSET__OFFSET__SHIFT
+(gc_12_1_0_sh_mask.h). The v12_1.c hunk here uses the v12_1 macro so it compiles.
+The original ML submission (vs a different baseline) would not compile on v12_1.c.
+---
+
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_device_queue_manager.c b/drivers/gpu/drm/amd/amdkfd/kfd_device_queue_manager.c
+index 67137679a..f5371ed5a 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_device_queue_manager.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_device_queue_manager.c
+@@ -824,11 +824,16 @@ static int create_queue_nocpsch(struct device_queue_manager *dqm,
+ 		goto out_deallocate_doorbell;
+ 	}
+ 
+-	if (qd)
++	if (qd) {
++		if (!mqd_mgr->restore_mqd) {
++			pr_err("amdkfd: restore_mqd not implemented for this GPU\n");
++			retval = -EINVAL;
++			goto out_deallocate_doorbell;
++		}
+ 		mqd_mgr->restore_mqd(mqd_mgr, &q->mqd, q->mqd_mem_obj, &q->gart_mqd_addr,
+ 				     &q->properties, restore_mqd, restore_ctl_stack,
+ 				     qd->ctl_stack_size);
+-	else
++	} else
+ 		mqd_mgr->init_mqd(mqd_mgr, &q->mqd, q->mqd_mem_obj,
+ 					&q->gart_mqd_addr, &q->properties);
+ 
+@@ -2176,11 +2181,16 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
+ 	q->properties.is_dbg_wa = qpd->pqm->process->debug_trap_enabled &&
+ 				  kfd_dbg_has_cwsr_workaround(q->device);
+ 
+-	if (qd)
++	if (qd) {
++		if (!mqd_mgr->restore_mqd) {
++			pr_err("amdkfd: restore_mqd not implemented for this GPU\n");
++			retval = -EINVAL;
++			goto out;
++		}
+ 		mqd_mgr->restore_mqd(mqd_mgr, &q->mqd, q->mqd_mem_obj, &q->gart_mqd_addr,
+ 				     &q->properties, restore_mqd, restore_ctl_stack,
+ 				     qd->ctl_stack_size);
+-	else
++	} else
+ 		mqd_mgr->init_mqd(mqd_mgr, &q->mqd, q->mqd_mem_obj,
+ 					&q->gart_mqd_addr, &q->properties);
+ 
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_mqd_manager_v12.c b/drivers/gpu/drm/amd/amdkfd/kfd_mqd_manager_v12.c
+index 7c387fa90..bd0b40fae 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_mqd_manager_v12.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_mqd_manager_v12.c
+@@ -380,6 +380,75 @@ static int debugfs_show_mqd_sdma(struct seq_file *m, void *data)
+ 
+ #endif
+ 
++static void checkpoint_mqd(struct mqd_manager *mm, void *mqd, void *mqd_dst, void *ctl_stack_dst)
++{
++	struct v12_compute_mqd *m;
++
++	m = get_mqd(mqd);
++
++	memcpy(mqd_dst, m, sizeof(struct v12_compute_mqd));
++}
++
++static void restore_mqd(struct mqd_manager *mm, void **mqd,
++			struct kfd_mem_obj *mqd_mem_obj, uint64_t *gart_addr,
++			struct queue_properties *qp, const void *mqd_src,
++			const void *ctl_stack_src, const u32 ctl_stack_size)
++{
++	uint64_t addr;
++	struct v12_compute_mqd *m;
++
++	m = (struct v12_compute_mqd *) mqd_mem_obj->cpu_ptr;
++	addr = mqd_mem_obj->gpu_addr;
++
++	memcpy(m, mqd_src, sizeof(*m));
++
++	*mqd = m;
++	if (gart_addr)
++		*gart_addr = addr;
++
++	m->cp_hqd_pq_doorbell_control =
++		qp->doorbell_off << CP_HQD_PQ_DOORBELL_CONTROL__DOORBELL_OFFSET__SHIFT;
++	pr_debug("cp_hqd_pq_doorbell_control 0x%x\n", m->cp_hqd_pq_doorbell_control);
++
++	qp->is_active = 0;
++}
++
++static void checkpoint_mqd_sdma(struct mqd_manager *mm,
++				void *mqd,
++				void *mqd_dst,
++				void *ctl_stack_dst)
++{
++	struct v12_sdma_mqd *m;
++
++	m = get_sdma_mqd(mqd);
++
++	memcpy(mqd_dst, m, sizeof(struct v12_sdma_mqd));
++}
++
++static void restore_mqd_sdma(struct mqd_manager *mm, void **mqd,
++			     struct kfd_mem_obj *mqd_mem_obj, uint64_t *gart_addr,
++			     struct queue_properties *qp,
++			     const void *mqd_src,
++			     const void *ctl_stack_src,
++			     const u32 ctl_stack_size)
++{
++	uint64_t addr;
++	struct v12_sdma_mqd *m;
++
++	m = (struct v12_sdma_mqd *) mqd_mem_obj->cpu_ptr;
++	addr = mqd_mem_obj->gpu_addr;
++
++	memcpy(m, mqd_src, sizeof(*m));
++
++	m->sdmax_rlcx_doorbell_offset =
++		qp->doorbell_off << SDMA0_QUEUE0_DOORBELL_OFFSET__OFFSET__SHIFT;
++
++	*mqd = m;
++	if (gart_addr)
++		*gart_addr = addr;
++
++	qp->is_active = 0;
++}
+ struct mqd_manager *mqd_manager_init_v12(enum KFD_MQD_TYPE type,
+ 		struct kfd_node *dev)
+ {
+@@ -407,6 +476,8 @@ struct mqd_manager *mqd_manager_init_v12(enum KFD_MQD_TYPE type,
+ 		mqd->mqd_size = sizeof(struct v12_compute_mqd);
+ 		mqd->get_wave_state = get_wave_state;
+ 		mqd->mqd_stride = kfd_mqd_stride;
++		mqd->checkpoint_mqd = checkpoint_mqd;
++		mqd->restore_mqd = restore_mqd;
+ #if defined(CONFIG_DEBUG_FS)
+ 		mqd->debugfs_show_mqd = debugfs_show_mqd;
+ #endif
+@@ -453,6 +524,8 @@ struct mqd_manager *mqd_manager_init_v12(enum KFD_MQD_TYPE type,
+ 		mqd->is_occupied = kfd_is_occupied_sdma;
+ 		mqd->mqd_size = sizeof(struct v12_sdma_mqd);
+ 		mqd->mqd_stride = kfd_mqd_stride;
++		mqd->checkpoint_mqd = checkpoint_mqd_sdma;
++		mqd->restore_mqd = restore_mqd_sdma;
+ #if defined(CONFIG_DEBUG_FS)
+ 		mqd->debugfs_show_mqd = debugfs_show_mqd_sdma;
+ #endif
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_mqd_manager_v12_1.c b/drivers/gpu/drm/amd/amdkfd/kfd_mqd_manager_v12_1.c
+index 431a940f9..12ece7496 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_mqd_manager_v12_1.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_mqd_manager_v12_1.c
+@@ -641,6 +641,75 @@ static int debugfs_show_mqd_sdma(struct seq_file *m, void *data)
+ 
+ #endif
+ 
++static void checkpoint_mqd(struct mqd_manager *mm, void *mqd, void *mqd_dst, void *ctl_stack_dst)
++{
++	struct v12_1_compute_mqd *m;
++
++	m = get_mqd(mqd);
++
++	memcpy(mqd_dst, m, sizeof(struct v12_1_compute_mqd));
++}
++
++static void restore_mqd(struct mqd_manager *mm, void **mqd,
++			struct kfd_mem_obj *mqd_mem_obj, uint64_t *gart_addr,
++			struct queue_properties *qp, const void *mqd_src,
++			const void *ctl_stack_src, const u32 ctl_stack_size)
++{
++	uint64_t addr;
++	struct v12_1_compute_mqd *m;
++
++	m = (struct v12_1_compute_mqd *) mqd_mem_obj->cpu_ptr;
++	addr = mqd_mem_obj->gpu_addr;
++
++	memcpy(m, mqd_src, sizeof(*m));
++
++	*mqd = m;
++	if (gart_addr)
++		*gart_addr = addr;
++
++	m->cp_hqd_pq_doorbell_control =
++		qp->doorbell_off << CP_HQD_PQ_DOORBELL_CONTROL__DOORBELL_OFFSET__SHIFT;
++	pr_debug("cp_hqd_pq_doorbell_control 0x%x\n", m->cp_hqd_pq_doorbell_control);
++
++	qp->is_active = 0;
++}
++
++static void checkpoint_mqd_sdma(struct mqd_manager *mm,
++				void *mqd,
++				void *mqd_dst,
++				void *ctl_stack_dst)
++{
++	struct v12_sdma_mqd *m;
++
++	m = get_sdma_mqd(mqd);
++
++	memcpy(mqd_dst, m, sizeof(struct v12_sdma_mqd));
++}
++
++static void restore_mqd_sdma(struct mqd_manager *mm, void **mqd,
++			     struct kfd_mem_obj *mqd_mem_obj, uint64_t *gart_addr,
++			     struct queue_properties *qp,
++			     const void *mqd_src,
++			     const void *ctl_stack_src,
++			     const u32 ctl_stack_size)
++{
++	uint64_t addr;
++	struct v12_sdma_mqd *m;
++
++	m = (struct v12_sdma_mqd *) mqd_mem_obj->cpu_ptr;
++	addr = mqd_mem_obj->gpu_addr;
++
++	memcpy(m, mqd_src, sizeof(*m));
++
++	m->sdmax_rlcx_doorbell_offset =
++		qp->doorbell_off << SDMA0_SDMA_QUEUE0_DOORBELL_OFFSET__OFFSET__SHIFT;
++
++	*mqd = m;
++	if (gart_addr)
++		*gart_addr = addr;
++
++	qp->is_active = 0;
++}
+ struct mqd_manager *mqd_manager_init_v12_1(enum KFD_MQD_TYPE type,
+ 		struct kfd_node *dev)
+ {
+@@ -668,6 +737,8 @@ struct mqd_manager *mqd_manager_init_v12_1(enum KFD_MQD_TYPE type,
+ 		mqd->mqd_size = sizeof(struct v12_1_compute_mqd);
+ 		mqd->get_wave_state = get_wave_state_v12_1;
+ 		mqd->mqd_stride = kfd_mqd_stride;
++		mqd->checkpoint_mqd = checkpoint_mqd;
++		mqd->restore_mqd = restore_mqd;
+ #if defined(CONFIG_DEBUG_FS)
+ 		mqd->debugfs_show_mqd = debugfs_show_mqd;
+ #endif
+@@ -714,6 +785,8 @@ struct mqd_manager *mqd_manager_init_v12_1(enum KFD_MQD_TYPE type,
+ 		mqd->is_occupied = kfd_is_occupied_sdma;
+ 		mqd->mqd_size = sizeof(struct v12_sdma_mqd);
+ 		mqd->mqd_stride = kfd_mqd_stride;
++		mqd->checkpoint_mqd = checkpoint_mqd_sdma;
++		mqd->restore_mqd = restore_mqd_sdma;
+ #if defined(CONFIG_DEBUG_FS)
+ 		mqd->debugfs_show_mqd = debugfs_show_mqd_sdma;
+ #endif

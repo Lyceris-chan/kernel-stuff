@@ -1,0 +1,50 @@
+From 20260701161721.85681-13-timur.kristof@gmail.com Mon Sep 17 00:00:00 2001
+From: timur.kristof at gmail.com (=?UTF-8?q?Timur=20Krist=C3=B3f?=)
+Date: Wed,  1 Jul 2026 18:17:19 +0200
+Subject: [PATCH 12/14] drm/amdgpu/ih7.0: Use MMIO ACK instead of doorbell for
+ retry CAM on IH 7.0
+
+---
+ drivers/gpu/drm/amd/amdgpu/ih_v7_0.c | 17 +----------------
+ 1 file changed, 1 insertion(+), 16 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/ih_v7_0.c b/drivers/gpu/drm/amd/amdgpu/ih_v7_0.c
+index f1de6450a31d..291326d2ee8b 100644
+--- a/drivers/gpu/drm/amd/amdgpu/ih_v7_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/ih_v7_0.c
+@@ -279,19 +279,9 @@ static int ih_v7_0_enable_ring(struct amdgpu_device *adev,
+ 	return 0;
+ }
+ 
+-static uint32_t ih_v7_0_setup_retry_doorbell(u32 doorbell_index)
+-{
+-	u32 val = 0;
+-
+-	val = REG_SET_FIELD(val, IH_DOORBELL_RPTR, OFFSET, doorbell_index);
+-	val = REG_SET_FIELD(val, IH_DOORBELL_RPTR, ENABLE, 1);
+-
+-	return val;
+-}
+-
+ static void ih_v7_0_retry_cam_ack(struct amdgpu_device *adev, u32 cam_index)
+ {
+-	WDOORBELL32(adev->irq.retry_cam_doorbell_index, cam_index);
++	WREG32_SOC15(OSSSYS, 0, regIH_RETRY_CAM_ACK, cam_index);
+ }
+ 
+ #define regIH_RING1_CLIENT_CFG_INDEX_V7_1             0x122
+@@ -401,11 +391,6 @@ static int ih_v7_0_irq_init(struct amdgpu_device *adev)
+ 	pci_set_master(adev->pdev);
+ 
+ 	if (amdgpu_ip_version(adev, OSSSYS_HWIP, 0) == IP_VERSION(7, 1, 0)) {
+-		/* Allocate the doorbell for IH Retry CAM */
+-		adev->irq.retry_cam_doorbell_index = (adev->doorbell_index.ih + 2) << 1;
+-		WREG32_SOC15(OSSSYS, 0, regIH_DOORBELL_RETRY_CAM,
+-				ih_v7_0_setup_retry_doorbell(adev->irq.retry_cam_doorbell_index));
+-
+ 		/* Enable IH Retry CAM */
+ 		tmp = RREG32_SOC15(OSSSYS, 0, regIH_RETRY_INT_CAM_CNTL);
+ 		tmp = REG_SET_FIELD(tmp, IH_RETRY_INT_CAM_CNTL, ENABLE, 1);
+-- 
+2.54.0
+

@@ -1,0 +1,35 @@
+From fb8379680c8292bfe3b0855a7bed94d9749a92b5 Mon Sep 17 00:00:00 2001
+From: Pierre-Eric Pelloux-Prayer <pierre-eric.pelloux-prayer@amd.com>
+Date: Mon, 15 Jun 2026 13:44:13 +0200
+Subject: [PATCH] drm/amdgpu: don't disable ttm buffer funcs on reset
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Access to hw is already suspended so there are no reasons to
+disable ttm buffer funcs.
+
+Signed-off-by: Pierre-Eric Pelloux-Prayer <pierre-eric.pelloux-prayer@amd.com>
+Reviewed-by: Christian König <christian.koenig@amd.com>
+Reviewed-by: Alex Deucher <alexander.deucher@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_device.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
+index 964efec0d335..b7751dde2894 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
+@@ -3162,8 +3162,6 @@ static int amdgpu_device_ip_suspend(struct amdgpu_device *adev)
+ 		amdgpu_virt_request_full_gpu(adev, false);
+ 	}
+ 
+-	amdgpu_ttm_disable_buffer_funcs(adev);
+-
+ 	r = amdgpu_device_ip_suspend_phase1(adev);
+ 	if (r)
+ 		return r;
+-- 
+2.55.0
+

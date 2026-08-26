@@ -1,0 +1,222 @@
+From 20260701161721.85681-3-timur.kristof@gmail.com Mon Sep 17 00:00:00 2001
+From: timur.kristof at gmail.com (=?UTF-8?q?Timur=20Krist=C3=B3f?=)
+Date: Wed,  1 Jul 2026 18:17:09 +0200
+Subject: [PATCH 02/14] drm/amdgpu/gfxhub: Enable retry fault interrupts when
+ needed
+
+---
+ drivers/gpu/drm/amd/amdgpu/gfxhub_v11_5_0.c | 9 +++++++--
+ drivers/gpu/drm/amd/amdgpu/gfxhub_v12_0.c   | 9 +++++++--
+ drivers/gpu/drm/amd/amdgpu/gfxhub_v1_0.c    | 9 +++++++--
+ drivers/gpu/drm/amd/amdgpu/gfxhub_v1_2.c    | 2 ++
+ drivers/gpu/drm/amd/amdgpu/gfxhub_v2_0.c    | 9 +++++++--
+ drivers/gpu/drm/amd/amdgpu/gfxhub_v2_1.c    | 9 +++++++--
+ drivers/gpu/drm/amd/amdgpu/gfxhub_v3_0.c    | 9 +++++++--
+ drivers/gpu/drm/amd/amdgpu/gfxhub_v3_0_3.c  | 9 +++++++--
+ 8 files changed, 51 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/gfxhub_v11_5_0.c b/drivers/gpu/drm/amd/amdgpu/gfxhub_v11_5_0.c
+index 652eea6eae4a..ef20eafd59ae 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gfxhub_v11_5_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/gfxhub_v11_5_0.c
+@@ -155,6 +155,7 @@ static void gfxhub_v11_5_0_init_gart_aperture_regs(struct amdgpu_device *adev)
+ static void gfxhub_v11_5_0_init_system_aperture_regs(struct amdgpu_device *adev)
+ {
+ 	uint64_t value;
++	u32 tmp;
+ 
+ 	WREG32_SOC15(GC, 0, regGCMC_VM_AGP_BASE, 0);
+ 	WREG32_SOC15(GC, 0, regGCMC_VM_AGP_BOT, adev->gmc.agp_start >> 24);
+@@ -180,8 +181,12 @@ static void gfxhub_v11_5_0_init_system_aperture_regs(struct amdgpu_device *adev)
+ 	WREG32_SOC15(GC, 0, regGCVM_L2_PROTECTION_FAULT_DEFAULT_ADDR_HI32,
+ 		     (u32)((u64)adev->dummy_page_addr >> 44));
+ 
+-	WREG32_FIELD15_PREREG(GC, 0, GCVM_L2_PROTECTION_FAULT_CNTL2,
+-		       ACTIVE_PAGE_MIGRATION_PTE_READ_RETRY, 1);
++	tmp = RREG32_SOC15(GC, 0, regGCVM_L2_PROTECTION_FAULT_CNTL2);
++	tmp = REG_SET_FIELD(tmp, GCVM_L2_PROTECTION_FAULT_CNTL2,
++				 ACTIVE_PAGE_MIGRATION_PTE_READ_RETRY, 1);
++	tmp = REG_SET_FIELD(tmp, GCVM_L2_PROTECTION_FAULT_CNTL2,
++				 ENABLE_RETRY_FAULT_INTERRUPT, !adev->gmc.noretry);
++	WREG32_SOC15(GC, 0, regGCVM_L2_PROTECTION_FAULT_CNTL2, tmp);
+ }
+ 
+ static void gfxhub_v11_5_0_init_tlb_regs(struct amdgpu_device *adev)
+diff --git a/drivers/gpu/drm/amd/amdgpu/gfxhub_v12_0.c b/drivers/gpu/drm/amd/amdgpu/gfxhub_v12_0.c
+index 6cbf837d50dd..ec3ff4dec674 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gfxhub_v12_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/gfxhub_v12_0.c
+@@ -158,6 +158,7 @@ static void gfxhub_v12_0_init_gart_aperture_regs(struct amdgpu_device *adev)
+ static void gfxhub_v12_0_init_system_aperture_regs(struct amdgpu_device *adev)
+ {
+ 	uint64_t value;
++	u32 tmp;
+ 
+ 	/* Program the AGP BAR */
+ 	WREG32_SOC15(GC, 0, regGCMC_VM_AGP_BASE, 0);
+@@ -184,8 +185,12 @@ static void gfxhub_v12_0_init_system_aperture_regs(struct amdgpu_device *adev)
+ 	WREG32_SOC15(GC, 0, regGCVM_L2_PROTECTION_FAULT_DEFAULT_ADDR_HI32,
+ 		     (u32)((u64)adev->dummy_page_addr >> 44));
+ 
+-	WREG32_FIELD15_PREREG(GC, 0, GCVM_L2_PROTECTION_FAULT_CNTL2,
+-		       ACTIVE_PAGE_MIGRATION_PTE_READ_RETRY, 1);
++	tmp = RREG32_SOC15(GC, 0, regGCVM_L2_PROTECTION_FAULT_CNTL2);
++	tmp = REG_SET_FIELD(tmp, GCVM_L2_PROTECTION_FAULT_CNTL2,
++				 ACTIVE_PAGE_MIGRATION_PTE_READ_RETRY, 1);
++	tmp = REG_SET_FIELD(tmp, GCVM_L2_PROTECTION_FAULT_CNTL2,
++				 ENABLE_RETRY_FAULT_INTERRUPT, !adev->gmc.noretry);
++	WREG32_SOC15(GC, 0, regGCVM_L2_PROTECTION_FAULT_CNTL2, tmp);
+ }
+ 
+ 
+diff --git a/drivers/gpu/drm/amd/amdgpu/gfxhub_v1_0.c b/drivers/gpu/drm/amd/amdgpu/gfxhub_v1_0.c
+index bfe247b1a333..27d7f7cb903f 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gfxhub_v1_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/gfxhub_v1_0.c
+@@ -91,6 +91,7 @@ static void gfxhub_v1_0_init_gart_aperture_regs(struct amdgpu_device *adev)
+ static void gfxhub_v1_0_init_system_aperture_regs(struct amdgpu_device *adev)
+ {
+ 	uint64_t value;
++	u32 tmp;
+ 
+ 	if (!amdgpu_sriov_vf(adev) || adev->asic_type <= CHIP_VEGA10) {
+ 		/* Program the AGP BAR */
+@@ -134,8 +135,12 @@ static void gfxhub_v1_0_init_system_aperture_regs(struct amdgpu_device *adev)
+ 		WREG32_SOC15(GC, 0, mmVM_L2_PROTECTION_FAULT_DEFAULT_ADDR_HI32,
+ 			     (u32)((u64)adev->dummy_page_addr >> 44));
+ 
+-		WREG32_FIELD15(GC, 0, VM_L2_PROTECTION_FAULT_CNTL2,
+-			       ACTIVE_PAGE_MIGRATION_PTE_READ_RETRY, 1);
++		tmp = RREG32_SOC15(GC, 0, mmVM_L2_PROTECTION_FAULT_CNTL2);
++		tmp = REG_SET_FIELD(tmp, VM_L2_PROTECTION_FAULT_CNTL2,
++					 ACTIVE_PAGE_MIGRATION_PTE_READ_RETRY, 1);
++		tmp = REG_SET_FIELD(tmp, VM_L2_PROTECTION_FAULT_CNTL2,
++					 ENABLE_RETRY_FAULT_INTERRUPT, !adev->gmc.noretry);
++		WREG32_SOC15(GC, 0, mmVM_L2_PROTECTION_FAULT_CNTL2, tmp);
+ 	}
+ 
+ 	/* In the case squeezing vram into GART aperture, we don't use
+diff --git a/drivers/gpu/drm/amd/amdgpu/gfxhub_v1_2.c b/drivers/gpu/drm/amd/amdgpu/gfxhub_v1_2.c
+index fbdf46070b38..ed9a64bc5aaa 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gfxhub_v1_2.c
++++ b/drivers/gpu/drm/amd/amdgpu/gfxhub_v1_2.c
+@@ -176,6 +176,8 @@ gfxhub_v1_2_xcc_init_system_aperture_regs(struct amdgpu_device *adev,
+ 			tmp = RREG32_SOC15(GC, GET_INST(GC, i), regVM_L2_PROTECTION_FAULT_CNTL2);
+ 			tmp = REG_SET_FIELD(tmp, VM_L2_PROTECTION_FAULT_CNTL2,
+ 					    ACTIVE_PAGE_MIGRATION_PTE_READ_RETRY, 1);
++			tmp = REG_SET_FIELD(tmp, VM_L2_PROTECTION_FAULT_CNTL2,
++					    ENABLE_RETRY_FAULT_INTERRUPT, !adev->gmc.noretry);
+ 			WREG32_SOC15(GC, GET_INST(GC, i), regVM_L2_PROTECTION_FAULT_CNTL2, tmp);
+ 		}
+ 
+diff --git a/drivers/gpu/drm/amd/amdgpu/gfxhub_v2_0.c b/drivers/gpu/drm/amd/amdgpu/gfxhub_v2_0.c
+index 9ea593e2c719..152b2735d360 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gfxhub_v2_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/gfxhub_v2_0.c
+@@ -151,6 +151,7 @@ static void gfxhub_v2_0_init_gart_aperture_regs(struct amdgpu_device *adev)
+ static void gfxhub_v2_0_init_system_aperture_regs(struct amdgpu_device *adev)
+ {
+ 	uint64_t value;
++	u32 tmp;
+ 
+ 	if (!amdgpu_sriov_vf(adev)) {
+ 		/* Program the AGP BAR */
+@@ -178,8 +179,12 @@ static void gfxhub_v2_0_init_system_aperture_regs(struct amdgpu_device *adev)
+ 	WREG32_SOC15(GC, 0, mmGCVM_L2_PROTECTION_FAULT_DEFAULT_ADDR_HI32,
+ 		     (u32)((u64)adev->dummy_page_addr >> 44));
+ 
+-	WREG32_FIELD15(GC, 0, GCVM_L2_PROTECTION_FAULT_CNTL2,
+-		       ACTIVE_PAGE_MIGRATION_PTE_READ_RETRY, 1);
++	tmp = RREG32_SOC15(GC, 0, mmGCVM_L2_PROTECTION_FAULT_CNTL2);
++	tmp = REG_SET_FIELD(tmp, GCVM_L2_PROTECTION_FAULT_CNTL2,
++				 ACTIVE_PAGE_MIGRATION_PTE_READ_RETRY, 1);
++	tmp = REG_SET_FIELD(tmp, GCVM_L2_PROTECTION_FAULT_CNTL2,
++				 ENABLE_RETRY_FAULT_INTERRUPT, !adev->gmc.noretry);
++	WREG32_SOC15(GC, 0, mmGCVM_L2_PROTECTION_FAULT_CNTL2, tmp);
+ }
+ 
+ 
+diff --git a/drivers/gpu/drm/amd/amdgpu/gfxhub_v2_1.c b/drivers/gpu/drm/amd/amdgpu/gfxhub_v2_1.c
+index 30b90d35abd0..83c2ddbbd292 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gfxhub_v2_1.c
++++ b/drivers/gpu/drm/amd/amdgpu/gfxhub_v2_1.c
+@@ -154,6 +154,7 @@ static void gfxhub_v2_1_init_gart_aperture_regs(struct amdgpu_device *adev)
+ static void gfxhub_v2_1_init_system_aperture_regs(struct amdgpu_device *adev)
+ {
+ 	uint64_t value;
++	u32 tmp;
+ 
+ 	if (amdgpu_sriov_vf(adev))
+ 		return;
+@@ -182,8 +183,12 @@ static void gfxhub_v2_1_init_system_aperture_regs(struct amdgpu_device *adev)
+ 	WREG32_SOC15(GC, 0, mmGCVM_L2_PROTECTION_FAULT_DEFAULT_ADDR_HI32,
+ 		     (u32)((u64)adev->dummy_page_addr >> 44));
+ 
+-	WREG32_FIELD15(GC, 0, GCVM_L2_PROTECTION_FAULT_CNTL2,
+-		       ACTIVE_PAGE_MIGRATION_PTE_READ_RETRY, 1);
++	tmp = RREG32_SOC15(GC, 0, mmGCVM_L2_PROTECTION_FAULT_CNTL2);
++	tmp = REG_SET_FIELD(tmp, GCVM_L2_PROTECTION_FAULT_CNTL2,
++				 ACTIVE_PAGE_MIGRATION_PTE_READ_RETRY, 1);
++	tmp = REG_SET_FIELD(tmp, GCVM_L2_PROTECTION_FAULT_CNTL2,
++				 ENABLE_RETRY_FAULT_INTERRUPT, !adev->gmc.noretry);
++	WREG32_SOC15(GC, 0, mmGCVM_L2_PROTECTION_FAULT_CNTL2, tmp);
+ }
+ 
+ 
+diff --git a/drivers/gpu/drm/amd/amdgpu/gfxhub_v3_0.c b/drivers/gpu/drm/amd/amdgpu/gfxhub_v3_0.c
+index 9e6a6e13dec0..90bbb2fe4884 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gfxhub_v3_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/gfxhub_v3_0.c
+@@ -150,6 +150,7 @@ static void gfxhub_v3_0_init_gart_aperture_regs(struct amdgpu_device *adev)
+ static void gfxhub_v3_0_init_system_aperture_regs(struct amdgpu_device *adev)
+ {
+ 	uint64_t value;
++	u32 tmp;
+ 
+ 	/* Program the AGP BAR */
+ 	WREG32_SOC15(GC, 0, regGCMC_VM_AGP_BASE, 0);
+@@ -176,8 +177,12 @@ static void gfxhub_v3_0_init_system_aperture_regs(struct amdgpu_device *adev)
+ 	WREG32_SOC15(GC, 0, regGCVM_L2_PROTECTION_FAULT_DEFAULT_ADDR_HI32,
+ 		     (u32)((u64)adev->dummy_page_addr >> 44));
+ 
+-	WREG32_FIELD15_PREREG(GC, 0, GCVM_L2_PROTECTION_FAULT_CNTL2,
+-		       ACTIVE_PAGE_MIGRATION_PTE_READ_RETRY, 1);
++	tmp = RREG32_SOC15(GC, 0, regGCVM_L2_PROTECTION_FAULT_CNTL2);
++	tmp = REG_SET_FIELD(tmp, GCVM_L2_PROTECTION_FAULT_CNTL2,
++				 ACTIVE_PAGE_MIGRATION_PTE_READ_RETRY, 1);
++	tmp = REG_SET_FIELD(tmp, GCVM_L2_PROTECTION_FAULT_CNTL2,
++				 ENABLE_RETRY_FAULT_INTERRUPT, !adev->gmc.noretry);
++	WREG32_SOC15(GC, 0, regGCVM_L2_PROTECTION_FAULT_CNTL2, tmp);
+ }
+ 
+ 
+diff --git a/drivers/gpu/drm/amd/amdgpu/gfxhub_v3_0_3.c b/drivers/gpu/drm/amd/amdgpu/gfxhub_v3_0_3.c
+index b3b1085c7cd3..1b3c067ab48c 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gfxhub_v3_0_3.c
++++ b/drivers/gpu/drm/amd/amdgpu/gfxhub_v3_0_3.c
+@@ -153,6 +153,7 @@ static void gfxhub_v3_0_3_init_gart_aperture_regs(struct amdgpu_device *adev)
+ static void gfxhub_v3_0_3_init_system_aperture_regs(struct amdgpu_device *adev)
+ {
+ 	uint64_t value;
++	u32 tmp;
+ 
+ 	if (amdgpu_sriov_vf(adev))
+ 		return;
+@@ -181,8 +182,12 @@ static void gfxhub_v3_0_3_init_system_aperture_regs(struct amdgpu_device *adev)
+ 	WREG32_SOC15(GC, 0, regGCVM_L2_PROTECTION_FAULT_DEFAULT_ADDR_HI32,
+ 		     (u32)((u64)adev->dummy_page_addr >> 44));
+ 
+-	WREG32_FIELD15_PREREG(GC, 0, GCVM_L2_PROTECTION_FAULT_CNTL2,
+-		       ACTIVE_PAGE_MIGRATION_PTE_READ_RETRY, 1);
++	tmp = RREG32_SOC15(GC, 0, regGCVM_L2_PROTECTION_FAULT_CNTL2);
++	tmp = REG_SET_FIELD(tmp, GCVM_L2_PROTECTION_FAULT_CNTL2,
++				 ACTIVE_PAGE_MIGRATION_PTE_READ_RETRY, 1);
++	tmp = REG_SET_FIELD(tmp, GCVM_L2_PROTECTION_FAULT_CNTL2,
++				 ENABLE_RETRY_FAULT_INTERRUPT, !adev->gmc.noretry);
++	WREG32_SOC15(GC, 0, regGCVM_L2_PROTECTION_FAULT_CNTL2, tmp);
+ }
+ 
+ 
+-- 
+2.54.0
+

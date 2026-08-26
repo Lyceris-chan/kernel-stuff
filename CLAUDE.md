@@ -105,13 +105,14 @@ When asked to "update the kernel", "bump to a new RC", or "check for new patches
 
 1. Never use `ld.mold` — crashes on kernel vDSO linker scripts (`fatal: unknown linker script token SECTIONS`).
 2. Never access `lore.kernel.org` — anti-bot blocks automated agents. Use git repos or `lists.freedesktop.org` archives. The **drm/amd work items tracker** (`https://gitlab.freedesktop.org/drm/amd/-/work_items`) IS accessible — plain `curl` with **no User-Agent** returns real content (issues + events API; notes API is 401-gated).
-3. Never hand-write or fabricate a patch diff. No traceable commit or mailing-list submission → tell the user, don't invent one. **AI-assisted patches ARE allowed** (2026-08-03): a named human author, `Signed-off-by`, an `Assisted-by:` trailer, and traceable provenance are required; fabricated diffs with no source remain forbidden.
-4. Never add patches for hardware we don't have (Intel/Nvidia GPUs, ARM/SoC, Apple T2, laptop amps, TV tuners).
-5. Never clone into `/tmp` — use `repos/` in the workspace.
-6. Never run `make menuconfig`/`nconfig` unless the user explicitly asks.
-7. Never remove a patch without explicit user approval, even if it looks irrelevant.
-8. Never use `8.8.8.8` in network scripts — use Quad9 (`9.9.9.9`).
-9. Never set `LLVM` to a path. `tools/bpf/resolve_btfids/Makefile` checks `ifeq ($(LLVM),1)`; a path value breaks BTF ID resolution. Prepend the LLVM `bin/` to `$PATH` and set `LLVM=1`.
+3. Never hand-write or fabricate a patch diff. No traceable commit or mailing-list submission → tell the user, don't invent one. **AI-assisted patches ARE allowed** (2026-08-03): a named human author, `Signed-off-by`, an `Assisted-by:` trailer, and traceable provenance are required; fabricated diffs with no source remain forbidden. **Patches must be clean and non-hallucinated** (2026-08-26): every patch must pass `git apply --check` AND `patch -p1 --dry-run` against the reference tree before being added; a patch that only applies with heavy fuzz, that I generated without a traceable source, or whose hunks reference symbols/context I invented must be reported to the user, not silently carried.
+4. Never use `pip --break-system-packages` (or `pip install --user` against a managed Python). Install Python tooling in a venv, or via the distro package manager (pacman/AUR).
+5. Never add patches for hardware we don't have (Intel/Nvidia GPUs, ARM/SoC, Apple T2, laptop amps, TV tuners).
+6. Never clone into `/tmp` — use `repos/` in the workspace.
+7. Never run `make menuconfig`/`nconfig` unless the user explicitly asks.
+8. Never remove a patch without explicit user approval, even if it looks irrelevant.
+9. Never use `8.8.8.8` in network scripts — use Quad9 (`9.9.9.9`).
+10. Never set `LLVM` to a path. `tools/bpf/resolve_btfids/Makefile` checks `ifeq ($(LLVM),1)`; a path value breaks BTF ID resolution. Prepend the LLVM `bin/` to `$PATH` and set `LLVM=1`.
 
 ## Kconfig essentials
 

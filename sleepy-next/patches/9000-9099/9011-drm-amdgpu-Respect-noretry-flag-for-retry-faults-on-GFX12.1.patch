@@ -1,0 +1,49 @@
+From 20260701161721.85681-2-timur.kristof@gmail.com Mon Sep 17 00:00:00 2001
+From: timur.kristof at gmail.com (=?UTF-8?q?Timur=20Krist=C3=B3f?=)
+Date: Wed,  1 Jul 2026 18:17:08 +0200
+Subject: [PATCH 01/14] drm/amdgpu: Respect noretry flag for retry faults on
+ GFX12.1
+
+---
+ drivers/gpu/drm/amd/amdgpu/gfxhub_v12_1.c | 4 ++--
+ drivers/gpu/drm/amd/amdgpu/mmhub_v4_2_0.c | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/gfxhub_v12_1.c b/drivers/gpu/drm/amd/amdgpu/gfxhub_v12_1.c
+index 4c2fd1e6616e..0cada13d92a4 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gfxhub_v12_1.c
++++ b/drivers/gpu/drm/amd/amdgpu/gfxhub_v12_1.c
+@@ -243,7 +243,7 @@ static void gfxhub_v12_1_xcc_init_system_aperture_regs(struct amdgpu_device *ade
+ 		tmp = REG_SET_FIELD(tmp, GCVM_L2_PROTECTION_FAULT_CNTL2,
+ 				    ACTIVE_PAGE_MIGRATION_PTE_READ_RETRY, 1);
+ 		tmp = REG_SET_FIELD(tmp, GCVM_L2_PROTECTION_FAULT_CNTL2,
+-				    ENABLE_RETRY_FAULT_INTERRUPT, 0x1);
++				    ENABLE_RETRY_FAULT_INTERRUPT, !adev->gmc.noretry);
+ 		WREG32_SOC15(GC, GET_INST(GC, i),
+ 			     regGCVM_L2_PROTECTION_FAULT_CNTL2, tmp);
+ 	}
+@@ -447,7 +447,7 @@ static void gfxhub_v12_1_xcc_setup_vmid_config(struct amdgpu_device *adev,
+ 			/* Send no-retry XNACK on fault to suppress VM fault storm */
+ 			tmp = REG_SET_FIELD(tmp, GCVM_CONTEXT1_CNTL,
+ 					    RETRY_PERMISSION_OR_INVALID_PAGE_FAULT,
+-					    1);
++					    !adev->gmc.noretry);
+ 			WREG32_SOC15_OFFSET(GC, GET_INST(GC, j), regGCVM_CONTEXT1_CNTL,
+ 					    i * hub->ctx_distance, tmp);
+ 			WREG32_SOC15_OFFSET(GC, GET_INST(GC, j),
+diff --git a/drivers/gpu/drm/amd/amdgpu/mmhub_v4_2_0.c b/drivers/gpu/drm/amd/amdgpu/mmhub_v4_2_0.c
+index 49b7f16a941f..f2c549737e02 100644
+--- a/drivers/gpu/drm/amd/amdgpu/mmhub_v4_2_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/mmhub_v4_2_0.c
+@@ -320,7 +320,7 @@ static void mmhub_v4_2_0_mid_init_system_aperture_regs(struct amdgpu_device *ade
+ 		tmp = REG_SET_FIELD(tmp, MMVM_L2_PROTECTION_FAULT_CNTL2,
+ 				    ACTIVE_PAGE_MIGRATION_PTE_READ_RETRY, 1);
+ 		tmp = REG_SET_FIELD(tmp, MMVM_L2_PROTECTION_FAULT_CNTL2,
+-				    ENABLE_RETRY_FAULT_INTERRUPT, 0x1);
++				    ENABLE_RETRY_FAULT_INTERRUPT, !adev->gmc.noretry);
+ 		WREG32_SOC15(MMHUB, GET_INST(MMHUB, i),
+ 			     regMMVM_L2_PROTECTION_FAULT_CNTL2, tmp);
+ 	}
+-- 
+2.54.0
+

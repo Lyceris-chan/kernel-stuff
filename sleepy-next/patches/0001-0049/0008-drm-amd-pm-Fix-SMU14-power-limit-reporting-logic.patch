@@ -1,0 +1,44 @@
+From 69f45207be7af942c7b31a9b6c357eed758da22e Mon Sep 17 00:00:00 2001
+From: Sleepy <sleepy@example.com>
+Date: Thu, 16 Jul 2026 06:54:39 +0200
+Subject: [PATCH 36/36] drm/amd/pm: Fix SMU14 power limit reporting logic
+
+smu_v14_0_2_get_power_limit() only exposes the full PPT overdrive range
+when smu->od_enabled is set; with overdrive disabled, the default
+state, it reports an upper bound of 0. That clamps the reported maximum
+power limit to the nominal default even on boards whose SMU supports
+the PPT overdrive feature, so the board's true maximum PPT is
+unreachable until the user enables overdrive.
+
+Gate the overdrive range on PP_OD_FEATURE_PPT_BIT support alone,
+dropping the smu->od_enabled requirement, so the native [min, max] PPT
+range is reported whenever the feature exists.
+
+Signed-off-by: Antigravity <antigravity@gemini.local>
+---
+ drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c b/drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c
+index eed4fca09..4c33efd15 100644
+--- a/drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c
++++ b/drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c
+@@ -1640,13 +1640,10 @@ static int smu_v14_0_2_get_power_limit(struct smu_context *smu,
+ 		*default_power_limit = pp_limit;
+ 
+ 	if (powerplay_table) {
+-		if (smu->od_enabled &&
+-		    smu_v14_0_2_is_od_feature_supported(smu, PP_OD_FEATURE_PPT_BIT)) {
++		if (smu_v14_0_2_is_od_feature_supported(smu, PP_OD_FEATURE_PPT_BIT)) {
++			/* Unlocked for aggressive power usage: allow max PPT limit natively */
+ 			od_percent_upper = pptable->SkuTable.OverDriveLimitsBasicMax.Ppt;
+ 			od_percent_lower = pptable->SkuTable.OverDriveLimitsBasicMin.Ppt;
+-		} else if (smu_v14_0_2_is_od_feature_supported(smu, PP_OD_FEATURE_PPT_BIT)) {
+-			od_percent_upper = 0;
+-			od_percent_lower = pptable->SkuTable.OverDriveLimitsBasicMin.Ppt;
+ 		}
+ 	}
+ 
+-- 
+2.55.0
+

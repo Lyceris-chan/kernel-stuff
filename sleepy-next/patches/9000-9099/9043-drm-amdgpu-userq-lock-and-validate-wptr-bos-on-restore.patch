@@ -1,0 +1,85 @@
+From Jesse.Zhang at amd.com  Wed Aug 19 02:21:08 2026
+From: Jesse.Zhang@amd.com (Jesse Zhang)
+Date: Wed, 19 Aug 2026 10:21:08 +0800
+Subject: [PATCH v2] drm/amdgpu/userq: lock and validate wptr BOs before
+ reading their GPU offset on restore
+Message-ID: <20260819022138.3908141-1-Jesse.Zhang@amd.com>
+
+On resume, amdgpu_userq_vm_validate_and_restore_queue() updates each queue's
+wptr GPU address via amdgpu_bo_gpu_offset().
+
+WPTR BOs are VM-mapped, but each BO has its own reservation object and is not
+implicitly covered by the VM validation path here. This can leave offset reads
+without proper BO locking/placement state and trigger WARN_ONs.
+  ------------[ cut here ]------------
+  WARNING: amdgpu_object.c:1486 at amdgpu_bo_gpu_offset+0x75/0xa0 [amdgpu], CPU#3: kworker/3:1/116
+  Workqueue: events amdgpu_userq_restore_worker [amdgpu]
+  RIP: 0010:amdgpu_bo_gpu_offset+0x75/0xa0 [amdgpu]
+  Call Trace:
+   <TASK>
+   amdgpu_userq_vm_validate_and_restore_queue+0x629/0x960 [amdgpu]
+   amdgpu_userq_restore_worker+0xa6/0x180 [amdgpu]
+   process_scheduled_works+0xa6/0x460
+   worker_thread+0x13c/0x290
+   kthread+0xfb/0x140
+   ret_from_fork+0x1b6/0x2b0
+   ret_from_fork_asm+0x1a/0x30
+   </TASK>
+  ---[ end trace 0000000000000000 ]---
+  ------------[ cut here ]------------
+  WARNING: amdgpu_object.c:1485 at amdgpu_bo_gpu_offset+0x9a/0xa0 [amdgpu], CPU#2: kworker/2:1/127
+  Workqueue: events amdgpu_userq_restore_worker [amdgpu]
+  RIP: 0010:amdgpu_bo_gpu_offset+0x9a/0xa0 [amdgpu]
+
+Add each queue's WPTR BO to the drm_exec ww context and validate it to its
+allowed placement before the later offset update.
+
+v2:
+- Clarify that WPTR BOs are VM-mapped (fix incorrect "not part of VM" wording). (Christian)
+- Describe both parts of the fix: lock BO reservations in drm_exec and
+  validate BO placement before offset reads.
+
+Signed-off-by: Jesse Zhang <Jesse.Zhang@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c | 24 +++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+index 17cc48d87c4d..ab8fc14a235b 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+@@ -1054,6 +1054,30 @@ amdgpu_userq_vm_validate_and_restore_queue(struct amdgpu_userq_mgr *uq_mgr)
+ 		drm_exec_retry_on_contention(&exec);
+ 		if (unlikely(ret))
+ 			goto unlock_all;
++
++		/*
++		 * WPTR BOs are VM-mapped, but each BO has its own reservation
++		 * object. Lock them into this drm_exec ww context so the later
++		 * amdgpu_bo_gpu_offset() reads are done with the BO resv locked.
++		 */
++		xa_for_each(&uq_mgr->userq_xa, tmp_key, queue) {
++			struct ttm_operation_ctx wptr_ctx = { false, false };
++
++			bo = queue->wptr_obj.obj;
++			if (!bo)
++				continue;
++
++			ret = drm_exec_prepare_obj(&exec, &bo->tbo.base,
++						   TTM_NUM_MOVE_FENCES + 1);
++			drm_exec_retry_on_contention(&exec);
++			if (unlikely(ret))
++				goto unlock_all;
++
++			amdgpu_bo_placement_from_domain(bo, bo->allowed_domains);
++			ret = ttm_bo_validate(&bo->tbo, &bo->placement, &wptr_ctx);
++			if (unlikely(ret))
++				goto unlock_all;
++		}
+ 	}
+ 
+ 	if (invalidated) {
+-- 
+2.49.0
+
+

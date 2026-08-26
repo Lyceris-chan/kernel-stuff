@@ -1,0 +1,33 @@
+From f000000000000000000000000000000000000001 Mon Sep 17 00:00:00 2001
+From: Charlene Liu <Charlene.Liu@amd.com>
+Date: Wed, 5 Aug 2026 14:36:24 +0800
+Subject: [PATCH] drm/amd/display: fix HPD program filter programming
+
+[why]
+fix a regression when moving logic from dal_hw_hpd_set_config to link_enc:
+Toggle_filter HW register programming is in wrong unit,
+which caused the connection time extreamly long.
+
+Reviewed-by: Ovidiu Bunea <ovidiu.bunea@amd.com>
+Signed-off-by: Charlene Liu <Charlene.Liu@amd.com>
+Signed-off-by: Tom Chung <chiahsuan.chung@amd.com>
+---
+diff --git a/drivers/gpu/drm/amd/display/dc/dio/dcn42/dcn42_dio_link_encoder.c b/drivers/gpu/drm/amd/display/dc/dio/dcn42/dcn42_dio_link_encoder.c
+index fae49b3b170e..50174aded6aa 100644
+--- a/drivers/gpu/drm/amd/display/dc/dio/dcn42/dcn42_dio_link_encoder.c
++++ b/drivers/gpu/drm/amd/display/dc/dio/dcn42/dcn42_dio_link_encoder.c
+@@ -58,8 +58,8 @@ bool dcn42_program_hpd_filter(struct link_encoder *enc, int delay_on_connect_in_
+ 	struct dcn10_link_encoder *enc10 = TO_DCN10_LINK_ENC(enc);
+ 
+ 	HPD_REG_SET_2(DC_HPD_TOGGLE_FILT_CNTL, 0,
+-			DC_HPD_CONNECT_INT_DELAY, delay_on_connect_in_ms,
+-			DC_HPD_DISCONNECT_INT_DELAY, delay_on_disconnect_in_ms);
++			DC_HPD_CONNECT_INT_DELAY, delay_on_connect_in_ms / 10,
++			DC_HPD_DISCONNECT_INT_DELAY, delay_on_disconnect_in_ms / 10);
+ 
+ 	return true;
+ }
+-- 
+2.43.0
+
+

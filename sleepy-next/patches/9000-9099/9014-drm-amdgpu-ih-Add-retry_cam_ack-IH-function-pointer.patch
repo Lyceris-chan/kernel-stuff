@@ -1,0 +1,102 @@
+From 20260701161721.85681-5-timur.kristof@gmail.com Mon Sep 17 00:00:00 2001
+From: timur.kristof at gmail.com (=?UTF-8?q?Timur=20Krist=C3=B3f?=)
+Date: Wed,  1 Jul 2026 18:17:11 +0200
+Subject: [PATCH 04/14] drm/amdgpu/ih: Add retry_cam_ack IH function pointer
+
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_gmc.c | 7 ++++++-
+ drivers/gpu/drm/amd/amdgpu/amdgpu_ih.h  | 1 +
+ drivers/gpu/drm/amd/amdgpu/ih_v7_0.c    | 6 ++++++
+ drivers/gpu/drm/amd/amdgpu/vega20_ih.c  | 8 +++++++-
+ 4 files changed, 20 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_gmc.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_gmc.c
+index 3f0b1b7a557b..bb278a61dc9e 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_gmc.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_gmc.c
+@@ -552,6 +552,11 @@ int amdgpu_gmc_handle_retry_fault(struct amdgpu_device *adev,
+ 	int ret;
+ 
+ 	if (adev->irq.retry_cam_enabled) {
++		if (!adev->irq.ih_funcs->retry_cam_ack) {
++			dev_warn(adev->dev, "retry CAM is enabled, but retry_cam_ack is NULL\n");
++			return -EOPNOTSUPP;
++		}
++
+ 		/* Delegate it to a different ring if the hardware hasn't
+ 		 * already done it.
+ 		 */
+@@ -562,7 +567,7 @@ int amdgpu_gmc_handle_retry_fault(struct amdgpu_device *adev,
+ 
+ 		ret = amdgpu_vm_handle_fault(adev, entry->pasid, entry->vmid, node_id,
+ 					     addr, entry->timestamp, write_fault);
+-		WDOORBELL32(adev->irq.retry_cam_doorbell_index, cam_index);
++		adev->irq.ih_funcs->retry_cam_ack(adev, cam_index);
+ 		if (ret)
+ 			return 1;
+ 	} else {
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_ih.h b/drivers/gpu/drm/amd/amdgpu/amdgpu_ih.h
+index 444437c30088..e6e34f6e86f4 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_ih.h
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_ih.h
+@@ -97,6 +97,7 @@ struct amdgpu_ih_funcs {
+ 	const char *(*node_id_to_die_name)(struct amdgpu_device *adev,
+ 					   unsigned int node_id,
+ 					   char *buf, size_t size);
++	void (*retry_cam_ack)(struct amdgpu_device *adev, u32 cam_index);
+ };
+ 
+ #define amdgpu_ih_get_wptr(adev, ih) (adev)->irq.ih_funcs->get_wptr((adev), (ih))
+diff --git a/drivers/gpu/drm/amd/amdgpu/ih_v7_0.c b/drivers/gpu/drm/amd/amdgpu/ih_v7_0.c
+index bd332e8cc5bf..24be9d726428 100644
+--- a/drivers/gpu/drm/amd/amdgpu/ih_v7_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/ih_v7_0.c
+@@ -289,6 +289,11 @@ static uint32_t ih_v7_0_setup_retry_doorbell(u32 doorbell_index)
+ 	return val;
+ }
+ 
++static void ih_v7_0_retry_cam_ack(struct amdgpu_device *adev, u32 cam_index)
++{
++	WDOORBELL32(adev->irq.retry_cam_doorbell_index, cam_index);
++}
++
+ #define regIH_RING1_CLIENT_CFG_INDEX_V7_1             0x122
+ #define regIH_RING1_CLIENT_CFG_INDEX_V7_1_BASE_IDX    0
+ #define regIH_RING1_CLIENT_CFG_DATA_V7_1              0x123
+@@ -865,6 +870,7 @@ static const struct amdgpu_ih_funcs ih_v7_0_funcs = {
+ 	.decode_iv_ts = amdgpu_ih_decode_iv_ts_helper,
+ 	.set_rptr = ih_v7_0_set_rptr,
+ 	.node_id_to_die_name = ih_v7_0_node_id_to_die_name,
++	.retry_cam_ack = ih_v7_0_retry_cam_ack,
+ };
+ 
+ static void ih_v7_0_set_interrupt_funcs(struct amdgpu_device *adev)
+diff --git a/drivers/gpu/drm/amd/amdgpu/vega20_ih.c b/drivers/gpu/drm/amd/amdgpu/vega20_ih.c
+index 85846fd08ce4..30a82fff3ff7 100644
+--- a/drivers/gpu/drm/amd/amdgpu/vega20_ih.c
++++ b/drivers/gpu/drm/amd/amdgpu/vega20_ih.c
+@@ -293,6 +293,11 @@ static uint32_t vega20_setup_retry_doorbell(u32 doorbell_index)
+ 	return val;
+ }
+ 
++static void vega20_retry_cam_ack(struct amdgpu_device *adev, u32 cam_index)
++{
++	WDOORBELL32(adev->irq.retry_cam_doorbell_index, cam_index);
++}
++
+ /**
+  * vega20_ih_irq_init - init and enable the interrupt ring
+  *
+@@ -738,7 +743,8 @@ static const struct amdgpu_ih_funcs vega20_ih_funcs = {
+ 	.get_wptr = vega20_ih_get_wptr,
+ 	.decode_iv = amdgpu_ih_decode_iv_helper,
+ 	.decode_iv_ts = amdgpu_ih_decode_iv_ts_helper,
+-	.set_rptr = vega20_ih_set_rptr
++	.set_rptr = vega20_ih_set_rptr,
++	.retry_cam_ack = vega20_retry_cam_ack,
+ };
+ 
+ static void vega20_ih_set_interrupt_funcs(struct amdgpu_device *adev)
+-- 
+2.54.0
+

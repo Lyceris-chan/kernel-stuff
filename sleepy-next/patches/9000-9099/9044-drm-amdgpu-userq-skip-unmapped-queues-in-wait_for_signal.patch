@@ -1,0 +1,45 @@
+From: Jesse.Zhang@amd.com (Jesse Zhang)
+Date: Tue, 18 Aug 2026 15:29:25 +0800
+Subject: [PATCH] drm/amdgpu/userq: skip unmapped queues in
+ amdgpu_userq_wait_for_signal
+Message-ID: <20260818072959.3356764-1-Jesse.Zhang@amd.com>
+
+amdgpu_userq_wait_for_signal() does an unbounded dma_fence_wait() on
+every queue's last_fence before eviction. A queue disabled via MODIFY
+with queue_percentage == 0 is unmapped but stays in the xarray, and its
+pending fence never signals because the work will not run while the
+queue is unmapped. Eviction then blocks forever, hanging the task and
+wedging the GPU on a forced reset.
+
+Only wait on fences of queues that are still mapped.
+
+Signed-off-by: Jesse Zhang <Jesse.Zhang@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+index feffebb210ea..cfbfecb05768 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+@@ -1302,6 +1302,16 @@ amdgpu_userq_wait_for_signal(struct amdgpu_userq_mgr *uq_mgr)
+ 		if (!f)
+ 			continue;
+ 
++		/*
++		 * Only a mapped queue can make progress on its fences. A queue
++		 * that has been unmapped (e.g. disabled through a MODIFY with
++		 * queue_percentage == 0) will never execute its pending work,
++		 * so its last_fence would never signal. Waiting on it here would
++		 * block the eviction path forever, so skip such queues.
++		 */
++		if (queue->state != AMDGPU_USERQ_STATE_MAPPED)
++			continue;
++
+ 		dma_fence_wait(f, false);
+ 	}
+ }
+-- 
+2.49.0
+
+

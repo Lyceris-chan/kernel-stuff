@@ -1,0 +1,41 @@
+From 882e8148ae7ec0c504c472b01cdebe7b69e04da5 Mon Sep 17 00:00:00 2001
+From: Antigravity <antigravity@gemini.local>
+Date: Wed, 1 Jul 2026 13:00:00 +0200
+Subject: [PATCH 29/36] drm/amd/pm: Add bounds checking for SMU14 I2C commands
+
+smu_v14_0_2_i2c_xfer() writes one SwI2cCmd_t per transferred byte into
+req->SwI2cCmds[], a fixed-size array of MAX_SW_I2C_COMMANDS entries.
+The loop index c accumulates across every message in the transfer, so a
+request whose total byte count exceeds MAX_SW_I2C_COMMANDS writes past
+the end of the array and corrupts the SMU command buffer.
+
+Check c against MAX_SW_I2C_COMMANDS before dereferencing the slot and
+return -EINVAL through the existing fail path on overflow.
+
+Signed-off-by: Antigravity <antigravity@gemini.local>
+---
+ drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c b/drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c
+index c61bc0d79..e0ce16fb7 100644
+--- a/drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c
++++ b/drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c
+@@ -1927,7 +1927,13 @@ static int smu_v14_0_2_i2c_xfer(struct i2c_adapter *i2c_adap,
+ 
+ 	for (c = i = 0; i < num_msgs; i++) {
+ 		for (j = 0; j < msg[i].len; j++, c++) {
+-			SwI2cCmd_t *cmd = &req->SwI2cCmds[c];
++			SwI2cCmd_t *cmd;
++
++			if (c >= MAX_SW_I2C_COMMANDS) {
++				r = -EINVAL;
++				goto fail;
++			}
++			cmd = &req->SwI2cCmds[c];
+ 
+ 			if (!(msg[i].flags & I2C_M_RD)) {
+ 				/* write */
+-- 
+2.55.0
+

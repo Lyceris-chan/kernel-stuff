@@ -1,0 +1,71 @@
+From 288cc4a54a002c2f28d20859f30547512a1e2aba Mon Sep 17 00:00:00 2001
+From: Jesse Zhang <Jesse.Zhang@amd.com>
+Date: Thu, 30 Jul 2026 17:17:53 +0800
+Subject: [PATCH] drm/amdgpu/mes12: fix dropped dispatches under queue
+ oversubscription
+
+On gfx12, when more queues are ready than there are HQD slots
+(oversubscription), MES keeps queues unmapped and maps a queue to an HQD
+on demand when its doorbell rings; a queue is only refetched once its
+per-queue work_done is cleared.
+
+Historically oversubscription was handled via the aggregated doorbell,
+but that is a shared level-wide signal: MES cannot tell which queue rang
+and never clears a queue's work_done, so it relies on the coarse
+oversubscription timer to rescan. gfx12 therefore drives GFX/compute
+through the per-queue unmapped-doorbell path instead (the aggregated
+doorbell now only serves SDMA), which can pinpoint the ringing queue and
+lets MES stay idle otherwise.
+
+But with unmapped-doorbell mode 1 (basic) a ring only sets a coarse
+level-wide ready flag and does not read the per-queue bitmap or clear the
+ringing queue's work_done. A queue still marked done from a prior dispatch
+is skipped and its new work is never fetched: the completion never
+signals, while queue creation succeeds and no dmesg error is reported.
+
+Switch to mode 2 (basic+): MES reads the per-queue CP_UNMAPPED_QUEUE
+bitmap, identifies which queue rang, and clears its work_done so it is
+rescheduled promptly. This affects every queue MES schedules on gfx12
+(KFD and DRM user queues), which share the one MES instance and this
+global setting.
+
+Tested on gfx1201: concurrent multi-queue dispatch that intermittently
+stalled under mode 1 now passes on both the KFD and DRM userq paths.
+
+v2: update commit message: describe the oversubscription case, why the
+    aggregated doorbell is not used for GFX/compute on gfx12, and why
+    basic+ (not basic) is required.
+
+Signed-off-by: Jesse Zhang <Jesse.Zhang@amd.com>
+Reviewed-by: Shaoyun Liu <shaoyun.liu@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/mes_v12_0.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/mes_v12_0.c b/drivers/gpu/drm/amd/amdgpu/mes_v12_0.c
+index 3b2b955cf..ee72afdb0 100644
+--- a/drivers/gpu/drm/amd/amdgpu/mes_v12_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/mes_v12_0.c
+@@ -993,10 +993,16 @@ static int mes_v12_0_set_hw_resources(struct amdgpu_mes *mes, int pipe)
+ 	/*
+ 	 * Keep oversubscribe timer for sdma . When we have unmapped doorbell
+ 	 * handling support, other queue will not use the oversubscribe timer.
+-	 * handling  mode - 0: disabled; 1: basic version; 2: basic+ version
++	 * handling  mode - 0: disabled; 1: basic; 2: basic+; 3: basic++
++	 *
++	 * Use basic+ (2): on an unmapped-queue doorbell ring MES reads the
++	 * per-queue CP_UNMAPPED_QUEUE bitmap and clears the ringing queue's
++	 * work_done so it is rescheduled. basic (1) only sets a coarse
++	 * level-wide ready flag without clearing work_done, so a queue that
++	 * rings after work_done was set is skipped and its work is lost.
+ 	 */
+ 	mes_set_hw_res_pkt.oversubscription_timer = mes_rev < 0x8b ? 0 : 50;
+-	mes_set_hw_res_pkt.unmapped_doorbell_handling = 1;
++	mes_set_hw_res_pkt.unmapped_doorbell_handling = 2;
+ 
+ 	if (amdgpu_mes_log_enable) {
+ 		mes_set_hw_res_pkt.enable_mes_event_int_logging = 1;
+-- 
+2.55.0
+

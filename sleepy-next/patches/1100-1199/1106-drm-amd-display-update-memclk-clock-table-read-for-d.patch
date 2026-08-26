@@ -1,0 +1,50 @@
+From d52de56938c38e70b4b77250912ee9e816cc145e Mon Sep 17 00:00:00 2001
+From: Dmytro Laktyushkin <dmytro.laktyushkin@amd.com>
+Date: Thu, 4 Jun 2026 09:26:22 -0400
+Subject: [PATCH] drm/amd/display: update memclk clock table read for dcn42
+
+Change memclk table to match dcfclk size to avoid fine grained mapping
+in dml2.1
+
+Reviewed-by: Charlene Liu <charlene.liu@amd.com>
+Signed-off-by: Dmytro Laktyushkin <dmytro.laktyushkin@amd.com>
+Signed-off-by: George Zhang <george.zhang@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ .../amd/display/dc/clk_mgr/dcn42/dcn42_clk_mgr.c | 16 +++++++++++-----
+ 1 file changed, 11 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/display/dc/clk_mgr/dcn42/dcn42_clk_mgr.c b/drivers/gpu/drm/amd/display/dc/clk_mgr/dcn42/dcn42_clk_mgr.c
+index d01e5969a..3baac7fa3 100644
+--- a/drivers/gpu/drm/amd/display/dc/clk_mgr/dcn42/dcn42_clk_mgr.c
++++ b/drivers/gpu/drm/amd/display/dc/clk_mgr/dcn42/dcn42_clk_mgr.c
+@@ -999,15 +999,21 @@ void dcn42_get_smu_clocks(struct clk_mgr_internal *clk_mgr_int)
+ 			clk_mgr_base->bw_params->clk_table.num_entries_per_clk.num_fclk_levels = dpm_clks->NumFclkLevelsEnabled;
+ 			clk_mgr_base->bw_params->clk_table.num_entries = dpm_clks->NumFclkLevelsEnabled;
+ 
+-			/* Memory Pstate table is in reverse order*/
++			/* Memory Pstate table is in reverse order for dcn42. Proper way to map this is for pmfw to provide an fclk indexed uclk key since we consume fclk matched pairs.*/
+ 			ASSERT(dpm_clks->NumMemPstatesEnabled <= NUM_MEM_PSTATE_LEVELS);
+ 			if (dpm_clks->NumMemPstatesEnabled > NUM_MEM_PSTATE_LEVELS)
+ 				dpm_clks->NumMemPstatesEnabled = NUM_MEM_PSTATE_LEVELS;
+-			for (i = 0; i < dpm_clks->NumMemPstatesEnabled; i++) {
+-				clk_mgr_base->bw_params->clk_table.entries[dpm_clks->NumMemPstatesEnabled - 1 - i].memclk_mhz = dpm_clks->MemPstateTable[i].MemClk;
+-				clk_mgr_base->bw_params->clk_table.entries[dpm_clks->NumMemPstatesEnabled - 1 - i].wck_ratio = dcn42_convert_wck_ratio(dpm_clks->MemPstateTable[i].WckRatio)	;
++			for (i = 0; i < dpm_clks->NumDcfClkLevelsEnabled; i++) {
++				if (i < dpm_clks->NumMemPstatesEnabled) {
++					clk_mgr_base->bw_params->clk_table.entries[dpm_clks->NumMemPstatesEnabled - 1 - i].memclk_mhz = dpm_clks->MemPstateTable[i].MemClk;
++					clk_mgr_base->bw_params->clk_table.entries[dpm_clks->NumMemPstatesEnabled - 1 - i].wck_ratio = dcn42_convert_wck_ratio(dpm_clks->MemPstateTable[i].WckRatio);
++				} else {
++					clk_mgr_base->bw_params->clk_table.entries[i].memclk_mhz = dpm_clks->MemPstateTable[0].MemClk;
++					clk_mgr_base->bw_params->clk_table.entries[i].wck_ratio = dcn42_convert_wck_ratio(dpm_clks->MemPstateTable[0].WckRatio);
++				}
+ 			}
+-			clk_mgr_base->bw_params->clk_table.num_entries_per_clk.num_memclk_levels = dpm_clks->NumMemPstatesEnabled;
++
++			clk_mgr_base->bw_params->clk_table.num_entries_per_clk.num_memclk_levels = dpm_clks->NumDcfClkLevelsEnabled;
+ 
+ 			/* DTBCLK*/
+ 			clk_mgr_base->bw_params->clk_table.entries[0].dtbclk_mhz = 600; /* Fixed on platform */
+-- 
+2.55.0
+

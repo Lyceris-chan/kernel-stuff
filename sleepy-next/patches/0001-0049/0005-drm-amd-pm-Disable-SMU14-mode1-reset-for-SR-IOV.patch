@@ -1,0 +1,38 @@
+From 680124f219d218f78681e7a10fbca6ce2270f614 Mon Sep 17 00:00:00 2001
+From: Antigravity <antigravity@gemini.local>
+Date: Wed, 1 Jul 2026 13:00:00 +0200
+Subject: [PATCH 28/36] drm/amd/pm: Disable SMU14 mode1 reset for SR-IOV
+
+smu_v14_0_2_is_mode1_reset_supported() is an unfilled TODO stub that
+always reports mode1 reset as supported. In an SR-IOV virtual function
+mode1 reset is unsupported, and issuing one hangs the GPU instead of
+recovering it, so callers must never attempt it there.
+
+Return false when amdgpu_sriov_vf() indicates a VF and keep the
+default true for bare-metal devices.
+
+Signed-off-by: Antigravity <antigravity@gemini.local>
+---
+ drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c b/drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c
+index a6a88e7b2..c61bc0d79 100644
+--- a/drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c
++++ b/drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c
+@@ -1892,7 +1892,11 @@ static int smu_v14_0_2_baco_exit(struct smu_context *smu)
+ 
+ static bool smu_v14_0_2_is_mode1_reset_supported(struct smu_context *smu)
+ {
+-	// TODO
++	struct amdgpu_device *adev = smu->adev;
++
++	/* SR-IOV does not support SMU mode1 reset */
++	if (amdgpu_sriov_vf(adev))
++		return false;
+ 
+ 	return true;
+ }
+-- 
+2.55.0
+

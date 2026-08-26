@@ -1,0 +1,59 @@
+From 040f7925dea9dd455d0434695639ebfe3d46a1bf Mon Sep 17 00:00:00 2001
+From: "Huang, Leon" <Leon.Huang1@amd.com>
+Date: Wed, 15 Jul 2026 00:07:53 +0800
+Subject: [PATCH] drm/amd/display: Add get replay residency function
+
+[Why&How]
+Add dc interface to export link service function for getting Replay
+residency
+
+Reviewed-by: Robin Chen <robin.chen@amd.com>
+Signed-off-by: Huang, Leon <Leon.Huang1@amd.com>
+Signed-off-by: Fangzhi Zuo <jerry.zuo@amd.com>
+Tested-by: Dan Wheeler <daniel.wheeler@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/display/dc/core/dc_link_exports.c | 7 +++++++
+ drivers/gpu/drm/amd/display/dc/dc.h                   | 8 ++++++++
+ 2 files changed, 15 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/display/dc/core/dc_link_exports.c b/drivers/gpu/drm/amd/display/dc/core/dc_link_exports.c
+index f25d4b3e1..14fc4ef48 100644
+--- a/drivers/gpu/drm/amd/display/dc/core/dc_link_exports.c
++++ b/drivers/gpu/drm/amd/display/dc/core/dc_link_exports.c
+@@ -534,6 +534,13 @@ bool dc_link_set_pr_general_cmd(struct dc_link *link,
+ 	return link->dc->link_srv->dp_pr_set_general_cmd(link, general_cmd_data);
+ }
+ 
++void dc_link_edp_replay_residency(const struct dc_link *link,
++		unsigned int *residency, bool is_start, enum pr_residency_mode mode)
++{
++	if (link && link->dc && link->dc->link_srv)
++		link->dc->link_srv->edp_replay_residency(link, residency, is_start, mode);
++}
++
+ bool dc_link_get_pr_state(const struct dc_link *link, uint64_t *state)
+ {
+ 	return link->dc->link_srv->dp_pr_get_state(link, state);
+diff --git a/drivers/gpu/drm/amd/display/dc/dc.h b/drivers/gpu/drm/amd/display/dc/dc.h
+index 07ebd98f0..8eaa21913 100644
+--- a/drivers/gpu/drm/amd/display/dc/dc.h
++++ b/drivers/gpu/drm/amd/display/dc/dc.h
+@@ -2984,6 +2984,14 @@ bool dc_link_update_pr_state(struct dc_link *link,
+ bool dc_link_set_pr_general_cmd(struct dc_link *link,
+ 		struct dmub_cmd_pr_general_cmd_data *general_cmd_data);
+ 
++/*
++ * Measure Panel Replay residency for the given link.
++ * mode: PR_RESIDENCY_MODE_PHY, PR_RESIDENCY_MODE_ALPM, or
++ *       PR_RESIDENCY_MODE_ENABLEMENT_PERIOD
++ */
++void dc_link_edp_replay_residency(const struct dc_link *link,
++		unsigned int *residency, bool is_start, enum pr_residency_mode mode);
++
+ /*
+  * Get Panel Replay state:
+  *
+-- 
+2.55.0
+

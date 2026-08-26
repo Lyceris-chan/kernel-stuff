@@ -1,0 +1,31 @@
+From fe5dfb55dd70eed75d5f8f50657334f03c71deef Mon Sep 17 00:00:00 2001
+From: Amber Lin <Amber.Lin@amd.com>
+Date: Wed, 6 May 2026 15:02:35 -0400
+Subject: [PATCH] drm/amdgpu: Allocate enough space for hpd info on gfx11
+
+MES in newer versions on gfx11 and gfx12 can support queue/pipe
+reset via MES.
+
+Signed-off-by: Amber Lin <Amber.Lin@amd.com>
+Reviewed-by: Jesse Zhang <jesse.zhang@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_mes.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_mes.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_mes.c
+index 3aa5bd1e67c1..ae45d840a066 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_mes.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_mes.c
+@@ -217,7 +217,7 @@ int amdgpu_mes_init(struct amdgpu_device *adev)
+ 	if (r)
+ 		goto error_doorbell;
+ 
+-	if (amdgpu_ip_version(adev, GC_HWIP, 0) >= IP_VERSION(12, 1, 0)) {
++	if (amdgpu_ip_version(adev, GC_HWIP, 0) >= IP_VERSION(11, 0, 0)) {
+ 		/* When queue/pipe reset is done in MES instead of in the
+ 		 * driver, MES passes hung queues information to the driver in
+ 		 * hung_queue_hqd_info. Calculate required space to store this
+-- 
+2.55.0
+
