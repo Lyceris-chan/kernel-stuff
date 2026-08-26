@@ -1,0 +1,9 @@
+# Build artifacts + large source tarballs (re-downloaded by makepkg)
+src/
+pkg/
+LLVM-23.1.0-Linux-X64.tar.xz
+next-*.tar.gz
+*.pkg.tar.zst
+config-7.2.*
+# Root patch symlinks (auto-created by PKGBUILD)
+/*.patch

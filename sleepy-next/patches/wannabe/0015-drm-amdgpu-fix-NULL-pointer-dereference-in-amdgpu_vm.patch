@@ -1,0 +1,31 @@
+From 2eeb9993b4494cbe8736d885a6bc79f9c79f4864 Mon Sep 17 00:00:00 2001
+From: Sleepy <sleepy@example.com>
+Date: Wed, 26 Aug 2026 12:36:42 +0200
+Subject: [PATCH 15/16] drm/amdgpu: fix NULL pointer dereference in
+ amdgpu_vm_init error path
+
+Reorder the error path (dri-devel ML 591316, 08-25): free the root page
+table after unreserving the root BO, so amdgpu_vm_pt_free_root() does not
+touch a still-reserved (and possibly NULL) root.bo.
+
+ML WIP (08-25) - isolated commit, easy to drop when it lands upstream.
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+index 15f39ca683d9..600315acd0df 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+@@ -2736,8 +2736,8 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+ 	return 0;
+ 
+ error_free_root:
+-	amdgpu_vm_pt_free_root(adev, vm);
+ 	amdgpu_bo_unreserve(vm->root.bo);
++	amdgpu_vm_pt_free_root(adev, vm);
+ 	amdgpu_bo_unref(&root_bo);
+ 
+ error_free_delayed:

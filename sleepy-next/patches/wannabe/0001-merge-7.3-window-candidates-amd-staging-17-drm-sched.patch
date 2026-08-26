@@ -1,0 +1,1042 @@
+From 759b7fb8fbe9a5fae6f314e474d4c35b49e99f45 Mon Sep 17 00:00:00 2001
+From: Sleepy <sleepy@local>
+Date: Wed, 26 Aug 2026 11:23:42 +0200
+Subject: [PATCH 01/16] merge 7.3-window candidates: amd-staging (17) +
+ drm/sched lock
+
+Merge hardware-relevant 7.3-window commits not yet in next-20260825:
+- amd-staging-drm-next (17): KFD CRIU restore_mqd guard, userq fence-lock +
+  wptr-restore, MES teardown, SVM migrate error+hole, AQL zero-size,
+  CU-occupancy GFX12, no-retry PTE, VM dw-estimate, DCN42 min-dispclk,
+  OPP/DPP accounting, dc_lock leak, DM IRQ NULL guard, dml2 bpp, vblank_nom,
+  mes indenting, HPD IRQ logging
+- drm/sched: lock drm_sched_entity_is_idle() (data-race fix, fuzz-3)
+
+Base: linux-next next-20260825 (7.3 merge-window content).
+---
+ .../drm/amd/amdgpu/amdgpu_amdkfd_gfx_v12.c    | 150 +++++++++++++++++-
+ .../gpu/drm/amd/amdgpu/amdgpu_amdkfd_gpuvm.c  |   7 +
+ drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c     |  24 +++
+ .../gpu/drm/amd/amdgpu/amdgpu_userq_fence.c   |  20 ++-
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h        |   2 +
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm_sdma.c   |   5 +
+ drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c        |   2 +-
+ drivers/gpu/drm/amd/amdgpu/mes_userqueue.c    |   2 +-
+ drivers/gpu/drm/amd/amdkfd/kfd_chardev.c      |   3 +-
+ drivers/gpu/drm/amd/amdkfd/kfd_migrate.c      |  56 ++++---
+ drivers/gpu/drm/amd/amdkfd/kfd_process.c      |  44 +++--
+ .../gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c |   6 +
+ .../drm/amd/display/amdgpu_dm/amdgpu_dm_irq.c |  11 +-
+ .../dml2_0/dml21/dml21_translation_helper.c   |  17 +-
+ .../dml21/inc/bounding_boxes/dcn42b_soc_bb.h  |  10 +-
+ .../src/dml2_core/dml2_core_dcn4_calcs.c      |  30 ++--
+ .../dml2_core/dml2_core_dcn5_calcs_dchub.c    |   4 +-
+ .../dml2_core_dcn5_funcs_initialize.c         |   2 +-
+ .../dml2_core_dcn5_funcs_mode_support.c       |  23 ++-
+ .../dml2_core_dcn6_funcs_initialize.c         |   2 +
+ .../dml2_core_dcn6_funcs_mode_support.c       |  24 ++-
+ .../dc/resource/dcn42/dcn42_resource.c        |   4 +-
+ .../dc/resource/dcn42b/dcn42b_resource.c      |   4 +-
+ drivers/gpu/drm/scheduler/sched_entity.c      |  10 +-
+ 24 files changed, 378 insertions(+), 84 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gfx_v12.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gfx_v12.c
+index e11ba3e91841..62b9db64368e 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gfx_v12.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gfx_v12.c
+@@ -368,6 +368,153 @@ static uint32_t kgd_gfx_v12_hqd_sdma_get_doorbell(struct amdgpu_device *adev,
+ 	return 0;
+ }
+ 
++static void lock_spi_csq_mutexes(struct amdgpu_device *adev)
++{
++	mutex_lock(&adev->srbm_mutex);
++	mutex_lock(&adev->grbm_idx_mutex);
++
++}
++
++static void unlock_spi_csq_mutexes(struct amdgpu_device *adev)
++{
++	mutex_unlock(&adev->grbm_idx_mutex);
++	mutex_unlock(&adev->srbm_mutex);
++}
++
++/**
++ * get_wave_count: Read device registers to get number of waves in flight for
++ * a particular queue. The method also returns the doorbell offset associated
++ * with the queue.
++ *
++ * @adev: Handle of device whose registers are to be read
++ * @queue_idx: Index of queue in the queue-map bit-field
++ * @queue_cnt: Stores the wave count and doorbell offset for an active queue
++ * @inst: xcc's instance number on a multi-XCC setup
++ */
++static void get_wave_count(struct amdgpu_device *adev, int queue_idx,
++		struct kfd_cu_occupancy *queue_cnt, uint32_t inst)
++{
++	int pipe_idx;
++	int queue_slot;
++	unsigned int reg_val;
++	unsigned int wave_cnt;
++	/*
++	 * Program GRBM with appropriate MEID, PIPEID, QUEUEID and VMID
++	 * parameters to read out waves in flight. Get doorbell offset if there are
++	 * non-zero waves in flight.
++	 */
++	pipe_idx = queue_idx / adev->gfx.mec.num_queue_per_pipe;
++	queue_slot = queue_idx % adev->gfx.mec.num_queue_per_pipe;
++	soc24_grbm_select(adev, 1, pipe_idx, queue_slot, 0);
++	reg_val = RREG32_SOC15_IP(GC, SOC15_REG_OFFSET(GC, 0,
++				  regSPI_CSQ_WF_ACTIVE_COUNT_0) + queue_slot);
++	wave_cnt = reg_val & SPI_CSQ_WF_ACTIVE_COUNT_0__COUNT_MASK;
++	if (wave_cnt != 0) {
++		queue_cnt->wave_cnt += wave_cnt;
++		queue_cnt->doorbell_off =
++			(RREG32_SOC15(GC, 0, regCP_HQD_PQ_DOORBELL_CONTROL) &
++			 CP_HQD_PQ_DOORBELL_CONTROL__DOORBELL_OFFSET_MASK) >>
++			 CP_HQD_PQ_DOORBELL_CONTROL__DOORBELL_OFFSET__SHIFT;
++	}
++}
++
++/**
++ * kgd_gfx_v12_get_cu_occupancy: Reads relevant registers associated with each
++ * shader engine and aggregates the number of waves that are in flight for the
++ * process whose pasid is provided as a parameter. The process could have ZERO
++ * or more queues running and submitting waves to compute units.
++ *
++ * @adev: Handle of device from which to get number of waves in flight
++ * @cu_occupancy: Array that gets filled with wave_cnt and doorbell offset
++ *		  for comparison later.
++ * @max_waves_per_cu: Output parameter updated with maximum number of waves
++ *                    possible per Compute Unit
++ * @inst: xcc's instance number on a multi-XCC setup
++ *
++ * Note: It's possible that the device has too many queues (oversubscription)
++ * in which case a VMID could be remapped to a different PASID. This could lead
++ * to an inaccurate wave count. Following is a high-level sequence:
++ *    Time T1: vmid = getVmid(); vmid is associated with Pasid P1
++ *    Time T2: passId = getPasId(vmid); vmid is associated with Pasid P2
++ * In the sequence above wave count obtained from time T1 will be incorrectly
++ * lost or added to total wave count.
++ *
++ * The registers that provide the waves in flight are:
++ *
++ *  SPI_CSQ_WF_ACTIVE_STATUS - bit-map of queues per pipe. The bit is ON if a
++ *  queue is slotted, OFF if there is no queue. A process could have ZERO or
++ *  more queues slotted and submitting waves to be run on compute units. Even
++ *  when there is a queue it is possible there could be zero wave fronts, this
++ *  can happen when queue is waiting on top-of-pipe events - e.g. waitRegMem
++ *  command
++ *
++ *  For each bit that is ON from above:
++ *
++ *    Read (SPI_CSQ_WF_ACTIVE_COUNT_0 + queue_idx) register. It provides the
++ *    number of waves that are in flight for the queue at specified index. The
++ *    index ranges from 0 to 7.
++ *
++ *    If non-zero waves are in flight, store the corresponding doorbell offset
++ *    of the queue, along with the wave count.
++ *
++ *    Determine if the queue belongs to the process by comparing the doorbell
++ *    offset against the process's queues. If it matches, aggregate the wave
++ *    count for the process.
++ *
++ *  Reading registers referenced above involves programming GRBM appropriately
++ */
++static void kgd_gfx_v12_get_cu_occupancy(struct amdgpu_device *adev,
++				struct kfd_cu_occupancy *cu_occupancy,
++				int *max_waves_per_cu, uint32_t inst)
++{
++	int qidx;
++	int se_idx;
++	int se_cnt;
++	int queue_map;
++	int max_queue_cnt;
++	DECLARE_BITMAP(cp_queue_bitmap, AMDGPU_MAX_QUEUES);
++
++	lock_spi_csq_mutexes(adev);
++	soc24_grbm_select(adev, 1, 0, 0, 0);
++
++	/*
++	 * Iterate through the shader engines and arrays of the device
++	 * to get number of waves in flight
++	 */
++	bitmap_complement(cp_queue_bitmap, adev->gfx.mec_bitmap[0].queue_bitmap,
++			  AMDGPU_MAX_QUEUES);
++	max_queue_cnt = adev->gfx.mec.num_pipe_per_mec *
++			adev->gfx.mec.num_queue_per_pipe;
++	se_cnt = adev->gfx.config.max_shader_engines;
++	for (se_idx = 0; se_idx < se_cnt; se_idx++) {
++		amdgpu_gfx_select_se_sh(adev, se_idx, 0, 0xffffffff, inst);
++		queue_map = RREG32_SOC15(GC, 0,
++					 regSPI_CSQ_WF_ACTIVE_STATUS);
++
++		for (qidx = 0; qidx < max_queue_cnt; qidx++) {
++			/* Skip queues that are not associated with
++			 * compute functions
++			 */
++			if (!test_bit(qidx, cp_queue_bitmap))
++				continue;
++
++			if (!(queue_map & (1 << qidx)))
++				continue;
++
++			/* Get number of waves in flight and aggregate them */
++			get_wave_count(adev, qidx, &cu_occupancy[qidx], inst);
++		}
++	}
++
++	amdgpu_gfx_select_se_sh(adev, 0xffffffff, 0xffffffff, 0xffffffff, inst);
++	soc24_grbm_select(adev, 0, 0, 0, 0);
++	unlock_spi_csq_mutexes(adev);
++
++	/* Update the output parameters and return */
++	*max_waves_per_cu = adev->gfx.cu_info.simd_per_cu *
++				adev->gfx.cu_info.max_waves_per_simd;
++}
++
+ const struct kfd2kgd_calls gfx_v12_kfd2kgd = {
+ 	.init_interrupts = init_interrupts_v12,
+ 	.hqd_dump = hqd_dump_v12,
+@@ -381,5 +528,6 @@ const struct kfd2kgd_calls gfx_v12_kfd2kgd = {
+ 	.set_wave_launch_mode = kgd_gfx_v12_set_wave_launch_mode,
+ 	.set_address_watch = kgd_gfx_v12_set_address_watch,
+ 	.clear_address_watch = kgd_gfx_v12_clear_address_watch,
+-	.hqd_sdma_get_doorbell = kgd_gfx_v12_hqd_sdma_get_doorbell
++	.hqd_sdma_get_doorbell = kgd_gfx_v12_hqd_sdma_get_doorbell,
++	.get_cu_occupancy = kgd_gfx_v12_get_cu_occupancy,
+ };
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gpuvm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gpuvm.c
+index 34481ee7065a..d66881684ee5 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gpuvm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gpuvm.c
+@@ -1795,6 +1795,12 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
+ 		size >>= 1;
+ 	aligned_size = PAGE_ALIGN(size);
+ 
++	/* reject AQL queue with size < 2 */
++	if (!aligned_size) {
++		ret = -EINVAL;
++		goto err_alignment_size;
++	}
++
+ 	(*mem)->alloc_flags = flags;
+ 
+ 	amdgpu_sync_create(&(*mem)->sync);
+@@ -1886,6 +1892,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
+ 	amdgpu_amdkfd_unreserve_mem_limit(adev, aligned_size, flags, xcp_id);
+ err_reserve_limit:
+ 	amdgpu_sync_free(&(*mem)->sync);
++err_alignment_size:
+ 	mutex_destroy(&(*mem)->lock);
+ 	if (gobj)
+ 		drm_gem_object_put(gobj);
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+index 24adad7be251..0a816b3c5ff9 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+@@ -1047,6 +1047,30 @@ amdgpu_userq_vm_validate_and_restore_queue(struct amdgpu_userq_mgr *uq_mgr)
+ 		drm_exec_retry_on_contention(&exec);
+ 		if (unlikely(ret))
+ 			goto unlock_all;
++
++		/*
++		 * WPTR BOs are VM-mapped, but each BO has its own reservation
++		 * object. Lock them into this drm_exec ww context so the later
++		 * amdgpu_bo_gpu_offset() reads are done with the BO resv locked.
++		 */
++		xa_for_each(&uq_mgr->userq_xa, tmp_key, queue) {
++			struct ttm_operation_ctx wptr_ctx = { false, false };
++
++			bo = queue->wptr_obj.obj;
++			if (!bo)
++				continue;
++
++			ret = drm_exec_prepare_obj(&exec, &bo->tbo.base,
++						   TTM_NUM_MOVE_FENCES + 1);
++			drm_exec_retry_on_contention(&exec);
++			if (unlikely(ret))
++				goto unlock_all;
++
++			amdgpu_bo_placement_from_domain(bo, bo->allowed_domains);
++			ret = ttm_bo_validate(&bo->tbo, &bo->placement, &wptr_ctx);
++			if (unlikely(ret))
++				goto unlock_all;
++		}
+ 	}
+ 
+ 	if (invalidated) {
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c
+index a33dbe978798..4b023e024d9f 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c
+@@ -191,14 +191,15 @@ void amdgpu_userq_fence_driver_destroy(struct kref *ref)
+ 	struct dma_fence *f;
+ 
+ 	spin_lock_irqsave(&fence_drv->fence_list_lock, flags);
++	lockdep_assert_held(&fence_drv->fence_list_lock);
+ 	list_for_each_entry_safe(fence, tmp, &fence_drv->fences, link) {
+ 		f = &fence->base;
+-
+-		if (!dma_fence_is_signaled(f)) {
++		spin_lock(dma_fence_spinlock(f));
++		if (!dma_fence_is_signaled_locked(f)) {
+ 			dma_fence_set_error(f, -ECANCELED);
+-			dma_fence_signal(f);
++			dma_fence_signal_locked(f);
+ 		}
+-
++		spin_unlock(dma_fence_spinlock(f));
+ 		list_del(&fence->link);
+ 		dma_fence_put(f);
+ 	}
+@@ -423,11 +424,16 @@ amdgpu_userq_fence_driver_set_error(struct amdgpu_userq_fence *fence,
+ 	struct dma_fence *f;
+ 
+ 	spin_lock_irqsave(&fence_drv->fence_list_lock, flags);
+-
++	lockdep_assert_held(&fence_drv->fence_list_lock);
+ 	f = rcu_dereference_protected(&fence->base,
+ 				      lockdep_is_held(&fence_drv->fence_list_lock));
+-	if (f && !dma_fence_is_signaled_locked(f))
+-		dma_fence_set_error(f, error);
++	if (f) {
++		/* nest f->lock inside fence_list_lock */
++		spin_lock(dma_fence_spinlock(f));
++		if (!dma_fence_is_signaled_locked(f))
++			dma_fence_set_error(f, error);
++		spin_unlock(dma_fence_spinlock(f));
++	}
+ 	spin_unlock_irqrestore(&fence_drv->fence_list_lock, flags);
+ }
+ 
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
+index d32183cd9e0f..253ec6fc018f 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
+@@ -141,6 +141,8 @@ struct amdgpu_bo_vm;
+ #define AMDGPU_PDE_PTE_FLAG(adev)	\
+ 	((amdgpu_ip_version((adev), GC_HWIP, 0) >= IP_VERSION(12, 0, 0)) ? AMDGPU_PDE_PTE_GFX12 : AMDGPU_PDE_PTE)
+ 
++/* Flag combination to set no-retry on GFX 12 */
++#define AMDGPU_VM_NORETRY_FLAGS_GFX12	(AMDGPU_PTE_SYSTEM | AMDGPU_PTE_SNOOPED)
+ /* How to program VM fault handling */
+ #define AMDGPU_VM_FAULT_STOP_NEVER	0
+ #define AMDGPU_VM_FAULT_STOP_FIRST	1
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_sdma.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_sdma.c
+index 50cc0779c340..eb8cf0d9d9c5 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_sdma.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_sdma.c
+@@ -254,6 +254,11 @@ static int amdgpu_vm_sdma_update(struct amdgpu_vm_update_params *p,
+ 						     AMDGPU_KERNEL_JOB_ID_VM_UPDATE);
+ 			if (r)
+ 				return r;
++
++			/* The estimate above describes the job which was just
++			 * submitted, take the budget of the newly allocated one.
++			 */
++			ndw = p->num_dw_left;
+ 		}
+ 
+ 		if (!p->pages_addr) {
+diff --git a/drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c b/drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c
+index b05465dc30b4..6745b762fba6 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c
+@@ -668,7 +668,7 @@ static int gmc_v12_0_early_init(struct amdgpu_ip_block *ip_block)
+ 		adev->gmc.private_aperture_end =
+ 			adev->gmc.private_aperture_start + (4ULL << 30) - 1;
+ 
+-	adev->gmc.noretry_flags = AMDGPU_VM_NORETRY_FLAGS_TF;
++	adev->gmc.noretry_flags = AMDGPU_VM_NORETRY_FLAGS_GFX12;
+ 
+ 	return 0;
+ }
+diff --git a/drivers/gpu/drm/amd/amdgpu/mes_userqueue.c b/drivers/gpu/drm/amd/amdgpu/mes_userqueue.c
+index fae709f134bb..14a5abe42d1f 100644
+--- a/drivers/gpu/drm/amd/amdgpu/mes_userqueue.c
++++ b/drivers/gpu/drm/amd/amdgpu/mes_userqueue.c
+@@ -146,7 +146,7 @@ static int mes_userq_map(struct amdgpu_usermode_queue *queue)
+ 	queue_input.wptr_mc_addr = queue->wptr_obj.gpu_addr;
+ 
+ 	if (mes->use_rs64mem) {
+-		 if (!uq_mgr->proc_ctx_allocated) {
++		if (!uq_mgr->proc_ctx_allocated) {
+ 			r = amdgpu_mes_alloc_proc_ctx_index(mes, &uq_mgr->proc_ctx_array_index);
+ 			if (r) {
+ 				DRM_ERROR("Failed to allocate userq process index err:%d\n", r);
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c b/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c
+index 6fd18488d5cf..7fcfc150a7fc 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c
+@@ -1200,7 +1200,8 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
+ 
+ 		if (flags & KFD_IOC_ALLOC_MEM_FLAGS_AQL_QUEUE_MEM)
+ 			size >>= 1;
+-		atomic64_add(PAGE_ALIGN(size), &pdd->vram_usage);
++		size = PAGE_ALIGN(size);
++		atomic64_add(size, &pdd->vram_usage);
+ 	}
+ 
+ 	mutex_unlock(&p->mutex);
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_migrate.c b/drivers/gpu/drm/amd/amdkfd/kfd_migrate.c
+index f5af1dd3b70e..253365a8257e 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_migrate.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_migrate.c
+@@ -134,7 +134,7 @@ svm_migrate_copy_memory_gart(struct amdgpu_device *adev, dma_addr_t *sys,
+ 	u64 gart_s, gart_d;
+ 	struct dma_fence *next;
+ 	u64 size;
+-	int r;
++	int r = 0;
+ 
+ 	ring = to_amdgpu_ring(adev->mman.buffer_funcs_scheds[0]);
+ 	entity = &adev->mman.move_entities[0];
+@@ -258,15 +258,6 @@ svm_migrate_get_sys_page(struct vm_area_struct *vma, unsigned long addr)
+ 	return page;
+ }
+ 
+-static void svm_migrate_put_sys_page(unsigned long addr)
+-{
+-	struct page *page;
+-
+-	page = pfn_to_page(addr >> PAGE_SHIFT);
+-	unlock_page(page);
+-	put_page(page);
+-}
+-
+ static unsigned long svm_migrate_successful_pages(struct migrate_vma *migrate)
+ {
+ 	unsigned long mpages = 0;
+@@ -293,7 +284,7 @@ svm_migrate_copy_to_vram(struct kfd_node *node, struct svm_range *prange,
+ 	dma_addr_t *src;
+ 	u64 *dst;
+ 	u64 i, j;
+-	int r;
++	int r = 0;
+ 
+ 	pr_debug("svms 0x%p [0x%lx 0x%lx 0x%llx]\n", prange->svms, prange->start,
+ 		 prange->last, ttm_res_offset);
+@@ -319,6 +310,7 @@ svm_migrate_copy_to_vram(struct kfd_node *node, struct svm_range *prange,
+ 					      DMA_BIDIRECTIONAL);
+ 			r = dma_mapping_error(dev, src[i]);
+ 			if (r) {
++				src[i] = 0;
+ 				dev_err(dev, "%s: fail %d dma_map_page\n",
+ 					__func__, r);
+ 				goto out_free_vram_pages;
+@@ -343,7 +335,8 @@ svm_migrate_copy_to_vram(struct kfd_node *node, struct svm_range *prange,
+ 		pr_debug_ratelimited("dma mapping src to 0x%llx, pfn 0x%lx\n",
+ 				     src[i] >> PAGE_SHIFT, page_to_pfn(spage));
+ 
+-		if (j >= (cursor.size >> PAGE_SHIFT) - 1 && i < npages - 1) {
++		/* accumulated j + 1 pages reach end of current drm_buddy_block */
++		if (j + 1 >= (cursor.size >> PAGE_SHIFT)) {
+ 			r = svm_migrate_copy_memory_gart(adev, src + i - j,
+ 							 dst + i - j, j + 1,
+ 							 FROM_RAM_TO_VRAM,
+@@ -357,7 +350,8 @@ svm_migrate_copy_to_vram(struct kfd_node *node, struct svm_range *prange,
+ 		}
+ 	}
+ 
+-	r = svm_migrate_copy_memory_gart(adev, src + i - j, dst + i - j, j,
++	if (j > 0)
++		r = svm_migrate_copy_memory_gart(adev, src + i - j, dst + i - j, j,
+ 					 FROM_RAM_TO_VRAM, mfence);
+ 
+ out_free_vram_pages:
+@@ -591,9 +585,10 @@ svm_migrate_copy_to_ram(struct amdgpu_device *adev, struct svm_range *prange,
+ 			dma_addr_t *scratch, u64 npages)
+ {
+ 	struct device *dev = adev->dev;
+-	u64 *src;
++	struct page *dpage = NULL;
+ 	dma_addr_t *dst;
+-	struct page *dpage;
++	u64 *src;
++
+ 	u64 i = 0, j;
+ 	u64 addr;
+ 	int r = 0;
+@@ -647,6 +642,7 @@ svm_migrate_copy_to_ram(struct amdgpu_device *adev, struct svm_range *prange,
+ 		r = dma_mapping_error(dev, dst[i]);
+ 		if (r) {
+ 			dev_err(adev->dev, "%s: fail %d dma_map_page\n", __func__, r);
++			dst[i] = 0;
+ 			goto out_oom;
+ 		}
+ 
+@@ -654,17 +650,39 @@ svm_migrate_copy_to_ram(struct amdgpu_device *adev, struct svm_range *prange,
+ 				     dst[i] >> PAGE_SHIFT, page_to_pfn(dpage));
+ 
+ 		migrate->dst[i] = migrate_pfn(page_to_pfn(dpage));
++
++		dpage = NULL;
+ 		j++;
+ 	}
+ 
+-	r = svm_migrate_copy_memory_gart(adev, dst + i - j, src + i - j, j,
+-					 FROM_VRAM_TO_RAM, mfence);
+-
++	if (j > 0)
++		r = svm_migrate_copy_memory_gart(adev, dst + i - j, src + i - j, j,
++						 FROM_VRAM_TO_RAM, mfence);
+ out_oom:
+ 	if (r) {
+ 		pr_debug("failed %d copy to ram\n", r);
++
++		/* first release current dpage when dma_map_page fail */
++		if (dpage) {
++			unlock_page(dpage);
++			put_page(dpage);
++		}
++
++		/* release previous allocated sys pages and unmap dma address */
+ 		while (i--) {
+-			svm_migrate_put_sys_page(dst[i]);
++
++			if (dst[i]) {
++				dma_unmap_page(dev, dst[i], PAGE_SIZE,
++					       DMA_BIDIRECTIONAL);
++				dst[i] = 0;
++			}
++
++			dpage = migrate_pfn_to_page(migrate->dst[i]);
++			if (!dpage)
++				continue;
++
++			unlock_page(dpage);
++			put_page(dpage);
+ 			migrate->dst[i] = 0;
+ 		}
+ 	}
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_process.c b/drivers/gpu/drm/amd/amdkfd/kfd_process.c
+index 0a7c1900da95..dd938788bdd9 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_process.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_process.c
+@@ -1408,23 +1408,16 @@ void kfd_process_notifier_release_internal(struct kfd_process *p)
+ 		kfd_unref_process(p);
+ 
+ 	/*
+-	 * Dequeue and destroy user queues, it is not safe for GPU to access
+-	 * system memory after mmu release notifier callback returns because
+-	 * exit_mmap free process memory afterwards.
++	 * Disable debug BEFORE dequeuing/flushing the MES process context.
++	 *
++	 * kfd_dbg_trap_disable() -> kfd_dbg_trap_deactivate() issues
++	 * SET_SHADER_DEBUGGER (process_ctx_flush=0) packets that re-add the
++	 * process to the MES scheduler list. kfd_process_dequeue_from_all_devices()
++	 * sends the process_ctx_flush=1 that retires the context. If debug
++	 * teardown ran after the dequeue, those packets would put the process
++	 * back on the MES list and, once proc_ctx_bo is freed, MES would fault
++	 * on the freed process context. Retiring the context last avoids this.
+ 	 */
+-	kfd_process_dequeue_from_all_devices(p);
+-	pqm_uninit(&p->pqm);
+-
+-	for (i = 0; i < p->n_pdds; i++) {
+-		struct kfd_process_device *pdd = p->pdds[i];
+-
+-		/* re-enable GFX OFF since runtime enable with ttmp setup disabled it. */
+-		if (!kfd_dbg_is_rlc_restore_supported(pdd->dev) && p->runtime_info.ttmp_setup)
+-			amdgpu_gfx_off_ctrl(pdd->dev->adev, true);
+-	}
+-
+-	/* Indicate to other users that MM is no longer valid */
+-	p->mm = NULL;
+ 	kfd_dbg_trap_disable(p);
+ 
+ 	if (atomic_read(&p->debugged_process_count) > 0) {
+@@ -1445,6 +1438,25 @@ void kfd_process_notifier_release_internal(struct kfd_process *p)
+ 		srcu_read_unlock(&kfd_processes_srcu, idx);
+ 	}
+ 
++	/*
++	 * Dequeue and destroy user queues, it is not safe for GPU to access
++	 * system memory after mmu release notifier callback returns because
++	 * exit_mmap free process memory afterwards.
++	 */
++	kfd_process_dequeue_from_all_devices(p);
++	pqm_uninit(&p->pqm);
++
++	for (i = 0; i < p->n_pdds; i++) {
++		struct kfd_process_device *pdd = p->pdds[i];
++
++		/* re-enable GFX OFF since runtime enable with ttmp setup disabled it. */
++		if (!kfd_dbg_is_rlc_restore_supported(pdd->dev) && p->runtime_info.ttmp_setup)
++			amdgpu_gfx_off_ctrl(pdd->dev->adev, true);
++	}
++
++	/* Indicate to other users that MM is no longer valid */
++	p->mm = NULL;
++
+ 	if (p->context_id == KFD_CONTEXT_ID_PRIMARY)
+ 		mmu_notifier_put(&p->mmu_notifier);
+ }
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
+index 284aac4d96bc..ec483276d753 100644
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
+@@ -1589,6 +1589,9 @@ static int dm_suspend(struct amdgpu_ip_block *ip_block)
+ 		res = amdgpu_dm_commit_zero_streams(dm->dc);
+ 		if (res != DC_OK) {
+ 			drm_err(adev_to_drm(adev), "Failed to commit zero streams: %d\n", res);
++			dc_state_release(dm->cached_dc_state);
++			dm->cached_dc_state = NULL;
++			mutex_unlock(&dm->dc_lock);
+ 			return -EINVAL;
+ 		}
+ 
+@@ -1884,6 +1887,9 @@ static int dm_resume(struct amdgpu_ip_block *ip_block)
+ 		r = dm_dmub_hw_init(adev);
+ 		if (r) {
+ 			drm_err(adev_to_drm(adev), "DMUB interface failed to initialize: status=%d\n", r);
++			dc_state_release(dm->cached_dc_state);
++			dm->cached_dc_state = NULL;
++			mutex_unlock(&dm->dc_lock);
+ 			return r;
+ 		}
+ 
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_irq.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_irq.c
+index 9be63996b062..546911b152e4 100644
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_irq.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_irq.c
+@@ -618,6 +618,9 @@ STATIC_IFN_KUNIT void amdgpu_dm_irq_schedule_work(struct amdgpu_device *adev,
+ 
+ 	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
+ 
++	if (!adev->dm.irq_wq)
++		goto out_unlock;
++
+ 	if (list_empty(handler_list))
+ 		goto out_unlock;
+ 
+@@ -1735,7 +1738,9 @@ int amdgpu_dm_register_hpd_handlers(struct amdgpu_device *adev)
+ 			if (int_params.irq_source == DC_IRQ_SOURCE_INVALID ||
+ 				int_params.irq_source  < DC_IRQ_SOURCE_HPD1 ||
+ 				int_params.irq_source  > DC_IRQ_SOURCE_HPD6) {
+-				drm_err(adev_to_drm(adev), "Failed to register hpd irq!\n");
++				drm_err(adev_to_drm(adev),
++					"Failed to register hpd irq %u for %s!\n",
++					int_params.irq_source, connector->name);
+ 				return -EINVAL;
+ 			}
+ 
+@@ -1753,7 +1758,9 @@ int amdgpu_dm_register_hpd_handlers(struct amdgpu_device *adev)
+ 			if (int_params.irq_source == DC_IRQ_SOURCE_INVALID ||
+ 				int_params.irq_source  < DC_IRQ_SOURCE_HPD1RX ||
+ 				int_params.irq_source  > DC_IRQ_SOURCE_HPD6RX) {
+-				drm_err(adev_to_drm(adev), "Failed to register hpd rx irq!\n");
++				drm_err(adev_to_drm(adev),
++					"Failed to register hpd rx irq %u for %s!\n",
++					int_params.irq_source, connector->name);
+ 				return -EINVAL;
+ 			}
+ 
+diff --git a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/dml21_translation_helper.c b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/dml21_translation_helper.c
+index 1b0d55e2d7b0..b71323747c91 100644
+--- a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/dml21_translation_helper.c
++++ b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/dml21_translation_helper.c
+@@ -94,6 +94,20 @@ static unsigned int calc_max_hardware_v_total(const struct dc_stream_state *stre
+ 	return max_hw_v_total;
+ }
+ 
++static unsigned int calc_vblank_nom_lines(const struct dc_stream_state *stream, const unsigned int default_vblank_nom_us)
++{
++	unsigned int vblank_avail = stream->timing.v_total - stream->timing.v_addressable;
++	unsigned int vblank_nom = (unsigned int)div64_u64((uint64_t)default_vblank_nom_us * 1000ULL, // vblank_nom_ns
++			div64_u64((uint64_t)stream->timing.h_total * 10000000ULL, (uint64_t)stream->timing.pix_clk_100hz)); // line_time_ns
++
++	if (vblank_avail < vblank_nom ||
++			stream->adaptive_sync_infopacket.valid ||
++			(stream->link && stream->link->replay_settings.config.replay_supported))
++		vblank_nom = vblank_avail;
++
++	return vblank_nom;
++}
++
+ static void populate_dml21_timing_config_from_stream_state(struct dml2_timing_cfg *timing,
+ 		struct dc_stream_state *stream,
+ 		struct pipe_ctx *otg_master_pipe,
+@@ -199,7 +213,7 @@ static void populate_dml21_timing_config_from_stream_state(struct dml2_timing_cf
+ 		break;
+ 	}
+ 
+-	timing->vblank_nom = timing->v_total - timing->v_active;
++	timing->vblank_nom = calc_vblank_nom_lines(stream, dml_ctx->v21.dml_init.ip_caps.vblank_nom_default_us);
+ }
+ 
+ static void populate_dml21_output_config_from_stream_state(struct dml2_link_output_cfg *output,
+@@ -1142,4 +1156,3 @@ void dml21_init_min_clocks_for_dc_state(struct dml2_context *in_ctx, struct dc_s
+ 	min_clocks->stutter_efficiency.z8_stutter_period = 100000;
+ 	min_clocks->zstate_support = DCN_ZSTATE_SUPPORT_ALLOW;
+ }
+-
+diff --git a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/inc/bounding_boxes/dcn42b_soc_bb.h b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/inc/bounding_boxes/dcn42b_soc_bb.h
+index 5d844ff4b671..924e602d2568 100644
+--- a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/inc/bounding_boxes/dcn42b_soc_bb.h
++++ b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/inc/bounding_boxes/dcn42b_soc_bb.h
+@@ -53,7 +53,6 @@ static const struct dml2_soc_qos_parameters dml_dcn42b_variant_a_soc_qos_params
+ 	},
+ 	.qos_params = {
+ 		.dcn32x = {
+-			.loaded_round_trip_latency_fclk_cycles = 106,
+ 			.urgent_latency_us = {
+ 				.base_latency_us = 4,
+ 				.base_latency_pixel_vm_us = 4,
+@@ -61,8 +60,9 @@ static const struct dml2_soc_qos_parameters dml_dcn42b_variant_a_soc_qos_params
+ 				.scaling_factor_fclk_us = 0,
+ 				.scaling_factor_mhz = 0,
+ 			},
+-			.urgent_out_of_order_return_per_channel_pixel_and_vm_bytes = 4096,
++			.loaded_round_trip_latency_fclk_cycles = 106,
+ 			.urgent_out_of_order_return_per_channel_pixel_only_bytes = 4096,
++			.urgent_out_of_order_return_per_channel_pixel_and_vm_bytes = 4096,
+ 			.urgent_out_of_order_return_per_channel_vm_only_bytes = 4096,
+ 		},
+ 	},
+@@ -170,7 +170,6 @@ static const struct dml2_soc_bb dml2_socbb_dcn42b = {
+ 		},
+ 		.qos_params = {
+ 			.dcn32x = {
+-				.loaded_round_trip_latency_fclk_cycles = 106,
+ 				.urgent_latency_us = {
+ 					.base_latency_us = 4,
+ 					.base_latency_pixel_vm_us = 4,
+@@ -178,8 +177,9 @@ static const struct dml2_soc_bb dml2_socbb_dcn42b = {
+ 					.scaling_factor_fclk_us = 0,
+ 					.scaling_factor_mhz = 0,
+ 				},
+-				.urgent_out_of_order_return_per_channel_pixel_and_vm_bytes = 4096,
++				.loaded_round_trip_latency_fclk_cycles = 106,
+ 				.urgent_out_of_order_return_per_channel_pixel_only_bytes = 4096,
++				.urgent_out_of_order_return_per_channel_pixel_and_vm_bytes = 4096,
+ 				.urgent_out_of_order_return_per_channel_vm_only_bytes = 4096,
+ 			},
+ 		},
+@@ -211,8 +211,8 @@ static const struct dml2_soc_bb dml2_socbb_dcn42b = {
+ 	.return_bus_width_bytes = 64,
+ 	.hostvm_min_page_size_kbytes = 4,
+ 	.gpuvm_min_page_size_kbytes = 4,
+-	.gpuvm_max_page_table_levels = 1,
+ 	.hostvm_max_non_cached_page_table_levels = 2,
++	.gpuvm_max_page_table_levels = 1,
+ 	.phy_downspread_percent = 0.38,
+ 	.dcn_downspread_percent = 0.38,
+ 	.dispclk_dppclk_vco_speed_mhz = 3000,
+diff --git a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn4_calcs.c b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn4_calcs.c
+index 72acf12e9251..b467347e9886 100644
+--- a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn4_calcs.c
++++ b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn4_calcs.c
+@@ -4117,9 +4117,7 @@ static bool ValidateODMMode(enum dml2_odm_mode ODMMode,
+ 	bool UseDSC,
+ 	unsigned int NumberOfDSCSlices,
+ 	unsigned int TotalNumberOfActiveDPP,
+-	unsigned int TotalNumberOfActiveOPP,
+ 	unsigned int MaxNumDPP,
+-	unsigned int MaxNumOPP,
+ 	double DISPCLKRequired,
+ 	unsigned int NumberOfDPPRequired,
+ 	unsigned int MaxHActiveForDSC,
+@@ -4135,7 +4133,7 @@ static bool ValidateODMMode(enum dml2_odm_mode ODMMode,
+ 
+ 	if (DISPCLKRequired > MaxDispclk)
+ 		return false;
+-	if ((TotalNumberOfActiveDPP + NumberOfDPPRequired) > MaxNumDPP || (TotalNumberOfActiveOPP + NumberOfDPPRequired) > MaxNumOPP)
++	if ((TotalNumberOfActiveDPP + NumberOfDPPRequired) > MaxNumDPP)
+ 		return false;
+ 	if (are_odm_segments_symmetrical) {
+ 		if (HActive % (NumberOfDPPRequired * pixels_per_clock_cycle))
+@@ -4181,9 +4179,7 @@ static noinline_for_stack void CalculateODMMode(
+ 	double MaxDispclk,
+ 	bool DSCEnable,
+ 	unsigned int TotalNumberOfActiveDPP,
+-	unsigned int TotalNumberOfActiveOPP,
+ 	unsigned int MaxNumDPP,
+-	unsigned int MaxNumOPP,
+ 	double PixelClock,
+ 	unsigned int NumberOfDSCSlices,
+ 
+@@ -4253,9 +4249,7 @@ static noinline_for_stack void CalculateODMMode(
+ 			UseDSC,
+ 			NumberOfDSCSlices,
+ 			TotalNumberOfActiveDPP,
+-			TotalNumberOfActiveOPP,
+ 			MaxNumDPP,
+-			MaxNumOPP,
+ 			DISPCLKRequired,
+ 			NumberOfDPPRequired,
+ 			MaxHActiveForDSC,
+@@ -8483,7 +8477,6 @@ static bool dml_core_mode_support(struct dml2_core_calcs_mode_support_ex *in_out
+ 	CalculateSwathAndDETConfiguration(&mode_lib->scratch, CalculateSwathAndDETConfiguration_params);
+ 
+ 	mode_lib->ms.TotalNumberOfActiveDPP = 0;
+-	mode_lib->ms.TotalNumberOfActiveOPP = 0;
+ 	mode_lib->ms.support.TotalAvailablePipesSupport = true;
+ 
+ 	for (k = 0; k < mode_lib->ms.num_active_planes; ++k) {
+@@ -8519,9 +8512,7 @@ static bool dml_core_mode_support(struct dml2_core_calcs_mode_support_ex *in_out
+ 			mode_lib->ms.max_dispclk_freq_mhz,
+ 			false, // DSCEnable
+ 			mode_lib->ms.TotalNumberOfActiveDPP,
+-			mode_lib->ms.TotalNumberOfActiveOPP,
+ 			mode_lib->ip.max_num_dpp,
+-			mode_lib->ip.max_num_opp,
+ 			((double)display_cfg->stream_descriptors[display_cfg->plane_descriptors[k].stream_index].timing.pixel_clock_khz / 1000),
+ 			mode_lib->ms.support.NumberOfDSCSlices[k],
+ 
+@@ -8540,9 +8531,7 @@ static bool dml_core_mode_support(struct dml2_core_calcs_mode_support_ex *in_out
+ 			mode_lib->ms.max_dispclk_freq_mhz,
+ 			true, // DSCEnable
+ 			mode_lib->ms.TotalNumberOfActiveDPP,
+-			mode_lib->ms.TotalNumberOfActiveOPP,
+ 			mode_lib->ip.max_num_dpp,
+-			mode_lib->ip.max_num_opp,
+ 			((double)display_cfg->stream_descriptors[display_cfg->plane_descriptors[k].stream_index].timing.pixel_clock_khz / 1000),
+ 			mode_lib->ms.support.NumberOfDSCSlices[k],
+ 
+@@ -8680,12 +8669,25 @@ static bool dml_core_mode_support(struct dml2_core_calcs_mode_support_ex *in_out
+ #endif
+ 	}
+ 
++	// TotalNumberOfActiveDPP is the sum of all planes
+ 	mode_lib->ms.TotalNumberOfActiveDPP = 0;
+-	mode_lib->ms.TotalNumberOfActiveOPP = 0;
+ 	for (k = 0; k < mode_lib->ms.num_active_planes; ++k) {
+ 		mode_lib->ms.TotalNumberOfActiveDPP += mode_lib->ms.NoOfDPP[k];
+-		mode_lib->ms.TotalNumberOfActiveOPP += mode_lib->ms.NoOfOPP[k];
+ 	}
++
++	// TotalNumberOfActiveOPP is the sum of the per stream max of all planes
++	mode_lib->ms.TotalNumberOfActiveOPP = 0;
++	for (k = 0; k < display_cfg->num_streams; ++k) {
++		unsigned int NoOfOppPerStream = 0;
++		for (m = 0; m < display_cfg->num_planes; ++m) {
++			if (display_cfg->plane_descriptors[m].stream_index == k) {
++				NoOfOppPerStream = NoOfOppPerStream < mode_lib->ms.NoOfOPP[m] ? mode_lib->ms.NoOfOPP[m] : NoOfOppPerStream;
++			}
++		}
++
++		mode_lib->ms.TotalNumberOfActiveOPP += NoOfOppPerStream;
++	}
++
+ 	if (mode_lib->ms.TotalNumberOfActiveDPP > (unsigned int)mode_lib->ip.max_num_dpp)
+ 		mode_lib->ms.support.TotalAvailablePipesSupport = false;
+ 	if (mode_lib->ms.TotalNumberOfActiveOPP > (unsigned int)mode_lib->ip.max_num_opp)
+diff --git a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn5_calcs_dchub.c b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn5_calcs_dchub.c
+index 05a99c4f761b..38ccf9dab31f 100644
+--- a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn5_calcs_dchub.c
++++ b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn5_calcs_dchub.c
+@@ -74,7 +74,9 @@ void dcn5_calculate_byte_per_pixel_and_block_sizes(
+ 		*BytePerPixelDETC = 0;
+ 		*BytePerPixelY = 8;
+ 		*BytePerPixelC = 0;
+-	} else if (SourcePixelFormat == dml2_444_32 || SourcePixelFormat == dml2_rgbe || SourcePixelFormat == dml2_422_packed_10 || SourcePixelFormat == dml2_422_packed_12) {
++	} else if (SourcePixelFormat == dml2_444_32 ||
++		   SourcePixelFormat == dml2_rgbe ||
++		   SourcePixelFormat == dml2_422_packed_12) {
+ 		*BytePerPixelDETY = 4;
+ 		*BytePerPixelDETC = 0;
+ 		*BytePerPixelY = 4;
+diff --git a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn5_funcs_initialize.c b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn5_funcs_initialize.c
+index 31681c7f655e..5907cc155505 100644
+--- a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn5_funcs_initialize.c
++++ b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn5_funcs_initialize.c
+@@ -33,7 +33,7 @@ static void patch_ip_caps_with_explicit_ip_params(struct dml2_ip_capabilities *i
+ static void patch_ip_params_with_ip_caps(struct dml2_core_ip_params *ip_params, const struct dml2_ip_capabilities *ip_caps)
+ {
+ 	ip_params->max_num_dpp = ip_caps->pipe_count;
+-	ip_params->max_num_opp = ip_caps->pipe_count;
++	ip_params->max_num_opp = ip_caps->otg_count;
+ 	ip_params->max_num_otg = ip_caps->otg_count;
+ 	ip_params->num_dsc = ip_caps->num_dsc;
+ 	ip_params->max_num_dp2p0_streams = ip_caps->max_num_dp2p0_streams;
+diff --git a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn5_funcs_mode_support.c b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn5_funcs_mode_support.c
+index 9d68c9dd0a1d..2e86a134e074 100644
+--- a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn5_funcs_mode_support.c
++++ b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn5_funcs_mode_support.c
+@@ -795,22 +795,26 @@ static void dcn5_ms_calculate_num_of_dpp_required(
+ 		const struct dml2_display_cfg *display_cfg,
+ 		struct dml2_core_internal_display_mode_lib *mode_lib)
+ {
+-	unsigned int k;
++	unsigned int k, m;
+ 	const struct dml2_plane_parameters *plane;
+ 
+ 	for (k = 0; k < mode_lib->ms.num_active_planes; ++k) {
+ 		plane = &display_cfg->plane_descriptors[k];
+ 		mode_lib->ms.MPCCombine[k] = false;
+ 		mode_lib->ms.NoOfDPP[k] = 1;
++		mode_lib->ms.NoOfOPP[k] = 1;
+ 		if (mode_lib->ms.ODMMode[k] == dml2_odm_mode_combine_4to1) {
+ 			mode_lib->ms.MPCCombine[k] = false;
+ 			mode_lib->ms.NoOfDPP[k] = 4;
++			mode_lib->ms.NoOfOPP[k] = 4;
+ 		} else if (mode_lib->ms.ODMMode[k] == dml2_odm_mode_combine_3to1) {
+ 			mode_lib->ms.MPCCombine[k] = false;
+ 			mode_lib->ms.NoOfDPP[k] = 3;
++			mode_lib->ms.NoOfOPP[k] = 3;
+ 		} else if (mode_lib->ms.ODMMode[k] == dml2_odm_mode_combine_2to1) {
+ 			mode_lib->ms.MPCCombine[k] = false;
+ 			mode_lib->ms.NoOfDPP[k] = 2;
++			mode_lib->ms.NoOfOPP[k] = 2;
+ 		} else if (plane->overrides.mpcc_combine_factor == 2) {
+ 			mode_lib->ms.MPCCombine[k] = true;
+ 			mode_lib->ms.NoOfDPP[k] = 2;
+@@ -832,12 +836,27 @@ static void dcn5_ms_calculate_num_of_dpp_required(
+ 		DML_LOG_VERBOSE("DML::%s: k=%d, NoOfDPP = %d\n", __func__, k,
+ 				mode_lib->ms.NoOfDPP[k]);
+ 	}
++
++
++	// TotalNumberOfActiveOPP is the sum of the per stream max NoOfOPP of all planes driving that stream
++	mode_lib->ms.TotalNumberOfActiveOPP = 0;
++	for (k = 0; k < display_cfg->num_streams; ++k) {
++		unsigned int NoOfOppPerStream = 0;
++
++		for (m = 0; m < mode_lib->ms.num_active_planes; ++m) {
++			if (display_cfg->plane_descriptors[m].stream_index == k)
++				NoOfOppPerStream = NoOfOppPerStream < mode_lib->ms.NoOfOPP[m] ? mode_lib->ms.NoOfOPP[m] : NoOfOppPerStream;
++		}
++
++		mode_lib->ms.TotalNumberOfActiveOPP += NoOfOppPerStream;
++	}
+ }
+ 
+ static bool dcn5_ms_check_total_available_pipes_support(
+ 		struct dml2_core_internal_display_mode_lib *mode_lib)
+ {
+-	return mode_lib->ms.TotalNumberOfActiveDPP <= (unsigned int) mode_lib->ip.max_num_dpp;
++	return mode_lib->ms.TotalNumberOfActiveDPP <= (unsigned int) mode_lib->ip.max_num_dpp
++			&& mode_lib->ms.TotalNumberOfActiveOPP <= (unsigned int) mode_lib->ip.max_num_opp;
+ }
+ 
+ static void dcn5_ms_calculate_total_num_of_single_dpp_surfaces(
+diff --git a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn6_funcs_initialize.c b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn6_funcs_initialize.c
+index 23fd6edeb0cf..5abce647da0a 100644
+--- a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn6_funcs_initialize.c
++++ b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn6_funcs_initialize.c
+@@ -24,6 +24,7 @@ struct dml2_core_ip_params core_dcn6_ip_caps_base = {
+ 	.writeback_interface_buffer_size_kbytes = 90,
+ 	//Number of pipes after DCN Pipe harvesting
+ 	.max_num_dpp = 4,
++	.max_num_opp = 4,
+ 	.max_num_otg = 4,
+ 	.max_num_wb = 1,
+ 	.zero_size_buffer_entries = 512,
+@@ -111,6 +112,7 @@ static void patch_ip_caps_with_explicit_ip_params(struct dml2_ip_capabilities *i
+ static void patch_ip_params_with_ip_caps(struct dml2_core_ip_params *ip_params, const struct dml2_ip_capabilities *ip_caps)
+ {
+ 	ip_params->max_num_dpp = ip_caps->pipe_count;
++	ip_params->max_num_opp = ip_caps->otg_count;
+ 	ip_params->max_num_otg = ip_caps->otg_count;
+ 	ip_params->TDLUT_33cube_count = ip_caps->TDLUT_33cube_count;
+ 	ip_params->num_dsc = ip_caps->num_dsc;
+diff --git a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn6_funcs_mode_support.c b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn6_funcs_mode_support.c
+index d83c7eea462b..e9e22a3c8702 100644
+--- a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn6_funcs_mode_support.c
++++ b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_core/dml2_core_dcn6_funcs_mode_support.c
+@@ -988,12 +988,16 @@ static void dcn6_ms_calculate_num_of_dpp_required(
+ 	for (k = 0; k < display_cfg->num_planes; k++) {
+ 		plane = &display_cfg->plane_descriptors[k];
+ 		outputs->NoOfDPP[k] = 1;
++		outputs->NoOfOPP[k] = 1;
+ 		if (inputs->ODMMode[k] == dml2_odm_mode_combine_4to1) {
+ 			outputs->NoOfDPP[k] = 4;
++			outputs->NoOfOPP[k] = 4;
+ 		} else if (inputs->ODMMode[k] == dml2_odm_mode_combine_3to1) {
+ 			outputs->NoOfDPP[k] = 3;
++			outputs->NoOfOPP[k] = 3;
+ 		} else if (inputs->ODMMode[k] == dml2_odm_mode_combine_2to1) {
+ 			outputs->NoOfDPP[k] = 2;
++			outputs->NoOfOPP[k] = 2;
+ 		} else if (plane->overrides.mpcc_combine_factor == 2) {
+ 			outputs->MPCCombine[k] = true;
+ 			outputs->NoOfDPP[k] = 2;
+@@ -1027,12 +1031,28 @@ static bool dcn6_ms_check_total_available_pipes_support(
+ 	struct dml2_core_internal_mode_support *inputs = states;
+ 	struct dml2_core_internal_mode_support *outputs = states;
+ 	unsigned int totalNumOfActiveDPP = 0;
+-	unsigned int k;
++	unsigned int k, m;
+ 
+ 	DML_LOG_FUNC_ENTER();
+ 	for (k = 0; k < display_cfg->num_planes; k++)
+ 		totalNumOfActiveDPP += inputs->NoOfDPP[k];
+-	outputs->support.TotalAvailablePipesSupport = totalNumOfActiveDPP <= (unsigned int)ip->max_num_dpp;
++
++
++	// TotalNumberOfActiveOPP is the sum of the per stream max NoOfOPP of all planes driving that stream
++	outputs->TotalNumberOfActiveOPP = 0;
++	for (k = 0; k < display_cfg->num_streams; k++) {
++		unsigned int NoOfOppPerStream = 0;
++
++		for (m = 0; m < display_cfg->num_planes; m++) {
++			if (display_cfg->plane_descriptors[m].stream_index == k)
++				NoOfOppPerStream = NoOfOppPerStream < inputs->NoOfOPP[m] ? inputs->NoOfOPP[m] : NoOfOppPerStream;
++		}
++
++		outputs->TotalNumberOfActiveOPP += NoOfOppPerStream;
++	}
++
++	outputs->support.TotalAvailablePipesSupport = totalNumOfActiveDPP <= (unsigned int)ip->max_num_dpp
++			&& outputs->TotalNumberOfActiveOPP <= (unsigned int)ip->max_num_opp;
+ 
+ 	DML_LOG_DEBUG_BOOL(outputs->support.TotalAvailablePipesSupport);
+ 	DML_LOG_FUNC_EXIT();
+diff --git a/drivers/gpu/drm/amd/display/dc/resource/dcn42/dcn42_resource.c b/drivers/gpu/drm/amd/display/dc/resource/dcn42/dcn42_resource.c
+index 6370d3903eb5..3c7cd3ecc687 100644
+--- a/drivers/gpu/drm/amd/display/dc/resource/dcn42/dcn42_resource.c
++++ b/drivers/gpu/drm/amd/display/dc/resource/dcn42/dcn42_resource.c
+@@ -2407,9 +2407,7 @@ static bool dcn42_resource_construct(
+ 	dc->dml2_options.dcn_pipe_count = pool->base.pipe_count;
+ 	 /*this will use real soc clock table*/
+ 	dc->dml2_options.use_native_soc_bb_construction = true;
+-	dc->dml2_options.minimize_dispclk_using_odm = false;
+-	if (dc->config.EnableMinDispClkODM)
+-		dc->dml2_options.minimize_dispclk_using_odm = true;
++	dc->dml2_options.minimize_dispclk_using_odm = dc->config.EnableMinDispClkODM;
+ 	dc->dml2_options.enable_windowed_mpo_odm = dc->config.enable_windowed_mpo_odm;
+ 	dc->dml2_options.map_dc_pipes_with_callbacks = true;
+ 	dc->dml2_options.force_tdlut_enable = true;
+diff --git a/drivers/gpu/drm/amd/display/dc/resource/dcn42b/dcn42b_resource.c b/drivers/gpu/drm/amd/display/dc/resource/dcn42b/dcn42b_resource.c
+index 41f0c67f57ff..8b1ee45d9c13 100644
+--- a/drivers/gpu/drm/amd/display/dc/resource/dcn42b/dcn42b_resource.c
++++ b/drivers/gpu/drm/amd/display/dc/resource/dcn42b/dcn42b_resource.c
+@@ -2387,9 +2387,7 @@ static bool dcn42b_resource_construct(
+ 	dc->dml2_options.dcn_pipe_count = pool->base.pipe_count;
+ 	 /*this will use real soc clock table*/
+ 	dc->dml2_options.use_native_soc_bb_construction = true;
+-	dc->dml2_options.minimize_dispclk_using_odm = false;
+-	if (dc->config.EnableMinDispClkODM)
+-		dc->dml2_options.minimize_dispclk_using_odm = true;
++	dc->dml2_options.minimize_dispclk_using_odm = dc->config.EnableMinDispClkODM;
+ 	dc->dml2_options.enable_windowed_mpo_odm = dc->config.enable_windowed_mpo_odm;
+ 	dc->dml2_options.map_dc_pipes_with_callbacks = true;
+ 	dc->dml2_options.force_tdlut_enable = true;
+diff --git a/drivers/gpu/drm/scheduler/sched_entity.c b/drivers/gpu/drm/scheduler/sched_entity.c
+index a4a7efdbf229..bf97508a45b9 100644
+--- a/drivers/gpu/drm/scheduler/sched_entity.c
++++ b/drivers/gpu/drm/scheduler/sched_entity.c
+@@ -207,14 +207,18 @@ EXPORT_SYMBOL(drm_sched_entity_modify_sched);
+ 
+ static bool drm_sched_entity_is_idle(struct drm_sched_entity *entity)
+ {
+-	rmb(); /* for list_empty to work without lock */
++	bool idle = false;
++
++	spin_lock(&entity->lock);
+ 
+ 	if (list_empty(&entity->list) ||
+ 	    spsc_queue_count(&entity->job_queue) == 0 ||
+ 	    entity->stopped)
+-		return true;
++		idle = true;
+ 
+-	return false;
++	spin_unlock(&entity->lock);
++
++	return idle;
+ }
+ 
+ /**

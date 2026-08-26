@@ -1,0 +1,154 @@
+From cd4af3bd9966e4dd187c7217f5681748db683b2e Mon Sep 17 00:00:00 2001
+From: Sleepy <sleepy@example.com>
+Date: Wed, 26 Aug 2026 12:28:16 +0200
+Subject: [PATCH 12/16] drm/amdgpu: merge userq GPU-reset crash + lockdep fixes
+ (Vitaly Prosyak)
+
+The 5-patch series from the amd-gfx ML (08-24, messages 151398-151403)
+that fixes userq crashes and lockdep violations during GPU reset, applied
+cleanly to next-20260825:
+
+- 1/5 reserve a dma_resv slot before adding the eviction fence
+- 2/5 cancel hang_detect_work before taking userq_mutex (deadlock fix)
+- 3/5 take the reset lock after halt_activities
+- 4/5 psp: skip firmware.mutex in psp_resume during GPU reset
+- 5/5 move drm_client_dev_resume outside reset_domain->sem
+
+Userq is the RDNA4 queue-submission path; these harden the GPU-reset
+error path. ML WIP (posted 08-24, after next-20260825) - isolated in a
+single commit, easy to drop when they land upstream.
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_device.c    | 21 ++++++++++++++-----
+ .../drm/amd/amdgpu/amdgpu_eviction_fence.c    |  2 ++
+ drivers/gpu/drm/amd/amdgpu/amdgpu_psp.c       | 13 +++++++++---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c     |  5 ++++-
+ 4 files changed, 32 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
+index a6b066df879a..4822d1fe19c4 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
+@@ -5220,8 +5220,6 @@ int amdgpu_device_reinit_after_reset(struct amdgpu_reset_context *reset_context)
+ 				if (r)
+ 					goto out;
+ 
+-				drm_client_dev_resume(adev_to_drm(tmp_adev));
+-
+ 				/*
+ 				 * The GPU enters bad state once faulty pages
+ 				 * by ECC has reached the threshold, and ras
+@@ -5796,19 +5794,23 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
+ 	/* Cannot be called after locking reset domain */
+ 	amdgpu_ras_pre_reset(adev, &device_list);
+ 
+-	/* We need to lock reset domain only once both for XGMI and single device */
+-	amdgpu_device_recovery_get_reset_lock(adev, &device_list);
+-
+ 	/* unmap all the mappings of doorbell and framebuffer to prevent user space from
+ 	 * accessing them
+ 	 */
+ 	unmap_mapping_range(adev->ddev.anon_inode->i_mapping, 0, 0, 1);
+ 	amdgpu_amdkfd_clear_kfd_mapping(adev);
+ 
++	/* Halt activities before taking reset lock to avoid circular dependency:
++	 * halt_activities -> drm_client_dev_suspend -> dc_lock, while display
++	 * IRQ path holds dc_lock and tries to acquire reset_domain->sem.
++	 */
+ 	amdgpu_device_halt_activities(adev, job, reset_context, &device_list,
+ 				      hive, need_emergency_restart);
+ 	if (need_emergency_restart)
+ 		goto skip_sched_resume;
++
++	/* Take reset lock after halt_activities to avoid AB-BA deadlock */
++	amdgpu_device_recovery_get_reset_lock(adev, &device_list);
+ 	/*
+ 	 * Must check guilty signal here since after this point all old
+ 	 * HW fences are force signaled.
+@@ -5832,6 +5834,15 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
+ 	amdgpu_device_gpu_resume(adev, &device_list, need_emergency_restart);
+ reset_unlock:
+ 	amdgpu_device_recovery_put_reset_lock(adev, &device_list);
++	/* Resume DRM clients after releasing reset lock: clientlist_mutex
++	 * must be taken before reset_domain->sem in lock ordering.
++	 */
++	if (!need_emergency_restart && !r) {
++		struct amdgpu_device *tmp_adev;
++
++		list_for_each_entry(tmp_adev, &device_list, reset_list)
++			drm_client_dev_resume(adev_to_drm(tmp_adev));
++	}
+ 	amdgpu_ras_post_reset(adev, &device_list);
+ end_reset:
+ 	if (hive) {
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_eviction_fence.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_eviction_fence.c
+index f6b7522c3c82..823d62923932 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_eviction_fence.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_eviction_fence.c
+@@ -105,6 +105,8 @@ int amdgpu_evf_mgr_attach_fence(struct amdgpu_eviction_fence_mgr *evf_mgr,
+ 
+ 		amdgpu_bo_placement_from_domain(bo, bo->allowed_domains);
+ 		ret = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
++		if (!ret)
++			ret = dma_resv_reserve_fences(resv, 1);
+ 		if (!ret)
+ 			dma_resv_add_fence(resv, ev_fence,
+ 					   DMA_RESV_USAGE_BOOKKEEP);
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_psp.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_psp.c
+index 04f6ebf31cca..108a7fba6250 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_psp.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_psp.c
+@@ -3806,7 +3806,12 @@ static int psp_resume(struct amdgpu_ip_block *ip_block)
+ 		}
+ 	}
+ 
+-	mutex_lock(&adev->firmware.mutex);
++	/* reset_domain->sem is held exclusively during GPU reset, so no
++	 * concurrent firmware operations can run; skip firmware.mutex to
++	 * avoid inverting the firmware.mutex -> reset_domain->sem ordering.
++	 */
++	if (!amdgpu_in_reset(adev))
++		mutex_lock(&adev->firmware.mutex);
+ 
+ 	ret = amdgpu_ucode_init_bo(adev);
+ 	if (ret)
+@@ -3869,13 +3874,15 @@ static int psp_resume(struct amdgpu_ip_block *ip_block)
+ 				"SECUREDISPLAY: Failed to initialize SECUREDISPLAY\n");
+ 	}
+ 
+-	mutex_unlock(&adev->firmware.mutex);
++	if (!amdgpu_in_reset(adev))
++		mutex_unlock(&adev->firmware.mutex);
+ 
+ 	return 0;
+ 
+ failed:
+ 	dev_err(adev->dev, "PSP resume failed\n");
+-	mutex_unlock(&adev->firmware.mutex);
++	if (!amdgpu_in_reset(adev))
++		mutex_unlock(&adev->firmware.mutex);
+ 	return ret;
+ }
+ 
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+index 08070ff59736..5371225ea0c3 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+@@ -566,12 +566,15 @@ amdgpu_userq_destroy(struct amdgpu_userq_mgr *uq_mgr, struct amdgpu_usermode_que
+ 	trace_amdgpu_userq_destroy_start(queue);
+ 
+ 	cancel_delayed_work_sync(&uq_mgr->resume_work);
++	/* Cancel before taking userq_mutex: cancel_delayed_work_sync() waits
++	 * for any running instance, which itself takes userq_mutex.
++	 */
++	cancel_delayed_work_sync(&queue->hang_detect_work);
+ 
+ 	mutex_lock(&uq_mgr->userq_mutex);
+ 	amdgpu_userq_wait_for_last_fence(queue);
+ 
+ 	amdgpu_userq_detach_doorbell(queue);
+-	cancel_delayed_work_sync(&queue->hang_detect_work);
+ 
+ #if defined(CONFIG_DEBUG_FS)
+ 	debugfs_remove_recursive(queue->debugfs_queue);
