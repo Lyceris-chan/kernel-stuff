@@ -1,71 +1,51 @@
 From: Sleepy <sleepy@localhost>
-Subject: [PATCH] drm/amd/display: fall back to DRM-core AMD VSDB FreeSync info
+Subject: [PATCH] drm/amd/display: take the MCCS VCP code from DRM-core AMD VSDB
 
-The amdgpu-side parse_hdmi_amd_vsdb() relies on the DMUB/DMCU firmware to
-report the AMD VSDB (dc_edid_parser_send_cea + DMUB_CMD__EDID_CEA). On some
-RDNA4 parts the firmware does not detect the AMD VSDB, so
-vsdb_info.freesync_supported stays false and the connector reports
-vrr_capable=0 even though the display advertises FreeSync (AMD VSDB v1/v2).
+The DMUB firmware reports freesync_supported for HDMI FreeSync displays but
+does not provide the MCCS VCP code (sink->edid_caps.freesync_vcp_code stays
+0). The later check in amdgpu_dm_update_freesync_caps():
+  if ((HDMI || PCON) && (!freesync_vcp_code ||
+      (freesync_vcp_code && !mccs_caps.freesync_supported)))
+    freesync_capable = false;
+then undoes the freesync_capable that was just set, leaving vrr_capable=0
+(verified at runtime: fs_sup=1 fscap=1 vcp=0 mccs=0).
 
-drm_edid.c (patch 0050) already parses the AMD VSDB directly and populates
-connector->display_info.amd_vsdb (freesync_supported, min/max frame rate,
-freesync_vcp_code) for v1/v2/v3. Use that as a fallback in
-amdgpu_dm_update_freesync_caps() when the firmware path found nothing, and
-also populate sink->edid_caps.freesync_vcp_code + mccs_caps.freesync_supported
-so the later freesync_vcp_code/mccs reset in the same function does not undo
-the fallback result.
+drm_edid.c (patch 0050) parses the AMD VSDB directly and provides
+connector->display_info.amd_vsdb.freesync_vcp_code. Set
+sink->edid_caps.freesync_vcp_code + sink->mccs_caps.freesync_supported from
+it in the main HDMI branch so the reset no longer fires. Includes temporary
+pr_info diagnostics.
 
 Signed-off-by: Sleepy <sleepy@localhost>
 Assisted-by: Claude <noreply@anthropic.com>
 ---
 diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
-index 9a80c41095fc..22d95de6b91b 100644
+index 9a80c41095fc..4a89bee8305f 100644
 --- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
 +++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
-@@ -3928,6 +3928,46 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
- 			       vsdb_info.min_refresh_rate_hz,
- 			       vsdb_info.max_refresh_rate_hz, freesync_capable);
- 
-+		/*
-+		 * The amdgpu-side parse_hdmi_amd_vsdb() relies on the DMUB/DMCU
-+		 * firmware to report the AMD VSDB; on some RDNA4 parts the
-+		 * firmware does not detect it. Fall back to the DRM-core parse
-+		 * (drm_edid.c), which reads the AMD VSDB directly and already
-+		 * populated connector->display_info.amd_vsdb.
-+		 */
-+		if (!freesync_capable &&
-+		    connector->display_info.amd_vsdb.freesync_supported) {
-+			amdgpu_dm_connector->min_vfreq =
-+				connector->display_info.amd_vsdb.min_frame_rate;
-+			amdgpu_dm_connector->max_vfreq =
-+				connector->display_info.amd_vsdb.max_frame_rate;
-+			if (amdgpu_dm_connector->max_vfreq -
-+			    amdgpu_dm_connector->min_vfreq > 10)
-+				freesync_capable = true;
+@@ -3920,6 +3920,25 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
+ 				connector->display_info.monitor_range.min_vfreq = vsdb_info.min_refresh_rate_hz;
+ 				connector->display_info.monitor_range.max_vfreq = vsdb_info.max_refresh_rate_hz;
+ 			}
 +
-+			connector->display_info.monitor_range.min_vfreq =
-+				amdgpu_dm_connector->min_vfreq;
-+			connector->display_info.monitor_range.max_vfreq =
-+				amdgpu_dm_connector->max_vfreq;
-+
-+			/* The later freesync_vcp_code/mccs check (see the
-+			 * freesync_capable = false reset below) would undo this;
-+			 * satisfy it with the DRM-core VCP info so the
-+			 * fallback result sticks.
++			/*
++			 * The DMUB firmware reports freesync_supported but does not
++			 * provide the MCCS VCP code, and the later
++			 * freesync_vcp_code/mccs reset would undo freesync_capable.
++			 * Take the VCP code from the DRM-core AMD VSDB parse
++			 * (drm_edid.c, patch 0050).
 +			 */
 +			if (connector->display_info.amd_vsdb.freesync_vcp_code) {
 +				sink->edid_caps.freesync_vcp_code =
 +					connector->display_info.amd_vsdb.freesync_vcp_code;
 +				sink->mccs_caps.freesync_supported = true;
++				pr_info("sleepy-next VRR: set vcp=%d mccs=1 (fs_sup=%d)\n",
++					sink->edid_caps.freesync_vcp_code,
++					connector->display_info.amd_vsdb.freesync_supported);
++			} else {
++				pr_info("sleepy-next VRR: no vcp in amd_vsdb (fs_sup=%d)\n",
++					connector->display_info.amd_vsdb.freesync_supported);
 +			}
-+
-+			drm_dbg_driver(adev_to_drm(adev),
-+				       "VRR: drm-edid amd_vsdb fallback: fs_sup=1 min=%d max=%d\n",
-+				       amdgpu_dm_connector->min_vfreq,
-+				       amdgpu_dm_connector->max_vfreq);
-+		}
-+
-+
- 		/*
- 		 * If AMD VSDB didn't provide a valid FreeSync range, fall back to
- 		 * the HDMI 2.1 VRR capability parsed from the HF-VSDB.
+ 		}
+ 
+ 		drm_dbg_driver(adev_to_drm(adev),
