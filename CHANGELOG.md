@@ -9,6 +9,57 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [wannabe-7.3-rc1] — 2026-08-26 (preview tree, unreleased)
+
+Built a **wannabe 7.3-rc1** preview tree (`wannabe-7.3-rc1/`, git worktree
+from `linux-next` `next-20260825`) ahead of the 7.3-rc1 release. It is a
+superset of the 7.2.0-2 build plus the 7.3 merge-window content relevant to
+this hardware. See `WANNABE-7.3.md` for the full breakdown.
+
+### Added (upstream 7.3 window, arrives with the real bump)
+
+- **AMDGPU/DC**: amd-drm-next-7.3-2026-08-19 merge (pipeline-sync, userq
+  destroy hang/race, KIQ ring fence, VCN overflow, brightness curve,
+  VA-map-before-restore) + 17 amd-staging backports (KFD CRIU, userq
+  fence-lock/wptr-restore, MES teardown, SVM migrate, AQL zero-size,
+  CU-occupancy GFX12, no-retry PTE, VM dw-estimate, DCN42 fixes, HPD IRQ
+  logging).
+- **MM**: ~30 commits (MGLRU exec-folio promote/young-counter, vmscan
+  lru_lock/folio_referenced, zram/zsmalloc/zswap, swap single-folio revert,
+  memcg reparent) + drm/sched `entity_is_idle()` lock.
+- **amd-pstate**: dynamic EPP as `energy_performance_preference`, CPPC
+  hot-path, `bios_min_perf` — the old `amd_dynamic_epp` cmdline is gone.
+- **Latency**: ByteDance SMP-IPI preemption rework (~90% scheduling-latency
+  drop; covers Phoronix 08-17/08-22 articles) + x86/mm `flush_tlb_multi`
+  preemption.
+- **TTM** (Valve): aggressive eviction below the protection limit.
+- **sched-ext**: sub-scheduler support "feature complete" (`scx_bpf_dsq_move`
+  fix, header syncs).
+
+### Added (sleepy-kernel series carried over)
+
+- The full 69-patch additive series from the 7.2.0-2 build: CachyOS squashes
+  (bbr3, kbuild, cpu-isa, config-hooks, preempt-ipi, ACPI-BM/S5, fork
+  backports), local GPU fixes (PROFILE_PEAK, SMU14, DCN/EDID, TLB-invalidate,
+  retry-fault, userq, MES CRIU, VCN util, soft-evicted), bfq/mq-deadline,
+  LRU-MARIE 0.10.5, zstd/zswap, NAP governor.
+
+### Added (Phoronix WIP, RFC)
+
+- **Rik van Riel `mm/gup` follow_page_mask() batching** (RFC v3) — up to
+  12.8× in gup_test on mTHP paths (GPU userptr / io_uring / VMA walkers
+  benefit). Applies cleanly to next-20260825; marked RFC (v4 exists), expect
+  upstream revisions to supersede.
+
+### Deferred (off-target or WIP)
+
+- Menu-governor wakeup fix (Intel Xeon; we run NAP), RTL8261C/D (not our NIC),
+  DRM fair-policy fix (FIFO default), k10temp per-CCD (EPYC-only), HDMI 2.1
+  VRR/ALLM (missed 7.3), reflex governor (needs cpufreq API port), work-items
+  #5616/#4753 (no provenance).
+
+---
+
 ## [7.2.0-2-sleepy] — 2026-08-19 (sweep candidates merged)
 
 Merged the 17 verified candidates from the 08-19 ultracode sweep onto the 7.2

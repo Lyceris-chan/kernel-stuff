@@ -416,7 +416,9 @@ needed): amd-drm-next-7.3-2026-08-19 merge, ~30 MM commits (MGLRU/vmscan/zram/
 zsmalloc/zswap), amd-pstate dynamic-EPP + CPPC set, sched-ext fixes, sch_cake
 fix, dmemcg. These arrive with the real 7.3 bump.
 
-**Merged on top (18 commits, cherry-picked to commit `759b7fb8fbe9`):**
+**Merged on top — three layers, committed on the worktree branch `wannabe-7.3`:**
+
+*Layer 1 — upstream merges (18 commits, `759b7fb8fbe9`):*
 - 17 amd-staging-drm-next: KFD CRIU restore_mqd NULL guard (`75a5e1b6b`),
   userq fence-lock (`dc312e088`) + wptr-restore (`67376cbe8`), MES teardown
   (`300ef13f1`), SVM migrate error+hole (`ec4d432be`,`f0b4aedc4`), AQL
@@ -427,9 +429,37 @@ fix, dmemcg. These arrive with the real 7.3 bump.
   mes indenting (`b17d01d87`), HPD IRQ logging (`288f60836`).
 - drm/sched lock `drm_sched_entity_is_idle()` (`0e118b936`, fuzz-3).
 
+*Layer 2 — sleepy-kernel additive series (69 commits, `4834e3546e26`):* the
+full CachyOS branch squashes (0101 bbr3, 0103 kbuild, 0104 cpu-isa, 0105
+config-hooks/fixes, 0106 off-target drops, 0108 preempt-ipi, 0109 ACPI-BM/
+S5-eviction, 0110–0113 fork backports) + local GPU fixes (PROFILE_PEAK, SMU14,
+DCN/EDID, TLB-invalidation, retry-fault, userq, MES CRIU, VCN util,
+soft-evicted), bfq/mq-deadline, LRU-MARIE 0.10.5, zstd/zswap, NAP governor —
+so the tree is a superset of the 7.2.0-2 build, not just upstream 7.3.
+
+*Layer 3 — Phoronix WIP merge (8 commits, `7afdec79e9f0`…`6c2092bc8448`):*
+Rik van Riel's `mm/gup` `follow_page_mask()` batching RFC v3 (lkml
+`20260811025157.1632867-1-riel@surriel.com`, 08-11) — up to 12.8× in gup_test
+on mTHP; applies cleanly to next-20260825 (`git am`, no conflicts). Marked RFC
+(v4 exists) — expect upstream revisions to supersede; the merge point is
+isolated so it's easy to drop. Reverses the 08-15 "Reviewed, not taken"
+verdict **for the wannabe tree only**; still not part of the PKGBUILD series.
+
+**Phoronix month check (through 08-25) — verified already in base:** SMP-IPI
+preemption rework (ByteDance/Chuyi Zhou, `smp-core-2026-08-17`: task-local IPI
+cpumask `9a560af15fd3`, preempt-before-wait `8df8a6028309`), `x86_mm_for_7.3`
+`flush_tlb_multi()` preemption + stack `flush_tlb_info`, TTM-aggressive
+(Valve, `bbc744c062f8` + `3d33e9c726d6`), amd-pstate dynamic-EPP per-policy
+(`b7294b627598`) + `epp_boost` (our cmdline already uses it), sched-ext
+feature-complete (`11260c335ec6`), zsmalloc `zs_free` + `rmap_walk_ksm`
+(19 Aug MM). **Off-target:** menu-governor 5× wakeup (Intel Xeon; we run the
+NAP governor), RTL8261C/D 5 GbE (we have RTL8125B/r8169), DRM fair-policy fix
+(FIFO default), k10temp per-CCD (EPYC Zen 5 only).
+
 **Deferred:** sirlucjan reflex 0.3.1r2 governor (cpufreq API 4→5 args;
 needs port + review); work-items #5616/#4753 (WIP/community, no upstream
-provenance); ML-only userq/KFD series mostly superseded by amd-staging or
+provenance); HDMI 2.1 VRR/ALLM (AMD amd-gfx — missed 7.3, WIP; re-evaluate
+when they land); ML-only userq/KFD series mostly superseded by amd-staging or
 awaiting v2+. See `WANNABE-7.3.md` for the full breakdown and rebuild
 instructions.
 
@@ -1110,9 +1140,12 @@ archives — lore itself is Anubis-blocked). Series grew 151 → 154 patches.
   movement near boundaries because lookup classifies payload size while
   allocation adds `ZS_HANDLE_SIZE`.
 
-**Reviewed, not taken:** Rik van Riel's `[RFC PATCH v3 0/8] batch lookups in
-follow_page_mask()` (lkml 08-11, `<20260811025157.1632867-1-riel@surriel.com>`)
-— gup perf series (2.2–5.9× on mTHP), RFC not merged, not adoptable as-is.
+**Reviewed, not taken (PKGBUILD series):** Rik van Riel's `[RFC PATCH v3 0/8]
+batch lookups in follow_page_mask()` (lkml 08-11,
+`<20260811025157.1632867-1-riel@surriel.com>`) — gup perf series (2.2–5.9× on
+mTHP, up to 12.8× in gup_test), RFC not merged, not adoptable as-is for the
+7.2 build. **Later merged into the wannabe 7.3 tree** (08-26, applies cleanly
+to next-20260825) — see the 2026-08-26 record above.
 mm/swap single-folio revert (Hellwig) — needs the unmerged swap_ops series
 prereqs in `mm/page_io.c`. DCN42 DCHVM↔rIOMMU SDP port series (James Lin,
 amd-gfx 08-11) — display-virtualization, off-target for a desktop. zram
