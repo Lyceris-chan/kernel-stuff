@@ -51,46 +51,74 @@ hardware is unsupported.
 
 ## What this kernel adds
 
-Here's what `linux-sleepy` gives you on top of each baseline.
+This package layers a sanitized CachyOS patchset plus targeted upstream and
+local patches on the Linux 7.2 baseline. The two listings below are the
+cumulative delta for this build, in Keep a Changelog form.
 
-**Over vanilla Linux 7.2:**
+### Over vanilla Linux 7.2
 
-- The hardware-relevant subset of CachyOS: BBRv3 TCP, `-O3` + Zen 4 ISA, VRAM
-  cgroups, sched-ext preemption, HDMI 2.1 FreeSync/VRR, and EDID DSC BPP.
-- ~90 AMD-specific backports from `drm-next`, `linux-pm`, `amd-gfx`, and the
-  amd-gfx/dri-devel lists: SMU14 power fixes (incl. the smu_v14_0_0 DPM
-  clock-query set), DCN401/DCN42B display fixes (incl. PSR/Replay Part 2,
-  IPS/zstate, HDMI clock + DML fixes, HDR/SDR seamless switch, MST HDCP
-  bounds-check), `amd-pstate` EPP boost, and GFX12 stability work.
-- agd5f/staging backports: `BUG()` → `WARN()` conversions for GFX12/PSP14/MES/IMU
-  (`9001`–`9003`, `9009`–`9010`), the TTM copy-packet-size optimization (`9006`),
-  `DB_RING_CONTROL` / `TRUNCATE_COORD_MODE` GFX12 fixes (`9007`–`9008`), the
-  **retry-fault handling v3 series** (`9011`–`9024`, Timur Kristóf), and the
-  **amd-drm-next-7.3-2026-08-06 backports** (`9030`–`9032`: smu_v14_0_0 DCLK metric,
-  DCEFCLK, and `find_clk_level()` DPM fixes), the amdgpu CS/VM correctness
-  series (`9033`–`9035`: FENCE-chunk leak, VM overrun, BO-VA kmap offset), the
-  gfx12 userq sub-page VA-validation fix (`9036`), the RDNA4/gfx1201
-  prefer-default-discovery-offset fix (`9037`), and the GFX12 userq/HMM
-  correctness set (`9038`–`9040`: PRT-mapping reject, eviction-fence rearm
-  bound, HMM range free on the CS error path).
-  The Exit-idle-optimizations series merged upstream into rc6 and was dropped.
-  The SMU14 PPT-limits framework rework from the same tag is **deferred to 7.3**
-  (does not apply cleanly to the rc7 series state).
-- Local handmade SMU14/DCN401 patches, including the `PROFILE_PEAK` GFXCLK
-  ceiling float.
-- BFQ/mq-deadline contention fixes, LRU-MARIE page eviction, the **zstd 1.6.0**
-  merge (with the gcc-BMI2 segfault guard), zram zstd + stability fixes
-  (`2102`–`2108`), MGLRU fixes + zswap reclaim tuning (`2111`–`2113`), and the
-  NAP cpuidle governor.
+**Added**
 
-**Over stock CachyOS:**
+- **CachyOS hardware subset**: BBRv3 TCP as the default congestion controller,
+  `-O3` + Zen 4 ISA builds, sched-ext preemption, HDMI 2.1 FreeSync/VRR, EDID
+  DSC BPP, VRAM cgroups, config hooks (EEVDF base_slice, THP defrag,
+  `lru_gen_min_ttl`).
+- **AMD display and power backports** (drm-next, linux-pm, amd-gfx, dri-devel):
+  SMU14 power fixes (incl. the `smu_v14_0_0` DPM clock-query set), DCN401/DCN42B
+  display fixes (PSR/Replay Part 2, IPS/zstate, HDMI clock + DML fixes,
+  HDR/SDR seamless switch, MST HDCP bounds-check), `amd-pstate` EPP boost
+  (`amd_pstate.epp_boost=1`), and GFX12 stability work.
+- **agd5f/staging backports**: GFX12/PSP14/MES/IMU `BUG()`→`WARN()` conversions
+  (`9001`–`9003`, `9009`–`9010`), TTM copy-packet-size optimization (`9006`),
+  `DB_RING_CONTROL`/`TRUNCATE_COORD_MODE` GFX12 fixes (`9007`–`9008`), the
+  retry-fault handling v3 series (`9011`–`9024`, Timur Kristóf), the
+  amd-drm-next-7.3-2026-08-06 backports (`9030`–`9032`), the amdgpu CS/VM
+  correctness series (`9033`–`9035`), gfx12 userq fixes (`9036`–`9040`).
+  The Exit-idle-optimizations series merged upstream into rc6 and was dropped;
+  the SMU14 PPT-limits framework rework is deferred to 7.3.
+- **Local handmade patches**: `PROFILE_PEAK` GFXCLK ceiling float (`0003`),
+  deep-sleep disable while `PROFILE_PEAK`/COMPUTE is active (`0004`), plus
+  SMU14/DCN401/EDID fixes.
+- **Schedulers, MM, idle**: BFQ/mq-deadline contention fixes, LRU-MARIE page
+  eviction, the zstd 1.6.0 merge (with the gcc-BMI2 segfault guard), zram zstd
+  + stability fixes (`2102`–`2108`), MGLRU fixes + zswap reclaim tuning
+  (`2111`–`2113`), and the NAP cpuidle governor.
 
-- Only hardware-relevant branches are kept; off-target patches (i915, btusb,
-  rtw89, laptop audio, and more) are reverted by the `0106` drop patch.
-- The kernel is trimmed for a single machine: `DRM_I915`, `DRM_NOUVEAU`,
-  `DRM_XE`, `IIO`, `ISDN`, `CAN`, and AppArmor are disabled.
-- A custom `PROFILE_PEAK` power-profile enhancement and an optional CAKE SQM
-  service are included.
+**Changed**
+
+- TCP default is BBR3; the old BBR is disabled (both define the same BTF kfunc
+  symbol, only one can be built-in).
+- The kernel compiles with Clang ThinLTO at `-O3` and `-march=znver4`, using a
+  pre-built LLVM toolchain from kernel.org.
+- `CONFIG_CMDLINE` bakes in `cpuidle.governor=nap amd_pstate.epp_boost=1
+  elevator=kyber pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0`.
+
+**Fixed**
+
+- PCIe ASPM / amdgpu runtime-PM stopgaps for the drm/amd !5538 SMU bus-drop and
+  the silent gaming freeze (SMU IF mismatch 0x2e vs 0x33); see the ASPM note
+  below.
+
+### Over stock CachyOS
+
+**Added**
+
+- `PROFILE_PEAK` power-profile enhancement (`0003`/`0004`).
+- `net-tune` service: optional CAKE SQM shaping + low-latency ethernet tuning.
+
+**Removed**
+
+- Off-target CachyOS branches, reverted by the `0106` drop patch (i915, btusb,
+  rtw89, laptop audio, and more).
+- Config trim for one machine: `DRM_I915`, `DRM_NOUVEAU`, `DRM_XE`, `IIO`,
+  `ISDN`, `CAN`, and AppArmor disabled.
+
+### Wannabe 7.3 preview
+
+For the 7.3 merge-window content ahead of 7.3-rc1 (linux-next `next-20260825`
++ 15 hardware merges: amd-staging, HDMI VRR/ALLM v4, `mm/gup` batching, userq
+GPU-reset, KFD), see `WANNABE-7.3.md` and the tracked, reproducible patch
+series in `wannabe-7.3-patches/`.
 
 **PCIe ASPM is disabled.** The kernel no longer forces a compile-time ASPM policy
 (was `PCIEASPM_PERFORMANCE` — there is no Kconfig "off" option) and the built-in
