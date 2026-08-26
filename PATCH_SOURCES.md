@@ -403,6 +403,38 @@ Our RX 9070 XT is `smu_v14_0_0` (dmesg: `detected ip block number 4 <smu_v14_0_0
 
 ---
 
+## 2026-08-26 — Wannabe 7.3-rc1 preview tree
+
+Created a **wannabe 7.3-rc1** preview tree at `wannabe-7.3-rc1/` (git worktree
+from `repos/linux-next` at **next-20260825**), because 7.3-rc1 is not yet
+released. Full six-source sweep (drm-next, drm-misc, amd-staging-drm-next,
+linux-next, linux-pm, amd-gfx + dri-devel ML, sirlucjan, GitLab work-items,
+Phoronix) to identify 7.3-window hardware-relevant content.
+
+**Base = next-20260825 already covers most of the window** (no backport
+needed): amd-drm-next-7.3-2026-08-19 merge, ~30 MM commits (MGLRU/vmscan/zram/
+zsmalloc/zswap), amd-pstate dynamic-EPP + CPPC set, sched-ext fixes, sch_cake
+fix, dmemcg. These arrive with the real 7.3 bump.
+
+**Merged on top (18 commits, cherry-picked to commit `759b7fb8fbe9`):**
+- 17 amd-staging-drm-next: KFD CRIU restore_mqd NULL guard (`75a5e1b6b`),
+  userq fence-lock (`dc312e088`) + wptr-restore (`67376cbe8`), MES teardown
+  (`300ef13f1`), SVM migrate error+hole (`ec4d432be`,`f0b4aedc4`), AQL
+  zero-size (`15b286c89`), CU-occupancy GFX12 (`61e1afedd`), no-retry PTE
+  (`9b7ce74b7`), VM dw-estimate (`39e5b1e4f`), DCN42 min-dispclk
+  (`b7c4f79d7`), OPP/DPP (`a7f08cbee`), dc_lock leak (`683b1264d`), DM IRQ
+  NULL guard (`0372d4c81`), dml2 bpp (`a3540509b`), vblank_nom (`3fa6d595d`),
+  mes indenting (`b17d01d87`), HPD IRQ logging (`288f60836`).
+- drm/sched lock `drm_sched_entity_is_idle()` (`0e118b936`, fuzz-3).
+
+**Deferred:** sirlucjan reflex 0.3.1r2 governor (cpufreq API 4→5 args;
+needs port + review); work-items #5616/#4753 (WIP/community, no upstream
+provenance); ML-only userq/KFD series mostly superseded by amd-staging or
+awaiting v2+. See `WANNABE-7.3.md` for the full breakdown and rebuild
+instructions.
+
+---
+
 ## 2026-08-19 — Bump to Linux 7.2 stable (drops + CachyOS squash regen + MARIE 0.10.5)
 
 Bumped the base from 7.2-rc7 to the **7.2 stable release** (`linux-7.2` tag,
