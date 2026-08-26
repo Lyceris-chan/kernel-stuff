@@ -1,0 +1,58 @@
+From: Sleepy <sleepy@localhost>
+Subject: [PATCH] drm/amd/display: fall back to DRM-core AMD VSDB FreeSync info
+
+The amdgpu-side parse_hdmi_amd_vsdb() relies on the DMUB/DMCU firmware to
+report the AMD VSDB (dc_edid_parser_send_cea + DMUB_CMD__EDID_CEA). On some
+RDNA4 parts the firmware does not detect the AMD VSDB, so
+vsdb_info.freesync_supported stays false and the connector reports
+vrr_capable=0 even though the display advertises FreeSync (AMD VSDB v1/v2).
+
+drm_edid.c (patch 0050) already parses the AMD VSDB directly and populates
+connector->display_info.amd_vsdb (freesync_supported, min/max frame rate)
+for v1/v2/v3. Use that as a fallback in amdgpu_dm_update_freesync_caps()
+when the firmware path found nothing, so HDMI FreeSync/VRR works regardless
+of firmware behaviour.
+
+Signed-off-by: Sleepy <sleepy@localhost>
+Assisted-by: Claude <noreply@anthropic.com>
+---
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
+index 9a80c41095fc..6e7329744b68 100644
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
+@@ -3928,6 +3928,35 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
+ 			       vsdb_info.min_refresh_rate_hz,
+ 			       vsdb_info.max_refresh_rate_hz, freesync_capable);
+ 
++		/*
++		 * The amdgpu-side parse_hdmi_amd_vsdb() relies on the DMUB/DMCU
++		 * firmware to report the AMD VSDB; on some RDNA4 parts the
++		 * firmware does not detect it. Fall back to the DRM-core parse
++		 * (drm_edid.c), which reads the AMD VSDB directly and already
++		 * populated connector->display_info.amd_vsdb.
++		 */
++		if (!freesync_capable &&
++		    connector->display_info.amd_vsdb.freesync_supported) {
++			amdgpu_dm_connector->min_vfreq =
++				connector->display_info.amd_vsdb.min_frame_rate;
++			amdgpu_dm_connector->max_vfreq =
++				connector->display_info.amd_vsdb.max_frame_rate;
++			if (amdgpu_dm_connector->max_vfreq -
++			    amdgpu_dm_connector->min_vfreq > 10)
++				freesync_capable = true;
++
++			connector->display_info.monitor_range.min_vfreq =
++				amdgpu_dm_connector->min_vfreq;
++			connector->display_info.monitor_range.max_vfreq =
++				amdgpu_dm_connector->max_vfreq;
++
++			drm_dbg_driver(adev_to_drm(adev),
++				       "VRR: drm-edid amd_vsdb fallback: fs_sup=1 min=%d max=%d\n",
++				       amdgpu_dm_connector->min_vfreq,
++				       amdgpu_dm_connector->max_vfreq);
++		}
++
++
+ 		/*
+ 		 * If AMD VSDB didn't provide a valid FreeSync range, fall back to
+ 		 * the HDMI 2.1 VRR capability parsed from the HF-VSDB.

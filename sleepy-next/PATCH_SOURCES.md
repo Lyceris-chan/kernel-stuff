@@ -54,3 +54,17 @@ Improvement Observed For gup_test". Not in next-20260825 (targets 7.4);
 applies cleanly. 8 patches, `2120`–`2127`, each with the original
 From:/Signed-off-by: (Rik van Riel) preserved. Marked RFC — re-evaluate when
 it lands upstream (7.4).
+
+## Added (local fix, 2026-08-26)
+
+- **`0040`** — drm/amd/display: fall back to DRM-core AMD VSDB FreeSync info.
+  The amdgpu-side `parse_hdmi_amd_vsdb()` relies on the DMUB/DMCU firmware to
+  report the AMD VSDB; on RDNA4 the firmware does not detect it, leaving
+  `vrr_capable=0` even for displays that advertise FreeSync via the AMD VSDB
+  (verified: modetest `vrr_capable: 0` on an HDMI display whose EDID has AMD
+  VSDB v2, Feature Caps 0x09, 48-120 Hz). `drm_edid.c` (patch `0050`) already
+  parses the AMD VSDB kernel-side into `connector->display_info.amd_vsdb`
+  (`freesync_supported`, `min/max_frame_rate`) for v1/v2/v3 — use it as a
+  fallback in `amdgpu_dm_update_freesync_caps()` when the firmware path found
+  nothing. Local fix (Sleepy + Claude-assisted), applies on top of the
+  VRR/ALLM series.
