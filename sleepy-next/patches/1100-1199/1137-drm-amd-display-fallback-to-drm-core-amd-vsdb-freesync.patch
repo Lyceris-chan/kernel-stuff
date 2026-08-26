@@ -8,19 +8,21 @@ vsdb_info.freesync_supported stays false and the connector reports
 vrr_capable=0 even though the display advertises FreeSync (AMD VSDB v1/v2).
 
 drm_edid.c (patch 0050) already parses the AMD VSDB directly and populates
-connector->display_info.amd_vsdb (freesync_supported, min/max frame rate)
-for v1/v2/v3. Use that as a fallback in amdgpu_dm_update_freesync_caps()
-when the firmware path found nothing, so HDMI FreeSync/VRR works regardless
-of firmware behaviour.
+connector->display_info.amd_vsdb (freesync_supported, min/max frame rate,
+freesync_vcp_code) for v1/v2/v3. Use that as a fallback in
+amdgpu_dm_update_freesync_caps() when the firmware path found nothing, and
+also populate sink->edid_caps.freesync_vcp_code + mccs_caps.freesync_supported
+so the later freesync_vcp_code/mccs reset in the same function does not undo
+the fallback result.
 
 Signed-off-by: Sleepy <sleepy@localhost>
 Assisted-by: Claude <noreply@anthropic.com>
 ---
 diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
-index 9a80c41095fc..6e7329744b68 100644
+index 9a80c41095fc..22d95de6b91b 100644
 --- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
 +++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
-@@ -3928,6 +3928,35 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
+@@ -3928,6 +3928,46 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
  			       vsdb_info.min_refresh_rate_hz,
  			       vsdb_info.max_refresh_rate_hz, freesync_capable);
  
@@ -45,6 +47,17 @@ index 9a80c41095fc..6e7329744b68 100644
 +				amdgpu_dm_connector->min_vfreq;
 +			connector->display_info.monitor_range.max_vfreq =
 +				amdgpu_dm_connector->max_vfreq;
++
++			/* The later freesync_vcp_code/mccs check (see the
++			 * freesync_capable = false reset below) would undo this;
++			 * satisfy it with the DRM-core VCP info so the
++			 * fallback result sticks.
++			 */
++			if (connector->display_info.amd_vsdb.freesync_vcp_code) {
++				sink->edid_caps.freesync_vcp_code =
++					connector->display_info.amd_vsdb.freesync_vcp_code;
++				sink->mccs_caps.freesync_supported = true;
++			}
 +
 +			drm_dbg_driver(adev_to_drm(adev),
 +				       "VRR: drm-edid amd_vsdb fallback: fs_sup=1 min=%d max=%d\n",
