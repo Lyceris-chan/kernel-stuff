@@ -134,6 +134,26 @@ tree** — the 7.3 base supersedes it (all 11 shared files unchanged; the
 squash is only meaningful on 7.2, where the amdgpu_dm split is absent).
 Series targets 7.4; isolated and easy to drop when it lands upstream.
 
+**Why `0107` stays in the 7.2 PKGBUILD series (and the ML HDMI can't replace
+it there):** the ML VRR/ALLM v4 patches 1/4, 3/4, 4/4 target
+`amdgpu_dm_connector.c` / `amdgpu_dm_freesync.c` — the 7.3 amdgpu_dm split.
+Verified against `repos/linux-7.2`: those files are absent (monolithic
+`amdgpu_dm.c`), so p1/p3/p4 fail `git apply --check`; only p2 (drm/edid,
+= our `0055`) applies. On 7.2, `0107` is the workable HDMI FreeSync/VRR
+path (dc_edid_parser exists on 7.2 too, wired into monolithic amdgpu_dm.c)
+and is proven good (work-item #5649: CachyOS 7.2 HDMI works where vanilla
+doesn't). Clean ML HDMI is a 7.3+ path — already adopted here.
+
+**Leo Li (`sunpeng.li@amd.com`) display fixes — in the base (verified):**
+402 commits from Leo Li in next-20260825, including the flip_done work that
+work-item #5616 references: "Fix flip-done timeouts on mode1 reset"
+(`82730dba0cf9`), "consolidate DCN vblank/flip handling onto
+vupdate_no_lock" (`c87e6635d2db`), "check GRPH_FLIP status before sending
+event" (`f64a9be56536`), "Exit idle optimizations before programming"
+(`8419331e64d9`). Not backported to the 7.2 series (7.3-window display
+refactor — same amdgpu_dm-split reason as HDMI); they arrive with the 7.3
+bump.
+
 ## FAAA / Phoronix month audit (290 articles, through 08-26)
 
 Scanned the full Phoronix month index (`/home/sleepy/Desktop/FAAA`) plus the

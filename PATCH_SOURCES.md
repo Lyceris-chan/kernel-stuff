@@ -453,6 +453,20 @@ after halt_activities, psp firmware.mutex skip, drm_client_resume outside
 reset sem); BO-bind for imported BOs (v5, `151460`); KFD mark queues as
 reset after full GPU reset (`151019`). All isolated commits, easy to drop.
 
+**0107 vs clean ML HDMI (verified 08-26):** the ML VRR/ALLM v4 amdgpu-side
+patches (1/4, 3/4, 4/4) target `amdgpu_dm_connector.c` / `amdgpu_dm_freesync.c`
+— absent from 7.2 (monolithic amdgpu_dm.c). Confirmed with `git apply
+--check` against `repos/linux-7.2`: p1/p3/p4 fail ("No such file"); only p2
+(drm/edid, = our `0055`) applies. So `0107` (dc_edid_parser-based, wired
+into monolithic amdgpu_dm.c) stays required on 7.2 — the clean ML HDMI is a
+7.3+ path, already adopted in the wannabe tree (Layer 4).
+
+**Leo Li (`sunpeng.li@amd.com`) display fixes — in the wannabe base, not
+the 7.2 series:** 402 commits in next-20260825, incl. flip-done timeouts on
+mode1 reset (`82730dba0cf9`), DCN vblank/flip consolidation onto
+vupdate_no_lock (`c87e6635d2db`), GRPH_FLIP status check (`f64a9be56536`).
+7.3-window display refactor (amdgpu_dm split) — not backported to 7.2.
+
 *Layer 4 — clean 7.3 HDMI (3 commits, `5ea4142645e4`):* the three amdgpu-side
 patches of the **HDMI 2.1 VRR + ALLM v4** series (amd-gfx ML, `150619`–
 `150623`): `SIGNAL_TYPE_HDMI_FRL` FreeSync + VTEM packet, HF-VSDB VRR-range

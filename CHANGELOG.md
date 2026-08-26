@@ -65,6 +65,13 @@ this hardware. See `WANNABE-7.3.md` for the full breakdown.
 
 - MARIE LRU **0.10.5 is current** (no newer from firelzrd or sirlucjan).
 - zstd `2100` already has the gcc<11.4 segfault workaround.
+- **0107 vs clean ML HDMI**: verified the ML VRR/ALLM v4 amdgpu-side
+  patches can't replace `0107` on 7.2 (they target the amdgpu_dm split,
+  absent there) — `0107` stays required on 7.2; clean ML HDMI is already
+  adopted in the wannabe 7.3 tree.
+- **Leo Li (sunpeng.li) display fixes** — confirmed in the wannabe base
+  (402 commits, incl. flip-done timeouts on mode1 reset + DCN vblank/flip
+  consolidation); arrive with the 7.3 bump, not backported to 7.2.
 - Work items tracked: **#5693** (RX 9070 XT VCN-unigate + SMU deadlock,
   no fix yet), #5649 (HDMI FRL blanking, RDNA3), #5671, #5656.
 - Candidates under review (not merged): 30-patch GPU TLB-invalidation
