@@ -361,6 +361,14 @@ source=(
   "patches/2100-2199/2117-mm-zswap-support-batch-writeback-in-shrink_memcg.patch"
   "patches/2100-2199/2118-mm-shmem-reject-page-aligned-fallocate-end-overflow.patch"
   "patches/2100-2199/2119-mm-memcontrol-avoid-false-sharing-between-vmstats-and-events.patch"
+  "patches/2100-2199/2120-mm-gup-mm-gup-break-out-gup-fill-pages-helper.patch"
+  "patches/2100-2199/2121-mm-gup-mm-gup-convert-follow-page-mask-to-return-a-long.patch"
+  "patches/2100-2199/2122-mm-gup-mm-gup-split-follow-page-pte-commit-out-of.patch"
+  "patches/2100-2199/2123-mm-gup-mm-gup-break-out-follow-one-pte-helper.patch"
+  "patches/2100-2199/2124-mm-gup-mm-gup-fill-the-pages-array-outside-the-pud-pmd-lock.patch"
+  "patches/2100-2199/2125-mm-gup-mm-gup-return-a-huge-page-s-full-count-from.patch"
+  "patches/2100-2199/2126-mm-gup-mm-gup-walk-multiple-PTEs-per-follow-page-pte-call.patch"
+  "patches/2100-2199/2127-mm-gup-mm-gup-batch-contiguous-same-folio-PTEs-into-one.patch"
   "patches/2200-2299/2200-7.2-nap-v0.5.0.patch"
   "patches/9000-9099/9001-drm-amdgpu-gfx12-drop-all-BUG-s.patch"
   "patches/9000-9099/9002-drm-amdgpu-gfx12.1-drop-all-BUG-s.patch"
@@ -968,7 +976,7 @@ for _p in "${pkgname[@]}"; do
     }"
 done
 
-b2sums=('7a7db03df6b471f8c79b3857a9111d562ee545f4271135ef800ee9d8a9052362fd63e202831209039b3e3d58e6395df2337771a29f8e11ddba863b300477882c'
+b2sums=('bc52438a4ed5dc71334ef07b0046da07eca032e86cc693a095eb9ac6618357c93f32e5bc5b0e38255f2dbecdf576a5e1231a8bd9f6e8c0ac0675b1c9c4308c9c'
         '23f570909d870d709e9b9f414d8a9f543da492085c0ed457e6896d995e5cd608f7e45f3bdc96a5f09b595fb04e24babd6b9811ed03ea8d9598996aea0e890a9b'
         'a7cefe36f18ea4390b41849e604ad6257cccdbf25c2af380d2353397858cba21f6eb02b0774ebc24ec26639539a8858a29262b02edb60eba5736cd172993480f'
         '458b2cb2413befbbd76c22bd541da17694965d535b486df65fc6b5c470a8b06ddbb0224f25dd966d53210de2d9559da04b7822f688e5f0034ec0094d2f276be8'
@@ -1107,6 +1115,14 @@ b2sums=('7a7db03df6b471f8c79b3857a9111d562ee545f4271135ef800ee9d8a9052362fd63e20
         'd83dcda9e2047e98a2d85fc1aa491ea2992bc8d994435216d4d06168c50b6c5ff52b362febe2a3ef932e1b78557d8245be076d0fedab4a6a63d6f8ed270547f5'
         '7c61f5a26b9381c0b78f0c5741549ecf74d3839a750da84e933e0ae86af9a822dd96d3baa61e6d7d87fc273cf8e3092c5b6def35256c2d1a7fc10dd05d1276c9'
         '202837df1d30fd3d6c61a8efe56ace4927cbbec6b835a191d53bc553e9cb75ee9c889849bc3626bf758127ebefa8fcef388921de1f9bb7d5de8754adb2048d38'
+        'a745db752d2586475d373cb29e64b4f42f6e305b4b3e588efbce955491429c73b3d16c426e76118b1499bbfb4a2159192f3950ed06d309064eb28750a1d6e6aa'
+        '8820c684d4f21c9c74729a518f187334b817b8059436aa808e423533a67a6b752a93df4e79c200307b29635f0de393f6749aaa52cfc20e28957f759b4adb6ce0'
+        '877dc1eebcaec113969ea45471b63e0339066a270da667b5c1aa1578e26aa01c7ec34e1cb4c436565553388e0ba04add10bf3540fe4ba7e11b24aa8a8d8ccc4f'
+        '462ac8db18e5755331a47e2c4d8ae24bb2b4042b098bad70f2814ebb97ca10d6c888bc0c75741000a36772c1247b22d5af569b9e756ef7a5558df8c163d5e769'
+        '98b30de1e48e6baca5f29d293f2f89e3eedd4882e8091ace78f7b2a1ae9cb2cc2e3189b0e37c5e212e7df4bf97d840130bb1bed812bfb6e978ac48d0bb8019eb'
+        'e5330139599a17003bdc3508190e71b3875e354ea6f345d24104ff3449724fab9638f2e431ed0e86c0d987733431da0594bec323271c135e8c6daacf5c7eeb69'
+        'a590f6140a02f5cbee18f8ea91ec079e965b5d06a9bdf09c85940f6380fbd6d8a29cb87f846fe05985bb8a256177dd27d3d2a6a1cca9c296cd1c0b3e7ce01985'
+        'c91351632390e03d5b874ce5180e07c54c892592180c7d9bf14175e3874762cad385e60f5f77aae24a58bcd1c1a380e40598a52d0dc085fe04f5c63805c68048'
         'dc4e862e8f9fa7e8ead895908459757afd1027c24b960ae3d289a7212e29575bce3ce4627d5fd73edf211ee162dfa545e1642c5b16e8156f3dce50af8ef3c256'
         '4882cc909f5ee8e4c974f3849e4446656895fb8c5f0c10fa0992e5e7c7ae6ce1ded523326bb51c91ff161d15335968434fabb44cf822cb17fd6364c4d8eb24c5'
         '8a9f7682c746fd53536798e7110836059f982b3daa6b95a767249fe9888a3105d0be3dc9917924aba9bba45f0538436a9e3f67f5d958b63ee9288f391f3507ac'

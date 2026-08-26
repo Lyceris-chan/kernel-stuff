@@ -44,3 +44,13 @@ patches that do not apply cleanly to next-20260825 (e.g. MARIE) are skipped
 entirely, never half-applied. The VRR/ALLM series is verified to apply on
 next-20260825 + the 0050s, with the HF-VSDB VRR fallback and
 `drm_connector_attach_vrr_capable_property` present in the built kernel.
+
+## Added (Phoronix 08-11 WIP — RFC, 7.4-target)
+
+The `mm/gup` follow_page_mask() batching series (Rik van Riel, Meta; RFC v3,
+lkml `20260811025157.1632867-1-riel@surriel.com`) — up to 12.8× in gup_test on
+mTHP paths (GPU userptr, io_uring, VMA walkers). Phoronix 08-11 "Up To 12.8x
+Improvement Observed For gup_test". Not in next-20260825 (targets 7.4);
+applies cleanly. 8 patches, `2120`–`2127`, each with the original
+From:/Signed-off-by: (Rik van Riel) preserved. Marked RFC — re-evaluate when
+it lands upstream (7.4).
