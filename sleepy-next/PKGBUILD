@@ -241,6 +241,7 @@ source=(
   "patches/0050-0099/0050-drm-edid-Parse-AMD-VSDB-for-FreeSync-refresh-range.patch"
   "patches/0050-0099/0055-drm-edid-parse-HDMI-2.1-gaming-ALLM-VRR-caps-from-HF-VSDB.patch"
   "patches/0050-0099/0058-drm-amd-display-restore-FRL-cap-on-non-destructive-HDMI-link.patch"
+  "patches/0050-0099/0059-drm-amd-display-merge-HDMI-VRR-ALLM-v4-amdgpu-side.patch"
   "patches/0101-0113/0101-cachy-bbr3.patch"
   "patches/0101-0113/0102-cachy-kbuild.patch"
   "patches/0101-0113/0103-cachy-cpu-isa.patch"
@@ -984,6 +985,7 @@ b2sums=('ca95542d6bc5786f1b3ab5ca992d264bf3691c5593963895721b000e496c9d8d0dd7cd4
         'b866c2e213614bff04f852e67c2762e6ca28b402dd43142df61192d516bedb7b6d8a7a647870e1121461375735a5e84acae96dc03059347fbf405dddbefd1212'
         'f61685cae107b07fd76a108f80cb0452378c672180a98dd49cf0707a7a6013162f20c1f893f080add632d8ad3fe1e0667db1a4d494f16bd2bd980eee506bbf91'
         'bb8068b44b22abd2316e41425cc250e517bcd76b52885a6ab81de8129f1a82bb93e6f048d521325666cbddb23f32cf74038abc577d1fbe6a20e655dc3f852137'
+        '8d6d67fa51c6b745ac23df41e3ec99f3a7ef772f8b23a938162ba2cf7b371ae04daac92feb2f40bdc3435866a695c54204165ad0315037b101e4a77a8e8e8ab3'
         '1cb6e0ae6f57e9eca2067594ce83c005c6bc49e6a3d7fb11aa1aeee12204691304da0483e5be3c20b233c132a54831ffa587765599634a5ad123489e99982a58'
         'ee5f2c4aead1f2fc8d8096ae2a953d4c45d4c79de29e0578da543767a2d96664f903f043af36cf481adc13f203e2eca8fb616c26257e6cce5b3cae26b1d46ddf'
         'fdc7fc1d942be4fe8dadcb228b7f9c02273eaec91631ff609a07722b74b1db64828e144856e01a8ffd039762d1970a7ec511a3d240481544c570592914573b69'
