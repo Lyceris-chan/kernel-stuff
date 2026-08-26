@@ -84,6 +84,20 @@ this hardware. See `WANNABE-7.3.md` for the full breakdown.
   DRM fair-policy fix (FIFO default), k10temp per-CCD (EPYC-only), reflex
   governor (needs cpufreq API port), work-items #5616/#4753 (no provenance).
 
+### Fixed (2026-08-26) — DCN401 "box/square" scanout artifact
+
+The fixed small square over app windows (absent from screenshots, color tracks
+the content behind it) on this base was caused by DCN4 Idle Power States
+pipe-gating. `hubp2_is_flip_pending()` returns `false` when `hubp->power_gated`,
+so the 7.3 VUPDATE_NO_LOCK flip-event handler (which replaced the HW-latch
+GRPH_PFLIP path) delivers flip completion before HW latches → the compositor
+re-paints a buffer the display is still scanning → a fixed content-tracking
+region. Fixed with `amdgpu.dcdebugmask=0x800` (`DC_DISABLE_IPS`) in the built-in
+CMDLINE (PKGBUILD). A/B verified: `0x20000` (FAMS) and `0x8` (clock gating) did
+not help; `0x800` (IPS off) fixed it. Same class as AMD drm/amd work item
+#5570 (Navi 21, closed 2026-08-25). Re-evaluate when a proper DCN401
+flip-pending fix lands upstream.
+
 ---
 
 ## [7.2.0-2-sleepy] — 2026-08-19 (sweep candidates merged)

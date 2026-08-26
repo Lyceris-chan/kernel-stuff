@@ -181,7 +181,7 @@ _minor=0
 _rcver=
 pkgver=20260825
 _tagrel=1
-pkgrel=3
+pkgrel=5
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -326,8 +326,11 @@ source=(
   "patches/1100-1199/1137-drm-amd-display-Bounds-check-connector-index-in-MST-get_modes.patch"
   "patches/1100-1199/1137-drm-amd-display-fallback-to-drm-core-amd-vsdb-freesync.patch"
   "patches/1100-1199/1138-drm-amd-display-fix-seamless-mode-switch-for-HDR-to-SDR.patch"
+  "patches/1100-1199/1138-drm-amd-display-pull-colorops-into-state-when-recreating-a-plane.patch"
+  "patches/1100-1199/1139-drm-amd-display-fix-missing-blend-mode-prop-warning.patch"
   "patches/1100-1199/1139-drm-amd-display-resize-MST-HDCP-arrays-to-32.patch"
   "patches/1100-1199/1140-drm-amd-display-clamp-force_min_dcfclk-to-dcn42b-range.patch"
+  "patches/1100-1199/1140-drm-amd-display-fall-back-to-overlay-cursor-on-dcn4x.patch"
   "patches/1200-1299/1200-cpufreq-amd-pstate-Document-missing-kernel-doc-mem.patch"
   "patches/1200-1299/1201-cpufreq-amd-pstate-Update-cppc_req_cached-before-w.patch"
   "patches/1200-1299/1202-cpufreq-amd-pstate-Add-per-core-EPP-boost-for-rec.patch"
@@ -628,9 +631,17 @@ EOF
     # amdgpu.aspm=0 / amdgpu.runpm=0: conservative amdgpu-side stopgaps for the
     # silent gaming freeze (SMU IF mismatch 0x2e vs 0x33, !5538) — no GPU ASPM or
     # BACO/runtime-PM power transitions. DPM stays on so clocks still downclock.
+    # amdgpu.dcdebugmask=0x800 = DC_DISABLE_IPS: disables DCN4 Idle Power States.
+    # On DCN401, IPS/DPG pipe-gating makes dc_get_flip_pending_on_otg()'s
+    # hubp2_is_flip_pending() read return false (hubp->power_gated) while a flip
+    # is still pending, so the VUPDATE_NO_LOCK handler delivers the flip event
+    # before HW latches → the compositor re-paints a buffer still being scanned →
+    # a fixed content-tracking square over app windows (the sleepy-next "box",
+    # matches AMD drm/amd work item #5570 class). Verified fixed 2026-08-26 with
+    # dcdebugmask=0x800 (0x20000 FAMS and 0x8 clock-gating did NOT help).
     # Appended to the bootloader params (CMDLINE_OVERRIDE is off); boots this kernel
     # with ASPM off regardless of the platform/BIOS default.
-    scripts/config -e CMDLINE_BOOL --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0" -d CMDLINE_OVERRIDE
+    scripts/config -e CMDLINE_BOOL --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0 amdgpu.dcdebugmask=0x800" -d CMDLINE_OVERRIDE
     scripts/config -e DEBUG_KERNEL -d DEBUG_INFO_NONE -d DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT -e DEBUG_INFO_DWARF5 -e DEBUG_INFO_BTF
     scripts/config -d SECURITY_APPARMOR -d SECURITY_APPARMOR_DEBUG -d SECURITY_APPARMOR_INTROSPECT_POLICY
     scripts/config -d AUDIT -d AUDITSYSCALL -d AUDIT_ARCH -d SLUB_DEBUG
@@ -1081,8 +1092,11 @@ b2sums=('bc52438a4ed5dc71334ef07b0046da07eca032e86cc693a095eb9ac6618357c93f32e5b
         '0eced8df6c40f49c572184aa1a888461ee495db3bd147f2772374ebfc517337ea0a88e0b4d6fbcee6259e1cd04575a0a330da3cc02f23aab96ab8eda2b08230a'
         'abe62b4dadc481d6b1144a579d95c035d8b3d18f0ff5ffaf966c7cd8652242136183c0809210f122220905eda927e6adba524b17138a6e1e3ed785b0d43d62e5'
         'a2d40fbc155534aaca840d5fa6f19f90bc4a39190e55edec06209d9aecae9c3095a52604d3b9c6c3038a0dd903676be913c1db7d0f7493e8cac34fb863e7a0ae'
+        'a1442892cc6ed1f8334beeabc418a5532cf1e9a8626f3e0ecbb35792808302b06e4266291849351a6a95b06a5c10aa7ec8787fe096d89688cc9bae30c7498240'
+        'eb0169140aa96b826a21b92fc57e2ff222b9f6bd5f33619257ab6e07e48597c54cc01fc5af995b31b2fd5d2698c36ce73b5a4c30ba9a8432a8340c8bbaf046df'
         '9732479235914fb6f4b125d9bfcb5656a9b06c117bf40927e8a09ab3bd771f5d0474e07525ba1211909246d1c8da9b2b01ea4db20ae442462dd366473337bbd6'
         'fa40e8b06e0aaa0b2a27d1acf93dd6a9024728ee395a85878bafa05ad736950de70a20aed0033e76c26e12360f018d5ae58d647b055d8deb35f874da4ed69dcd'
+        '1094af318d7d6657d4e4acf67083fabe478281105b175c229a8f48bc248227cde1ae44e38dccec51e579f3841180a9b2523e9eecf39f7e125d9115794cedf37c'
         'aad86c7d3e29956976634971ed46663e67365517b69e35e7cce3e135bcc855c324187dd691630af28a5da7045e6766d52a3b2392726b0bc8587a221f9eedca48'
         'e9d464ebf525cd8d93d48f1cbedea0197bd9d0142085da7d83ec3dfda0174483a0fea4077055fd7d1ad9180563dc6dfb77e4f52f9bcb023b7c7d7c9fb5c39ece'
         '9d3e36dbc5c9c5342d2991c4665278ed075073196251e59280bd12f1d6812a37d31db58f5cb978b926e2dcd0a32365960a414b69d10f463bd8f68cedbb4bb6ae'

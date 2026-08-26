@@ -68,3 +68,16 @@ it lands upstream (7.4).
   fallback in `amdgpu_dm_update_freesync_caps()` when the firmware path found
   nothing. Local fix (Sleepy + Claude-assisted), applies on top of the
   VRR/ALLM series.
+
+## Fixed (cmdline, 2026-08-26) — DCN401 "box/square" artifact
+
+Not a patch: `amdgpu.dcdebugmask=0x800` (`DC_DISABLE_IPS`) added to the
+built-in CMDLINE in `PKGBUILD`. On DCN401, IPS/DPG pipe-gating sets
+`hubp->power_gated`, making `hubp2_is_flip_pending()` return `false` while a
+flip is still pending → the VUPDATE_NO_LOCK flip-event handler delivers the
+completion before HW latches → the compositor re-paints a buffer still being
+scanned → a fixed content-tracking square over app windows (the sleepy-next
+"box", absent from compositor screenshots). Matches AMD drm/amd work item
+#5570 class. A/B verified 2026-08-26: `0x20000` (FAMS) and `0x8` (clock
+gating) did not help; `0x800` (IPS off) fixed it. Re-evaluate when a proper
+DCN401 flip-pending fix lands upstream.
