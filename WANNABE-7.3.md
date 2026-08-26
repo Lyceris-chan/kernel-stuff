@@ -21,6 +21,8 @@ History (bottom → top):
    WIP, Rik van Riel).
 5. `5ea4142645e4` — **3 upstream HDMI 2.1 VRR/ALLM v4 commits** (clean
    HDMI, amd-gfx ML).
+6. `cd4af3bd9966`, `9d45255b110d`, `89caac2e1573` — **3 ML WIP merges**
+   (userq GPU-reset 5-patch + BO-bind + KFD queues-reset).
 
 ## What the base already contains
 
@@ -96,6 +98,24 @@ applies cleanly to next-20260825 (8 patches, `git am`). Benchmark (gup_test
 a wider series) — expect upstream revisions to supersede these commits; the
 wannabe tree marks the merge point so they're easy to drop.
 
+## ML WIP merges (commits `cd4af3bd9966`, `9d45255b110d`, `89caac2e1573`)
+
+Additional amd-gfx ML series (08-24/08-25) that apply cleanly to
+next-20260825, merged as isolated commits so they're easy to drop when they
+land upstream:
+
+- **userq GPU-reset crash + lockdep 5-patch** (Vitaly Prosyak, `151398`–
+  `151403`): reserve a dma_resv slot before adding the eviction fence,
+  cancel `hang_detect_work` before `userq_mutex` (deadlock), take the reset
+  lock after `halt_activities`, skip `firmware.mutex` in `psp_resume` during
+  GPU reset, move `drm_client_dev_resume` outside `reset_domain->sem`.
+- **BO-bind for imported BOs** (v5, `151460`): `amdgpu_evf_mgr_attach_fence`
+  validates imported (dmabuf) BOs even when the eviction fence is signaled,
+  so VMs using user queues can bind them.
+- **KFD mark queues as reset** (`151019`): after a full GPU reset the MES
+  queue table is wiped; mark queues as reset so teardown doesn't try to
+  remove them from MES again (gfx1201 is MES-based).
+
 ## Clean 7.3 HDMI (commit `5ea4142645e4`) — upstream VRR/ALLM, no CachyOS fluff
 
 The base (`next-20260825`) carries the clean upstream 7.3 HDMI path:
@@ -135,9 +155,27 @@ amd-gfx and dri-devel MLs, work-items tracker, sirlucjan, and firelzrd:
   #5649 (HDMI FRL blanking on 4k TVs — CachyOS 7.2 known-good, RDNA3),
   #5671 (RX9070XT link-2 enable fail), #5656 (HDMI IEC958 passthrough).
 - **Candidates not merged (review)**: amd-gfx `[PATCH 00/30] Rework GPU TLB
-  invalidation` (gmc12 MES/SDMA pasid TLB — 30 patches, v1, major rework of
-  our TLB series); dri-devel MMIO-TLB fallback RFC v3 (S4 KIQ-wedge); userq
-  GPU-reset crash/lockdep 5-patch (`151398`); `151407` keep-userq-manager.
+  invalidation` (Alex Deucher, gmc12 MES/SDMA pasid TLB — 30 patches, v1,
+  major rework that supersedes our TLB series; defer to the 7.4 window,
+  watch `agd5f tlb_inv_rework`); dri-devel MMIO-TLB fallback RFC v3 (S4
+  KIQ-wedge) — **dropped by its author**; `151407` keep-userq-manager —
+  **rejected by Christian König**.
+
+## Repo + work-items re-check (08-26)
+
+- **Repos**: linux-next still at `next-20260825` (our base is current);
+  drm-next HEAD 08-24 and linux-pm HEAD 08-18 are in base;
+  amd-staging-drm-next tip `75a5e1b6b` (08-12) is exactly our Layer-1
+  cherry-pick — no newer on-target commits (post-08-12 content is GC 12.1 /
+  NPS / datacenter, off-target for gfx1201).
+- **Work items re-scan**: nothing new actionable. The **flip_done timed out
+  on RX 9070 XT** cluster (#5616, #5625, #5647, #5696) is an open bug — the
+  amd-drm-next-7.3 merges already carry the DCN flip_done/atomize fixes.
+  **#5693** (VCN ungate + SMU deadlock → Mode 1 reset, created 08-25) still
+  has no referenced fix — tracked. #5695 (DCN401 RA24 format), #5671 (link-2
+  enable) — open, no fixes.
+- **sirlucjan**: new `zstd-dev-patches-v2` (same merge as our `2100`), aufs
+  + handheld (off-target). No 7.3 dir yet.
 - **Off-target**: menu-governor 5× wakeup (Intel Xeon; we run NAP),
   RTL8261C/D 5 GbE (RTL8125B/r8169), DRM fair-policy fix (FIFO default),
   k10temp per-CCD (EPYC only), UALink (datacenter), aufs/handheld

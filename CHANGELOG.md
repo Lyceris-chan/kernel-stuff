@@ -56,6 +56,10 @@ this hardware. See `WANNABE-7.3.md` for the full breakdown.
   equals our additive `0055`. **The CachyOS `0107` hdmi squash contributes
   nothing to this tree** (base supersedes it via `dc_edid_parser` +
   `update_freesync_caps` + FRL fixes) — clean upstream, no CachyOS fluff.
+- **ML WIP merges** (amd-gfx, 08-24/08-25): userq GPU-reset crash + lockdep
+  5-patch (Vitaly Prosyak — dma_resv slot, hang_detect_work deadlock,
+  reset-lock order, psp resume), BO-bind for imported user-queue BOs (v5),
+  KFD mark queues as reset after full GPU reset. All isolated commits.
 
 ### Verified during the FAAA / month audit
 

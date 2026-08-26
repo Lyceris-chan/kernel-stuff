@@ -445,6 +445,14 @@ on mTHP; applies cleanly to next-20260825 (`git am`, no conflicts). Marked RFC
 isolated so it's easy to drop. Reverses the 08-15 "Reviewed, not taken"
 verdict **for the wannabe tree only**; still not part of the PKGBUILD series.
 
+*Layer 5 — ML WIP merges (3 commits, `cd4af3bd9966`, `9d45255b110d`,
+`89caac2e1573`):* amd-gfx ML series (08-24/08-25) that apply cleanly —
+userq GPU-reset crash + lockdep 5-patch (`151398`–`151403`, Vitaly Prosyak:
+dma_resv slot reserve, hang_detect_work cancel-before-mutex, reset-lock
+after halt_activities, psp firmware.mutex skip, drm_client_resume outside
+reset sem); BO-bind for imported BOs (v5, `151460`); KFD mark queues as
+reset after full GPU reset (`151019`). All isolated commits, easy to drop.
+
 *Layer 4 — clean 7.3 HDMI (3 commits, `5ea4142645e4`):* the three amdgpu-side
 patches of the **HDMI 2.1 VRR + ALLM v4** series (amd-gfx ML, `150619`–
 `150623`): `SIGNAL_TYPE_HDMI_FRL` FreeSync + VTEM packet, HF-VSDB VRR-range
