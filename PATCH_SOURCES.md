@@ -416,7 +416,7 @@ needed): amd-drm-next-7.3-2026-08-19 merge, ~30 MM commits (MGLRU/vmscan/zram/
 zsmalloc/zswap), amd-pstate dynamic-EPP + CPPC set, sched-ext fixes, sch_cake
 fix, dmemcg. These arrive with the real 7.3 bump.
 
-**Merged on top — three layers, committed on the worktree branch `wannabe-7.3`:**
+**Merged on top — four layers, committed on the worktree branch `wannabe-7.3`:**
 
 *Layer 1 — upstream merges (18 commits, `759b7fb8fbe9`):*
 - 17 amd-staging-drm-next: KFD CRIU restore_mqd NULL guard (`75a5e1b6b`),
@@ -444,6 +444,17 @@ on mTHP; applies cleanly to next-20260825 (`git am`, no conflicts). Marked RFC
 (v4 exists) — expect upstream revisions to supersede; the merge point is
 isolated so it's easy to drop. Reverses the 08-15 "Reviewed, not taken"
 verdict **for the wannabe tree only**; still not part of the PKGBUILD series.
+
+*Layer 4 — clean 7.3 HDMI (3 commits, `5ea4142645e4`):* the three amdgpu-side
+patches of the **HDMI 2.1 VRR + ALLM v4** series (amd-gfx ML, `150619`–
+`150623`): `SIGNAL_TYPE_HDMI_FRL` FreeSync + VTEM packet, HF-VSDB VRR-range
+fallback, `ALLM_Mode` in HF-VSIF (Fangzhi Zuo, HDMI 2.1 §7.6.6). The drm/edid
+part (`150619`) equals our additive `0055`. **The CachyOS `0107` hdmi squash
+contributed nothing to this tree** — the 7.3 base supersedes it (verified:
+all 11 shared files unchanged from base; base has `dc_edid_parser` +
+`amdgpu_dm_update_freesync_caps` in the split connector file + FRL fixes
+incl. old `1113`/`1119`). 0107 stays in the 7.2 PKGBUILD series (needed there:
+the amdgpu_dm split is absent on 7.2 — see work-item #5649).
 
 **Phoronix month check (through 08-25) — verified already in base:** SMP-IPI
 preemption rework (ByteDance/Chuyi Zhou, `smp-core-2026-08-17`: task-local IPI

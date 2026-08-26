@@ -19,6 +19,8 @@ History (bottom → top):
 3. `4834e3546e26` — **69 sleepy-kernel additive patches** (CachyOS + local).
 4. `7afdec79e9f0 … 6c2092bc8448` — **8 RFC gup-batching commits** (Phoronix
    WIP, Rik van Riel).
+5. `5ea4142645e4` — **3 upstream HDMI 2.1 VRR/ALLM v4 commits** (clean
+   HDMI, amd-gfx ML).
 
 ## What the base already contains
 
@@ -94,20 +96,52 @@ applies cleanly to next-20260825 (8 patches, `git am`). Benchmark (gup_test
 a wider series) — expect upstream revisions to supersede these commits; the
 wannabe tree marks the merge point so they're easy to drop.
 
-## Phoronix check result (month through 08-25)
+## Clean 7.3 HDMI (commit `5ea4142645e4`) — upstream VRR/ALLM, no CachyOS fluff
 
-Scanned the full month's kernel articles for on-target items:
+The base (`next-20260825`) carries the clean upstream 7.3 HDMI path:
+`dc_edid_parser` (DC-level EDID parser, used by `amdgpu_dm_connector.c`),
+`amdgpu_dm_update_freesync_caps()` in the split connector file, freesync
+module HDMI support, and the FRL fixes from the `amd-drm-next-7.3-2026-08-06`
+pull (FRL rate/FFE caps, gated FRL polling — incl. our old `1113`/`1119`).
+On top we merged the **HDMI 2.1 VRR + ALLM series v4** (amd-gfx ML,
+2026-08, `150619`–`150623`), the three amdgpu-side patches that apply
+cleanly: `SIGNAL_TYPE_HDMI_FRL` FreeSync + VTEM packet (Fangzhi Zuo),
+HF-VSDB VRR-range fallback when the AMD VSDB has none, and `ALLM_Mode` in
+the HF-VSIF when Gaming-VRR is active (HDMI 2.1 §7.6.6). The drm/edid part
+(`150619`) is already present as our additive `0055` (functionally identical
+to v4 2/4). The **CachyOS `0107` hdmi squash contributed nothing to this
+tree** — the 7.3 base supersedes it (all 11 shared files unchanged; the
+squash is only meaningful on 7.2, where the amdgpu_dm split is absent).
+Series targets 7.4; isolated and easy to drop when it lands upstream.
+
+## FAAA / Phoronix month audit (290 articles, through 08-26)
+
+Scanned the full Phoronix month index (`/home/sleepy/Desktop/FAAA`) plus the
+amd-gfx and dri-devel MLs, work-items tracker, sirlucjan, and firelzrd:
 
 - **In base (verified in tree)**: SMP-IPI preemption (17 & 22 Aug),
   `flush_tlb_multi` preemption (22 Aug), TTM-aggressive (07 Aug),
   amd-pstate dynamic-EPP per-policy + epp_boost (28 & 31 Jul),
-  sched-ext feature-complete (22 Aug), zsmalloc/rmap_walk_ksm MM (19 Aug).
-- **WIP merged** (this tree): `follow_page_mask()` batching (11 Aug).
-- **Off-target / not applicable**: menu-governor 5× wakeup (Intel Xeon; we
-  run the NAP governor), RTL8261C/D 5 GbE (we have RTL8125B/r8169), DRM
-  scheduler fair-policy fix (we default FIFO; upstream reverted fair),
-  HDMI 2.1 VRR/ALLM (missed 7.3, WIP — deferred), k10temp per-CCD
-  (EPYC Zen 5 only).
+  sched-ext feature-complete (22 Aug), zsmalloc/rmap_walk_ksm MM (19 Aug),
+  SMU14 fixes + OD-PPT (`93bd6de5518d`), AMD VSDB parse + FRL fixes.
+- **WIP merged** (this tree): `follow_page_mask()` batching (11 Aug),
+  HDMI 2.1 VRR/ALLM v4 (07-30→08-26 series).
+- **MARIE LRU**: **0.10.5 is current** — firelzrd repo at the same
+  `55d2c27` commit, sirlucjan has no 7.3 dir yet. No update.
+- **zstd**: our `2100` already includes the gcc<11.4 segfault workaround;
+  sirlucjan's new `zstd-dev-patches-v2` is the same merge reorganized.
+- **Work items worth tracking**: **#5693** (RX 9070 XT VCN-unigate + SMU
+  deadlock → Mode 1 reset on hw video decode, created 08-25 — no fix yet),
+  #5649 (HDMI FRL blanking on 4k TVs — CachyOS 7.2 known-good, RDNA3),
+  #5671 (RX9070XT link-2 enable fail), #5656 (HDMI IEC958 passthrough).
+- **Candidates not merged (review)**: amd-gfx `[PATCH 00/30] Rework GPU TLB
+  invalidation` (gmc12 MES/SDMA pasid TLB — 30 patches, v1, major rework of
+  our TLB series); dri-devel MMIO-TLB fallback RFC v3 (S4 KIQ-wedge); userq
+  GPU-reset crash/lockdep 5-patch (`151398`); `151407` keep-userq-manager.
+- **Off-target**: menu-governor 5× wakeup (Intel Xeon; we run NAP),
+  RTL8261C/D 5 GbE (RTL8125B/r8169), DRM fair-policy fix (FIFO default),
+  k10temp per-CCD (EPYC only), UALink (datacenter), aufs/handheld
+  (sirlucjan new — off-target).
 
 ## Deferred (needs rebase / review / provenance)
 
@@ -117,12 +151,12 @@ Scanned the full month's kernel articles for on-target items:
 - **Work-items #5616 / #4753**: DCN4 flip_done Atomize-GLOBAL_SYNC_STATUS
   fix (WIP tracker attachment, 7.2-based, needs rebase) and FAMS2
   mclk-stutter workaround (community, no upstream provenance).
-- **HDMI 2.1 VRR/ALLM** (AMD, amd-gfx ML): will miss 7.3; re-evaluate when
-  they land.
-- **ML-only series** (08-19..08-25): userq GPU-reset crash/lockdep 5-patch,
-  KFD SDMA oversubscription GFX12, userq UAPI query/LIST/MODIFY — mostly
-  superseded by the amd-staging merges or awaiting v2+; cherry-pick the
-  on-target pieces when they land upstream.
+- **`mm/gup` follow_page_mask v4** and **GPU TLB invalidation rework
+  (`151442`)** — bigger series, review before merging.
+- **ML-only series** (08-19..08-26): userq GPU-reset crash/lockdep 5-patch
+  (`151398`), KFD SDMA oversubscription GFX12, userq UAPI query/LIST/MODIFY
+  — mostly superseded by the amd-staging merges or awaiting v2+; cherry-pick
+  the on-target pieces when they land upstream.
 
 ## Rebuild instructions
 

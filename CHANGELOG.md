@@ -50,13 +50,27 @@ this hardware. See `WANNABE-7.3.md` for the full breakdown.
   12.8× in gup_test on mTHP paths (GPU userptr / io_uring / VMA walkers
   benefit). Applies cleanly to next-20260825; marked RFC (v4 exists), expect
   upstream revisions to supersede.
+- **Clean 7.3 HDMI — upstream HDMI 2.1 VRR + ALLM v4** (amd-gfx ML): the
+  three amdgpu-side patches (`SIGNAL_TYPE_HDMI_FRL` FreeSync + VTEM,
+  HF-VSDB VRR-range fallback, ALLM_Mode in HF-VSIF). The drm/edid part
+  equals our additive `0055`. **The CachyOS `0107` hdmi squash contributes
+  nothing to this tree** (base supersedes it via `dc_edid_parser` +
+  `update_freesync_caps` + FRL fixes) — clean upstream, no CachyOS fluff.
+
+### Verified during the FAAA / month audit
+
+- MARIE LRU **0.10.5 is current** (no newer from firelzrd or sirlucjan).
+- zstd `2100` already has the gcc<11.4 segfault workaround.
+- Work items tracked: **#5693** (RX 9070 XT VCN-unigate + SMU deadlock,
+  no fix yet), #5649 (HDMI FRL blanking, RDNA3), #5671, #5656.
+- Candidates under review (not merged): 30-patch GPU TLB-invalidation
+  rework (`151442`), MMIO-TLB fallback RFC v3, userq-reset 5-patch.
 
 ### Deferred (off-target or WIP)
 
 - Menu-governor wakeup fix (Intel Xeon; we run NAP), RTL8261C/D (not our NIC),
-  DRM fair-policy fix (FIFO default), k10temp per-CCD (EPYC-only), HDMI 2.1
-  VRR/ALLM (missed 7.3), reflex governor (needs cpufreq API port), work-items
-  #5616/#4753 (no provenance).
+  DRM fair-policy fix (FIFO default), k10temp per-CCD (EPYC-only), reflex
+  governor (needs cpufreq API port), work-items #5616/#4753 (no provenance).
 
 ---
 
