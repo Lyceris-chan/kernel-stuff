@@ -9,6 +9,68 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.2.0-7-sleepy-next-20260827] — 2026-08-27
+
+Updated the sleepy-next preview kernel to linux-next `next-20260827` and ran a
+thorough sweep across every source we track — the lkml archives, the AMD
+display and power-management mailing lists, the AMD driver bug tracker, and
+the drm-next / amd-staging / drm-misc git trees. That surfaced **23 new
+patches** relevant to this hardware, all merged into this release:
+
+### Added
+- **Better CPU frequency control (15 patches).** A rework of the ACPI CPPC
+  path that `amd-pstate` uses on Zen 4. It validates the firmware-provided
+  tables, reports write errors instead of silently dropping them, serializes
+  update commands, and fixes a batch of register-width and memory-lifetime
+  bugs. The result is more robust and predictable CPU frequency scaling.
+- **Faster zstd (3 patches).** The kernel's zstd now probes for the CPU's
+  BMI2 instructions once instead of on every compression context — a small
+  win for zram/zswap startup and use.
+- **More robust displays (3 patches).** The AMD display driver no longer
+  tries receiver power control over a dead AUX channel, closes the DDC line
+  when an I2C setup fails, and falls back to software I2C when the hardware
+  engine stumbles. Steadier EDID/display detection on HDMI.
+- **A boot-time fix (1 patch).** The early graphics init no longer runs an
+  SR-IOV-only workaround on normal desktop cards.
+- **sched-ext tweak (1 patch).** Skip per-CPU allocation for built-in
+  schedulers — a small cleanup for the sched-ext subsystem.
+
+### Changed
+- Bumped the linux-next base from `next-20260826` to `next-20260827` (a
+  one-day refresh; no AMD display changes in that delta).
+
+## [7.2.0-6-sleepy-next-20260826] — 2026-08-26
+
+### Fixed
+- **The "box/square" artifact is now permanently fixed.** We baked the
+  fix into the kernel itself, so it no longer depends on a boot argument.
+  Root cause: the display controller's idle-power feature made the driver
+  report a screen update as complete before the hardware had actually
+  latched it, so the desktop compositor redrew into a buffer that was still
+  being scanned — leaving a small square of stale content over app windows.
+  Disabling that idle-power feature (via `amdgpu.dcdebugmask=0x800`) resolves
+  it at a small power cost.
+
+### Changed
+- Bumped the linux-next base to `next-20260826` (a routine one-day refresh).
+
+## [7.2.0-5-sleepy-next-20260825] — 2026-08-26
+
+### Added
+- DCN4 cursor/plane fixes carried from upstream (color-management state on
+  plane recreate, a blend-mode property warning fix, and an overlay-cursor
+  fallback for DCN4).
+
+### Fixed
+- **HDMI Variable Refresh Rate (VRR)** — now offered on the HDMI outputs
+  (the firmware-based path missed FreeSync panels; the driver now reads the
+  panel's advertised ranges directly).
+- **The "box/square" artifact** — first worked around via the boot entry
+  (`amdgpu.dcdebugmask=0x800`, disables Idle Power States); made permanent in
+  the next release.
+
+---
+
 ## [wannabe-7.3-rc1] — 2026-08-26 (preview tree, unreleased)
 
 Built a **wannabe 7.3-rc1** preview tree (`wannabe-7.3-rc1/`, git worktree
