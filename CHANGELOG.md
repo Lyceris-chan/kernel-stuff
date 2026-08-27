@@ -98,6 +98,22 @@ not help; `0x800` (IPS off) fixed it. Same class as AMD drm/amd work item
 #5570 (Navi 21, closed 2026-08-25). Re-evaluate when a proper DCN401
 flip-pending fix lands upstream.
 
+### Updated (2026-08-27) — sleepy-next bumped to next-20260827 + sweep patches
+
+- **Bump**: linux-next `next-20260827` (pkgrel 7). No drm/amd changes in the
+  one-day delta; the 188-patch series applies/skips identically.
+- **zstd BMI2 probe series** (`2128`–`2130`, Usama Arif/Meta) — probe the CPU
+  for BMI2 once instead of per context (`lib/zstd`).
+- **ACPI CPPC v5** (`1210`–`1224`, Christian Loehle) — 15-patch rework of the
+  CPPC control path amd-pstate runs on Zen 4 (register access + lifetime fixes).
+- **drm/amd/display** (`1141`–`1143`, NepNep7601) — RX power control without
+  AUX, DDC-close on I2C failure, software-I2C fallback.
+- **drm/amdgpu** `1059` (Mario Limonciello, Cc:stable) — restrict BAR0 fallback
+  read to SR-IOV VFs (boot-path regression fix).
+- **sched_ext** `2005` (Qiurong Fang) — skip per-CPU allocation for built-in
+  DSQs.
+- Block merge `55ab7e14222e` confirmed already in base.
+
 ---
 
 ## [7.2.0-2-sleepy] — 2026-08-19 (sweep candidates merged)

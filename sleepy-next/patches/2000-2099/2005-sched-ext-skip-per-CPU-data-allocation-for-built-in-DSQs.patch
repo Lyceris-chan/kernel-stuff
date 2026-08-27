@@ -1,0 +1,56 @@
+From: Qiurong Fang <fangqiurong@kylinos.cn>
+To: tj@kernel.org
+Cc: void@manifault.com,
+	arighi@nvidia.com,
+	changwoo@igalia.com,
+	sched-ext@lists.linux.dev,
+	linux-kernel@vger.kernel.org
+Subject: [PATCH] sched_ext: Skip per-CPU data allocation for built-in DSQs
+Date: Thu, 27 Aug 2026 16:23:29 +0800
+Message-Id: <20260827082329.3368255-1-fangqiurong@kylinos.cn>
+X-Mailer: git-send-email 2.25.1
+
+From: fangqiurong <fangqiurong@kylinos.cn>
+
+Deferred reenqueue tracking is only supported for user DSQs:
+schedule_dsq_reenq() serves the local DSQ through
+sch->pcpu->deferred_reenq_local and rejects all other built-in DSQ
+ids. Every built-in DSQ still carries nr_cpu_ids * sizeof(struct
+scx_dsq_pcpu) bytes of dead per-CPU memory.
+
+Skip the allocation for built-in DSQ ids.
+
+Fixes: 30b0515342db ("sched_ext: Add per-CPU data to DSQs")
+Signed-off-by: fangqiurong <fangqiurong@kylinos.cn>
+---
+ kernel/sched/ext/ext.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/kernel/sched/ext/ext.c b/kernel/sched/ext/ext.c
+index c539d15cda63..eaa64b8193e1 100644
+--- a/kernel/sched/ext/ext.c
++++ b/kernel/sched/ext/ext.c
+@@ -5048,6 +5048,10 @@ s32 scx_init_dsq(struct scx_dispatch_q *dsq, u64 dsq_id, struct scx_sched *sch)
+ 	dsq->id = dsq_id;
+ 	dsq->sched = sch;
+ 
++	/* Deferred reenqueue tracking is only supported for user DSQs */
++	if (dsq_id & SCX_DSQ_FLAG_BUILTIN)
++		return 0;
++
+ 	dsq->pcpu = alloc_percpu(struct scx_dsq_pcpu);
+ 	if (!dsq->pcpu)
+ 		return -ENOMEM;
+@@ -5066,6 +5070,9 @@ static void exit_dsq(struct scx_dispatch_q *dsq)
+ {
+ 	s32 cpu;
+ 
++	if (!dsq->pcpu)
++		return;
++
+ 	for_each_possible_cpu(cpu) {
+ 		struct scx_dsq_pcpu *pcpu = per_cpu_ptr(dsq->pcpu, cpu);
+ 		struct scx_deferred_reenq_user *dru = &pcpu->deferred_reenq_user;
+-- 
+2.43.0
+

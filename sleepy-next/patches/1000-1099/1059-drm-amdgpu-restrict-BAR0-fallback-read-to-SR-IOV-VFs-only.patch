@@ -1,0 +1,34 @@
+From: mario.limonciello at amd.com (Mario Limonciello)
+Date: Wed, 26 Aug 2026 13:51:02 -0500
+Subject: [PATCH] drm/amdgpu: restrict BAR0 fallback read to SR-IOV VFs only
+Message-ID: <20260826185102.2269511-1-mario.limonciello@amd.com>
+
+The BAR0 fallback read path was introduced as a workaround for SR-IOV VFs
+where the VRAM aperture is not available during early init. Restrict this
+workaround to only SR-IOV VFs where it's needed.
+
+Cc: stable at vger.kernel.org
+Reported-by: gloveless at jqluv.com
+Fixes: ea8ac194077d ("drm/amdgpu: reduce early full GPU access during SR-IOV init")
+Signed-off-by: Mario Limonciello <mario.limonciello at amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_device.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
+index 3603f7109703c..251c4aea013fc 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
+@@ -765,6 +765,9 @@ static int amdgpu_device_read_fb_via_bar0(struct amdgpu_device *adev,
+ 	if (!buf || !size)
+ 		return -EINVAL;
+ 
++	if (!amdgpu_sriov_vf(adev))
++		return -EINVAL;
++
+ 	flags = pci_resource_flags(adev->pdev, 0);
+ 	if ((flags & IORESOURCE_UNSET) || !(flags & IORESOURCE_MEM))
+ 		return -EINVAL;
+-- 
+2.43.0
+

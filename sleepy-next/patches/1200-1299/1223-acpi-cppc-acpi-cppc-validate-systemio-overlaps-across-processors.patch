@@ -1,0 +1,95 @@
+From: Christian Loehle <christian.loehle@arm.com>
+To: "Rafael J . Wysocki" <rafael@kernel.org>,
+	Viresh Kumar <viresh.kumar@linaro.org>
+Cc: linux-pm@vger.kernel.org,
+	linux-acpi@vger.kernel.org,
+	linux-kernel@vger.kernel.org,
+	Len Brown <lenb@kernel.org>,
+	Jie Zhan <zhanjie9@hisilicon.com>,
+	Lifeng Zheng <zhenglifeng1@huawei.com>,
+	Pierre Gondois <pierre.gondois@arm.com>,
+	Sumit Gupta <sumitg@nvidia.com>,
+	Sudeep Holla <sudeep.holla@arm.com>,
+	Ionela Voinescu <ionela.voinescu@arm.com>,
+	zhongqiu.han@oss.qualcomm.com,
+	Christian Loehle <christian.loehle@arm.com>
+Subject: [PATCH v5 14/15] ACPI: CPPC: Validate SystemIO overlaps across processors
+Date: Thu, 27 Aug 2026 07:30:59 +0100
+Message-Id: <20260827063100.2741066-15-christian.loehle@arm.com>
+X-Mailer: git-send-email 2.34.1
+In-Reply-To: <20260827063100.2741066-1-christian.loehle@arm.com>
+References: <20260827063100.2741066-1-christian.loehle@arm.com>
+
+System I/O port space is global, but the overlap check only compares
+registers within one _CPC package.  Whole-width accesses from different
+processors can therefore target partially overlapping port ranges and
+clobber each other.
+
+Extend the physical interval registry to SystemIO.  Permit read-only
+overlap and exact full-width aliases of the same logical CPPC entry.
+Reject every other cross-processor overlap involving a writable entry.
+
+Fixes: a2c8f92bea5f ("ACPI: CPPC: Implement support for SystemIO registers")
+Signed-off-by: Christian Loehle <christian.loehle@arm.com>
+---
+ drivers/acpi/cppc_acpi.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/acpi/cppc_acpi.c b/drivers/acpi/cppc_acpi.c
+index 955067925cf0..62d50ec71ca7 100644
+--- a/drivers/acpi/cppc_acpi.c
++++ b/drivers/acpi/cppc_acpi.c
+@@ -139,6 +139,7 @@ INTERVAL_TREE_DEFINE(struct cpc_non_mmio_node, rb, u64, subtree_last,
+ 		     cpc_non_mmio_itree)
+ 
+ static struct rb_root_cached cpc_pcc_trees[MAX_PCC_SUBSPACES];
++static struct rb_root_cached cpc_sysio_tree = RB_ROOT_CACHED;
+ static DEFINE_MUTEX(cpc_non_mmio_lock);
+ 
+ static struct cpc_sysmem_node *cpc_sysmem_first(u64 start, u64 last)
+@@ -587,6 +588,8 @@ static struct rb_root_cached *cpc_non_mmio_tree(u8 space_id, u8 pcc_ss_id)
+ {
+ 	if (space_id == ACPI_ADR_SPACE_PLATFORM_COMM)
+ 		return &cpc_pcc_trees[pcc_ss_id];
++	if (space_id == ACPI_ADR_SPACE_SYSTEM_IO)
++		return &cpc_sysio_tree;
+ 	return NULL;
+ }
+ 
+@@ -604,7 +607,8 @@ static int cpc_validate_non_mmio_pair(const struct cpc_non_mmio_node *a,
+ 	    a->last == b->last)
+ 		return 0;
+ 
+-	name = "PCC";
++	name = a->space_id == ACPI_ADR_SPACE_PLATFORM_COMM ?
++	       "PCC" : "SystemIO";
+ 	pr_err("CPU%d: %s _CPC register %u conflicts with CPU%d register %u\n",
+ 	       a->desc->cpu_id, name, a->reg_idx, b->desc->cpu_id,
+ 	       b->reg_idx);
+@@ -659,10 +663,11 @@ static int cpc_register_non_mmio_desc(struct cpc_desc *cpc_desc,
+ 			continue;
+ 
+ 		space_id = reg->cpc_entry.reg.space_id;
+-		if (space_id != ACPI_ADR_SPACE_PLATFORM_COMM)
++		if (space_id != ACPI_ADR_SPACE_PLATFORM_COMM &&
++		    space_id != ACPI_ADR_SPACE_SYSTEM_IO)
+ 			continue;
+ 
+-		if (pcc_ss_id < 0) {
++		if (space_id == ACPI_ADR_SPACE_PLATFORM_COMM && pcc_ss_id < 0) {
+ 			ret = -EINVAL;
+ 			goto out_unregister;
+ 		}
+@@ -674,7 +679,8 @@ static int cpc_register_non_mmio_desc(struct cpc_desc *cpc_desc,
+ 		node->desc = cpc_desc;
+ 		node->reg_idx = i;
+ 		node->space_id = space_id;
+-		node->pcc_ss_id = pcc_ss_id;
++		node->pcc_ss_id = space_id == ACPI_ADR_SPACE_PLATFORM_COMM ?
++				      pcc_ss_id : 0;
+ 		tree = cpc_non_mmio_tree(space_id, node->pcc_ss_id);
+ 
+ 		match = cpc_non_mmio_itree_iter_first(tree, node->start,
+-- 
+2.34.1
+

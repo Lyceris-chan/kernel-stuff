@@ -81,3 +81,50 @@ scanned → a fixed content-tracking square over app windows (the sleepy-next
 #5570 class. A/B verified 2026-08-26: `0x20000` (FAMS) and `0x8` (clock
 gating) did not help; `0x800` (IPS off) fixed it. Re-evaluate when a proper
 DCN401 flip-pending fix lands upstream.
+
+## Added (2026-08-27) — zstd BMI2 probe series (Usama Arif, Meta)
+
+`2128`–`2130`, "zstd: probe the CPU for BMI2 support once, not per context"
+(lkml `20260826122558.2662013-1-usama.arif@linux.dev`, via the lkml
+public-inbox git mirror — lore.kernel.org web is Anubis-blocked, the
+`repos/lore-mirror` epoch-20 clone is the working access path). Three patches
+on `lib/zstd`:
+- `2128` — `ZSTD_initStaticCCtx()` routes its BMI2 probe through
+  `ZSTD_cpuSupportsBmi2()` (requires BMI1+BMI2, matching the dynamic-dispatch
+  bodies; latent inconsistency, no field-visible change).
+- `2129` — `ZSTD_cpuSupportsBmi2()` returns 0 when `DYNAMIC_BMI2` is unset
+  (nothing reads the flag in static dispatch).
+- `2130` — probe the CPU once and cache the result with READ_ONCE/WRITE_ONCE
+  instead of re-probing per context.
+
+Relevant: this kernel ships `CONFIG_ZSTD_COMMON/COMPRESS/DECOMPRESS=y` (zram/
+zswap use zstd). Original `From:`/`Date:`/`Subject:`/`Signed-off-by:` headers
+kept intact (mailing-list noise headers trimmed). Applies cleanly to
+next-20260827 with `patch -p1 --forward -F2` (cumulative order 2128→2129→2130).
+
+## Added (2026-08-27 sweep — 20 patches)
+
+Fresh 08-26/27 ML submissions found in the lkml public-inbox mirror
+(`repos/lore-mirror`) and the amd-gfx/dri-devel August archives. All apply
+cleanly to next-20260827 with `patch -p1 --forward -F2` (verified in series
+order) and keep original headers/Signed-off-by.
+
+- **`1210`–`1224` — ACPI: CPPC v5 (15 patches)**, Christian Loehle (arm.com),
+  lkml `2026082711…`. Reworks the CPPC control path amd-pstate runs on Zen 4:
+  validate `_CPC` packages, propagate control-write errors, serialize PCC
+  payload updates (single-reg + EPP), 64-bit register masks, reject unsafe
+  cross-CPU SystemMemory RMW, lifetime-leak fixes. High value for our
+  `amd_pstate.epp_boost=1` setup.
+- **`1141`–`1143` — drm/amd/display** (NepNep7601, amd-gfx ML 08-27): skip
+  receiver power control without AUX; close DDC on I2C engine setup failure;
+  fall back to software I2C on hardware engine failure. Display-link power
+  sequencing + DDC/I2C robustness on the shared path.
+- **`1059` — drm/amdgpu: restrict BAR0 fallback read to SR-IOV VFs only**
+  (Mario Limonciello, amd-gfx 08-26, `Cc: stable`). Early-init boot-path
+  regression fix (`Fixes: ea8ac194077d`).
+- **`2005` — sched_ext: skip per-CPU data allocation for built-in DSQs**
+  (Qiurong Fang, lkml 08-27). Relevant to `CONFIG_SCHED_CLASS_EXT=y`.
+
+Deferred (tracked, not merged): the 30-patch Alex Deucher **TLB-invalidation
+v2** upgrade of `1004`–`1017` (under review; swap in a dedicated session);
+gfx12 mes_dbgext; job-based IB refactor; blend-mode v4 (drm-helper piece).

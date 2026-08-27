@@ -1,0 +1,98 @@
+From: Christian Loehle <christian.loehle@arm.com>
+To: "Rafael J . Wysocki" <rafael@kernel.org>,
+	Viresh Kumar <viresh.kumar@linaro.org>
+Cc: linux-pm@vger.kernel.org,
+	linux-acpi@vger.kernel.org,
+	linux-kernel@vger.kernel.org,
+	Len Brown <lenb@kernel.org>,
+	Jie Zhan <zhanjie9@hisilicon.com>,
+	Lifeng Zheng <zhenglifeng1@huawei.com>,
+	Pierre Gondois <pierre.gondois@arm.com>,
+	Sumit Gupta <sumitg@nvidia.com>,
+	Sudeep Holla <sudeep.holla@arm.com>,
+	Ionela Voinescu <ionela.voinescu@arm.com>,
+	zhongqiu.han@oss.qualcomm.com,
+	Christian Loehle <christian.loehle@arm.com>,
+	Sashiko <sashiko-bot@kernel.org>
+Subject: [PATCH v5 05/15] ACPI: CPPC: Serialize PCC single-register payload updates
+Date: Thu, 27 Aug 2026 07:30:50 +0100
+Message-Id: <20260827063100.2741066-6-christian.loehle@arm.com>
+X-Mailer: git-send-email 2.34.1
+In-Reply-To: <20260827063100.2741066-1-christian.loehle@arm.com>
+References: <20260827063100.2741066-1-christian.loehle@arm.com>
+
+The PCC doorbell protocol requires OSPM to confirm ownership of the shared
+subspace before placing a command and its payload there.
+cppc_set_reg_val_in_pcc() instead modifies the payload before taking
+pcc_lock.
+
+A concurrent command can consequently overwrite or consume the staged
+value, and OSPM can write the shared region while the platform still owns
+it.
+
+Take the PCC write lock first, wait for the previous command to complete,
+and keep the lock held while staging the value and submitting CMD_WRITE.
+This follows the ownership sequence in ACPI 6.5 Section 14.5 and the
+existing contract documented by send_pcc_cmd().
+
+If ownership acquisition or staging fails, abort any older performance
+batch before dropping the exclusive lock. This advances its generation and
+wakes cppc_set_perf() callers which otherwise wait indefinitely for a
+command this path did not submit.
+
+Fixes: e05c75072c2e ("ACPI: CPPC: Add cppc_set_reg_val()")
+Reported-by: Sashiko <sashiko-bot@kernel.org>
+Link: https://sashiko.dev/#/patchset/20260724134251.1632824-1-christian.loehle%40arm.com
+Link: https://sashiko.dev/#/patchset/20260807111303.1062391-1-christian.loehle%40arm.com
+Signed-off-by: Christian Loehle <christian.loehle@arm.com>
+---
+ drivers/acpi/cppc_acpi.c | 21 ++++++++++++++++-----
+ 1 file changed, 16 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/acpi/cppc_acpi.c b/drivers/acpi/cppc_acpi.c
+index 1caac71d3e00..3f025cfa30f6 100644
+--- a/drivers/acpi/cppc_acpi.c
++++ b/drivers/acpi/cppc_acpi.c
+@@ -1504,7 +1504,7 @@ static int cppc_get_reg_val(int cpu, enum cppc_regs reg_idx, u64 *val)
+ static int cppc_set_reg_val_in_pcc(int cpu, struct cpc_register_resource *reg, u64 val)
+ {
+ 	int pcc_ss_id = per_cpu(cpu_pcc_subspace_idx, cpu);
+-	struct cppc_pcc_data *pcc_ss_data = NULL;
++	struct cppc_pcc_data *pcc_ss_data;
+ 	int ret;
+ 
+ 	if (pcc_ss_id < 0) {
+@@ -1512,15 +1512,26 @@ static int cppc_set_reg_val_in_pcc(int cpu, struct cpc_register_resource *reg, u
+ 		return -ENODEV;
+ 	}
+ 
+-	ret = cpc_write(cpu, reg, val);
+-	if (ret)
+-		return ret;
+-
+ 	pcc_ss_data = pcc_data[pcc_ss_id];
++	if (!pcc_ss_data)
++		return -ENODEV;
+ 
+ 	down_write(&pcc_ss_data->pcc_lock);
++
++	ret = check_pcc_chan(pcc_ss_id, false);
++	if (ret)
++		goto out;
++
++	ret = cpc_write(cpu, reg, val);
++	if (ret)
++		goto out;
++
+ 	/* after writing CPC, transfer the ownership of PCC to platform */
+ 	ret = send_pcc_cmd(pcc_ss_id, CMD_WRITE);
++
++out:
++	if (ret)
++		cppc_abort_pending_pcc_write(pcc_ss_data, ret);
+ 	up_write(&pcc_ss_data->pcc_lock);
+ 
+ 	return ret;
+-- 
+2.34.1
+
