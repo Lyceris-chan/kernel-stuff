@@ -9,6 +9,30 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.2.0-8-sleepy-next-20260828] — 2026-08-28
+
+Updated to linux-next `next-20260828`. This snapshot upstreams a large batch of
+the AMD driver fixes we had been carrying as patches — the base now includes
+them, so they no longer need to be applied by hand. Re-checked every source
+(AMD display/power mailing lists, lkml archives, the AMD bug tracker, and the
+drm-next / amd-staging trees) for this release window.
+
+### Added
+- **CU-occupancy support for GFX12.1** — now that this snapshot is the base,
+  the RX 9070 XT gets the fuller version of the compute/occupancy reporting.
+- The base now absorbs our previously-backported user-queue (userq), KFD
+  shared-memory (SVM), and CRIU patches — roughly 70 patches in our series
+  become redundant (the same fixes are now upstream).
+
+### Changed
+- Bumped the linux-next base from `next-20260827` to `next-20260828`; the
+  22 AMD commits that landed in that delta are all included.
+
+### Fixed
+- Bug fixes that landed in the delta are now in the base: a GPU-reset
+  display lock leak, a user-queue fence lock, SVM migration hole/error-path
+  fixes, a KFD CRIU NULL-guard, and a ring-isolation bounds check.
+
 ## [7.2.0-7-sleepy-next-20260827] — 2026-08-27
 
 Updated the sleepy-next preview kernel to linux-next `next-20260827` and ran a
