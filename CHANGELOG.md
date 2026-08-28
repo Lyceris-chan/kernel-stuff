@@ -9,6 +9,22 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.2.0-10-sleepy-next-20260828] — 2026-08-28
+
+Patch-series cleanup and rebuild. Fixed six of the second-sweep patches that
+were accidentally empty (no-ops) in -9 — they are now applied for real (the
+VM-update GPU-hang fix, GFX12 no-retry PTE, flip-schedule pair, and IRQ guard
+are now active). Also dropped 76 patches whose content `next-20260828` now
+upstreams, so the series is back to a clean 143 patches with no redundancy.
+
+### Fixed
+- The VM-update GPU-hang fix, GFX12 no-retry PTE, and DCN4 flip-schedule fixes
+  from the -9 release are now genuinely applied (they were empty no-ops before).
+
+### Changed
+- Removed 76 redundant/superseded patches the base now provides; series is 143
+  patches, `source=()` matches on-disk exactly.
+
 ## [7.2.0-9-sleepy-next-20260828] — 2026-08-28
 
 A second thorough sweep (amd-staging branch + mailing lists, 08-28 window)

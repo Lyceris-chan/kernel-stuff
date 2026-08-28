@@ -155,3 +155,17 @@ backported as `1054`, `9043`, `9045`, `9047`, `9048` are now redundant; `1026`
 needs a rebase to drop the duplicate guard while keeping the CRIU callbacks).
 The remaining pending amd-staging content is off-target (GC12.1/datacenter,
 SMU15, DCN5/6) or refactor — nothing else worth carrying this window.
+
+## Cleanup (2026-08-28, pkgrel 10)
+
+Dropped **76 patches** whose content next-20260828 now upstreams (verified by
+`patch -p1 --forward -F2 -R` reverse-apply against the base): `1000`-`1002`,
+`1019`, `1024`, `1047`, `1050`, `1051`, `1101`-`1104`, `1106`-`1111`,
+`1113`-`1115`, `1117`-`1126`, `1129`-`1133`, `1137`-`1139`, `1200`, `1205`,
+`1207`, `1208`, `2102`-`2105`, `2108`-`2119`, `9001`-`9003`, `9006`, `9009`,
+`9010`, `9030`, `9031`, `9032`, `9036`, `9042`, `9043`, `9048`, plus the
+superseded `1054`, `9045`, `9047` (base has refined revisions) and `9053`
+(DCN42 rIOMMU — already in base). `1026` (GFX12 CRIU callbacks) applies
+cleanly and is kept. Fixed the six `9049`-`9054` amd-staging patches that were
+accidentally empty (re-extracted via `git format-patch` from agd5f; `9053`
+dropped as redundant). `source=()` now matches on-disk exactly (143 patches).

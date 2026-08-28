@@ -1,0 +1,46 @@
+From 9b7ce74b78679f197ea50e18aeb7903469a8f27e Mon Sep 17 00:00:00 2001
+From: Mukul Joshi <mukul.joshi@amd.com>
+Date: Thu, 4 Dec 2025 17:11:21 -0500
+Subject: [PATCH] drm/amdgpu: Update no-retry PTE flags for GFX12
+
+The current combination of PTE flags to translate a retry
+fault into a no-retry fault is not valid for GFX12. Use a
+valid no-retry PTE flags combination that works for GFX 12.
+
+Signed-off-by: Mukul Joshi <mukul.joshi@amd.com>
+Reviewed-by: Felix Kuehling <felix.kuehling@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h | 2 ++
+ drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c | 2 +-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
+index d32183cd9e0f..253ec6fc018f 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
+@@ -141,6 +141,8 @@ struct amdgpu_bo_vm;
+ #define AMDGPU_PDE_PTE_FLAG(adev)	\
+ 	((amdgpu_ip_version((adev), GC_HWIP, 0) >= IP_VERSION(12, 0, 0)) ? AMDGPU_PDE_PTE_GFX12 : AMDGPU_PDE_PTE)
+ 
++/* Flag combination to set no-retry on GFX 12 */
++#define AMDGPU_VM_NORETRY_FLAGS_GFX12	(AMDGPU_PTE_SYSTEM | AMDGPU_PTE_SNOOPED)
+ /* How to program VM fault handling */
+ #define AMDGPU_VM_FAULT_STOP_NEVER	0
+ #define AMDGPU_VM_FAULT_STOP_FIRST	1
+diff --git a/drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c b/drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c
+index 8ad0c1d0f987..ea240aa1e445 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c
+@@ -668,7 +668,7 @@ static int gmc_v12_0_early_init(struct amdgpu_ip_block *ip_block)
+ 		adev->gmc.private_aperture_end =
+ 			adev->gmc.private_aperture_start + (4ULL << 30) - 1;
+ 
+-	adev->gmc.noretry_flags = AMDGPU_VM_NORETRY_FLAGS_TF;
++	adev->gmc.noretry_flags = AMDGPU_VM_NORETRY_FLAGS_GFX12;
+ 
+ 	return 0;
+ }
+-- 
+2.55.0
+
