@@ -181,7 +181,7 @@ _minor=0
 _rcver=
 pkgver=20260828
 _tagrel=1
-pkgrel=8
+pkgrel=9
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -289,6 +289,7 @@ source=(
   "patches/1000-1099/1057-drm-ttm-grab-bo-reference-before-locking.patch"
   "patches/1000-1099/1058-drm-amdgpu-track-suboptimal-always-valid-bos.patch"
   "patches/1000-1099/1059-drm-amdgpu-restrict-BAR0-fallback-read-to-SR-IOV-VFs-only.patch"
+  "patches/1000-1099/1060-drm-amdgpu-cancel-hang_detect_work-before-taking-userq-mutex.patch"
   "patches/1100-1199/1100-drm-amd-display-enable-psr-and-replay-on-dcn4-variant-and-fi.patch"
   "patches/1100-1199/1101-drm-amd-display-enable-pstate-for-dcn4-non-emulation-builds.patch"
   "patches/1100-1199/1102-drm-amd-display-increase-dcn42b-uclk-value.patch"
@@ -335,6 +336,7 @@ source=(
   "patches/1100-1199/1141-drm-amd-display-skip-receiver-power-control-without-AUX.patch"
   "patches/1100-1199/1142-drm-amd-display-close-DDC-on-I2C-engine-setup-failure.patch"
   "patches/1100-1199/1143-drm-amd-display-fall-back-to-software-I2C-on-hardware-engine-failure.patch"
+  "patches/1100-1199/1144-drm-amd-display-enable-HDMI-FRL-by-default.patch"
   "patches/1200-1299/1200-cpufreq-amd-pstate-Document-missing-kernel-doc-mem.patch"
   "patches/1200-1299/1201-cpufreq-amd-pstate-Update-cppc_req_cached-before-w.patch"
   "patches/1200-1299/1202-cpufreq-amd-pstate-Add-per-core-EPP-boost-for-rec.patch"
@@ -436,6 +438,12 @@ source=(
   "patches/9000-9099/9046-amdkfd-fix-integer-overflow-in-queue-ring-buffer-size.patch"
   "patches/9000-9099/9047-amdkfd-fix-error-path-at-svm_migrate_copy_to_ram.patch"
   "patches/9000-9099/9048-amdkfd-fix-vm-range-hole-at-svm_migrate_copy_to_vram.patch"
+  "patches/9000-9099/9049-drm-amdgpu-recompute-dw-estimate-after-allocating-VM-update-job.patch"
+  "patches/9000-9099/9050-drm-amdgpu-update-no-retry-PTE-flags-for-GFX12.patch"
+  "patches/9000-9099/9051-drm-amd-display-unify-CalculateFlipSchedule-logic.patch"
+  "patches/9000-9099/9052-drm-amd-display-fix-CalculateFlipSchedule-calculation.patch"
+  "patches/9000-9099/9053-drm-amd-display-notify-DMU-DCHVM-rIOMMU-DCN42.patch"
+  "patches/9000-9099/9054-drm-amd-display-guard-amdgpu_dm_irq_schedule_work-NULL-irq_wq.patch"
 )
 
 # makepkg 7.1.0 resolves local sources by basename in the PKGBUILD directory
@@ -1079,6 +1087,7 @@ b2sums=('518af96d5015873e97a766bccf466c2a39b8c86263f69215aa1de4c32c59e1c028aa7c6
         'f80b29d606f7a5a4a395952ab4994a10e8005831544d88c7e59621b61f0bfadc6b863314337e7183843cc3fd8018d975703ddd14bb62e3c8bc738df5c7e63d5d'
         '498ac5d39faa626f9e55902e7b2eb7993937893c2d1a20c9532001983a296cee648460a547c7b57142c9010995b34bfc49d3050e6eac69a6c55a137ce6424fff'
         '6ee4697db2969152e02aefad72a03fdf1bef5e397ae6a64a517554c3712ac7e0e2bc855e2b591eeddbfe03204d62e16c910c402ed4c71f868210509038e6b56f'
+        '06727a998555a2c0391a46ff7d6bfca02e43542ce39696881dc1887365df4ed68f633286f07e4e32f08a1931aa9ad911e90e797f207bb3390d5bd2c2d72516f8'
         '02803704ce3fe311f9bc88e0cdeae545829023a7c3c241a00f4a2bc07ffd27fe5089010b4fc0456c56898bbd09ab93ab3d764cfa97080a5aaf114df1bd91680b'
         '692244e62c6d34c7aca8fda750d18befaefdc02a3be11632aeb6a69327645e6814efb00a4c475bfc407c0dabbce0b5d88c86262acbf32b29111c5e99e2acabd6'
         '9395fc7d168c7cd6cb6b13edbedc2adc58a4a18cd024ae259345034b06bac84e8f9a34334508cd3571aaedb22e85aa2c9a01cd11e5c5336be148e07d63230bd8'
@@ -1125,6 +1134,7 @@ b2sums=('518af96d5015873e97a766bccf466c2a39b8c86263f69215aa1de4c32c59e1c028aa7c6
         '0fb08f727791630b6101b8263b23ce433a8b65f895ff757a4d79b282815be449e7b1932a752635e848b3b3ba8235a775a3bf618cfb933bb80d69f3a38f5e5ead'
         'cc08d619b72c0baf6ce3ec997a5a2e381bd6a4c87c395e4d89ba91523369da7a4562a65e837355fa31bce81726abdff717c7b4d70c2f0c02b563ab72b56f2027'
         '05f7335d35933033edcdbdd436dcf8c9fb1f6326cf4cefc34bbc48a1a91d7030536b0e69e48d8ffd4b0a20592f22b5a96895fbd277b776ad860bb2853025d532'
+        'fe7fbf83a8f834b103dbfa6f8209d32b62ad4df23683017e0347c03f23372180b331c226baa0ef563dcdc5ad7125f10ef69a072204eb6bf6cdd69f31ffc156b8'
         'aad86c7d3e29956976634971ed46663e67365517b69e35e7cce3e135bcc855c324187dd691630af28a5da7045e6766d52a3b2392726b0bc8587a221f9eedca48'
         'e9d464ebf525cd8d93d48f1cbedea0197bd9d0142085da7d83ec3dfda0174483a0fea4077055fd7d1ad9180563dc6dfb77e4f52f9bcb023b7c7d7c9fb5c39ece'
         '9d3e36dbc5c9c5342d2991c4665278ed075073196251e59280bd12f1d6812a37d31db58f5cb978b926e2dcd0a32365960a414b69d10f463bd8f68cedbb4bb6ae'
@@ -1225,6 +1235,12 @@ b2sums=('518af96d5015873e97a766bccf466c2a39b8c86263f69215aa1de4c32c59e1c028aa7c6
         '4b709d02832578271be2d4a180ba1002eb0dc120a4d4df2a149c2a320224791aea3dc64da520c3af53c4e7ca5ac2b906adae5e5f9ff003b7df3324b95d36b535'
         '208fa81e6adfc96da33118ee8ba1e70955ee200616f261c82c6823d4eb32c29adc31f00559966db976e603c35be6e0a4e76d74266b3d7ba76862f4f57c9f8cef'
         'dd7d9c9a51bdbdc9d7e8a5f88e0eb465a16a8c2f2953ffa4fef15265f809fde0c6bb9ad0f29a88a4106a669bdae9e252a44879badf00826b7590ff44354a5657'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
+        '786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce'
         '2cdec9daf2eb9d4a8e95f33bcc81e603899db1f2e4f55cde68fa29727972238b5bd544e055a06bd0c94569e222666f6d8bf231db9fa8593b6d5f4fe52b26022a'
         'fd97b3f9883167948e21e047733b87535676c305661c12f4a980ba123d08a00c4588a1e2ca8233621b530a743383c1f7cedac01bc142f72bf1c2d3d5b0c05a00')
 

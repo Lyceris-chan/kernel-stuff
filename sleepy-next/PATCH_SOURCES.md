@@ -128,3 +128,30 @@ order) and keep original headers/Signed-off-by.
 Deferred (tracked, not merged): the 30-patch Alex Deucher **TLB-invalidation
 v2** upgrade of `1004`–`1017` (under review; swap in a dedicated session);
 gfx12 mes_dbgext; job-based IB refactor; blend-mode v4 (drm-helper piece).
+
+## Added (2026-08-28 — second sweep window, 8 patches)
+
+Fresh 08-27/28 finds from the amd-staging-drm-next branch (agd5f) and the
+amd-gfx ML. All verified `patch -p1 --forward -F2` against next-20260828.
+
+- **`9049` — drm/amdgpu: recompute dw estimate after allocating a new VM
+  update job** (YuBiao Wang, `Cc: stable`). Stale free-dw count after job
+  realloc can encode a 1 GB copy inside the IB pool → GART fault + ring hang.
+  Coexists with our `9034` (same file, no hunk overlap).
+- **`9050` — drm/amdgpu: Update no-retry PTE flags for GFX12** (RDNA4 gfx12.0).
+- **`9051`/`9052` — DCN4 flip-schedule pair** (Unify + Fix CalculateFlipSchedule):
+  flip-path bandwidth calc; relevant to the VUPDATE_NO_LOCK "box" class.
+- **`9053` — DCN42 IPS1 rIOMMU hang fix** (DCHVM↔rIOMMU SDP port disconnect).
+- **`9054` — Guard amdgpu_dm_irq_schedule_work against NULL irq_wq** (teardown race).
+- **`1144` — drm/amd/display: Enable HDMI FRL by default** (Jerry Zuo, v2,
+  `20260827155409.1426730-1`, Reviewed-by Harry Wentland). Adds `DC_FRL_MASK`
+  to the default `amdgpu_dc_feature_mask` so HDMI 2.1 FRL is on.
+- **`1060` — drm/amdgpu: cancel hang_detect_work before taking userq_mutex**
+  (Vitaly Prosyak, `20260827222531.127950-1`, Reviewed-by Christian Koenig).
+  Deadlock fix on the gfx12 userq path.
+
+Note: next-20260828 upstreams ~18 more amd-staging commits (the ones we had
+backported as `1054`, `9043`, `9045`, `9047`, `9048` are now redundant; `1026`
+needs a rebase to drop the duplicate guard while keeping the CRIU callbacks).
+The remaining pending amd-staging content is off-target (GC12.1/datacenter,
+SMU15, DCN5/6) or refactor — nothing else worth carrying this window.

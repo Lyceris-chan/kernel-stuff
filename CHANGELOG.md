@@ -9,6 +9,32 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.2.0-9-sleepy-next-20260828] — 2026-08-28
+
+A second thorough sweep (amd-staging branch + mailing lists, 08-28 window)
+surfaced 8 more patches worth carrying, all built into this release:
+
+### Added
+- **A GPU-hang fix (CC: stable)** — the VM page-table update path could
+  reallocate a job and keep a stale "free space" count, encoding an enormous
+  copy that ran off the command buffer and hung the GPU ring.
+- **GFX12 "no-retry PTE" flags fix** — corrects the invalid flag combination
+  for RDNA4.
+- **Two DCN4 flip-schedule fixes** — corrected bandwidth math on the flip
+  path (same code area as the earlier display-freeze investigation).
+- **A DCN42 idle-power hang fix** — the display's data-path disconnect during
+  an idle-power state could overrun an I/O-MMU credit and hang invalidation.
+- **HDMI 2.1 FRL is now enabled by default** — the driver no longer needs a
+  module option to use high-bandwidth HDMI 2.1 Fixed-Rate Link.
+- **A user-queue deadlock fix** — cancels the hang-detect worker before
+  taking the user-queue mutex (reviewed, real deadlock path on RDNA4).
+- **A display-IRQ teardown guard** — avoids a race when the IRQ workqueue is
+  torn down.
+
+### Changed
+- The base (`next-20260828`) already upstreams ~18 of the AMD fixes we had
+  backported, so those no longer need local patches.
+
 ## [7.2.0-8-sleepy-next-20260828] — 2026-08-28
 
 Updated to linux-next `next-20260828`. This snapshot upstreams a large batch of
