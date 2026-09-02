@@ -38,7 +38,9 @@ description: >
   changes the process directory to the repo, so a relative patch path like
   `patches/<range>/NNNN-....patch` resolves against the repo and errors "can't
   open patch". Always write
-  `git -C repos/linux-7.2 apply --check "$PWD/patches/<range>/NNNN-....patch"`.
+  `git -C <ref-tree> apply --check "$PWD/patches/<range>/NNNN-....patch"` where
+  `<ref-tree>` is a worktree of `repos/linux-next` at the PKGBUILD `_srctag`
+  (the series base since 2026-09-02; `repos/linux-7.2*` are the retired era).
   Patches live in `patches/<range>/` folders (2026-08-11); root-level
   `NNNN-*.patch` entries are gitignored build symlinks, not the source of truth.
 - **Capture real exit codes, never `| head && echo OK`.** `git apply --check f 2>&1 |
@@ -278,7 +280,9 @@ that IS a candidate for our tree.
 Use `git apply --check` (not `patch --dry-run`) against the clean reference tree:
 
 ```bash
-TREE="repos/linux-7.2"
+# Reference tree = the series base: a worktree of repos/linux-next at the
+# PKGBUILD _srctag (repos/linux-7.2* are the retired 7.2 era, historical only).
+TREE="/tmp/ref-next"   # e.g. git -C repos/linux-next worktree add "$TREE" next-20260902
 
 check_commit() {
   local repo="$1" sha="$2"
@@ -422,9 +426,9 @@ adopting. Record the reconstruction in `PATCH_SOURCES.md` with the Message-ID.
 
 > The standalone **wannabe preview tree** (gitignored `wannabe-7.3-rc1/` git
 > worktree, branch `wannabe-7.3`, doc `WANNABE-7.3.md`, tracked
-> `wannabe-7.3-patches/` series) was **removed 2026-09-02**, superseded by the
-> `sleepy-next` package. There is no preview worktree to maintain: the linux-next
-> (7.3) preview kernel IS `sleepy-next/` (its own PKGBUILD, base = a
+> `wannabe-7.3-patches/` series) was **removed 2026-09-02**. There is no preview
+> worktree to maintain: the linux-next (7.3) preview kernel IS this repo's one
+> package, `linux-sleepy-next` (PKGBUILD at the repo root, base = a
 > `next-YYYYMMDD` snapshot). Sweep for 7.3-window content directly against that
 > series. History of the wannabe era lives in `CHANGELOG.md` + `PATCH_SOURCES.md`
 > (2026-08-26 record, annotated as superseded).

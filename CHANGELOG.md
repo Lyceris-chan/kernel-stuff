@@ -5,7 +5,32 @@ Ryzen 7 7700 (Zen 4) + Radeon RX 9070 XT (RDNA 4 / gfx1201) desktop.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/) and the
 [Google developer style guide](https://developers.google.com/style). Versioned
-by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
+by the running kernel (base + `pkgrel`), e.g. `7.3.0-rc1-13-sleepy-next-20260902`.
+
+---
+
+## [linux-sleepy-next — single package] — 2026-09-02
+
+**`linux-sleepy-next` is now the only kernel this project ships.** The 7.2
+`linux-sleepy` package was dropped in its favor; the repo is restructured from
+"a 7.2 kernel plus a `sleepy-next/` subpackage" to one `linux-sleepy-next`
+package at the repo root.
+
+### Changed
+- The `sleepy-next/` package (PKGBUILD, `config`, 112-patch series,
+  `PATCH_SOURCES.md`) moved to the repository root, replacing the 7.2 package.
+  The 7.2 provenance ledger is archived at `PATCH_SOURCES-7.2.md`.
+- `linux-sleepy-next` now ships the `net-tune` CAKE SQM service itself
+  (previously owned by the 7.2 `linux-sleepy` package, which is gone).
+- Documentation rewritten for the single kernel: `README.md` (lean overview),
+  `GUIDE.md` (build guide), `CHANGELOG.md`, `CLAUDE.md` (maintenance rules),
+  `PATCH_SOURCES.md`. Applied to the Google developer style guide.
+- The retired 7.2 `linux-sleepy` package files and per-release `.config`
+  snapshots were removed.
+
+### Removed
+- **`scx_cake --preset esports` guidance.** The esports preset no longer exists
+  in `scx_cake`; the README sched-ext section now shows plain `scx_cake`.
 
 ---
 

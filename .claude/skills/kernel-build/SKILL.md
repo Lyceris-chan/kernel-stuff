@@ -59,10 +59,14 @@ reverse-applied with `patch -Np1 --forward -R` to keep `.pstate_enabled = false`
   conflicting patch, note it in `PATCH_SOURCES.md` (Google doc style — see
   `.claude/style-guides/google-docguide/`).
 - Context lines shifted → regenerate from the source repo (see `patch-audit`).
-- Test a patch independently against the clean tree:
+- Test a patch independently against the clean base. The reference tree is now
+  the linux-next snapshot the series builds on: a git worktree of
+  `repos/linux-next` at the PKGBUILD `_srctag` (e.g.
+  `git -C repos/linux-next worktree add /tmp/ref next-20260902` — the repos/linux-7.2*
+  clones are the retired 7.2 era, use them only for historical compares):
   ```bash
-  git -C repos/linux-7.2 apply --check "$PWD/<patch>"     # forward (use ABSOLUTE path — git -C changes CWD)
-  git -C repos/linux-7.2 apply --check -R "$PWD/<patch>"  # already-applied?
+  git -C /tmp/ref apply --check "$PWD/<patch>"     # forward (use ABSOLUTE path — git -C changes CWD)
+  git -C /tmp/ref apply --check -R "$PWD/<patch>"  # already-applied?
   patch -p1 --forward --dry-run < <patch>                     # THE authoritative check — matches prepare()'s tool
   ```
   **Lesson (2026-08-03):** `git apply --check` can PASS where GNU `patch -p1

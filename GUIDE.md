@@ -1,6 +1,9 @@
-# linux-sleepy
+# linux-sleepy-next — build guide
 
-A custom Arch Linux kernel package (`linux-sleepy`) based on Linux 7.2-rc7, targeting AMD Zen 4 CPUs and RDNA 4 (Navi 48 / gfx1201) GPUs.
+A custom Arch Linux kernel package (`linux-sleepy-next`) built from a
+**linux-next** snapshot (`next-20260902`, the 7.3 merge-window content),
+targeting AMD Zen 4 CPUs and RDNA 4 (Navi 48 / gfx1201) GPUs. It descends from
+the 7.2 `linux-sleepy` package, which was retired on 2026-09-02.
 
 ## Target audience
 
@@ -11,43 +14,46 @@ This kernel is written for one specific hardware configuration:
 - **NIC**: Realtek RTL8125B 2.5 GbE
 - **Storage**: Phison E16 NVMe (PCIe 4.0)
 
-It is not a general-purpose distribution kernel. Configuration choices are intentionally opinionated for this hardware and may break other setups.
+It is not a general-purpose distribution kernel. Configuration choices are
+intentionally opinionated for this hardware and may break other setups.
 
 ---
 
-## Differences from vanilla linux-7.2-rc7
+## Differences from the linux-next baseline
 
 ### Build toolchain
 
-| Setting | Vanilla | This kernel |
-|---------|---------|-------------|
-| Compiler | GCC | Clang 23.1.0-rc2 (kernel.org pre-built) |
+| Setting | Baseline | This kernel |
+|---------|----------|-------------|
+| Compiler | GCC | Clang 23 (kernel.org pre-built) |
 | Linker | ld (GNU) | `ld.lld` |
 | LTO | None | ThinLTO (`CONFIG_LTO_CLANG_THIN=y`) |
 | Optimization | `-O2` | `-O3` (`CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y`) |
 | CPU tuning | Generic x86-64 | `-march=znver4` (`CONFIG_MZEN4=y`) |
 
-The LLVM toolchain is downloaded automatically from [mirrors.edge.kernel.org/pub/tools/llvm/](https://mirrors.edge.kernel.org/pub/tools/llvm/files/), maintained by Nathan Chancellor. On Wednesdays and Thursdays it checks for a newer weekly release candidate build before falling back to `llvm-23.1.0-rc2-x86_64.tar.xz`.
+The LLVM toolchain downloads automatically from
+[mirrors.edge.kernel.org/pub/tools/llvm/](https://mirrors.edge.kernel.org/pub/tools/llvm/files/)
+(Nathan Chancellor's weekly RC builds). On Wednesdays and Thursdays the
+PKGBUILD checks for a newer release candidate before falling back to the pinned
+`llvm-23.1.0-rc2-x86_64.tar.xz`.
 
-### Scheduler and core patches
+### CachyOS patch subsystems
 
-The following patches come from the [CachyOS linux-cachyos](https://github.com/CachyOS/linux-cachyos) patchset, squashed to one patch per branch (`0101`–`0109`), rebased onto 7.2-rc7:
+The kernel layers a sanitized CachyOS patchset, squashed to one patch per branch
+(`0101`–`0113`), rebased onto the linux-next snapshot:
 
-<details>
-<summary>CachyOS patch subsystems included</summary>
+| Squash | Description |
+|--------|-------------|
+| `0101` | BBR3 TCP congestion control |
+| `0102` | CachyOS kbuild (`-O3`) hooks |
+| `0103` | x86_64 Zen 4 ISA optimizations (`-march=znver4`) |
+| `0110` | CachyOS config hooks |
+| `0111` | ACPI: disable bus-master check for AMD |
+| `0112` | amdgpu: avoid evicting resources at S5 |
 
-| Branch (squash) | Description |
-|-----------------|-------------|
-| `bbr3` (`0101`) | Google BBR3 TCP congestion control |
-| `kbuild` (`0102`) | CachyOS Kconfig hooks / `-O3` build |
-| `cpu-isa` (`0103`) | x86_64 Zen 4 ISA optimizations (`-march=znver4`) |
-| `cgroup-vram` (`0104`) | VRAM accounting in memory cgroups |
-| `fixes` (`0105` + `0106`) | Hardware-relevant kernel fixes; off-target parts reverted by `0106-cachy-drops` |
-| `hdmi` (`0107`) | HDMI 2.1 FreeSync/VRR/PCON fixes (excl. `0151`) |
-| `preempt-ipi` (`0108`) | IPI-based preemption |
-| `vesa-dsc-bpp` (`0109`) | DSC bits-per-pixel fixes |
-
-</details>
+(There is no `0106`/`0107` in this series: the off-target-drop and hdmi
+squashes were superseded by the linux-next base, which carries the clean
+upstream HDMI path.)
 
 ### Additional out-of-tree patches
 
@@ -59,70 +65,73 @@ series is grouped by range:
 |---|---|---|
 | `0001–0049` | Handmade local patches (SMU14, DCN401, GFX12) | Sleepy/Antigravity |
 | `0050–0099` | Upstream EDID/display ML patches not yet landed | amd-gfx / dri-devel ML |
-| `0101–0113` | CachyOS branch squashes (0106 = off-target drops; 0110–0113 = fork backports) | sirlucjan / CachyOS fork |
-| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | drm-next / agd5f |
-| `1100–1199` | AMD Display (DCN4, DCN42B, PSR, Replay, pstate, MCIF ARB) | drm-next |
-| `1200–1299` | AMD Power Management (amd-pstate, cpufreq) | linux-pm / sirlucjan |
+| `0101–0113` | CachyOS branch squashes | sirlucjan / CachyOS fork |
+| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TLB) | drm-next / agd5f |
+| `1100–1199` | AMD Display (DCN4, DCN42B, FRL, colorops) | drm-next |
+| `1200–1299` | AMD Power Management (amd-pstate, ACPI CPPC) | linux-pm / sirlucjan |
 | `2000–2099` | Block / I/O schedulers (bfq, mq-deadline) | sirlucjan |
-| `2100–2199` | Memory management (zstd, LRU-MARIE) | sirlucjan |
+| `2100–2199` | Memory management (zstd, LRU-MARIE, gup batching) | sirlucjan / lkml |
 | `2200–2299` | CPU idle (NAP governor) | sirlucjan |
 | `9000–9099` | agd5f staging backports | `git format-patch` from agd5f/linux |
 
 ### Realtek RTL8125B NIC
 
-The RTL8125B 2.5 GbE NIC is driven by the in-kernel `r8169` driver (shipped as a module since 7.2). No out-of-tree Realtek driver is needed.
+The RTL8125B 2.5 GbE NIC is driven by the in-kernel `r8169` driver (built as a
+module). No out-of-tree Realtek driver is needed.
 
-### Kconfig changes from defconfig
+### Notable Kconfig changes
 
-The following options differ from the CachyOS base `.config` (which itself differs from vanilla defconfig). See `config` in this repository for the full file.
+The full set of `scripts/config` calls lives in `prepare()` in `PKGBUILD` (and
+`disable_configs.py`). Highlights:
 
-| Symbol | Vanilla/CachyOS | This kernel | Reason |
-|--------|----------------|-------------|--------|
-| `MZEN4` | `n` | `y` | Hardware: Zen 4 |
-| `LTO_CLANG_THIN` | `n` | `y` | ThinLTO via LLVM 23 |
-| `CC_OPTIMIZE_FOR_PERFORMANCE_O3` | `n` | `y` | `-O3` optimization |
-| `TCP_CONG_BBR` | `y` | `n` | Removed; conflicts with BBR3 BTF symbols |
-| `TCP_CONG_BBR3` | `n` | `y` (built-in) | BBR3 is the default TCP congestion control |
-| `DEFAULT_TCP_CONG` | `"cubic"` | `"bbr3"` | BBR3 default |
-| `DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT` | `y` | `n` | Disabled to fix pahole 1.31 + Clang 23 BTF generation |
-| `DEBUG_INFO_DWARF5` | `n` | `y` | Required for pahole BTF with Clang 23 |
-| `DEBUG_INFO_BTF` | `n` | `y` | BPF type information for bpftune |
-| `LRU_GEN` | depends | `y` | Multi-generational LRU |
-| `LRU_MARIE` | `n` | `y` | MARIE LRU variant |
-| `CPU_IDLE_GOV_NAP` | `n` | `y` | NAP cpuidle governor |
-| `V4L2_LOOPBACK` | `n` | `m` | Virtual camera device |
-| `DRM_I915`, `DRM_XE`, `DRM_NOUVEAU` | varies | `n` | Not present on target hardware |
-| `CMDLINE` | `""` | see below | Embedded boot parameters |
+| Symbol | This kernel | Reason |
+|--------|-------------|--------|
+| `MZEN4` | `y` | Hardware: Zen 4 |
+| `LTO_CLANG_THIN` | `y` | ThinLTO via LLVM 23 |
+| `CC_OPTIMIZE_FOR_PERFORMANCE_O3` | `y` | `-O3` |
+| `TCP_CONG_BBR` | `n` | Removed; conflicts with BBR3 BTF symbols |
+| `TCP_CONG_BBR3`, `DEFAULT_TCP_CONG` | `y` / `"bbr3"` | BBR3 is the default |
+| `DEBUG_INFO_DWARF5`, `DEBUG_INFO_BTF` | `y` | pahole BTF with Clang 23 |
+| `LRU_GEN`, `LRU_MARIE` | `y` | Multi-generational LRU + MARIE |
+| `CPU_IDLE_GOV_NAP` | `y` | NAP cpuidle governor |
+| `SCHED_CLASS_EXT` | `y` | sched-ext BPF schedulers |
+| `NET_SCH_INGRESS`, `IFB` | `y` / `m` | CAKE SQM download shaping |
+| `DRM_I915`, `DRM_XE`, `DRM_NOUVEAU` | `n` | Not present on target hardware |
 
 **Embedded kernel command line** (`CONFIG_CMDLINE`):
 
 ```
-cpuidle.governor=nap amd_pstate.epp_boost=1 elevator=kyber pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0
+cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0 amdgpu.dcdebugmask=0x800
 ```
 
-- `cpuidle.governor=nap` — activates the NAP cpuidle governor by default; without this the module loads but does not activate.
-- `amd_pstate.epp_boost=1` — enables per-core EPP boost for recently-busy CPUs on Zen 4. Requires the `epp_boost` patch series (`1202`).
-- `elevator=kyber` — selects the kyber I/O scheduler as default.
-- `pcie_aspm=off` — disables PCIe Active State Power Management entirely. This is the drm/amd !5538 SMU bus-drop stopgap (see the ASPM note in README "What this kernel adds").
-- `amdgpu.aspm=0` / `amdgpu.runpm=0` — disable the GPU's own ASPM and runtime-PM (BACO) transitions (added 2026-08-12, `7.2.0-rc7-4`). Conservative stopgaps for the silent gaming freeze (SMU IF mismatch 0x2e vs 0x33); DPM stays on.
+- `cpuidle.governor=nap` activates the NAP governor (without it the module
+  loads but does not activate).
+- `amd_pstate.epp_boost=1` enables per-core EPP boost (`1202`).
+- `pcie_aspm=off` + `amdgpu.aspm=0` + `amdgpu.runpm=0` are the drm/amd !5538
+  SMU bus-drop stopgaps; DPM stays on so clocks still downclock.
+- `amdgpu.dcdebugmask=0x800` disables DCN4 Idle Power States, fixing the
+  scanout-time "box" artifact on the RX 9070 XT.
 
 ---
 
-## PROFILE_PEAK Behavior & Deep Sleep Control (patches 0003 & 0004)
+## PROFILE_PEAK behavior and deep-sleep control (patches 0003 & 0004)
 
-**These patches are custom (`0003` and `0004`).** They modify `drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0.c`.
+**These patches are custom.** They modify
+`drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0.c`.
 
-### What the patches do
+- **`0003` — Allow PROFILE_PEAK GFXCLK ceiling to float.** Lets the GPU clock
+  ceiling float to the hardware boost limit (>3.0 GHz) while `PROFILE_PEAK` is
+  forced, instead of pinning it to the DPM table's peak entry.
+- **`0004` — Disable deep sleep in PROFILE_PEAK.** Disables deep sleep while
+  `PROFILE_PEAK` is forced (and while the COMPUTE workload profile is active)
+  to remove power-state wake-up latency; switching back to `auto`, `high`,
+  `low`, or `manual` restores it.
 
-- **`0003-drm-amd-pm-Allow-PROFILE_PEAK-GFXCLK-ceiling-to-floa.patch`**:
-  Refactors `smu_v14_0_set_soft_freq_limited_range()` into `smu_v14_0_set_soft_freq_limited_range_split()` to support independent `min_automatic` and `max_automatic` flags. Sets `sclk_max_auto = true` for GFXCLK during `PROFILE_PEAK` so GPU core clocks float freely to full hardware boost speeds (>3.0 GHz) while keeping `sclk_min` pinned to peak DPM levels.
+Set the profile with:
 
-- **`0004-drm-amd-pm-Disable-deep-sleep-in-PROFILE_PEAK.patch`**:
-  Disables deep sleep (`smu_v14_0_deep_sleep_control(smu, false)`) when entering `PROFILE_PEAK` to eliminate power state wake-up latencies and micro-stutter. Evaluates deep sleep control uniformly across all performance levels, re-enabling deep sleep on transitions away from `PROFILE_PEAK` to `AUTO`, `HIGH`, `LOW`, `MANUAL`, or `PROFILE_STANDARD` (unless compute profile mode is active).
-
-### Effect
-
-Setting `profile_peak` on RDNA 4 provides full hardware boost clocks (eliminating the stuck 2.0 GHz cap) while explicitly disabling deep sleep for minimum frame latency. Switching back to `auto`, `high`, `low`, or `manual` correctly restores deep sleep power management.
+```bash
+echo profile_peak | sudo tee /sys/class/drm/card0/device/power_dpm_force_performance_level
+```
 
 ---
 
@@ -133,42 +142,40 @@ Setting `profile_peak` on RDNA 4 provides full hardware boost clocks (eliminatin
 - Arch Linux with `makepkg`
 - `pahole` >= 1.31 (`dwarves` package)
 - `base-devel`
-- Network access (downloads kernel source, LLVM toolchain)
+- Network access (downloads the kernel source and the LLVM toolchain)
 
-No Clang or LLD packages are required. The PKGBUILD downloads a pre-built LLVM toolchain from kernel.org.
+No Clang or LLD packages are required. The PKGBUILD downloads a pre-built LLVM
+toolchain from kernel.org.
 
 ### Build and install
 
 ```bash
 rm -rf src pkg           # old patched files cause false conflicts
 makepkg -f -s -c
-sudo pacman -U linux-sleepy-*.pkg.tar.zst linux-sleepy-headers-*.pkg.tar.zst
+sudo pacman -U linux-sleepy-next-*.pkg.tar.zst linux-sleepy-next-headers-*.pkg.tar.zst
 sudo grub-mkconfig -o /boot/grub/grub.cfg  # or equivalent
 ```
 
-The build prompts interactively for your upload/download speeds and defaults to
-enabling CAKE SQM. In non-interactive environments (CI, pipes) the prompt is
-skipped and the shipped config is installed — CAKE shaping enabled at 80/80 Mbit
-by default.
+Run `updpkgsums` after any `source=()` change or patch-file edit. The build
+prompts interactively for your CAKE SQM upload/download speeds and defaults to
+enabling shaping; in non-interactive environments the prompt is skipped and the
+shipped config installs (CAKE shaping enabled at 80/80 Mbit by default).
 
-### SQM / bufferbloat mitigation
+### net-tune (SQM / bufferbloat mitigation)
 
-The `net-tune` service ships one unit (`/usr/lib/systemd/system/net-tune.service`)
-that applies low-latency ethernet tuning (`ENABLE_LATENCY`) and CAKE SQM shaping
-(`ENABLE_SQM`), each independently toggleable in `/etc/net-tune.conf`. The shipped
-config enables SQM by default (80/80 Mbit); answering the build prompt lets you
-enter your own upload/download speeds, and answering `n` (or editing
-`/etc/net-tune.conf` to `ENABLE_SQM=no`) disables shaping while keeping latency
-tuning.
+The `net-tune` service ships one unit
+(`/usr/lib/systemd/system/net-tune.service`) that applies low-latency ethernet
+tuning (`ENABLE_LATENCY`) and CAKE SQM shaping (`ENABLE_SQM`), each
+independently toggleable in `/etc/net-tune.conf`. BBR3 is the kernel-compiled
+default; the service only shapes CAKE, it does not change the congestion
+controller.
 
-BBR3 does **not** need to be set by this service; it is the kernel-compiled default.
+To adjust speeds without rebuilding, edit `/etc/net-tune.conf` and restart:
+`sudo systemctl restart net-tune.service`.
 
-To adjust speeds without rebuilding, edit `/etc/net-tune.conf` and restart the
-service (`sudo systemctl restart net-tune.service`).
-
-To confirm CAKE is actually shaping (both directions), check
-`journalctl -u net-tune -n 20` for the `net-tune: OK - CAKE shaping active` line
-after a restart, or inspect by hand:
+Confirm CAKE is shaping both directions by checking
+`journalctl -u net-tune -n 20` for `net-tune: OK - CAKE shaping active`, or by
+hand:
 
 ```bash
 tc qdisc show dev <iface>          # expect a root cake AND "qdisc ingress ffff:"
@@ -176,24 +183,27 @@ ip link show ifb4cake              # expect state UP, qdisc cake
 tc filter show dev <iface> ingress # expect a mirred redirect to ifb4cake
 ```
 
-If the ingress (download) half is missing — no `ingress ffff:` qdisc and no
-`ifb4cake` device — downloads run unshaped and you'll see bufferbloat on the
-download leg of a test while upload stays clean. Download shaping requires the
-`ingress` qdisc to be built into the kernel (`CONFIG_NET_SCH_INGRESS=y`, enabled
-in the PKGBUILD) — on a kernel without it, no amount of service configuration
-can create the ingress path, and the service will log
-`net-tune: ERROR - no ingress qdisc on <iface> ...`.
+Download shaping requires the `ingress` qdisc built in
+(`CONFIG_NET_SCH_INGRESS=y`) and a named `ifb4cake` device. If the ingress half
+is missing the service logs
+`net-tune: ERROR - no ingress qdisc on <iface> ...` and downloads run unshaped.
 
 ---
 
 ## Known issues and limitations
 
-- **BTF symbol conflict**: `CONFIG_TCP_CONG_BBR` (old BBRv1/v2) and `CONFIG_TCP_CONG_BBR3` both define `BTF_KFUNCS_START(tcp_bbr_check_kfunc_ids)`. Having both built-in causes `resolve_btfids` to exit 255 silently, which presents as `Failed to generate BTF for vmlinux`. This build disables the old BBR.
-- **DWARF5 required with Clang 23**: `DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT` produces DWARF output that `pahole` 1.31 cannot convert to BTF. This build uses `DEBUG_INFO_DWARF5` explicitly.
-- **LRU MARIE conflict with vm_swappiness**: The MARIE patch (`2101`) was sourced from the CachyOS-rebased version rather than the raw sirlucjan tree to avoid a `CONFIG_CACHY` vm_swappiness conflict.
-- **NAP governor**: NAP requires the `cpuidle.governor=nap` kernel parameter to activate. This build bakes it into `CONFIG_CMDLINE` so it is not needed on the boot command line.
-- **Patch `1101` is reverse-applied**: the DCN4 pstate-enable patch is applied then immediately reverse-applied in `prepare()` so `.pstate_enabled = false` avoids UCLK-switching display freezes on the RX 9070 XT. Restoring the vanilla setting keeps the GPU cool and power-efficient in `auto` mode without screen glitches.
-- **Patch 0003 is not upstream**: The PROFILE_PEAK patch modifies SMU14 power management in ways that have not been reviewed by AMD or the upstream community.
+- **BTF symbol conflict**: old BBR (`TCP_CONG_BBR`) and BBR3 both define
+  `BTF_KFUNCS_START(tcp_bbr_check_kfunc_ids)`; having both built-in makes
+  `resolve_btfids` exit 255. This build disables the old BBR.
+- **DWARF5 required with Clang 23**: `DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT`
+  produces DWARF that pahole 1.31 cannot convert to BTF. This build uses
+  `DEBUG_INFO_DWARF5`.
+- **NAP governor**: NAP requires `cpuidle.governor=nap`, baked into
+  `CONFIG_CMDLINE`.
+- **`0003`/`0004` are not upstream**: they modify SMU14 power management in ways
+  not yet reviewed by AMD.
+- **`pcie_aspm=off` is a stopgap** for the !5538 SMU bus-drop; it slightly
+  raises idle PCIe power draw.
 
 ---
 
@@ -202,11 +212,14 @@ can create the ingress path, and the service will log
 ```
 PKGBUILD                  Build script (Arch Linux makepkg format)
 config                    Base kernel .config (from CachyOS)
-disable_configs.py        Script to strip CachyOS-specific symbols before olddefconfig
+disable_configs.py        Script to strip unwanted symbols before olddefconfig
 patches/<range>/NNNN-*.patch   The patch series, one folder per number range
 net-tune/                 Unified CAKE SQM + latency tuning systemd service
 PATCH_SOURCES.md          Per-patch source URLs and commit hashes
-GUIDE.md                  Developer notes (build, patch workflow, CI)
+PATCH_SOURCES-7.2.md      Archived ledger of the retired 7.2 series
+README.md                 User-facing overview
+GUIDE.md                  This guide
+CHANGELOG.md              Per-release summary of what changed
 ```
 
 The PKGBUILD auto-creates gitignored root-level symlinks

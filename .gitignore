@@ -25,6 +25,6 @@ grep_output*.txt
 *.bak
 
 # Machine-specific generated configs (keep base 'config' tracked)
-config-7.2.*
+config-20*
 # Local tool state
 .kiro/

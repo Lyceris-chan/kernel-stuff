@@ -14,14 +14,13 @@ curl -I -s "https://git.kernel.org/torvalds/t/linux-<X.Y-rcN>.tar.gz"
 Stop and tell the user if this 404s — don't guess a nearby tag or round to one
 that exists.
 
-**Pre-RC fallback — sleepy-next linux-next preview (learned 2026-08-26):**
-when the NEXT mainline RC (e.g. 7.3-rc1) doesn't exist yet but the merge
-window is open, don't bump a `linux-7.2`-family PKGBUILD to a nonexistent
-tag. The 7.3 preview kernel is the separate **`sleepy-next/`** package, built
-from a `next-YYYYMMDD` snapshot (bump its `_srctag`, then run the patch-sweep
-Step-9 linux-next sweep). The earlier wannabe preview worktree (branch
-`wannabe-7.3`, doc `WANNABE-7.3.md`) was removed 2026-09-02 — do not recreate
-it; its content now lives in the sleepy-next series.
+**Bumping linux-sleepy-next (the linux-next preview, learned 2026-08-26):**
+this repo's one package (`linux-sleepy-next`, promoted to the repo root on
+2026-09-02) is built from a `next-YYYYMMDD` snapshot. A version bump moves
+`_srctag` to the newest snapshot and runs the patch-sweep Step-9 linux-next
+sweep; it is not a `linux-7.2`-family RC bump (that era is retired). The
+earlier wannabe preview worktree (branch `wannabe-7.3`, doc `WANNABE-7.3.md`)
+was removed 2026-09-02 — do not recreate it; its content lives in this series.
 
 **Tarball source URL:** the `cdn.kernel.org/pub/linux/kernel/v7.x/testing/`
 URL 404s right after a tag is cut (the cdn mirrors RC tarballs late). Point

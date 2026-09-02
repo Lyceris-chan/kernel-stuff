@@ -1,8 +1,11 @@
-# sleepy-kernel
+# sleepy-kernel (linux-sleepy-next)
 
-Custom Arch Linux kernel package based on Linux mainline RC releases, built for
-a single AMD Zen 4 + RDNA 4 desktop. Uses a sanitized CachyOS patchset as the
-base, with additional upstream and local patches filtered to this hardware.
+Custom Arch Linux kernel package built from **linux-next snapshots** (the 7.3
+merge-window preview) for a single AMD Zen 4 + RDNA 4 desktop, packaged as
+`linux-sleepy-next`. Uses a sanitized CachyOS patchset as the base, with
+additional upstream and local patches filtered to this hardware. The older 7.2
+`linux-sleepy` package and the `sleepy-next/` subfolder it lived in were retired
+2026-09-02 — this repo is now the single package.
 
 ## Target hardware
 
@@ -25,6 +28,7 @@ base, with additional upstream and local patches filtered to this hardware.
 | `README.md` | User-facing project doc |
 | `CHANGELOG.md` | Per-release summary of what changed, by kernel version + pkgrel |
 | `PATCH_SOURCES.md` | Per-patch provenance ledger — authors, commit hashes, source URLs, revisions |
+| `PATCH_SOURCES-7.2.md` | Archived provenance ledger of the retired 7.2 `linux-sleepy` series |
 | `LESSONS.md` | Full incident log ("do not repeat") — the durable rules are below; the context is there |
 
 Local Google documentation style guides (committed reference copies, CC-By 3.0
@@ -44,7 +48,7 @@ docs.
 | `repos/` | Cloned upstream git repos for patch extraction (gitignored; never clone into `/tmp`) |
 | `src/`, `pkg/` | Build artifacts — never commit |
 
-**Deleted files (do not recreate):** `cake-sqm.sh`, `cake-sqm.service`, `sqm-qos/`, `net-latency/` (replaced by the unified `net-tune/` service).
+**Deleted files (do not recreate):** `cake-sqm.sh`, `cake-sqm.service`, `sqm-qos/`, `net-latency/` (replaced by the unified `net-tune/` service). **Retired 2026-09-02:** the 7.2 `linux-sleepy` package (root 7.2 `PKGBUILD`/`config`/`patches`/`.SRCINFO` and its provenance ledger is archived as `PATCH_SOURCES-7.2.md`), the `sleepy-next/` subfolder (promoted to the repo root — do not recreate a nested package dir), and the `wannabe-7.3` preview tree.
 
 ## Skills — task-specific procedures live in `.claude/skills/`
 
@@ -67,24 +71,24 @@ Each range is a category; use the next unused number in the correct range.
 | Range | Category | Source / how to obtain |
 |---|---|---|
 | `0001–0049` | Handmade local patches (Sleepy/Antigravity) | SMU14, DCN401, GFX12 hand-written fixes for this hardware |
-| `0050–0099` | Upstream EDID/display ML patches not yet landed | `b4` mbox or freedesktop archives — verify with `git apply --check` against `repos/linux-7.2-rc7` |
+| `0050–0099` | Upstream EDID/display ML patches not yet landed | `b4` mbox or freedesktop archives — verify with `git apply --check` against `repos/linux-next@<current _srctag>` |
 | `0101–0113` | CachyOS branch squashes (0106 = off-target drops; 0110–0113 = CachyOS/linux-fork backports) | sirlucjan `-sep` dirs (see `patch-cachy-branches`); 0110–0113 from CachyOS/linux fork |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | drm-next / agd5f |
 | `1100–1199` | AMD Display (DCN4, DCN42B, PSR, Replay, pstate, MCIF ARB) | drm-next |
 | `1200–1299` | AMD Power Management (amd-pstate, cpufreq) | linux-pm / sirlucjan |
 | `2000–2099` | Block / I/O schedulers (bfq, mq-deadline) | sirlucjan |
-| `2100–2199` | Memory management (zstd, LRU-MARIE) | sirlucjan |
+| `2100–2199` | Memory management (zstd, LRU-MARIE, gup folio batching) | sirlucjan |
 | `2200–2299` | CPU idle (NAP governor) | sirlucjan `nap-patches/` (firelzrd's repo is BORE-only) |
-| `9000–9099` | agd5f staging backports | `git format-patch` from agd5f/linux — **verify all symbols exist in rc mainline first** |
+| `9000–9099` | agd5f staging backports | `git format-patch` from agd5f/linux — **verify all symbols exist in the next-snapshot base first** |
 
 All sirlucjan directories live under `repos/sirlucjan-kernel-patches/7.2/` (renamed from `7.2-rc/` when 7.2 released, 2026-08-19).
-The CachyOS squashes are generated **against the actual series state** (rc7 + the `00xx` local/upstream patches), not a clean rc — the pre-CachyOS patches touch shared files like `drm_edid.c`. Two known conflicts handled inside the squashes: `0151` duplicates `0055`, and `0053` must be dropped when the hdmi branch is present.
+The CachyOS squashes are generated **against the actual series state** (the current `_srctag` snapshot + the `00xx`-style local/upstream patches), not a clean snapshot — the pre-CachyOS patches touch shared files like `drm_edid.c`. This series has no `0106`/`0107` squash: the off-target-drop and hdmi squashes are superseded by the linux-next base (which carries the clean upstream HDMI path).
 
 ## Full maintenance cycle
 
-When asked to "update the kernel", "bump to a new RC", or "check for new patches", run the matching phases in order (a "check for new patches" request is phase 2 alone; a "build it" request is phase 3 alone):
+When asked to "update the kernel", "bump to a newer next snapshot / RC", or "check for new patches", run the matching phases in order (a "check for new patches" request is phase 2 alone; a "build it" request is phase 3 alone):
 
-1. **Version bump** — bump `_major`/`_minor`/`_rcver`/`_srcname` in PKGBUILD; rebase every patch; regenerate only the CachyOS squashes that fail `git apply --check`. Report every drop/regeneration with reasons before going further. → `kernel-version-bump`
+1. **Version bump** — bump `_srctag` to the newest `next-YYYYMMDD` (and `pkgver`/`pkgrel`) in PKGBUILD; rebase every patch; regenerate only the CachyOS squashes that fail `git apply --check`. Report every drop/regeneration with reasons before going further. → `kernel-version-bump`
 2. **Patch audit** — check all six sources (drm-next, linux-next, linux-pm, amd-gfx ML, dri-devel ML, sirlucjan) plus the drm/amd work_items tracker for anything new; list candidates with source and priority before adding. → `patch-sweep`
 3. **Build and fix** — `rm -rf src pkg && makepkg -f -s -c`; on failure diagnose per the rules below and keep iterating until the build succeeds or a MUST NOT rule blocks you. → `kernel-build`
 
@@ -128,7 +132,8 @@ scripts/config -d TCP_CONG_BBR -e TCP_CONG_BBR3 -e DEFAULT_BBR3 --set-str DEFAUL
 # Kernel command line (appended to bootloader params, does not override)
 # pcie_aspm=off = !5538 SMU bus-drop stopgap; amdgpu.aspm=0/runpm=0 = conservative
 # amdgpu-side stopgaps for the silent gaming freeze (SMU IF 0x2e vs 0x33). DPM stays on.
-scripts/config -e CMDLINE_BOOL --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 elevator=kyber pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0" -d CMDLINE_OVERRIDE
+# amdgpu.dcdebugmask=0x800 = DC_DISABLE_IPS: fixes the DCN401 scanout "box" artifact.
+scripts/config -e CMDLINE_BOOL --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0 amdgpu.dcdebugmask=0x800" -d CMDLINE_OVERRIDE
 # BTF / debug (Clang 23 requires DWARF5)
 scripts/config -e DEBUG_KERNEL -d DEBUG_INFO_NONE -d DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT -e DEBUG_INFO_DWARF5 -e DEBUG_INFO_BTF
 # BPF infrastructure (bpftune, sched-ext)
@@ -183,7 +188,7 @@ echo "-${pkgbase#linux-}" > localversion.20-pkgname
 scripts/config --set-str LOCALVERSION ""
 ```
 
-Result: `uname -r` → `7.2.0-rc7-1-sleepy`.
+Result: `uname -r` → `7.3.0-rc1-<pkgrel>-sleepy-next-<nextdate>` (e.g. `...-13-sleepy-next-20260902`).
 
 ## Local model routing
 
