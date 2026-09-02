@@ -9,23 +9,27 @@ Subject: [PATCH 09/14] drm/amdgpu/gmc12: Use AMDGPU_PTE_IS_PTE flag for
  1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c b/drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c
-index 299fe960b99e..c210e2463a27 100644
+index 3add79c474f3..33e38feb7a65 100644
 --- a/drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c
 +++ b/drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c
-@@ -644,11 +644,12 @@ static int gmc_v12_0_early_init(struct amdgpu_ip_block *ip_block)
- 		adev->gmc.xgmi.connected_to_cpu =
- 			adev->smuio.funcs->is_host_gpu_xgmi_supported(adev);
+@@ -827,6 +827,8 @@ static int gmc_v12_0_sw_init(struct amdgpu_ip_block *ip_block)
+ 		adev->gmc.vram_vendor = vram_vendor;
+ 	}
  
 +	adev->gmc.init_pte_flags = AMDGPU_PTE_IS_PTE;
 +
  	switch (amdgpu_ip_version(adev, GC_HWIP, 0)) {
- 	case IP_VERSION(12, 1, 0):
- 		gmc_v12_1_set_gmc_funcs(adev);
- 		gmc_v12_1_set_irq_funcs(adev);
+ 	case IP_VERSION(12, 0, 0):
+ 	case IP_VERSION(12, 0, 1):
+@@ -855,7 +857,6 @@ static int gmc_v12_0_sw_init(struct amdgpu_ip_block *ip_block)
+ 		pte_addr_mask = 0x000FFFFFFFFFF000ULL; /* 52 bit PA */
+ 		dma_addr_bits = 52;
+ 		adev->gmc.translate_further = adev->vm_manager.num_level > 1;
 -		adev->gmc.init_pte_flags = AMDGPU_PTE_IS_PTE;
  		break;
  	default:
- 		gmc_v12_0_set_gmc_funcs(adev);
+ 		dev_warn(adev->dev, "Unrecognized GC IP version: 0x%08x\n",
+
 -- 
 2.54.0
 

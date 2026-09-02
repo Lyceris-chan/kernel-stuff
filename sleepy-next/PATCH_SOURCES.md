@@ -237,3 +237,22 @@ a multi-agent recon/port/verify pass base-fit it). The 7.3 base diverged:
   and the mm/ subtree builds (gcc) with these fixes.
 - Runtime invariants (kcompressd folio_get/drain balance, queued-folio locking
   across the keep path) match base semantics but need real boot testing.
+
+## Updated (2026-09-02) — MARIE 0.11.0 rebuilt as STRICT 1-to-1 + base next-20260902
+
+The MARIE 2101 port was rebuilt as a strict 1-to-1 rebase (the prior adaptation
+was rejected as a rewrite). Verified: **0 non-verbatim MARIE lines** vs the
+original firelzrd 0.11.0 patch. Allowed differences only: (1) file re-points
+(mm/swap.c -> mm/folio.c, struct alloc_context fields internal.h ->
+page_alloc.h), (2) hunk context/offset adjustment, (3) a clearly-labelled
+"MARIE legacy writeout compatibility (SHIM)" in mm/page_io.c that re-provides
+the per-folio swap helpers (__swap_writepage, swap_writepage_bdev_sync,
+__end_swap_bio_write, count_swpout_vm_event) linux-next deleted in the
+swap_io_ctx rewrite and MARIE's verbatim code calls, mapped onto the 7.3 write
+path, (4) two minimal compile-fix lines (vma_flags_test for the base's
+vma_flags_t; `size = val` for the base's atomic_long_t memcg read) + the
+FOLIOREF_RECLAIM_CLEAN restore. mm/ compiles with CONFIG_LRU_MARIE=y.
+Bumped base to next-20260902; 11 carried patches dropped (now upstream:
+FRL cap/restore, HPD filter, FRL LT-timeout, overlay-cursor, dw-estimate,
+no-retry PTE, clamp-dcfclk, sched-ext DSQ, flip-schedule unify+fix); 3 rebased
+(0010 gfx12 barrier, 9011/9019 gmc). Series = 112 patches.

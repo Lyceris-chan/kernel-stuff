@@ -9,6 +9,20 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.3.0-rc1-13-sleepy-next-20260902] — 2026-09-02
+
+Bumped to today's linux-next (`next-20260902`) with **LRU-MARIE 0.11.0 rebuilt as a strict 1-to-1 rebase** of the original author's code.
+
+### Added
+- **LRU-MARIE 0.11.0 now carried verbatim** (byte-identical to firelzrd's patch; the earlier adaptation was rewritten to keep every MARIE line unchanged). Only additions: two minimal compile-fix lines (a `vma_flags_t` and an `atomic_long_t` API change the 7.3 base forced) and a clearly-separated "legacy writeout" shim that re-provides the per-folio swap helpers linux-next deleted (MARIE's code calls them as the author wrote it). Compiles clean.
+
+### Changed
+- Base bumped `next-20260901` -> `next-20260902`; the series drops 11 patches now merged upstream (CLIFF: FRL cap/restore, HPD filter, FRL LT-timeout, overlay-cursor, dw-estimate, no-retry PTE, flip-schedule fixes, clamp-dcfclk, sched-ext DSQ, unify-flip-schedule), and 3 were rebased for the new base. Series is now a clean 112 patches.
+- **The flip-schedule changes (which we had carried) are being reverted upstream for causing a regression** — confirming the drop.
+
+### Fixed
+- Extra-thorough source re-check (09-02): no new merged AMD fix for the 9070 XT. The passive-VRR series is confirmed as the pending #5649 (HDMI FRL) fix but remains v1 ML-only; the TLB-invalidation rework V2 supersedes our carried subset (deferred for a dedicated pass).
+
 ## [7.3.0-rc1-12-sleepy-next-20260901] — 2026-09-02
 
 Updated to the latest linux-next base (`next-20260901`, now carrying 7.3-rc1
