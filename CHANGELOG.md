@@ -9,6 +9,37 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.3.0-rc1-12-sleepy-next-20260901] — 2026-09-02
+
+Updated to the latest linux-next base (`next-20260901`, now carrying 7.3-rc1
+content — the kernel version string advances to 7.3.0-rc1) and completed a
+full re-sweep of every source. The headline change: **LRU-MARIE is now ported
+to the linux-next (7.3-merge) base**, replacing the version that never applied.
+
+### Added
+- **LRU-MARIE 0.11.0, ported to linux-next** (ultracode multi-agent port of the
+  original author's 7.2 patch). MARIE is a memory-reclaim accelerator: a
+  per-PFN reclaim-state byte array, SIMD young-bit walker, and — new in 0.11 —
+  a `kcompressd` async-compression thread with bio-coalesced swapout and an
+  early-OOM gate. The 7.3-merge mm diverged (memcg soft-limit removal, mglru
+  refactor, `page_io.c` rewritten around `swap_io_ctx`, `alloc_context` moved),
+  so the port base-fit those. Verified: applies cleanly + compiles
+  (`CONFIG_LRU_MARIE=y`). Runtime behavior needs real testing under memory
+  pressure.
+- The latest mm/mglru/memcg fixes from `next-20260901`.
+
+### Changed
+- **Dropped 20 patches** that target the 7.2-era base and do not apply to the
+  7.3-merge tree (they were silently skipped at build): 7.2-only CachyOS
+  squashes, SMU14/amd-pstate/ttm/gfx12 backports, early DCN4 backports the
+  base's newer code supersedes, zram OOB, and one userq fix. Series is now a
+  clean 123 patches — every one applies.
+
+### Fixed
+- Source sweep re-confirmed (all sources): no new AMD display/GPU fixes worth
+  carrying beyond the base. The passive-VRR series (dri-devel) is a new v1
+  feature, not a fix — assessed and deferred.
+
 ## [7.2.0-10-sleepy-next-20260828] — 2026-08-28
 
 Patch-series cleanup and rebuild. Fixed six of the second-sweep patches that

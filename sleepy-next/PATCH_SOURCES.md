@@ -169,3 +169,71 @@ superseded `1054`, `9045`, `9047` (base has refined revisions) and `9053`
 cleanly and is kept. Fixed the six `9049`-`9054` amd-staging patches that were
 accidentally empty (re-extracted via `git format-patch` from agd5f; `9053`
 dropped as redundant). `source=()` now matches on-disk exactly (143 patches).
+
+## Sweep 2026-09-02 — base bump to next-20260901, no new fixes worth carrying
+
+Full source re-check (linux-next next-20260901 fetched; amd-gfx + dri-devel
+2026-September archives; lkml mirror; drm/amd work-items tracker; CachyOS /
+sirlucjan / firelzrd; x86/security line). Findings, all **deferred/not carried**
+with reasons:
+
+- **LRU-MARIE 0.11.0** (firelzrd, 2026-08-31) — fetched. Does NOT port to the
+  7.3-merge-window base (both 0.10.5 and 0.11.0 fail `patch` against
+  next-20260828/0901: the mm memcg soft-limit removal shifted
+  memcontrol.h/vmscan.c). Our carried 2101 (0.10.5) is itself skipped by the
+  build for the same reason. Needs a dedicated 7.3 port before it can land.
+- **"passive VRR" series** (Jerry Zuo / Fangzhi Zuo + Tomasz Pakuła, v1
+  2026-09-01, `20260901191251.2653684-1`, dri-devel) — a NEW feature (keeps
+  sinks in their variable-refresh state during desktop/fixed-refresh use to
+  avoid HDMI blanking flicker), not a fix; touches DRM core + the 7.3 split
+  amdgpu_dm files; not in next-20260901. V1 unreviewed; our VRR already works
+  (HF-VSDB freesync_capable via 0059-0061/0063). pvr-01/pvr-03 apply clean,
+  pvr-02 needs a manual rebase. Deferred — re-evaluate on a v2/review.
+- **drm/amd/display cursor-disable w/ horizontal split planes** (yulingli,
+  08-31) — cursor fix; targets horizontal-split (ultrawide/ODM) configs, not
+  our 1920x1080 layout; not carried.
+- **Work items**: #5709 (HDMI FRL link-training fail on DPMS wake), #5717
+  (NAVI48/RX 9070 XT evicted-surface corruption) — open, no landed fix
+  referenced; track. #5616/#5705 flip_done class still open (no new fix).
+- CachyOS fixes v5 = cosmetic (HID touchpad); cachyos-linux/build forks stale.
+- x86/security: nothing new for Zen 4 since 08-01.
+
+Net: no new AMD fixes worth carrying this window; bumped base to
+`next-20260901` for the current mm/mglru + 7.3-rc1 content.
+
+## Dropped (2026-09-02) — 20 non-applying patches removed from sleepy-next
+
+These 20 patches target the vanilla-7.2 / 7.2-era base and do NOT apply to the
+7.3-merge linux-next base (the build was skipping them — verified: each fails
+`patch -p1 --forward` and does NOT reverse-apply). Removed from source=() and
+disk so the series only carries patches that actually apply:
+`0008` (SMU14 power-limit), CachyOS `0104`-`0113` 7.2-only squashes that don't
+port (cgroup-vram, fixes, drops, preempt-ipi, vesa-dsc, micro-opts), `1003`
+(gfx12 KCQ remap), `1023` (min_power_limit), `1057` (ttm BO ref), `1100`/
+`1105`/`1116`/`1127`/`1128` (DCN4/42b backports the base's newer DCN4 code
+supersedes), `1206`/`1209` (amd-pstate EPP — base CPPC v4+ path differs),
+`2106`/`2107` (zram OOB — base zram rewritten), `9041` (userq doorbell xa-lock
+— base userq evolved). `2101` (MARIE 0.10.5) retained pending the 0.11.0 port.
+Series now 123 patches.
+
+## Ported (2026-09-02) — LRU-MARIE 0.11.0 onto next-20260901 (replaces 2101 0.10.5)
+
+`2101` is now the **ultracode-ported LRU-MARIE 0.11.0** for the linux-next
+7.3-merge base (firelzrd's vanilla-7.2 patch does NOT apply to next-20260901;
+a multi-agent recon/port/verify pass base-fit it). The 7.3 base diverged:
+`mm/swap.c` content moved to `mm/folio.c`, `struct alloc_context` moved to
+`mm/page_alloc.h`, `page_io.c` was rewritten around `struct swap_io_ctx`
+(the old `swap_iocb**` per-folio path is gone), vma_flags became
+`vma_flags_t`, and the memcg soft-limit rbtree was removed. Port notes:
+- swapout batching delivered via the base's native ctx/bio coalescing (not
+  MARIE's removed `do_swapout_batch`); kcompressd kthread + store/drain +
+  nr_swap_write_failed early-OOM gate all present.
+- `FOLIOREF_RECLAIM_CLEAN` enum restored (base removed it); `vm_flags & VM_EXEC`
+  fixed to the base's `is_exec_file_folio`/vma_flags_t API.
+- 3 compile fixes applied: `#include "../swap.h"` (state_reclaim.c, for
+  mem_cgroup_swappiness), `#include "../page_alloc.h"` (defrag.c, for
+  buddy_order/post_alloc_hook), and 4-arg `post_alloc_hook(..., ALLOC_DEFAULT)`
+  in defrag_compat.h. Verified: applies clean (`patch -p1 --forward`, 0 rejects)
+  and the mm/ subtree builds (gcc) with these fixes.
+- Runtime invariants (kcompressd folio_get/drain balance, queued-folio locking
+  across the keep path) match base semantics but need real boot testing.
