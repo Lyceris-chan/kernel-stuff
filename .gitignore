@@ -28,6 +28,3 @@ grep_output*.txt
 config-7.2.*
 # Local tool state
 .kiro/
-# Wannabe 7.3 preview kernel tree (the patch series under wannabe-7.3-patches/
-# IS tracked — see README there for how to rebuild the tree from linux-next)
-wannabe-7.3-rc1/

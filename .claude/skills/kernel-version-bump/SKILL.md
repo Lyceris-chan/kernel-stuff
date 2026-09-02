@@ -14,12 +14,14 @@ curl -I -s "https://git.kernel.org/torvalds/t/linux-<X.Y-rcN>.tar.gz"
 Stop and tell the user if this 404s — don't guess a nearby tag or round to one
 that exists.
 
-**Pre-RC fallback — wannabe tree (learned 2026-08-26):** when the NEXT RC
-(e.g. 7.3-rc1) doesn't exist yet but the merge window is open, don't bump
-the PKGBUILD to a nonexistent tag. Instead offer the **wannabe preview tree**
-(`wannabe-7.3-rc1/`, git worktree from `repos/linux-next` at the newest
-`next-YYYYMMDD` tag, branch `wannabe-7.3`) and run the Step-9 wannabe sweep
-in the patch-sweep skill. See `WANNABE-7.3.md`.
+**Pre-RC fallback — sleepy-next linux-next preview (learned 2026-08-26):**
+when the NEXT mainline RC (e.g. 7.3-rc1) doesn't exist yet but the merge
+window is open, don't bump a `linux-7.2`-family PKGBUILD to a nonexistent
+tag. The 7.3 preview kernel is the separate **`sleepy-next/`** package, built
+from a `next-YYYYMMDD` snapshot (bump its `_srctag`, then run the patch-sweep
+Step-9 linux-next sweep). The earlier wannabe preview worktree (branch
+`wannabe-7.3`, doc `WANNABE-7.3.md`) was removed 2026-09-02 — do not recreate
+it; its content now lives in the sleepy-next series.
 
 **Tarball source URL:** the `cdn.kernel.org/pub/linux/kernel/v7.x/testing/`
 URL 404s right after a tag is cut (the cdn mirrors RC tarballs late). Point

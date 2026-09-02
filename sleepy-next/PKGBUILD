@@ -185,10 +185,10 @@ pkgrel=13
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
-# linux-next snapshot (the 7.3 merge-window content) for the wannabe 7.3 preview
+# linux-next snapshot (the 7.3 merge-window content) for the 7.3 preview
 _srctag=next-20260902
 _srcname=${_srctag}
-pkgdesc='Wannabe Linux 7.3-next preview kernel: linux-next 20260902 + sleepy hardware merges (CachyOS optimizations included)'
+pkgdesc='Sleepy-next 7.3 preview kernel: linux-next 20260902 + sleepy hardware merges (CachyOS optimizations included)'
 _kernver="$pkgver-$pkgrel"
 _kernuname="${pkgver}-${_pkgsuffix}"
 arch=('x86_64')

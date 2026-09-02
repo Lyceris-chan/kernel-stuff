@@ -9,6 +9,26 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [repo maintenance] — 2026-09-02
+
+- **Wannabe 7.3 preview removed.** The `wannabe-7.3-rc1/` preview tree (1.8 GB,
+  gitignored), its tracked `wannabe-7.3-patches/` series (16 patches) and
+  `WANNABE-7.3.md` were dropped — superseded by the `sleepy-next` package,
+  which already carries the same content (gup batching 2120–2127, HDMI VRR/ALLM
+  0059–0061, userq/KFD 9000s). Historical entries in this changelog and
+  `PATCH_SOURCES.md` are kept, annotated.
+- **Patch series verified clean.** Faithful reproduction of each package's
+  `prepare()` patch stage against a pristine base confirmed every source patch
+  applies in order with nothing silently skipped:
+  - `sleepy-next` (next-20260902): 112/112 apply — 70 clean, 35 line-offset,
+    7 minor fuzz (≤2, within the PKGBUILD's `-F2` tolerance); on-disk ↔
+    `source=()` reconcile 1:1, no orphans.
+  - `sleepy-kernel` 7.2 (v7.2.0): 174/174 apply — 171 clean, 3 minor fuzz
+    (`0004`, `1058`, `9007`, the same shared patches); `1101` revert intact.
+- `pkgdesc` for `linux-sleepy-next` renamed off the dead "Wannabe" name.
+
+---
+
 ## [7.3.0-rc1-13-sleepy-next-20260902] — 2026-09-02
 
 Bumped to today's linux-next (`next-20260902`) with **LRU-MARIE 0.11.0 rebuilt as a strict 1-to-1 rebase** of the original author's code.
@@ -182,12 +202,17 @@ patches** relevant to this hardware, all merged into this release:
 
 ---
 
-## [wannabe-7.3-rc1] — 2026-08-26 (preview tree, unreleased)
+## [wannabe-7.3-rc1] — 2026-08-26 (preview tree; superseded 2026-09-02)
+
+> The wannabe preview tree, its `wannabe-7.3-patches/` series and
+> `WANNABE-7.3.md` were removed 2026-09-02, superseded by the `sleepy-next`
+> package (which now carries this content as its 2120–2127 / 0059–0061 / 9000s
+> series). Historical record kept below.
 
 Built a **wannabe 7.3-rc1** preview tree (`wannabe-7.3-rc1/`, git worktree
 from `linux-next` `next-20260825`) ahead of the 7.3-rc1 release. It is a
 superset of the 7.2.0-2 build plus the 7.3 merge-window content relevant to
-this hardware. See `WANNABE-7.3.md` for the full breakdown.
+this hardware.
 
 ### Added (upstream 7.3 window, arrives with the real bump)
 
@@ -242,9 +267,9 @@ this hardware. See `WANNABE-7.3.md` for the full breakdown.
 - **0107 vs clean ML HDMI**: verified the ML VRR/ALLM v4 amdgpu-side
   patches can't replace `0107` on 7.2 (they target the amdgpu_dm split,
   absent there) — `0107` stays required on 7.2; clean ML HDMI is already
-  adopted in the wannabe 7.3 tree.
-- **Leo Li (sunpeng.li) display fixes** — confirmed in the wannabe base
-  (402 commits, incl. flip-done timeouts on mode1 reset + DCN vblank/flip
+  adopted in the linux-next preview (`sleepy-next`).
+- **Leo Li (sunpeng.li) display fixes** — confirmed in the linux-next preview
+  base (402 commits, incl. flip-done timeouts on mode1 reset + DCN vblank/flip
   consolidation); arrive with the 7.3 bump, not backported to 7.2.
 - Work items tracked: **#5693** (RX 9070 XT VCN-unigate + SMU deadlock,
   no fix yet), #5649 (HDMI FRL blanking, RDNA3), #5671, #5656.

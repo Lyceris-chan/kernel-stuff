@@ -1,11 +1,12 @@
 # sleepy-next — patch provenance
 
-`linux-sleepy-next` builds the **wannabe 7.3-next preview** kernel from the
-linux-next **next-20260825** snapshot + the sleepy 7.2 patch series (the same
-patches the `linux-sleepy` 7.2 build uses) + the clean upstream HDMI VRR/ALLM
-patches. See `../PATCH_SOURCES.md` (the 7.2 ledger) for the 173 shared patches
-— every one is the identical, traceable 7.2 series file (CachyOS squashes,
-upstream ML patches, agd5f backports, local patches).
+`linux-sleepy-next` builds the **7.3 linux-next preview** kernel from a
+linux-next snapshot (currently **next-20260902**) + the sleepy patch series
+(CachyOS squashes, upstream ML patches, agd5f backports, local patches). It
+superseded the earlier `wannabe-7.3` preview experiment (a `next-20260825`
+worktree + tracked `wannabe-7.3-patches/` series), which was removed on
+2026-09-02 — those early gup/HDMI/userq entries now live in this series.
+See `../PATCH_SOURCES.md` (the 7.2 ledger) for the shared 7.2 series files.
 
 ## Base
 

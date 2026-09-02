@@ -109,8 +109,9 @@ Never scrape `lore.kernel.org` — its anti-bot protection blocks agents.
 - **Tree-target triage — amdgpu_dm split (learned 2026-08-26):** a patch touching
   `amdgpu_dm_connector.c` / `amdgpu_dm_freesync.c` targets the 7.3+ amdgpu_dm split; the
   same content on 7.2 lives in the MONOLITHIC `amdgpu_dm.c`. Verify `git apply --check`
-  against the right reference tree (`repos/linux-7.2` for the PKGBUILD series, the wannabe
-  next-worktree for 7.3 previews) BEFORE deciding applicability — "No such file" on
+  against the right reference tree (`repos/linux-7.2` for the PKGBUILD series,
+  `repos/linux-next@<next-tag>` for the sleepy-next 7.3 preview — the wannabe worktree is
+  gone) BEFORE deciding applicability — "No such file" on
   `amdgpu_dm_connector.c` means the patch is 7.3-only.
 
 ### 4b. drm/amd work items tracker (gitlab.freedesktop.org) — ACCESS WORKAROUND (learned 2026-08-03)

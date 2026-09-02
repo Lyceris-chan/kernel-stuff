@@ -113,12 +113,11 @@ cumulative delta for this build, in Keep a Changelog form.
 - Config trim for one machine: `DRM_I915`, `DRM_NOUVEAU`, `DRM_XE`, `IIO`,
   `ISDN`, `CAN`, and AppArmor disabled.
 
-### Wannabe 7.3 preview
+### 7.3 preview (`sleepy-next`)
 
-For the 7.3 merge-window content ahead of 7.3-rc1 (linux-next `next-20260825`
-+ 15 hardware merges: amd-staging, HDMI VRR/ALLM v4, `mm/gup` batching, userq
-GPU-reset, KFD), see `WANNABE-7.3.md` and the tracked, reproducible patch
-series in `wannabe-7.3-patches/`.
+The linux-next (7.3 merge-window) preview kernel is a separate package —
+`sleepy-next/` (user docs: `sleepy-next/docs/README.md`). The earlier
+`wannabe-7.3-rc1` preview tree it replaced was removed on 2026-09-02.
 
 **PCIe ASPM is disabled.** The kernel no longer forces a compile-time ASPM policy
 (was `PCIEASPM_PERFORMANCE` — there is no Kconfig "off" option) and the built-in
