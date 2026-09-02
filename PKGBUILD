@@ -358,22 +358,14 @@ validpgpkeys=(
   E18447AC260021D31F3FF6C4C8A2A4774B8B63C4  # Eric Naim <dnaim@cachyos.org>
   E8B9AA39F054E30E8290D492C3C4820857F654FE  # Peter Jung <admin@ptr1337.dev>
 )
-# Use official Kernel.org pre-built LLVM toolchain (https://mirrors.edge.kernel.org/pub/tools/llvm/)
-# Automatically checks for Nathan Chancellor's latest weekly LLVM builds on Wednesday/Thursday
+# Pre-built LLVM toolchain: the official GitHub llvm-project release asset
+# LLVM-23.1.0-Linux-X64.tar.xz (llvmorg-23.1.0, added to source() below) is the
+# toolchain actually used. It links against ICU 70 (Arch ships ICU 78), so the
+# libs are bundled via the llvm-icu70-libs source. The kernel.org
+# ClangBuiltLinux weekly-rc auto-fetch was dropped 2026-09-02 (legacy
+# _kernel_org_llvm_tarball was never added to source()).
 : "${_use_kernel_org_llvm:=yes}"
-: "${_auto_fetch_latest_llvm:=no}"
-
-if [ "$_use_kernel_org_llvm" = "yes" ]; then
-    if [ "$_auto_fetch_latest_llvm" = "yes" ]; then
-        _latest_tarball=$(curl -s https://mirrors.edge.kernel.org/pub/tools/llvm/files/ | grep -o 'llvm-[^"]*-x86_64\.tar\.\(gz\|xz\)' | sort -u -V | tail -n 1)
-        if [ -n "$_latest_tarball" ]; then
-            _kernel_org_llvm_tarball="$_latest_tarball"
-            _llvm_dir_name="${_latest_tarball%.tar.*}"
-        fi
-    fi
-    : "${_kernel_org_llvm_tarball:=llvm-23.1.0-rc2-x86_64.tar.xz}"
-    : "${_llvm_dir_name:=LLVM-23.1.0-Linux-X64}"
-fi
+: "${_llvm_dir_name:=LLVM-23.1.0-Linux-X64}"
 
 _set_build_flags() {
     if _is_lto_kernel; then

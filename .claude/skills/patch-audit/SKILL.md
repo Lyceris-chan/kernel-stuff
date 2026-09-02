@@ -5,6 +5,12 @@ description: Ingest or upgrade a specific kernel patch for sleepy-kernel — add
 
 # Patch Audit & Ingestion
 
+**Reference tree (2026-09-02):** the 7.2 `linux-sleepy` base is retired. Every
+apply-check / symbol grep for this series targets a worktree of `repos/linux-next`
+at the PKGBUILD `_srctag` (make one with `git -C repos/linux-next worktree add
+/tmp/ref <tag>`). `repos/linux-7.2[-rcN]` mentions in the examples below are
+historical — substitute that worktree.
+
 Never scrape `lore.kernel.org` — its anti-bot protection blocks agents.
 
 ## Detailed Source Access & Fetch Guide

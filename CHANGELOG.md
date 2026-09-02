@@ -31,6 +31,17 @@ package at the repo root.
 ### Removed
 - **`scx_cake --preset esports` guidance.** The esports preset no longer exists
   in `scx_cake`; the README sched-ext section now shows plain `scx_cake`.
+- **7.2 `linux-sleepy` uninstalled** from the machine (only `linux-sleepy-next`
+  remains); the bootloader entry and net-tune files it owned were removed with
+  it. net-tune returns with the next `linux-sleepy-next` build, which now ships
+  the service itself.
+
+### Changed
+- **Toolchain pinned to LLVM 23.1.0 (final)** — the GitHub `llvmorg-23.1.0`
+  release asset (`LLVM-23.1.0-Linux-X64.tar.xz`) was already the toolchain
+  actually downloaded; the misleading kernel.org auto-fetch block (whose stale
+  `rc2` default was never wired into `source()`) was removed so the pin is
+  unambiguous.
 
 ---
 
