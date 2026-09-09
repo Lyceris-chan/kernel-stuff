@@ -83,53 +83,20 @@ git -C repos/sirlucjan-kernel-patches pull 2>&1 | tail -3 &
 git -C repos/firelzrd-bore-scheduler pull 2>&1 | tail -3 &
 wait
 
-# Mailing list archives (freedesktop, safe to curl)
-#
-# IMPORTANT: WebFetch returns HTTP 403 on lists.freedesktop.org. The ONLY
-# working method is curl with a browser User-Agent. This is a proven workaround.
+# Mailing lists: curl with a browser UA (WebFetch 403s). Full detail:
+# references/ml-access.md
 UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 MONTH=$(date +%Y-%B)   # e.g. 2026-August
-
-# Option A — monthly .txt.gz mbox (fastest for keyword scanning):
 curl -s -A "$UA" "https://lists.freedesktop.org/archives/amd-gfx/${MONTH}.txt.gz" -o /tmp/amd-gfx-${MONTH}.txt.gz
 [ -s /tmp/amd-gfx-${MONTH}.txt.gz ] && gunzip -f /tmp/amd-gfx-${MONTH}.txt.gz
 curl -s -A "$UA" "https://lists.freedesktop.org/archives/dri-devel/${MONTH}.txt.gz" -o /tmp/dri-devel-${MONTH}.txt.gz
 [ -s /tmp/dri-devel-${MONTH}.txt.gz ] && gunzip -f /tmp/dri-devel-${MONTH}.txt.gz
 
-# Option B — thread index HTML (use when you need a specific thread):
-#   https://lists.freedesktop.org/archives/amd-gfx/${MONTH}/thread.html
-#   https://lists.freedesktop.org/archives/dri-devel/${MONTH}/thread.html
-# Per-message pages live at .../{msgid}.html, e.g.:
-#   https://lists.freedesktop.org/archives/amd-gfx/2026-August/abcdef1234567890.html
-# Download one the same way, with the browser UA:
-#   curl -s -A "$UA" "https://lists.freedesktop.org/archives/dri-devel/${MONTH}/thread.html" -o /tmp/dri-thread.html
-# Message links in thread.html are <LI><A HREF="NNNNN.html">[PATCH n/N] subject
-# (msgid is a bare 6-digit number, NOT "msgNNNNN.html"). Extract subjects:
-#   grep -oE '<LI><A HREF="[0-9]+\.html">[^<]*' /tmp/dri-thread.html \
-#     | sed -E 's/<LI><A HREF="([0-9]+)\.html">/\1: /'
-# The date/subject/author indexes only contain navigation links — use thread.html.
-
-# ML message extraction (learned 2026-08-26) — per-message pages are unreliable
-# as raw patches. Known gotchas:
-#   * QP-encoded mboxes (patchew.org mirrors): `git am <mbox>` decodes them
-#     natively — use git am on a scratch worktree, then cherry-pick the commits.
-#   * dri-devel pages use U+00A0 non-breaking spaces for indentation AND wrap
-#     lines as <LI><A HREF=...>mailing-list links; always
-#     .replace('&nbsp;',' ').replace('\xa0',' ') before git apply.
-#   * Some messages are replies that quote the patch (broken spacing). Find the
-#     ORIGINAL [PATCH] message via the thread.html grep above instead.
-#   * Pages may carry a trailing "-------------- next part --------------" HTML
-#     attachment after the "-- 2.xx.x" diff terminator — truncate at "-- ".
-#   * After extraction always `git apply --check`; if a hunk is stale against a
-#     newer base, apply the change manually with Edit rather than forcing fuzz.
-
-# If a download produced an EMPTY file or a page containing "403 Forbidden",
-# stop — do not continue. Re-run with the UA above, or use the git repos.
-```
-
-**Never** access `lore.kernel.org` — its anti-bot protection blocks automated
-agents; this is a hard block, not a rate limit. Use only the git repos and the
-`lists.freedesktop.org` archives above.
+**Never** fetch the `lore.kernel.org` **web UI** — its Anubis anti-bot blocks
+automated agents (a hard block, not a rate limit). The **git endpoints are NOT
+gated**: `git clone --mirror https://lore.kernel.org/<list>/<epoch>` works
+(e.g. `lkml/20`, `rust-for-linux/0`) — messages are commits, raw email is blob
+`m`. Also use the git repos and the `lists.freedesktop.org` archives above.
 
 ## Step 2 — Git repo keyword scan
 
@@ -302,6 +269,19 @@ check_commit() {
 ## Step 6 — Triage checklist (run in this order for every CLEAN candidate)
 
 Every candidate must pass all four checks. Copy the commands exactly.
+
+**Check 0 — Upstream reverts + wrong-chip traps (learned 2026-09-09).**
+Two failure modes that cost a full debug cycle each:
+- **Reverts**: grep the ML/repo for `Revert "..."` of a patch we already carry.
+  If AMD is reverting it (*"Because it causes some regression"*), drop ours —
+  e.g. the DCN4 flip-schedule pair `9051`/`9052` (in `dml2_core_dcn4_calcs.c`).
+  ```bash
+  zcat /tmp/amd-gfx-*.txt.gz 2>/dev/null | grep -E '^Subject:.*Revert' | sort -u
+  ```
+- **Wrong chip**: a `gfx12` patch may target GC **12.1** (`gfx_v12_1.c`) — a
+  different ASIC. Our Navi 48 is GC IP **(12,0,1)** → `gfx_v12_0.c`. Verify in
+  `amdgpu_discovery.c`: `IP_VERSION(12,0,x)` → `gfx_v12_0`, `IP_VERSION(12,1,0)`
+  → `gfx_v12_1`. Don't adopt the latter.
 
 **Check 1 — Hardware relevance.** Does it target hardware we actually have?
 Allowed targets (from CLAUDE.md): RDNA 4 / gfx1201 / DCN401 / DCN42B / SMU14 /

@@ -21,6 +21,10 @@ during `prepare()`. The NIC uses the in-kernel `r8169` (no `r8125` package);
 webcams use `uvcvideo`; the build ships the `net-tune` service (CAKE SQM +
 latency tuning).
 
+**Full build is ~8 minutes** since the kbuild build-speedup series
+(`2300`–`2322`, `pkgrel 3`+). Rebuilds are cheap — prefer rebuilding over
+guessing. Run it in the background and watch for `Finished making` / `ERROR:`.
+
 Compile flags are fixed: `CC=clang LD=ld.lld LLVM=1 LLVM_IAS=1`. Never
 substitute these (see `reference.md` for why `ld.mold` specifically breaks).
 

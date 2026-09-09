@@ -7,149 +7,18 @@ description: Ingest or upgrade a specific kernel patch for sleepy-kernel — add
 
 Never scrape `lore.kernel.org` — its anti-bot protection blocks agents.
 
-## Detailed Source Access & Fetch Guide
+## Reference tree
 
-### 1. `drm-next` (AMD GPU / Display / SMU / RDNA 4)
-- **Repository**: `https://gitlab.freedesktop.org/drm/kernel.git` (branch `drm-next`) or `https://gitlab.freedesktop.org/drm/amd.git` (branch `amd-staging-drm-next`)
-- **Location**: `repos/drm-next`
-- **Fetch**: `cd repos/drm-next && git fetch origin`
-- **If gitlab.freedesktop.org returns HTTP 503 (`RPC failed; expected 'packfile'`)**:
-  do not block the cycle. Cover drm-next content via `repos/linux-next`
-  (drm-next is merged into it) and the AMD staging branch via
-  `repos/agd5f-linux` (same `amd-staging-drm-next` branch), and retry the
-  gitlab fetch in the background. Seen for hours on the 2026-08-03 7.2-rc6 bump.
-- **Search Query**:
-  ```bash
-  git log --oneline --grep="gfx12\|navi48\|dcn4\|smu14\|psp14\|mmhub_4\|sdma_v7\|vcn_v5\|dcn42b" origin/drm-next
-  ```
-- **Extract Patch**:
-  ```bash
-  git format-patch -1 <commit_hash> -o ../../
-  ```
+All apply-checks and symbol greps target the **base tree** of the package you
+are editing: `repos/linux-7.2@<tag>` for the root `linux-sleepy` package, or a
+`git worktree` of `repos/linux-next` at the `_srctag` (e.g. `v7.3-rc2`) for
+`sleepy-next`. Create one with
+`git -C repos/linux-next worktree add /tmp/ref <tag>`.
 
-### 2. `linux-next` (Mainline Integration Tree)
-- **Repository**: `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git`
-- **Location**: `repos/linux-next`
-- **Fetch**: `cd repos/linux-next && git fetch origin`
-- **Before fetching (learned 2026-08-03):** the full `git fetch origin` of
-  linux-next is very slow (many branches, single HTTP connection). First check
-  whether a newer daily snapshot even exists — the tree publishes `next-YYYYMMDD`
-  tags on working days only:
-  ```bash
-  git ls-remote --tags repos/linux-next 'next-*' | awk -F/ '{print $NF}' | grep -v "\^{}" | sort -V | tail -1
-  ```
-  If the latest tag is one you already have locally (compare against
-  `git -C repos/linux-next describe --tags master`), skip the fetch entirely —
-  there is no new content to sweep. Only fetch when a newer snapshot exists.
-  Note `next-*` tags skip weekends (08-01/08-02 were quiet on the 08-03 sweep).
-- **Search Query**:
-  ```bash
-  git log --oneline --grep="gfx12\|navi48\|dcn4\|smu14\|amd_pstate\|MZEN4\|CPPC" origin/master
-  ```
-- **Extract Patch**:
-  ```bash
-  git format-patch -1 <commit_hash> -o ../../
-  ```
+## Source access
 
-### 3. `linux-pm` (CPU Power / Freq / Zen 4 amd-pstate)
-- **Repository**: `https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git`
-- **Location**: `repos/linux-pm`
-- **Fetch**: `cd repos/linux-pm && git fetch origin`
-- **Search Query**:
-  ```bash
-  git log --oneline --grep="amd-pstate\|amd_pstate\|CPPC\|k10temp\|epp_boost" origin/master
-  ```
-- **Extract Patch**:
-  ```bash
-  git format-patch -1 <commit_hash> -o ../../
-  ```
-
-### 4. `amd-gfx` & `dri-devel` Mailing Lists
-- **Archives**: `https://lists.freedesktop.org/archives/amd-gfx/` and `https://lists.freedesktop.org/archives/dri-devel/`
-- **Access Method (proven workaround):** `WebFetch` gets HTTP 403 on
-  `lists.freedesktop.org`. Use `curl` with a browser User-Agent:
-  ```bash
-  UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
-  curl -s -A "$UA" "https://lists.freedesktop.org/archives/amd-gfx/${MONTH}/thread.html" -o /tmp/amd-thread.html
-  curl -s -A "$UA" "https://lists.freedesktop.org/archives/dri-devel/${MONTH}/thread.html" -o /tmp/dri-thread.html
-  ```
-  URL format: `https://lists.freedesktop.org/archives/{amd-gfx|dri-devel}/{YYYY-Month}/thread.html`
-  (or `date.html`). Per-message pages live at `.../{msgid}.html`. A monthly
-  `.txt.gz` mbox is also available: `.../{YYYY-Month}.txt.gz`.
-- **Search**: Parse thread HTML for subjects targeting `gfx12`, `navi48`, `dcn4`, `smu14`, `sdma7`, `vcn5`.
-- **Extraction**: Download raw mbox file for the target thread or save patch directly.
-- **Clean-patch extraction from mboxes (learned 2026-08-03):** a saved thread mbox
-  contains replies that *quote* the original patch, so `git apply --check` on a raw
-  message fails ("corrupt patch"). Split the **full monthly mbox** (`amd-gfx-2026-July.mbox`),
-  find the **original submission** (unquoted `diff --git`, author `Signed-off-by`), then
-  extract with `git mailinfo <msgfile> <patchfile>` → clean patch body + separate commit
-  message. Reconstruct the patch file with the original `From:`/`Date:`/`Subject:`/`Message-ID:`
-  headers (mbox format is fine; preserve author and `Signed-off-by`). **Sanitize the
-  filename**: a `Subject:` with a folded header line embeds a literal `\n` in the name —
-  strip it (e.g. `subj.split('] ',1)[-1].replace('\n',' ').replace('/','-')`) or rename to a
-  clean `NNNN-short-desc.patch` before copying into the repo.
-- **Series-order check:** a candidate whose trailing context matches content that an
-  earlier *backported* patch adds (e.g. `9008`'s DB_RING_CONTROL context comes from `9007`)
-  must be numbered to apply **after** that patch. Test sequentially in a scratch tree, not
-  just `git apply --check` in isolation.
-- **Context-symbol dependency (learned 2026-08-03):** a patch can require a *struct field*
-  or *function* another patch adds — e.g. `1129` (dtbclk) needs `execute_clk_mgr_block_sequence`
-  (added by `1127`) and `notify_cstate_disable` (added by `1128`) in its `clk_mgr.h`/`dcn42_clk_mgr.c`
-  hunk context. `git apply --check` on the full series tree may still pass (offset tolerance)
-  while GNU `patch` in prepare() rejects it. When a `.rej` shows context lines that reference a
-  symbol another carried patch adds, renumber so that patch comes FIRST (1127→1128→1129 order).
-  The definitive check is `prepare()`/`makepkg -o` applying the whole series in order.
-- **Per-message extraction gotchas (learned 2026-08-26):** thread.html message links are
-  `<LI><A HREF="NNNNN.html">subject` (bare 6-digit msgid, not `msgNNNNN.html`) — grep with
-  `-oE '<LI><A HREF="[0-9]+\.html">[^<]*'` to find the ORIGINAL submission (replies quote the
-  patch and break spacing). dri-devel pages use U+00A0 nbsp for indentation
-  (`.replace('&nbsp;',' ').replace('\xa0',' ')`) and may carry a trailing HTML attachment
-  after the `-- ` diff terminator (truncate there). QP-encoded mboxes: `git am <mbox>` on a
-  scratch worktree decodes natively, then cherry-pick.
-- **Tree-target triage — amdgpu_dm split (learned 2026-08-26):** a patch touching
-  `amdgpu_dm_connector.c` / `amdgpu_dm_freesync.c` targets the 7.3+ amdgpu_dm split; the
-  same content on 7.2 lives in the MONOLITHIC `amdgpu_dm.c`. Verify `git apply --check`
-  against the right reference tree (`repos/linux-7.2` for the PKGBUILD series,
-  `repos/linux-next@<next-tag>` for the sleepy-next 7.3 preview — the wannabe worktree is
-  gone) BEFORE deciding applicability — "No such file" on
-  `amdgpu_dm_connector.c` means the patch is 7.3-only.
-
-### 4b. drm/amd work items tracker (gitlab.freedesktop.org) — ACCESS WORKAROUND (learned 2026-08-03)
-
-`https://gitlab.freedesktop.org/drm/amd/-/work_items` and the REST API
-(`/api/v4/projects/drm%2Famd/...`) are fronted by **Anubis**, but the challenge is served
-**only to browser-like User-Agents**. Plain `curl` with **no User-Agent header** returns
-real GitLab content:
-```bash
-curl -s "https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/issues?state=opened&per_page=100&sort=updated_desc" -o issues.json
-curl -s "https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/events?per_page=100" -o events.json
-```
-The issue **notes** API is 401-gated (real auth), but the events/atom feeds expose comment
-bodies + referenced commit SHAs. Check issue titles/descriptions/comments for unmerged
-patch series or commit SHAs relevant to our hardware. (lore.kernel.org was NOT re-tested —
-the "never access lore" rule stands unless separately verified.)
-
-### 5. `sirlucjan` (Third-Party Performance Patches)
-- **Repository**: `https://github.com/sirlucjan/kernel-patches.git`
-- **Location**: `repos/sirlucjan-kernel-patches`
-- **Fetch**: `cd repos/sirlucjan-kernel-patches && git pull`
-- **Audit**: Inspect `7.2/` directories. Current versions to expect:
-  `lru-marie-patches-v12/`, `zstd-dev-patches/`, `block-patches-sep/`,
-  `cachyos-fixes-patches-v10-sep/`, `preempt-ipi-patches-v3-sep/`, `nap-patches/`.
-- **Byte-check**: Verify `2000–2004` (block), `2100–2101` (MM) patches match source diffs.
-
-### 6. `sirlucjan` NAP governor (NOT firelzrd)
-- **IMPORTANT (learned this session):** the NAP governor source is
-  `repos/sirlucjan-kernel-patches/7.2/nap-patches/`, which contains
-  `0001-7.2-nap-v0.5.0.patch`. firelzrd's repo
-  (`repos/firelzrd-bore-scheduler`) has **NO** `nap-patches/` directory — its
-  `patches/` only contains `additions/`, `legacy/`, `stable/`, `testing/` and is
-  BORE-scheduler only. Do not look for NAP patches there.
-- Fetch: `git -C repos/sirlucjan-kernel-patches pull`
-- Audit: `ls repos/sirlucjan-kernel-patches/7.2/nap-patches/` and compare
-  against the in-tree `2200-7.2-nap-v0.5.0.patch`.
-
----
+Per-source fetch commands, archive workarounds, and extraction gotchas:
+see [`references/sources.md`](references/sources.md).
 
 ## Step-by-Step Ingestion & Validation Workflow
 
@@ -162,23 +31,23 @@ Run these in order. Copy the commands exactly — do not improvise.
 
 2. **Check Symbol Presence**:
    ```bash
-   grep -r "<unique_symbol>" repos/linux-7.2-rc7/drivers/gpu/drm/amd/
+   grep -r "<unique_symbol>" <base-tree>/drivers/gpu/drm/amd/
    ```
    Run this for EVERY function/macro the patch references. If any symbol is
-   absent from the clean rc7 tree, the patch depends on staging infrastructure
+   absent from the clean base tree, the patch depends on staging infrastructure
    and must be DROPPED (see the agd5f staging lesson in `LESSONS.md`).
    **Cover struct members too** (learned 2026-08-10, patch `1025`): a patch can
    apply cleanly yet not compile when it references a `struct` field an
    upstream prerequisite series adds (e.g. `adev->gfx.userq_priv_fault_work` /
    `userq_priv_fault_slots`, added by the gfx11 priv-fault worker in drm-next
-   AFTER rc7). For every `adev->xxx.field` / `->member` the patch touches, grep
-   that member name in the clean tree's `.h`/`.c` (`grep -rn "userq_priv_fault_work" repos/linux-7.2-rc7/drivers/gpu/drm/amd/amdgpu/`). Absent member
+   AFTER the base release). For every `adev->xxx.field` / `->member` the patch touches, grep
+   that member name in the clean tree's `.h`/`.c` (`grep -rn "userq_priv_fault_work" <base-tree>/drivers/gpu/drm/amd/amdgpu/`). Absent member
    → DROP and defer to the next version move; do not backport the prerequisite
    series during a bump.
 
-3. **Forward apply check** — patch must apply to the clean rc7 tree:
+3. **Forward apply check** — patch must apply to the clean base tree:
    ```bash
-   git -C repos/linux-7.2-rc7 apply --check "$PWD/<NNNN-short-description.patch>"   # use ABSOLUTE path
+   git -C <base-tree> apply --check "$PWD/<NNNN-short-description.patch>"   # use ABSOLUTE path
    patch -p1 --forward --dry-run < <NNNN-short-description.patch>                  # authoritative — matches prepare()
    ```
    - No output = clean, proceeds to step 4.
@@ -186,16 +55,16 @@ Run these in order. Copy the commands exactly — do not improvise.
      regenerate from source, or drop the patch. Do not silently force it.
    - **`git apply --check` can pass while GNU `patch -p1 --forward` rejects**
      (learned 2026-08-03): ambiguous leading context (e.g. `if (r)` appears many
-     times in `gfx_v12_0_sw_init`) or a hunk touching a file absent from rc7
+     times in `gfx_v12_0_sw_init`) or a hunk touching a file absent from the base
      (DCN6 `dcn60_resource.c`) both fool `git apply`. ALWAYS confirm with
-     `patch -p1 --forward --dry-run`. For a file absent from rc7, strip that
+     `patch -p1 --forward --dry-run`. For a file absent from the base, strip that
      file's hunks + its stats line + fix the "N files changed" summary as a
      documented backport adjustment. Capture git's real exit code —
      `git apply ... > log 2>&1; echo $?` — never `| head && echo OK`.
 
 4. **Already-applied check** — confirm it is NOT already in the tree:
    ```bash
-   git -C repos/linux-7.2-rc7 apply --check -R <NNNN-short-description.patch>
+   git -C <base-tree> apply --check -R <NNNN-short-description.patch>
    ```
    - If this REVERSE check passes (no output), the patch is already merged —
      DROP it and report why.
@@ -204,14 +73,9 @@ Run these in order. Copy the commands exactly — do not improvise.
    (Lesson in `LESSONS.md`: use `git apply --check` for both — `patch --dry-run`
    reports false "corrupt patch" errors on mbox-format patches.)
 
-   **LESSON (2026-08-02 sweep) — reverse-clean means ALREADY IN BASE TREE:**
-   a clean reverse check is the single most common reason a candidate is
-   useless. This session caught six "already in the base tree" candidates
-   exactly this way: `f8ee6447e` (drm/amdgpu/discovery: Fix device family for DCN42),
-   `7e1b4bdb0` (Fix flip-done timeouts on mode1 reset), `c936b8126`,
-   `198663d03`, `183bbded9`, `85453fb4f`. When the reverse check passes clean,
-   the patch is ALREADY in the base tree (currently rc7) — DO NOT add it and
-   DO NOT try to force it. Record it in the sweep report as "already in base".
+   **Reverse-clean means ALREADY IN BASE.** A clean reverse check is
+   the most common reason a candidate is useless — record it as
+   "already in base" and do not add or force it.
 
 5. **Number Assignment**: The prefix MUST match the category. Copy the file in
    with the next unused number:
@@ -249,6 +113,45 @@ Run these in order. Copy the commands exactly — do not improvise.
 
 ---
 
+## Auditing the whole series (is every patch still needed + clean?)
+
+Run this after a base bump or before a release. Work in a **fresh worktree** at
+the base tag (`git -C repos/linux-next worktree add .wt-audit <tag>`).
+
+```bash
+# Apply the series cumulatively, exactly as prepare() does, classifying each.
+# The authoritative test — git apply --check and per-patch dry-runs give false
+# negatives, and `patch --forward` exits 0 when it SKIPS a reversed patch.
+python3 - <<'PY'
+import re, subprocess
+ps=[x.strip().strip('"') for x in re.search(r'^source=\((.*?)^\)',
+      open('PKGBUILD').read(), re.S|re.M).group(1).split('\n')
+      if x.strip().strip('"').endswith('.patch')]
+T='repos/linux-next/.wt-audit'; clean=[]; noop=[]; fail=[]
+for i,b in enumerate(ps,1):
+    d=subprocess.run(['patch','-p1','--forward','--dry-run','-F2'],cwd=T,
+        stdin=open(b),capture_output=True,text=True); o=d.stdout+d.stderr
+    if 'Reversed (or previously applied)' in o or 'Skipping patch' in o:
+        noop.append((i,b)); continue
+    if 'FAILED' in o or 'malformed' in o:
+        fail.append((i,b,o.strip().split('\n')[0][:70])); continue
+    subprocess.run(['patch','-p1','--forward','-F2'],cwd=T,stdin=open(b),capture_output=True)
+    clean.append((i,b))
+print(f"CLEAN={len(clean)} NO-OP={len(noop)} FAIL={len(noop and 0 or 0)+len(fail)}")
+for i,b in noop: print("  NO-OP (drop):", b)
+for i,b,d in fail: print("  FAIL:", b, "|", d)
+PY
+```
+
+- **NO-OP** = already in the base → drop it (a skipped patch is inert).
+- **FAIL** = needs rebasing or dropping; check whether the base superseded it.
+- After the audit, re-run the full apply and confirm **0 `.rej`** and that the
+  key hooks/symbols each patch adds are present.
+
+**Rebasing a large patch (LRU-MARIE)**: see
+[`references/marie-rebase.md`](references/marie-rebase.md) — never hand-edit
+hunk headers; regenerate the changed file-sections with `diff -u`.
+
 ## Replacing / upgrading an existing patch (e.g., a v2 → v4 revision swap)
 
 **Note on `00xx` local patches:** the local Antigravity patches live in the
@@ -270,8 +173,8 @@ cp ~/Downloads/<new-revision>.patch NNNN-short-description.patch
 updpkgsums
 
 # 3. Re-validate the swapped patch against the clean tree (forward + reverse):
-git -C repos/linux-7.2-rc7 apply --check NNNN-short-description.patch
-git -C repos/linux-7.2-rc7 apply --check -R NNNN-short-description.patch
+git -C <base-tree> apply --check NNNN-short-description.patch
+git -C <base-tree> apply --check -R NNNN-short-description.patch
 
 # 4. Re-validate the FULL series. A revision swap can shift context for LATER
 #    patches. The authoritative in-order apply check is prepare() — run it:

@@ -1,8 +1,13 @@
 # sleepy-kernel
 
-Custom Arch Linux kernel package based on Linux mainline RC releases, built for
-a single AMD Zen 4 + RDNA 4 desktop. Uses a sanitized CachyOS patchset as the
-base, with additional upstream and local patches filtered to this hardware.
+Custom Arch Linux kernel package built for a single AMD Zen 4 + RDNA 4 desktop.
+Uses a sanitized CachyOS patchset as the base, with additional upstream and
+local patches filtered to this hardware.
+
+Two packages: the root `PKGBUILD` (`linux-sleepy`, mainline) and
+`sleepy-next/PKGBUILD` (`linux-sleepy-next`, currently **Linux 7.3-rc2** —
+the actively maintained one). Track mainline RCs; linux-next snapshots are a
+preview base only when the RC line is unusable.
 
 ## Target hardware
 
@@ -75,10 +80,41 @@ Each range is a category; use the next unused number in the correct range.
 | `2000–2099` | Block / I/O schedulers (bfq, mq-deadline) | sirlucjan |
 | `2100–2199` | Memory management (zstd, LRU-MARIE) | sirlucjan |
 | `2200–2299` | CPU idle (NAP governor) | sirlucjan `nap-patches/` (firelzrd's repo is BORE-only) |
+| `2300–2399` | Build system / kbuild | ML (e.g. the kbuild build-speedup series, `2300`–`2322`) |
 | `9000–9099` | agd5f staging backports | `git format-patch` from agd5f/linux — **verify all symbols exist in rc mainline first** |
 
 All sirlucjan directories live under `repos/sirlucjan-kernel-patches/7.2/` (renamed from `7.2-rc/` when 7.2 released, 2026-08-19).
 The CachyOS squashes are generated **against the actual series state** (rc7 + the `00xx` local/upstream patches), not a clean rc — the pre-CachyOS patches touch shared files like `drm_edid.c`. Two known conflicts handled inside the squashes: `0151` duplicates `0055`, and `0053` must be dropped when the hdmi branch is present.
+
+## Durable findings (hardware + patch traps)
+
+- **GC 12.0 ≠ GC 12.1.** Navi 48 (RX 9070 XT) is GC IP **(12,0,1)** → uses
+  `gfx_v12_0.c`. `gfx_v12_1.c` is a *different chip* — amd-staging commits
+  touching it (e.g. "Remove gfxoff calls in GC v12.1") are **not ours**. Check
+  `IP_VERSION(12,0,x)` vs `IP_VERSION(12,1,0)` in `amdgpu_discovery.c` before
+  adopting any gfx12 patch.
+- **Never carry the DCN4 flip-schedule patches `9051`/`9052`.** AMD reverted
+  both upstream (*"Because it causes some regression"*, `dml2_core_dcn4_calcs.c`,
+  DCN4 = this GPU). They make the flip-bandwidth math more conservative and
+  mis-schedule flips — the prime suspect for scanout artifacts.
+- **VRR/VSDB lives upstream now.** linux-next 0908 has the Alex Huang rework
+  (common EDID parser, `parse_hdmi_amd_vsdb()` removed). Prefer upstream; do not
+  re-introduce local force-enable hacks (an old local MCCS hack was replaced by
+  the upstream `1145`).
+- **Patch headers = upstream quality.** AI-assisted patches need a *named human
+  author* (`Sleepy <sleepy@localhost>`), a matching `Signed-off-by:`, and an
+  `Assisted-by: Claude <noreply@anthropic.com>` trailer. Strip leftover
+  `[PATCH n/N]` series numbering from subjects.
+- **Audit with a cumulative apply.** `git apply --check` and single-patch
+  dry-runs give false negatives; the authoritative test is applying the whole
+  series in order with `patch -p1 --forward -F2` and detecting both `FAILED`
+  and `Skipping patch`/`Reversed` (a skipped patch is an inert no-op, not a
+  success). Use a fresh worktree at the base tag.
+- **lore.kernel.org git endpoints are NOT Anubis-gated** (only the web UI is):
+  `git clone --mirror https://lore.kernel.org/<list>/<epoch>` works (e.g.
+  `lkml/20`, `rust-for-linux/0`); messages are commits, raw email is blob `m`.
+- **Build time is ~8 min** with the kbuild speedup series (`2300`–`2322`).
+  A full rebuild is cheap — prefer rebuilding over guessing.
 
 ## Full maintenance cycle
 
@@ -93,7 +129,7 @@ When asked to "update the kernel", "bump to a new RC", or "check for new patches
 1. Compile with `CC=clang LD=ld.lld LLVM=1 LLVM_IAS=1`. The PKGBUILD downloads a pre-built LLVM toolchain from kernel.org. Never change the toolchain.
 2. `rm -rf src pkg` before every build. Old patched files cause false conflicts.
 3. `updpkgsums` after any `source=()` change **or any patch-file edit** (checksums must match 1:1).
-4. Keep every patch's original `From:`/`Date:`/`Subject:`/`Signed-off-by:` headers intact.
+4. Keep every patch's original `From:`/`Date:`/`Subject:`/`Signed-off-by:` headers intact. For our **own** patches, normalise to upstream quality: a named human author (`Sleepy <sleepy@localhost>`), a matching `Signed-off-by:`, an `Assisted-by: Claude <noreply@anthropic.com>` trailer, and no leftover `[PATCH n/N]` series numbering.
 5. `patch --dry-run -Np1 < ../patchfile.patch` (and `git apply --check`) before adding any patch.
 6. Resolve conflicts yourself — fix hunk offsets, regenerate from source, or drop the patch. Don't stall waiting on the user.
 7. Clone with `--shallow-since="YYYY-MM-DD"` — never `--depth=1`.
