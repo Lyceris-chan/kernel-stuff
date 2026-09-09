@@ -57,7 +57,7 @@ States.
 
 ## Patch series
 
-142 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+144 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 
 | Range | Category |
 |---|---|

@@ -182,7 +182,7 @@ _rcver=rc2
 
 pkgver=7.3.0_rc2
 _tagrel=1
-pkgrel=3
+pkgrel=4
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -281,6 +281,8 @@ source=(
   "patches/1100-1199/1143-drm-amd-display-fall-back-to-software-I2C-on-hardware-engine-failure.patch"
   "patches/1100-1199/1144-drm-amd-display-enable-HDMI-FRL-by-default.patch"
   "patches/1100-1199/1145-drm-amd-display-keep-freesync-for-HF-VSDB-VRR-in-MCCS-fallback.patch"
+  "patches/1100-1199/1150-drm-add-passive-vrr-properties-for-passive-desktop-vrr.patch"
+  "patches/1100-1199/1151-drm-amd-display-use-passive-vrr-properties-in-amdgpu.patch"
   "patches/1200-1299/1201-cpufreq-amd-pstate-Update-cppc_req_cached-before-w.patch"
   "patches/1200-1299/1202-cpufreq-amd-pstate-Add-per-core-EPP-boost-for-rec.patch"
   "patches/1200-1299/1203-Documentation-amd-pstate-Document-the-epp_boost-pa.patch"
@@ -994,6 +996,8 @@ b2sums=('d8522ffee4af76eacdba75a8116376e9c21621ed0b22cbd381b816cd71f9fc25d1682fe
         '05f7335d35933033edcdbdd436dcf8c9fb1f6326cf4cefc34bbc48a1a91d7030536b0e69e48d8ffd4b0a20592f22b5a96895fbd277b776ad860bb2853025d532'
         'fe7fbf83a8f834b103dbfa6f8209d32b62ad4df23683017e0347c03f23372180b331c226baa0ef563dcdc5ad7125f10ef69a072204eb6bf6cdd69f31ffc156b8'
         '27b9b8c41ab1c18e08f243384b643ad109937e594081de9c6759c86edec0be818c6a6a80796e7201b484f4a474cde33ddb00f79ef8e9967d97ef29407dc109fb'
+        '95f4a692189ef4370582ec23cf7943815953c3bab7620dbf068440ed01eded28fdafab9e4cf60695fc4513ea675e24f634fedccf8e5a9cf1edcf353e580b0726'
+        '1001d04235eec9ebd39930a76ac2074c1b7bbd70e8d075fdc2c73a7b1949306229e5d76025fc95343fb66a5975f6476132454cee5fb325c391f0885714c2f6b0'
         'e9d464ebf525cd8d93d48f1cbedea0197bd9d0142085da7d83ec3dfda0174483a0fea4077055fd7d1ad9180563dc6dfb77e4f52f9bcb023b7c7d7c9fb5c39ece'
         '9d3e36dbc5c9c5342d2991c4665278ed075073196251e59280bd12f1d6812a37d31db58f5cb978b926e2dcd0a32365960a414b69d10f463bd8f68cedbb4bb6ae'
         '52fe01328f544e023666eab1fd378ae0a0eb47385d495403a55a933f71beedcf295300767c1e43feb46366915fae8bea3b9137f11d16ed194a1fcf71d95aec0d'

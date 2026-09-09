@@ -9,6 +9,20 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.3.0-rc2-4-sleepy-next] — 2026-09-09
+
+### Added
+- **Passive VRR** (`1150`, `1151`) — Tomasz Pakuła's *"[PATCH v1 0/3]
+  drm/amd/display: passive VRR"* series, taken from CachyOS's `7.3/hdmi`
+  branch (same commits as the ML). Keeps the sink in its variable-refresh
+  state during fixed-refresh (desktop) use, avoiding the blanking/flicker
+  HDMI sinks show on VRR entry/exit. Part 3/3 is the HF-VSDB MCCS fix already
+  carried as `1145`. Author header de-MIME-encoded to the proper UTF-8 name.
+
+Series is now **144 patches**.
+
+---
+
 ## [7.3.0-rc2-3-sleepy-next] — 2026-09-09
 
 ### Fixed
@@ -109,8 +123,6 @@ Bumped to today's linux-next (`next-20260902`) with **LRU-MARIE 0.11.0 rebuilt a
 ### Changed
 - Base bumped `next-20260901` -> `next-20260902`; the series drops 11 patches now merged upstream (CLIFF: FRL cap/restore, HPD filter, FRL LT-timeout, overlay-cursor, dw-estimate, no-retry PTE, flip-schedule fixes, clamp-dcfclk, sched-ext DSQ, unify-flip-schedule), and 3 were rebased for the new base. Series is now a clean 112 patches.
 - **The flip-schedule changes (which we had carried) are being reverted upstream for causing a regression** — confirming the drop.
-
----
 
 ---
 
