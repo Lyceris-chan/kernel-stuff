@@ -9,6 +9,72 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.3.0-rc2-3-sleepy-next] — 2026-09-09
+
+### Fixed
+- **Dropped the two DCN4 flip-schedule patches (`9051`, `9052`) — AMD is
+  reverting both upstream for causing a regression.** `Revert "drm/amd/display:
+  Fix CalculateFlipSchedule Calculation"` (Samson Tam) and `Revert "drm/amd/
+  display: Unify CalculateFlipSchedule Logic"` (Austin Zheng) both land in
+  `dml2_core_dcn4_calcs.c` — **DCN4, this GPU** — each stating *"Because it
+  causes some regression"*. Our kernel carried the un-reverted versions; the
+  "fix" makes the flip-bandwidth math more conservative (adds `meta_row_bytes`,
+  halves `row_time_budget`), which mis-schedules flips. This is the strongest
+  candidate yet for the scanout "box"/flicker on the RX 9070 XT.
+
+### Added
+- **kbuild build-speedup series (23 patches, `2300`–`2322`)** — Lorenzo
+  Stoakes' *"[PATCH 00/23] kbuild: significantly speed up kernel builds"*
+  (rust-for-linux, 2026-09-08, `20260908-build-speedup-v1-0-5dc1ac01672d@kernel.org`).
+  Up to 36% faster full builds, ~70% incremental, ~90% no-op — significant for
+  this project's build loop. All 23 apply cleanly on top of the series.
+- New patch range `2300–2399` = build system / kbuild.
+
+### Changed
+- Series is now **142 patches** (was 121): +23 kbuild speedup, −2 flip-schedule.
+
+---
+
+## [7.3.0-rc2-2-sleepy-next] — 2026-09-07
+
+Moved off the linux-next snapshot line onto **Linux 7.3-rc2 (mainline)**, because
+the post-rc1 linux-next bases (0902/0904) carry unfixed upstream RDNA4 display
+bugs (open drm/amd work items #5722 duplicate_state panic, #5684 optc REG_WAIT
+hang, #5759/#5763 MES/wedge) that froze and panicked this RX 9070 XT. rc2
+sidesteps the linux-next mm churn and is the actual release-candidate line.
+
+### Changed
+- Base: linux-next `next-2026090N` snapshots → torvalds **`linux-7.3-rc2`**
+  (version scheme back to a mainline RC: `7.3.0-rc2-1-sleepy-next`).
+- **LRU-MARIE 0.11.0 ported to rc2.** The `mm/lru_marie/` subsystem stays
+  **byte-identical to firelzrd's 0.11.0** (verified; only the 3 prior one-line
+  compile fixes for the base API). The 3 host-file hooks were re-anchored to
+  rc2's renamed/simplified code: `mem_cgroup_get_zone_lru_size` (rc2 dropped the
+  `long val`/WARN path → `size = READ_ONCE(...)` + the Marie hook),
+  `swap.h`'s `kcompressd` decl (`__swap_writeout`→`__swap_writepage`), and the
+  `nr_swap_write_failed` bump in `swap_write_end` — each verified against the
+  actual rc2 source.
+- Series reconciled for rc2: **121 patches** (was 123 on 0901). Dropped 19 that
+  linux-next 0902–0904 merged upstream + the retry-fault/flip-schedule/userq
+  group now upstream + `1059` (BAR0, merged in rc2) + `1139` (blend-mode, code
+  changed); `0010` (gfx12 trap) and `1139` re-evaluated for rc2.
+- **VRR fix (pkgrel 2):** our local `1137` (hand-rolled MCCS VCP re-enable that
+  drove the scanout box by force-enabling VRR from the kernel-parsed AMD-VSDB)
+  was replaced with Fangzhi Zuo's upstream fix `1145` — skip the MCCS
+  `freesync_capable` clear when the sink advertises HF-VSDB VRR
+  (`!connector->display_info.hdmi.vrr_cap.supported`). VRR now engages the way
+  AMD intends, not via our local hack.
+
+### Fixed (during today's triage)
+- The recurring freezes and boot NULL-oops were upstream RDNA4 display bugs in
+  the 0902+ linux-next bases, not our series — confirmed by reproduction on
+  stock CachyOS rc and matching open upstream work items.
+- The scanout "box" artifact was a **monitor VRR/adaptive-sync** interaction
+  (not kernel/firmware) — resolved by disabling VRR on the monitor; the
+  DMCUB-firmware theory was ruled out.
+
+---
+
 ## [7.3.0-rc1-12-sleepy-next-20260901] — 2026-09-02
 
 Updated to the latest linux-next base (`next-20260901`, now carrying 7.3-rc1

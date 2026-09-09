@@ -1,7 +1,7 @@
 From 33a065acb38aeb3edb32a070f9f8a8f113bfafad Mon Sep 17 00:00:00 2001
-From: Antigravity <antigravity@gemini.local>
+From: Sleepy <sleepy@localhost>
 Date: Wed, 1 Jul 2026 13:00:00 +0200
-Subject: [PATCH 35/36] drm/amd/display: Prevent memory leak during IRQ service
+Subject: [PATCH] drm/amd/display: Prevent memory leak during IRQ service
  destroy
 
 dcn401_resource_destruct() calls dal_irq_service_destroy() inside the
@@ -11,7 +11,8 @@ is skipped the IRQ context is leaked on every destruct.
 
 Move the destroy call out of the loop so it always runs exactly once.
 
-Signed-off-by: Antigravity <antigravity@gemini.local>
+Signed-off-by: Sleepy <sleepy@localhost>
+Assisted-by: Claude <noreply@anthropic.com>
 ---
  .../drm/amd/display/dc/resource/dcn401/dcn401_resource.c    | 6 +++---
  1 file changed, 3 insertions(+), 3 deletions(-)

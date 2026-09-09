@@ -1,7 +1,7 @@
 From 7ceb7ab7c86f081cd6f88d3c48cec02333594971 Mon Sep 17 00:00:00 2001
-From: Antigravity <antigravity@gemini.local>
+From: Sleepy <sleepy@localhost>
 Date: Wed, 1 Jul 2026 13:00:00 +0200
-Subject: [PATCH 30/36] drm/amd/pm: Remove redundant mutex lock in SMU14 I2C
+Subject: [PATCH] drm/amd/pm: Remove redundant mutex lock in SMU14 I2C
  update
 
 smu_v14_0_2_i2c_xfer() takes adev->pm.mutex around the
@@ -15,7 +15,8 @@ on the nested acquisition.
 
 Remove the mutex_lock()/mutex_unlock() pair around the table update.
 
-Signed-off-by: Antigravity <antigravity@gemini.local>
+Signed-off-by: Sleepy <sleepy@localhost>
+Assisted-by: Claude <noreply@anthropic.com>
 ---
  drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c | 2 --
  1 file changed, 2 deletions(-)

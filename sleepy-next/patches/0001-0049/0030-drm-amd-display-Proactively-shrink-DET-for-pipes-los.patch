@@ -1,7 +1,7 @@
 From dd35d8c822026000fa905b9bde7078c3684f5d20 Mon Sep 17 00:00:00 2001
-From: Antigravity <antigravity@gemini.local>
+From: Sleepy <sleepy@localhost>
 Date: Wed, 1 Jul 2026 13:00:00 +0200
-Subject: [PATCH 31/36] drm/amd/display: Proactively shrink DET for pipes
+Subject: [PATCH] drm/amd/display: Proactively shrink DET for pipes
  losing space
 
 When a bandwidth update reallocates DET buffer space between pipes,
@@ -15,7 +15,8 @@ In dcn401_prepare_bandwidth(), before the compbuf is reprogrammed,
 iterate the pipes and immediately program the smaller DET size and
 segments for every pipe flagged for a DET change that is losing space.
 
-Signed-off-by: Antigravity <antigravity@gemini.local>
+Signed-off-by: Sleepy <sleepy@localhost>
+Assisted-by: Claude <noreply@anthropic.com>
 ---
  .../drm/amd/display/dc/hwss/dcn401/dcn401_hwseq.c | 15 +++++++++++++++
  1 file changed, 15 insertions(+)

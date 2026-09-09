@@ -1,5 +1,46 @@
 # sleepy-next — patch provenance
 
+## 2026-09-09 — full series audit (142 patches)
+
+Base moved from linux-next snapshots to mainline **Linux 7.3-rc2** (the
+linux-next 0902+ bases carried unfixed RDNA4 display bugs — see CHANGELOG).
+Full audit of the series against a pristine v7.3-rc2 tree:
+
+- **All 142 patches apply cleanly** (`patch -p1 --forward -F2`, cumulative), 0
+  rejected, 0 silently skipped/inert.
+- **Dropped this cycle:** `9051`/`9052` (DCN4 flip-schedule — AMD is reverting
+  both upstream, *"causes some regression"*, in `dml2_core_dcn4_calcs.c`);
+  `1059` (BAR0, merged in rc2); `1137` (local MCCS hack, replaced by the
+  upstream `1145`); `1139` (blend-mode, already in rc2 base); 19 patches merged
+  by linux-next 0902–0904.
+- **Added:** `1145` (upstream HF-VSDB MCCS FreeSync fix, Fangzhi Zuo) and the
+  23-patch **kbuild build-speedup series** `2300`–`2322` (Lorenzo Stoakes,
+  rust-for-linux 2026-09-08, `20260908-build-speedup-v1-0-5dc1ac01672d@kernel.org`).
+- **New range:** `2300–2399` = build system / kbuild.
+
+### Handmade patches (0001–0007, 0030–0034) — reviewed 2026-09-09
+
+All 12 are small, single-purpose fixes (1–17 added lines each), verified
+against the rc2 source:
+
+| Patch | Fix | Verified |
+|---|---|---|
+| `0001` | typo `tyep`→`type` in `smu_v14_0_set_irq_state` | cosmetic |
+| `0002` | free `user_overdrive_table` in `fini_smc_tables` (separate kzalloc — real leak) | correct |
+| `0003` | PROFILE_PEAK GFXCLK ceiling floats (firmware boost >3.0 GHz) | correct |
+| `0004` | deep sleep off while PROFILE_PEAK/COMPUTE active | correct |
+| `0005` | `is_mode1_reset_supported`: false for SR-IOV VF | correct |
+| `0006` | bounds-check `SwI2cCmds[c]` against `MAX_SW_I2C_COMMANDS` | correct |
+| `0007` | drop redundant `adev->pm.mutex` around `smu_cmn_update_table` (self-deadlock hazard) | correct |
+| `0030` | proactively shrink DET for pipes losing space | correct |
+| `0031` | free `enc20` before the hpd_source bounds return (leak) | correct |
+| `0032`/`0033` | `hpo_frl_link_enc_regs[1]`→`[2]` + second `reg_list(1)` (OOB) | correct |
+| `0034` | move `dal_irq_service_destroy` out of the per-pipe loop (double-destroy) | correct |
+
+Headers normalised to upstream quality: author `Sleepy <sleepy@localhost>`,
+matching `Signed-off-by`, `Assisted-by: Claude <noreply@anthropic.com>`, and
+leftover `[PATCH n/36]` series numbering stripped.
+
 `linux-sleepy-next` builds the **wannabe 7.3-next preview** kernel from the
 linux-next **next-20260825** snapshot + the sleepy 7.2 patch series (the same
 patches the `linux-sleepy` 7.2 build uses) + the clean upstream HDMI VRR/ALLM

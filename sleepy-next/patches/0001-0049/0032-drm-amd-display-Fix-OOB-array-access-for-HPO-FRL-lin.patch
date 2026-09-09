@@ -1,7 +1,7 @@
 From d8aa0fbd0493139648607dda9101348afc59e33a Mon Sep 17 00:00:00 2001
-From: Antigravity <antigravity@gemini.local>
+From: Sleepy <sleepy@localhost>
 Date: Wed, 1 Jul 2026 13:00:00 +0200
-Subject: [PATCH 33/36] drm/amd/display: Fix OOB array access for HPO FRL link
+Subject: [PATCH] drm/amd/display: Fix OOB array access for HPO FRL link
  encoder
 
 dcn401_resource.c declares hpo_frl_link_enc_regs as a single-element
@@ -12,7 +12,8 @@ adjacent static data.
 
 Size the array to two entries.
 
-Signed-off-by: Antigravity <antigravity@gemini.local>
+Signed-off-by: Sleepy <sleepy@localhost>
+Assisted-by: Claude <noreply@anthropic.com>
 ---
  .../gpu/drm/amd/display/dc/resource/dcn401/dcn401_resource.c    | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)

@@ -1,7 +1,7 @@
 From 680124f219d218f78681e7a10fbca6ce2270f614 Mon Sep 17 00:00:00 2001
-From: Antigravity <antigravity@gemini.local>
+From: Sleepy <sleepy@localhost>
 Date: Wed, 1 Jul 2026 13:00:00 +0200
-Subject: [PATCH 28/36] drm/amd/pm: Disable SMU14 mode1 reset for SR-IOV
+Subject: [PATCH] drm/amd/pm: Disable SMU14 mode1 reset for SR-IOV
 
 smu_v14_0_2_is_mode1_reset_supported() is an unfilled TODO stub that
 always reports mode1 reset as supported. In an SR-IOV virtual function
@@ -11,7 +11,8 @@ recovering it, so callers must never attempt it there.
 Return false when amdgpu_sriov_vf() indicates a VF and keep the
 default true for bare-metal devices.
 
-Signed-off-by: Antigravity <antigravity@gemini.local>
+Signed-off-by: Sleepy <sleepy@localhost>
+Assisted-by: Claude <noreply@anthropic.com>
 ---
  drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c | 6 +++++-
  1 file changed, 5 insertions(+), 1 deletion(-)

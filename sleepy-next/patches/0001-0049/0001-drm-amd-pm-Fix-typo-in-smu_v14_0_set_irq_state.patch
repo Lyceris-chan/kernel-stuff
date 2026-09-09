@@ -1,7 +1,7 @@
 From b0f38302d5be132f67588cdc6d8fff5fb790824b Mon Sep 17 00:00:00 2001
-From: Antigravity <antigravity@gemini.local>
+From: Sleepy <sleepy@localhost>
 Date: Wed, 1 Jul 2026 13:00:00 +0200
-Subject: [PATCH 25/36] drm/amd/pm: Fix typo in smu_v14_0_set_irq_state
+Subject: [PATCH] drm/amd/pm: Fix typo in smu_v14_0_set_irq_state
 
 The third parameter of smu_v14_0_set_irq_state() is spelled "tyep"
 instead of "type". While a parameter name does not affect the callback
@@ -10,7 +10,8 @@ signature harder to grep for during IRQ handling audits.
 
 Rename the parameter to "type".
 
-Signed-off-by: Antigravity <antigravity@gemini.local>
+Signed-off-by: Sleepy <sleepy@localhost>
+Assisted-by: Claude <noreply@anthropic.com>
 ---
  drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)

@@ -1,7 +1,7 @@
 From 882e8148ae7ec0c504c472b01cdebe7b69e04da5 Mon Sep 17 00:00:00 2001
-From: Antigravity <antigravity@gemini.local>
+From: Sleepy <sleepy@localhost>
 Date: Wed, 1 Jul 2026 13:00:00 +0200
-Subject: [PATCH 29/36] drm/amd/pm: Add bounds checking for SMU14 I2C commands
+Subject: [PATCH] drm/amd/pm: Add bounds checking for SMU14 I2C commands
 
 smu_v14_0_2_i2c_xfer() writes one SwI2cCmd_t per transferred byte into
 req->SwI2cCmds[], a fixed-size array of MAX_SW_I2C_COMMANDS entries.
@@ -12,7 +12,8 @@ the end of the array and corrupts the SMU command buffer.
 Check c against MAX_SW_I2C_COMMANDS before dereferencing the slot and
 return -EINVAL through the existing fail path on overflow.
 
-Signed-off-by: Antigravity <antigravity@gemini.local>
+Signed-off-by: Sleepy <sleepy@localhost>
+Assisted-by: Claude <noreply@anthropic.com>
 ---
  drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_2_ppt.c | 8 +++++++-
  1 file changed, 7 insertions(+), 1 deletion(-)

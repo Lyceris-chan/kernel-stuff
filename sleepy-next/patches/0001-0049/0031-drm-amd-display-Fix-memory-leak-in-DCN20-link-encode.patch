@@ -1,7 +1,7 @@
 From 42f8da1167d8b70f37826d3e17217714e5f8f5e4 Mon Sep 17 00:00:00 2001
-From: Antigravity <antigravity@gemini.local>
+From: Sleepy <sleepy@localhost>
 Date: Wed, 1 Jul 2026 13:00:00 +0200
-Subject: [PATCH 32/36] drm/amd/display: Fix memory leak in DCN20 link encoder
+Subject: [PATCH] drm/amd/display: Fix memory leak in DCN20 link encoder
  creation
 
 dcn401_link_encoder_create() kzalloc's enc20 and then returns NULL from
@@ -12,7 +12,8 @@ time an invalid hpd_source is passed in.
 Split the NULL check from the range check and kfree(enc20) before
 returning NULL on an out-of-range hpd_source.
 
-Signed-off-by: Antigravity <antigravity@gemini.local>
+Signed-off-by: Sleepy <sleepy@localhost>
+Assisted-by: Claude <noreply@anthropic.com>
 ---
  .../drm/amd/display/dc/resource/dcn401/dcn401_resource.c    | 6 +++++-
  1 file changed, 5 insertions(+), 1 deletion(-)

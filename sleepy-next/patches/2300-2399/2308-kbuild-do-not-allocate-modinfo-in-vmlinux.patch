@@ -1,0 +1,143 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
+Date: Tue, 08 Sep 2026 21:55:09 +0100
+Subject: [PATCH 09/23] kbuild: do not allocate .modinfo in vmlinux
+Message-Id: <20260908-build-speedup-v1-9-5dc1ac01672d@kernel.org>
+ Nathan Chancellor <nathan@kernel.org>, Nicolas Schier <nsc@kernel.org>, 
+ Nick Desaulniers <ndesaulniers@google.com>, 
+ Bill Wendling <morbo@google.com>, Justin Stitt <justinstitt@google.com>, 
+ Masahiro Yamada <masahiroy@kernel.org>, Alexey Gladkov <legion@kernel.org>, 
+ Thomas Gleixner <tglx@kernel.org>, Ingo Molnar <mingo@redhat.com>, 
+ Borislav Petkov <bp@alien8.de>, Dave Hansen <dave.hansen@linux.intel.com>, 
+ x86@kernel.org, "H. Peter Anvin" <hpa@zytor.com>, 
+ Paul Walmsley <pjw@kernel.org>, Palmer Dabbelt <palmer@dabbelt.com>, 
+ Albert Ou <aou@eecs.berkeley.edu>, Alexandre Ghiti <alex@ghiti.fr>, 
+ Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>, 
+ Will Deacon <will@kernel.org>, Mark Rutland <mark.rutland@arm.com>, 
+ Ard Biesheuvel <ardb@kernel.org>, 
+ Ilias Apalodimas <ilias.apalodimas@linaro.org>, 
+ Josh Poimboeuf <jpoimboe@kernel.org>, Peter Zijlstra <peterz@infradead.org>, 
+ Miguel Ojeda <ojeda@kernel.org>, Boqun Feng <boqun@kernel.org>, 
+ Gary Guo <gary@garyguo.net>, 
+ =?utf-8?q?Bj=C3=B6rn_Roy_Baron?= <bjorn3_gh@protonmail.com>, 
+ Benno Lossin <lossin@kernel.org>, Andreas Hindborg <a.hindborg@kernel.org>, 
+ Alice Ryhl <aliceryhl@google.com>, Trevor Gross <tmgross@umich.edu>, 
+ Danilo Krummrich <dakr@kernel.org>, 
+ Daniel Almeida <daniel.almeida@collabora.com>, 
+ Tamir Duberstein <tamird@kernel.org>, 
+ Alexandre Courbot <acourbot@nvidia.com>, 
+ =?utf-8?q?Onur_=C3=96zkan?= <work@onurozkan.dev>, 
+ Jonathan Corbet <corbet@lwn.net>, Randy Dunlap <rdunlap@infradead.org>
+ llvm@lists.linux.dev, linux-riscv@lists.infradead.org, 
+ linux-arch@vger.kernel.org, linux-arm-kernel@lists.infradead.org, 
+ linux-efi@vger.kernel.org, rust-for-linux@vger.kernel.org, 
+ linux-doc@vger.kernel.org, Jens Axboe <axboe@kernel.dk>, 
+ "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
+ h=from:subject:message-id; bh=MbJ/+6TmwtBwAFA3foaiJYQ20esYkNk6sPYlzgWUs0Q=;
+ b=owGbwMvMwCV2fu7ZrsZH9SKMp9WSGLIWlJn1XnoTy/us7THn/v8RVX+XTrB3Wan2+vZps7D/2
+ kaXZPW5O0pZGMS4GGTFFFmefxHfHyQSNq/zgr8bzBxWJpAhDFycAjCRMw8ZGdafYxPw61h16A/D
+ 3IeJjP63F138mL0o+o/alu0Bf64lHZ3NyDBV/3Zv6yO/02fcggQX9Xe4cp6t3mXzmq+wRyhq6Wn
+ HmWwA
+ fpr=E7F417BF5214569E89D04F46CF9DCD8A81E27F14
+
+Commit 3e86e4d74c04 ("kbuild: keep .modinfo section in vmlinux.unstripped")
+placed MODULE_INFO() strings in the .modinfo section in vmlinux.unstripped,
+however it left the section allocatable, so it gets assigned an address and
+on arm64, arm and riscv, the section is tagged as PT_LOAD.
+
+This is useless as the data is ultimately stripped anyway.
+
+Doing this results in a lot of unnecessary work - each pass copies the
+whole file, 450 MIB with relocations for an x86 allmodconfig build and 250
+MiB for an arm64 allmodconfig build.
+
+This adds ~0.7s on the serial tail of every build for arm64 and ~0.2s for
+x86 (the tail is single-threaded work done after parallel work has
+finished).
+
+Nothing requires .modinfo to exist at an address, so fix this by using
+--dump-section which prevents the allocation.
+
+Image, bzImage, System.map and modules.builtin.modinfo are unchanged and
+the stripped vmlinux differs only in its program headers.
+
+The objcopy passes are on the serial tail of every build that links
+vmlinux, no-op builds are unchanged.
+
+Whole build, 128-thread Threadripper 9980X, best of N runs:
+
+                                         before   after     delta
+                                         -------------------------------
+  x86 defconfig, touch mm/vma.c, gcc        8.9s     8.8s    -0.16s (-2%)
+  x86 defconfig, touch mm/vma.c, clang      8.1s     7.9s    -0.20s (-2%)
+  x86 defconfig, clean, gcc                27.6s    27.5s    -0.13s (0%)
+  x86 defconfig, clean, clang              27.2s    27.0s    -0.18s (-1%)
+  x86 allmodconfig, touch mm/vma.c, gcc    42.0s    41.6s    -0.40s (-1%)
+
+Assisted-by: LLM
+Signed-off-by: Lorenzo Stoakes (ARM) <ljs@kernel.org>
+---
+ include/asm-generic/vmlinux.lds.h |  2 +-
+ scripts/Makefile.vmlinux          | 24 ++++++------------------
+ 2 files changed, 7 insertions(+), 19 deletions(-)
+
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index b2988aa12f66..7be9e0321867 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -855,7 +855,7 @@
+ 		KLP_SYMID
+ 
+ #define MODINFO								\
+-		.modinfo : { *(.modinfo) . = ALIGN(8); }
++		.modinfo (INFO) : { *(.modinfo) . = ALIGN(8); }
+ 
+ #ifdef CONFIG_GENERIC_BUG
+ #define BUG_TABLE							\
+diff --git a/scripts/Makefile.vmlinux b/scripts/Makefile.vmlinux
+index 4b54aaeca65d..1fc7a0ca8eaf 100644
+--- a/scripts/Makefile.vmlinux
++++ b/scripts/Makefile.vmlinux
+@@ -90,11 +90,9 @@ remove-section-$(CONFIG_ARCH_VMLINUX_NEEDS_RELOCS) += '.rel.*'
+ 
+ remove-symbols := -w --strip-unneeded-symbol='__mod_device_table__*'
+ 
+-# To avoid warnings: "empty loadable segment detected at ..." from GNU objcopy,
+-# it is necessary to remove the PT_LOAD flag from the segment.
++# none of the removed sections is allocated, so no segment is left empty
+ quiet_cmd_strip_relocs = OBJCOPY $@
+-      cmd_strip_relocs = $(OBJCOPY) $(patsubst %,--set-section-flags %=noload,$(remove-section-y)) $< $@; \
+-                         $(OBJCOPY) $(addprefix --remove-section=,$(remove-section-y)) $(remove-symbols) $@
++      cmd_strip_relocs = $(OBJCOPY) $(addprefix --remove-section=,$(remove-section-y)) $(remove-symbols) $< $@
+ 
+ targets += vmlinux
+ vmlinux: vmlinux.unstripped FORCE
+@@ -103,21 +101,11 @@ vmlinux: vmlinux.unstripped FORCE
+ # modules.builtin.modinfo
+ # ---------------------------------------------------------------------------
+ 
+-# .modinfo in vmlinux.unstripped is aligned to 8 bytes for compatibility with
+-# tools that expect vmlinux to have sufficiently aligned sections but the
+-# additional bytes used for padding .modinfo to satisfy this requirement break
+-# certain versions of kmod with
+-#
+-#   depmod: ERROR: kmod_builtin_iter_next: unexpected string without modname prefix
+-#
+-# Strip the trailing padding bytes after extracting .modinfo to comply with
+-# what kmod expects to parse.
++# use --dump-section to include non-allocated sections
+ quiet_cmd_modules_builtin_modinfo = GEN     $@
+-      cmd_modules_builtin_modinfo = $(cmd_objcopy); \
+-                                    sed -i 's/\x00\+$$/\x00/g' $@; \
+-                                    chmod -x $@
+-
+-OBJCOPYFLAGS_modules.builtin.modinfo := -j .modinfo -O binary
++      cmd_modules_builtin_modinfo = $(OBJCOPY) -O binary -j .modinfo --dump-section .modinfo=$@ $< $@.tmp; \
++                                    rm -f $@.tmp; \
++                                    sed -i 's/\x00\+$$/\x00/g' $@
+ 
+ targets += modules.builtin.modinfo
+ modules.builtin.modinfo: vmlinux.unstripped FORCE
+
+-- 
+2.55.0

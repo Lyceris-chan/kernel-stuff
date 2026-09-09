@@ -1,7 +1,7 @@
 From f80ef62e0eec0fc0c294da72ee97b36fdbb57f95 Mon Sep 17 00:00:00 2001
-From: Antigravity <antigravity@gemini.local>
+From: Sleepy <sleepy@localhost>
 Date: Wed, 1 Jul 2026 13:00:00 +0200
-Subject: [PATCH 26/36] drm/amd/pm: Fix memory leaks in
+Subject: [PATCH] drm/amd/pm: Fix memory leaks in
  smu_v14_0_fini_smc_tables
 
 smu_v14_0_fini_smc_tables() frees every driver-table pointer except
@@ -13,7 +13,8 @@ unload, suspend, and reset.
 kfree() user_overdrive_table and set it to NULL alongside the other
 table pointers so the teardown is complete and idempotent.
 
-Signed-off-by: Antigravity <antigravity@gemini.local>
+Signed-off-by: Sleepy <sleepy@localhost>
+Assisted-by: Claude <noreply@anthropic.com>
 ---
  drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0.c | 2 ++
  1 file changed, 2 insertions(+)
