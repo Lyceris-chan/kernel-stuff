@@ -418,18 +418,24 @@ truth with proper tabs, and confirm content-identical modulo whitespace. Then
 pass BOTH `git apply --check` and GNU `patch -p1 --forward --dry-run` before
 adopting. Record the reconstruction in `PATCH_SOURCES.md` with the Message-ID.
 
-## Step 9 — Wannabe next-tree sweeps (pre-RC previews, learned 2026-08-26)
+## Step 9 — linux-next / sleepy-next sweeps (the 7.3 preview)
 
-When 7.3-rc1 doesn't exist yet, maintain the **wannabe preview tree** at
-`wannabe-7.3-rc1/` (git worktree from `repos/linux-next`, branch
-`wannabe-7.3`, gitignored). See `WANNABE-7.3.md` for the full history. For a
-"check everything" sweep against it:
+> The standalone **wannabe preview tree** (gitignored `wannabe-7.3-rc1/` git
+> worktree, branch `wannabe-7.3`, doc `WANNABE-7.3.md`, tracked
+> `wannabe-7.3-patches/` series) was **removed 2026-09-02**, superseded by the
+> `sleepy-next` package. There is no preview worktree to maintain: the linux-next
+> (7.3) preview kernel IS `sleepy-next/` (its own PKGBUILD, base = a
+> `next-YYYYMMDD` snapshot). Sweep for 7.3-window content directly against that
+> series. History of the wannabe era lives in `CHANGELOG.md` + `PATCH_SOURCES.md`
+> (2026-08-26 record, annotated as superseded).
+
+For a "check everything" sweep against the next snapshot base:
 
 1. **Repos**: linux-next tags (`git tag -l 'next-*'`) — the snapshot is the
-   base; if the newest tag equals what the worktree is on, repos are covered.
-   drm-next / linux-pm / amd-staging tips before the snapshot date are in base.
-   amd-staging tip = our Layer-1 cherry-pick; post-tip content is GC 12.1 /
-   datacenter (off-target for gfx1201).
+   sleepy-next base; if the newest tag equals the current `_srctag`, repos are
+   covered. drm-next / linux-pm / amd-staging tips before the snapshot date are
+   in base. amd-staging post-tip content is GC 12.1 / datacenter (off-target
+   for gfx1201) until the next amd-drm-next merge.
 2. **MLs**: amd-gfx + dri-devel are the ONLY relevant freedesktop lists
    (there is no separate "drm" or "amdgpu" list — those names map to amd-gfx
    and dri-devel). lore-only lists (linux-pm, linux-mm, linux-kernel, netdev)
@@ -437,8 +443,8 @@ When 7.3-rc1 doesn't exist yet, maintain the **wannabe preview tree** at
 3. **Work items**: see Step 4 caveats — mostly bug reports, track don't merge.
 4. **WIP merge rule**: a series applies cleanly to next-YYYYMMDD AND is
    on-target AND not a v1-major-rework / maintainer-rejected / author-dropped
-   → merge as ONE isolated commit ("ML WIP, easy to drop when it lands
-   upstream"), document in `WANNABE-7.3.md` + `PATCH_SOURCES.md`. Verify
+   → adopt as an isolated numbered patch ("ML WIP, easy to drop when it lands
+   upstream"), document in `sleepy-next/PATCH_SOURCES.md`. Verify
    `make defconfig` (cheap Kconfig sanity) and 0 `.orig`/`.rej` after.
    Rejected-as-upstream: author-dropped (MMIO-TLB fallback), maintainer-rejected
    (userq-manager keep-alive), v1-major-rework (Alex Deucher 30-patch GPU TLB
@@ -456,11 +462,11 @@ When 7.3-rc1 doesn't exist yet, maintain the **wannabe preview tree** at
    `c87e6635d2db`, GRPH_FLIP status check `f64a9be56536`): ~400 commits in
    the 7.3 base. They are the #5616 flip_done fixes — arrive with the 7.3
    bump, do NOT backport to 7.2 (same amdgpu_dm-split reason).
-7. **MARIE LRU**: 0.10.5 is current (firelzrd `55d2c27`; sirlucjan has no 7.3
-   dir). zstd `2100` already has the gcc<11.4 workaround (sirlucjan's
-   `zstd-dev-patches-v2` is the same merge reorganized).
+7. **MARIE LRU**: 0.11.0 is current (firelzrd, 2026-08-31), carried as a strict
+   1-to-1 rebase (`sleepy-next` `2101`). zstd `2100` already has the gcc<11.4
+   workaround (sirlucjan's `zstd-dev-patches-v2` is the same merge reorganized).
 
-Known-good WIP merges on the 7.3 tree (08-26): gup `follow_page_mask()`
-batching (Rik van Riel RFC v3, 8 commits, `git am`), HDMI VRR/ALLM v4
-amdgpu-side (3 commits), userq GPU-reset 5-patch (Vitaly Prosyak), BO-bind
-v5, KFD mark-queues-reset, vm_init NULL-deref reorder — all isolated commits.
+Known-good WIP content from the 08-26 preview era now ships in the sleepy-next
+series: gup `follow_page_mask()` batching (Rik van Riel RFC v3 → 2120–2127),
+HDMI VRR/ALLM v4 (→ 0059–0061), userq GPU-reset + BO-bind + KFD
+mark-queues-reset + vm_init reorder (→ 9000s).

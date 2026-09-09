@@ -403,7 +403,14 @@ Our RX 9070 XT is `smu_v14_0_0` (dmesg: `detected ip block number 4 <smu_v14_0_0
 
 ---
 
-## 2026-08-26 — Wannabe 7.3-rc1 preview tree
+## 2026-08-26 — Wannabe 7.3-rc1 preview tree (superseded 2026-09-02)
+
+> **Removed 2026-09-02.** The wannabe preview tree (`wannabe-7.3-rc1/`), its
+> tracked patch series (`wannabe-7.3-patches/`) and `WANNABE-7.3.md` were
+> dropped once the `sleepy-next` package became the maintained linux-next (7.3
+> preview) kernel. The entries described below (gup batching, HDMI VRR/ALLM,
+> userq/KFD) now ship as sleepy-next series patches (2120–2127, 0059–0061,
+> 9000s).
 
 Created a **wannabe 7.3-rc1** preview tree at `wannabe-7.3-rc1/` (git worktree
 from `repos/linux-next` at **next-20260825**), because 7.3-rc1 is not yet
@@ -501,8 +508,8 @@ NAP governor), RTL8261C/D 5 GbE (we have RTL8125B/r8169), DRM fair-policy fix
 needs port + review); work-items #5616/#4753 (WIP/community, no upstream
 provenance); HDMI 2.1 VRR/ALLM (AMD amd-gfx — missed 7.3, WIP; re-evaluate
 when they land); ML-only userq/KFD series mostly superseded by amd-staging or
-awaiting v2+. See `WANNABE-7.3.md` for the full breakdown and rebuild
-instructions.
+awaiting v2+. (The wannabe tree that held this layer was removed 2026-09-02;
+its content is superseded by the `sleepy-next` package.)
 
 ---
 
@@ -1185,8 +1192,9 @@ archives — lore itself is Anubis-blocked). Series grew 151 → 154 patches.
 batch lookups in follow_page_mask()` (lkml 08-11,
 `<20260811025157.1632867-1-riel@surriel.com>`) — gup perf series (2.2–5.9× on
 mTHP, up to 12.8× in gup_test), RFC not merged, not adoptable as-is for the
-7.2 build. **Later merged into the wannabe 7.3 tree** (08-26, applies cleanly
-to next-20260825) — see the 2026-08-26 record above.
+7.2 build. **Later merged into the linux-next preview** (08-26, applies cleanly
+to next-20260825) — now the sleepy-next 2120–2127 series — see the 2026-08-26
+record above.
 mm/swap single-folio revert (Hellwig) — needs the unmerged swap_ops series
 prereqs in `mm/page_io.c`. DCN42 DCHVM↔rIOMMU SDP port series (James Lin,
 amd-gfx 08-11) — display-virtualization, off-target for a desktop. zram
