@@ -92,6 +92,10 @@ sidesteps the linux-next mm churn and is the actual release-candidate line.
   - `sleepy-kernel` 7.2 (v7.2.0): 174/174 apply — 171 clean, 3 minor fuzz
     (`0004`, `1058`, `9007`, the same shared patches); `1101` revert intact.
 - `pkgdesc` for `linux-sleepy-next` renamed off the dead "Wannabe" name.
+- **Toolchain pin clarified to LLVM 23.1.0 final** (the GitHub `llvmorg-23.1.0`
+  release asset `LLVM-23.1.0-Linux-X64.tar.xz`, already the toolchain actually
+  downloaded). Removed the dead kernel.org auto-fetch block whose stale `rc2`
+  default was never wired into `source()`.
 
 ---
 
