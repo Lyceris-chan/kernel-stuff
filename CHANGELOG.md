@@ -9,6 +9,23 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.3.0-rc2-5-sleepy-next] — 2026-09-10
+
+### Added
+- **HDMI 2.1 VRR series — the final pieces of AMD's Linux 7.4 pull.** The
+  AMDGPU DRM-Next pull for 7.4 (posted 2026-09-10) enables HDMI 2.1 by default
+  with FreeSync/VRR/ALLM + passive VRR. We already carried the core
+  (`0059` 2.1 FreeSync, `0060` HDMI 2.1 VRR, `0061` ALLM, `1144` FRL-by-default,
+  `1150`/`1151` passive VRR); this adds the three newest commits from the
+  series:
+  - `1152` drm/amd/display: Emit VTEM for HF-VSDB VRR on TMDS links
+  - `1153` drm/amd/display: Fix HF-VSDB DSC bpc detection to be cumulative
+  - `1154` drm/amd/display: Fix NULL deref of new_stream->sink in VTEM guard
+
+Series is now **147 patches**, all applying cleanly to pristine v7.3-rc2.
+
+---
+
 ## [7.3.0-rc2-4-sleepy-next] — 2026-09-09
 
 ### Added
