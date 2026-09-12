@@ -115,6 +115,22 @@ The CachyOS squashes are generated **against the actual series state** (rc7 + th
   `lkml/20`, `rust-for-linux/0`); messages are commits, raw email is blob `m`.
 - **Build time is ~8 min** with the kbuild speedup series (`2300`–`2322`).
   A full rebuild is cheap — prefer rebuilding over guessing.
+- **Verify clones are FRESH before trusting a sweep** (2026-09-12). Stale and
+  corrupt clones repeatedly produced wrong "nothing new" conclusions. Check the
+  *remote-tracking ref you actually read* against the remote, not the local
+  branch (`git rev-parse refs/remotes/origin/<b>` vs
+  `git ls-remote <url> refs/heads/<b>`). **Shallow clones cannot always
+  fast-forward** — `git fetch` reports success but the ref never moves; if the
+  SHAs differ after a fetch, **re-clone** (`--shallow-since`, never
+  `--depth=1`). A corrupt pack (`pack has N unresolved deltas`) also needs a
+  re-clone. `gitlab.freedesktop.org` is intermittently unreachable — when it
+  times out, cover drm content via `repos/linux-next` and retry later.
+- **`ld.mold` cannot link the kernel** — re-verified 2026-09-12 on mold 2.42.1:
+  it rejects `OUTPUT_ARCH(...)`, `ENTRY(...)` and `SECTIONS{}` in `-T` scripts
+  with `unknown linker script token`, and `arch/x86/kernel/vmlinux.lds` opens
+  with `OUTPUT_ARCH`, so it fails immediately. This is an upstream mold
+  limitation (partial ld-script support), not a local misconfiguration — there
+  is no flag or workaround. Keep `ld.lld` (`LD=ld.lld`).
 
 ## Full maintenance cycle
 
