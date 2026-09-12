@@ -4,10 +4,15 @@ Custom Arch Linux kernel package built for a single AMD Zen 4 + RDNA 4 desktop.
 Uses a sanitized CachyOS patchset as the base, with additional upstream and
 local patches filtered to this hardware.
 
-Two packages: the root `PKGBUILD` (`linux-sleepy`, mainline) and
-`sleepy-next/PKGBUILD` (`linux-sleepy-next`, currently **Linux 7.3-rc2** —
-the actively maintained one). Track mainline RCs; linux-next snapshots are a
-preview base only when the RC line is unusable.
+One package: `sleepy-next/PKGBUILD` (`linux-sleepy-next`, currently **Linux
+7.3-rc2**). Track mainline RCs; linux-next snapshots are a preview base only
+when the RC line is unusable.
+
+**Single-package repo since 2026-09-12.** The repo previously carried a second
+package at the root — a 7.2 `linux-sleepy` build. It was dropped; its
+`PKGBUILD`, `patches/`, `config`, `disable_configs.py` and `net-tune/` live only
+in git history. Everything belongs under `sleepy-next/` now, and `net-tune` is
+shipped by `linux-sleepy-next`.
 
 ## Target hardware
 
@@ -26,10 +31,11 @@ preview base only when the RC line is unusable.
 
 | File | Purpose |
 |---|---|
-| `GUIDE.md` | End-user README: target audience, differences from vanilla, build instructions |
-| `README.md` | User-facing project doc |
+| `README.md` | Repo entry point — points at the package and its docs |
+| `sleepy-next/docs/GUIDE.md` | End-user guide: toolchain, differences from vanilla, build instructions |
+| `sleepy-next/docs/README.md` | Package overview, target hardware, build and install |
 | `CHANGELOG.md` | Per-release summary of what changed, by kernel version + pkgrel |
-| `PATCH_SOURCES.md` | Per-patch provenance ledger — authors, commit hashes, source URLs, revisions |
+| `sleepy-next/PATCH_SOURCES.md` | Per-patch provenance ledger — authors, commit hashes, source URLs, revisions |
 | `LESSONS.md` | Full incident log ("do not repeat") — the durable rules are below; the context is there |
 
 Local Google documentation style guides (committed reference copies, CC-By 3.0
@@ -41,15 +47,20 @@ docs.
 
 | Path | Purpose |
 |---|---|
-| `PKGBUILD` | Arch build script — version vars, `source=()`, `prepare()` applies the series + config overrides |
-| `config` | Base `.config` (from CachyOS) |
-| `disable_configs.py` | Strips unwanted driver configs before `olddefconfig` |
-| `patches/<range>/NNNN-*.patch` | The patch series, one folder per number range (see Patch numbering). Root-level `NNNN-*.patch` symlinks are auto-created by the PKGBUILD for makepkg 7.1.0 basename resolution and are gitignored. |
-| `net-tune/` | Unified CAKE SQM + latency tuning systemd service |
+| `sleepy-next/PKGBUILD` | Arch build script — version vars, `source=()`, `prepare()` applies the series + config overrides |
+| `sleepy-next/config` | Base `.config` (from CachyOS) |
+| `sleepy-next/disable_configs.py` | Strips unwanted driver configs before `olddefconfig` |
+| `sleepy-next/patches/<range>/NNNN-*.patch` | The patch series, one folder per number range (see Patch numbering). `NNNN-*.patch` symlinks are auto-created inside `sleepy-next/` by the PKGBUILD for makepkg 7.1.0 basename resolution and are gitignored. |
+| `sleepy-next/net-tune/` | Unified CAKE SQM + latency tuning systemd service |
+| `sleepy-next/docs/` | User-facing package docs |
 | `repos/` | Cloned upstream git repos for patch extraction (gitignored; never clone into `/tmp`) |
-| `src/`, `pkg/` | Build artifacts — never commit |
+| `sleepy-next/src/`, `sleepy-next/pkg/` | Build artifacts — never commit |
 
-**Deleted files (do not recreate):** `cake-sqm.sh`, `cake-sqm.service`, `sqm-qos/`, `net-latency/` (replaced by the unified `net-tune/` service).
+**Deleted files (do not recreate):** root-level `PKGBUILD`, `config`, `patches/`,
+`disable_configs.py`, `net-tune/`, `GUIDE.md`, `PATCH_SOURCES.md`, `.SRCINFO`
+(the dropped 7.2 `linux-sleepy` package — see History in `README.md`);
+`cake-sqm.sh`, `cake-sqm.service`, `sqm-qos/`, `net-latency/` (replaced by the
+unified `net-tune/` service).
 
 ## Skills — task-specific procedures live in `.claude/skills/`
 
@@ -81,9 +92,15 @@ Each range is a category; use the next unused number in the correct range.
 | `2100–2199` | Memory management (zstd, LRU-MARIE) | sirlucjan |
 | `2200–2299` | CPU idle (NAP governor) | sirlucjan `nap-patches/` (firelzrd's repo is BORE-only) |
 | `2300–2399` | Build system / kbuild | ML (e.g. the kbuild build-speedup series, `2300`–`2322`) |
+| `2400–2499` | Core scheduler (non-CachyOS) | sched-ext / lkml ML (e.g. Righi's need-resched tracing fix, `2400`) |
 | `9000–9099` | agd5f staging backports | `git format-patch` from agd5f/linux — **verify all symbols exist in rc mainline first** |
 
-All sirlucjan directories live under `repos/sirlucjan-kernel-patches/7.2/` (renamed from `7.2-rc/` when 7.2 released, 2026-08-19).
+All sirlucjan directories now live under `repos/sirlucjan-kernel-patches/7.3-rc/`.
+Note that sirlucjan **dropped the whole `7.2-rc` line** (commit `226df437`), so
+older provenance paths recorded against `7.2/` or `7.2-rc/` no longer resolve —
+including the `2200` NAP source (`7.3-rc/` has no `nap-patches`; NAP survives
+only under `7.0/` and `6.19/`). Our `2200` patch is unaffected; only its
+documented source path is stale.
 The CachyOS squashes are generated **against the actual series state** (rc7 + the `00xx` local/upstream patches), not a clean rc — the pre-CachyOS patches touch shared files like `drm_edid.c`. Two known conflicts handled inside the squashes: `0151` duplicates `0055`, and `0053` must be dropped when the hdmi branch is present.
 
 ## Durable findings (hardware + patch traps)
@@ -113,6 +130,32 @@ The CachyOS squashes are generated **against the actual series state** (rc7 + th
 - **lore.kernel.org git endpoints are NOT Anubis-gated** (only the web UI is):
   `git clone --mirror https://lore.kernel.org/<list>/<epoch>` works (e.g.
   `lkml/20`, `rust-for-linux/0`); messages are commits, raw email is blob `m`.
+  **But the epoch digit is a time shard, not a list id** (2026-09-12).
+  `/<list>/0` is the *oldest* shard, so a mirror of it can have its newest
+  message years in the past while `refs/heads/master` still matches the remote
+  — fresh-looking and silently useless (a full `netdev/0` mirror ended at
+  2017-11-02). Probe with `git ls-remote` and clone the **highest** epoch:
+  netdev `0,1,2,3` (use `/3`), linux-fsdevel `0,1` (use `/1`), linux-mm `0,1,2`
+  (use `/2`; `/0` ends 2021). io-uring, linux-block, linux-nvme, linux-pm are
+  `/0` only. `--shallow-since` fails **server-side** for `netdev/*` and
+  `linux-fsdevel/*` (`error processing shallow info: 4`, reproducible) but works
+  for the single-epoch lists; shallow-clone the highest epoch instead.
+- **Match a Message-ID with an anchored header regex, never a substring grep.**
+  Grepping a raw email for `20260911…` anywhere in the body also matches every
+  *reply* that quotes it, so the file you extract is someone else's reply, not
+  the patch. Use `grep -m1 -oE '^Message-I[Dd]: <PREFIX[^>]*>'`.
+- **There is exactly one package, and it lives in `sleepy-next/`**
+  (single-package repo since 2026-09-12). Always confirm you are testing the
+  live tree with `grep -m1 '^_major=' sleepy-next/PKGBUILD` and, for a built
+  artifact, `.BUILDINFO`'s `builddir` in the newest `*.pkg.tar.zst`. A stale
+  second patch tree used to exist at the repo root (174 files for the dropped
+  7.2 package); applying it to a 7.3-rc2 base produced ~97 spurious failures,
+  which is the wrong series rather than a broken one. If you ever see a large
+  block of failures, check *which* tree you applied before concluding anything.
+- **The live `prepare()` dry-run-gates every patch** and prints
+  `SKIPPED: <reason>` for a miss, then deletes `.rej` files — so a past build
+  tree with zero `.rej` does *not* prove every patch applied. Check the build
+  output for `SKIPPED`, and still run the cumulative apply.
 - **Build time is ~8 min** with the kbuild speedup series (`2300`–`2322`).
   A full rebuild is cheap — prefer rebuilding over guessing.
 - **Verify clones are FRESH before trusting a sweep** (2026-09-12). Stale and

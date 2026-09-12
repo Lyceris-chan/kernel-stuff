@@ -13,6 +13,12 @@ description: >
   sweep". For a single named patch/commit, use the patch-audit skill instead.
 ---
 
+> **Package location (2026-09-12).** The repo is single-package: everything this
+> skill touches lives in `sleepy-next/`. Unless a step says otherwise, `cd
+> sleepy-next` first so paths like `PKGBUILD`, `patches/...`, `config`,
+> `net-tune/` and `PATCH_SOURCES.md` resolve. From the repo root, prefix them
+> with `sleepy-next/`.
+
 ## Local model (Qwen) tips — READ THIS FIRST
 
 - **Copy commands exactly.** Do not improvise, rephrase, or "simplify" any

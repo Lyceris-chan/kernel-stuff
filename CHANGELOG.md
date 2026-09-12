@@ -9,6 +9,68 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.3.0-rc2-7-sleepy-next] — 2026-09-12
+
+### Changed
+- **The repository is now single-package.** The root 7.2 `linux-sleepy`
+  package was dropped: its `PKGBUILD`, `patches/` (174 files), `config`,
+  `disable_configs.py`, `net-tune/`, `GUIDE.md`, `PATCH_SOURCES.md` and
+  `.SRCINFO` are removed from the working tree and live only in git history.
+  `linux-sleepy-next` in `sleepy-next/` is the only package. Two couplings had
+  to be cut first: its `prepare()` read `../config` (the root config — now
+  `config`, its own byte-identical copy), and it deliberately did not install
+  `net-tune` because the 7.2 package owned it.
+- **`linux-sleepy-next` now ships `net-tune`** (CAKE SQM + low-latency ethernet
+  tuning), replacing the 7.2 package as its owner, and enables the service via
+  `multi-user.target.wants`. Its config comes from `/etc/net-tune.conf`, or the
+  shipped template — which defaults to `ENABLE_SQM=yes` at **80/80 Mbit** — when
+  a build is non-interactive. Set your real line rate there.
+
+### Added
+- **MGLRU v3 (`2131`–`2137`).** Barry Song's `mm/mglru: speed up
+  `inc_min_seq()` and fix cold/hot inversions`, extracted from akpm's
+  `mm-unstable`. Batches the per-folio work in `inc_min_seq()` — the
+  `nr_pages` update, the gen→gen moves, and an inlined prefetch helper — and
+  fixes hot/cold inversion by keeping promoted folios ahead. `CONFIG_LRU_GEN=y`
+  here, so aging runs on every reclaim; this trims sys time in the
+  memory-pressure window that produces desktop and game stutter.
+- **memcg per-cpu charge stock (`2138`).** Shakeel Butt's `memcg: trim the
+  per-cpu charge stock instead of draining it`, which splits the percpu-stock
+  high watermark from its emptying target (the page-allocator `pcp->batch`
+  idiom) rather than thrashing the stock.
+- **need-resched ordering fix (`2400`).** Andrea Righi's `sched: Set
+  need-resched flags before tracing`. The unpatched order emits
+  `sched_set_need_resched_tp` before setting the TIF bit, so a BPF tracepoint
+  program can recurse through `rcu_read_unlock_special()` into a kernel stack
+  overflow. Relevant here: we ship bpftune and run sched-ext.
+
+### Removed
+- **The dangling ADIOS config, in both packages.** `PKGBUILD` passed
+  `-e MQ_IOSCHED_ADIOS`, `config` set `CONFIG_MQ_IOSCHED_ADIOS=y`, and
+  `provides=()` listed `ADIOS-MODULE` — but no patch in either tree adds
+  `block/adios.c`, so `olddefconfig` silently dropped the symbol and the
+  package advertised a module it did not ship. The dead config line, the
+  `scripts/config` flag, and the `ADIOS-MODULE` provides entry are removed from
+  both `PKGBUILDs` and both `config` files. `DEFAULT_IOSCHED=kyber` was already
+  in effect and is unchanged.
+
+### Verified
+- The full **156-patch series applies to a pristine `v7.3-rc2` worktree with 0
+  failures** (cumulative `patch -Np1 --forward`, the same call the runner
+  makes), and 0 `SKIPPED` lines — the runner dry-run-gates every patch and
+  prints the reason for any miss, so a silently inert patch is visible.
+- A recovery note for the record: an earlier test this session appeared to show
+  97 broken patches. That was my error — the root `PKGBUILD` is the **old 7.2
+  `linux-sleepy`** series (`_major=7.2`, 174 patches), not the live one, and I
+  applied it to a 7.3-rc2 tree. The live package is `sleepy-next/`
+  (`linux-sleepy-next`, `_major=7.3`, 156 patches); the rc2-6 package's
+  `.BUILDINFO` confirms `builddir = .../sleepy-next`.
+
+### New range
+- `2400–2499` = core scheduler (non-CachyOS). The existing ranges cover
+  block/IO schedulers (`2000`), memory (`2100`), CPU idle (`2200`) and kbuild
+  (`2300`), but not sched core / EEVDF.
+
 ## [7.3.0-rc2-6-sleepy-next] — 2026-09-12
 
 ### Changed

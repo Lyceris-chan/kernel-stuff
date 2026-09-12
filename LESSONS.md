@@ -2,9 +2,8 @@
 
 Full incident log for sleepy-kernel. Kept out of `CLAUDE.md` so the operating
 manual stays short; CLAUDE.md carries only the durable rules. Read this before
-repeating a past mistake. Patch numbers are current as of 7.2-rc7 (see
-PATCH_SOURCES.md for renumber history, e.g. `1100`–`1103` were formerly
-`1025`, `1031`, `1033`, `1065`; `1020`–`1022` merged upstream in rc7).
+repeating a past mistake. Patch numbers are current as of 7.3-rc2; see
+`sleepy-next/PATCH_SOURCES.md` for per-patch provenance and renumber history.
 
 | Mistake | What happened | Rule |
 |---|---|---|

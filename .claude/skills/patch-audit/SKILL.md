@@ -3,6 +3,12 @@ name: patch-audit
 description: Ingest or upgrade a specific kernel patch for sleepy-kernel — add a named patch or commit SHA, swap an existing patch to a newer revision (e.g. a v2-to-v4 swap), or verify a candidate's provenance and eligibility (symbols exist, applies cleanly, hardware-relevant) before it goes in. Use when given a specific patch, commit, or series to bring into the tree, or when asked to audit/verify a patch source or PATCH_SOURCES.md provenance. For the periodic all-source sweep, use the patch-sweep skill instead.
 ---
 
+> **Package location (2026-09-12).** The repo is single-package: everything this
+> skill touches lives in `sleepy-next/`. Unless a step says otherwise, `cd
+> sleepy-next` first so paths like `PKGBUILD`, `patches/...`, `config`,
+> `net-tune/` and `PATCH_SOURCES.md` resolve. From the repo root, prefix them
+> with `sleepy-next/`.
+
 # Patch Audit & Ingestion
 
 Never scrape `lore.kernel.org` — its anti-bot protection blocks agents.

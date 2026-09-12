@@ -9,6 +9,12 @@ description: >
   GUIDE.md, write a commit message, or commit a maintenance result.
 ---
 
+> **Package location (2026-09-12).** The repo is single-package: everything this
+> skill touches lives in `sleepy-next/`. Unless a step says otherwise, `cd
+> sleepy-next` first so paths like `PKGBUILD`, `patches/...`, `config`,
+> `net-tune/` and `PATCH_SOURCES.md` resolve. From the repo root, prefix them
+> with `sleepy-next/`.
+
 # Docs maintenance & commit
 
 Run this AFTER the patch work (version bump, sweep, or audit) is done and the

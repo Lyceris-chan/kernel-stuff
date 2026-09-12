@@ -3,6 +3,12 @@ name: kernel-build
 description: Build sleepy-kernel with makepkg, diagnose and fix a failed build, or verify bpftune/BTF requirements survived the build. Use for any request to build the kernel, run makepkg, triage a build failure, resolve a patch/hunk conflict during a build, or verify BTF/vmlinux after building.
 ---
 
+> **Package location (2026-09-12).** The repo is single-package: everything this
+> skill touches lives in `sleepy-next/`. Unless a step says otherwise, `cd
+> sleepy-next` first so paths like `PKGBUILD`, `patches/...`, `config`,
+> `net-tune/` and `PATCH_SOURCES.md` resolve. From the repo root, prefix them
+> with `sleepy-next/`.
+
 # Kernel build
 
 ## Build

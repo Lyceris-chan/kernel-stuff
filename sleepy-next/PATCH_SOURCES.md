@@ -1,5 +1,67 @@
 # sleepy-next — patch provenance
 
+## 2026-09-12 — MM/sched optimizations + ADIOS cleanup (156 patches, pkgrel 7)
+
+Six-source sweep (linux-mm, akpm `mm-unstable`, linux-pm, sched-ext/lkml,
+block/net/fs, sirlucjan). Nine patches added; all nine were verified by
+**cumulative apply against a pristine v7.3-rc2 worktree on top of the full
+147-patch series** — the whole 156-patch series now applies with 0 failures and
+0 `SKIPPED` (the runner dry-run-gates and prints `SKIPPED:` for any miss).
+
+**Added — MGLRU v3 (`2131`–`2137`).** Barry Song (Xiaomi), `mm/mglru: speed up
+inc_min_seq() and fix cold/hot inversions`, v3 posted 2026-09-02
+(`20260901232421.40157-1-baohua@kernel.org`), in akpm `mm-unstable` as
+`54e9345e4563`, `521a7c952c89`, `3384a49a865e`, `e25d6c041ca0`, `efac6d51d1d6`,
+`81cb06a097b3`, `64fff1e3d929` (extracted with `git format-patch`). Batches the
+per-folio work in MGLRU `inc_min_seq()` — `nr_pages` update, gen→gen moves, an
+inlined prefetch helper — and fixes hot/cold inversion by keeping promoted
+folios ahead. Reviewed (`R-b` Kairui Song, Baolin Wang, Lian Wang, Ridong Chen;
+`Tested-by`), heading for 7.4. MGLRU ages on every reclaim here
+(`CONFIG_LRU_GEN=y`), so this cuts sys time in the memory-pressure window that
+causes desktop/game stutter. Applies mm/vmscan.c with offsets only; `2135` takes
+1 hunk at fuzz 1.
+
+**Added — `2138`, memcg per-cpu charge stock.** Shakeel Butt,
+`memcg: trim the per-cpu charge stock instead of draining it`, v2
+(`20260820012010.2016086-1-shakeel.butt@linux.dev`), `Acked-by: Michal Hocko`,
+in `mm-unstable`. Splits the percpu-stock high watermark from its emptying
+target (the page-allocator `pcp->batch` idiom) instead of thrashing the stock;
+measured 44.6–57% of CPU in charge/uncharge for request/response patterns.
+
+**Added — `2400`, need-resched ordering fix.** Andrea Righi (NVIDIA),
+`sched: Set need-resched flags before tracing`
+(`20260911213300.1305763-1-arighi@nvidia.com`). Sets the TIF bit *before*
+emitting `sched_set_need_resched_tp`, in both `set_tsk_need_resched()` and
+`__resched_curr()`. rc2 still traces first, and the unfixed order lets a BPF
+tracepoint program recurse through `rcu_read_unlock_special()` until kernel
+stack overflow — live risk here because we ship bpftune and run sched-ext. Clean
+apply; no other patch in the series touches `kernel/sched/core.c`.
+
+**New range:** `2400–2499` = core scheduler (non-CachyOS). Chosen because the
+existing ranges cover block/IO schedulers (`2000`), memory (`2100`), CPU idle
+(`2200`) and kbuild (`2300`), but not sched core / EEVDF.
+
+**Removed — the dangling ADIOS config (both packages).** `PKGBUILD` ran
+`scripts/config -e MQ_IOSCHED_ADIOS`, `config` set
+`CONFIG_MQ_IOSCHED_ADIOS=y`, and `provides=()` listed `ADIOS-MODULE`, but **no
+patch in either tree adds `block/adios.c`** — so `olddefconfig` silently dropped
+the symbol and the package advertised a module it did not ship. Confirmed on the
+running kernel: `/sys/block/nvme0n1/queue/scheduler` → `none mq-deadline
+[kyber] bfq` (no `adios`). The dead config line, the `-e MQ_IOSCHED_ADIOS` flag
+and the `ADIOS-MODULE` provides entry are removed from both `PKGBUILD`s and both
+`config` files. `DEFAULT_IOSCHED=kyber` was already in effect and is unchanged.
+sirlucjan's ADIOS 3.3.0 patch is available (`block/adios.c`, 2062 lines) if we
+ever want the scheduler itself.
+
+**Considered and not taken:** the Reflex cpufreq governor (`0.3.1r2`, verifies
+clean — the 7.2-era "cpufreq API 4→5" deferral is obsolete, and it shares no
+files with our series) and the nvme-pci adaptive-interrupt-polling v2 series
+(patch 1 applies, patch 2 needs a rebase — 1 of 20 hunks). Also rejected:
+hrtick repick v2 (needs rebase, collides with `0105`/`0113` regions),
+sched_ext lazy preemption (inert — `CONFIG_PREEMPT_LAZY` unset), Hugh Dickins'
+26-patch fbatch (needs two `mm-hotfixes-stable` prereqs, perf unproven), Jan
+Kara's deferred inode reclaim (still in review), CPPC v6 (hardening, not perf).
+
 ## 2026-09-09 — full series audit (142 patches)
 
 Base moved from linux-next snapshots to mainline **Linux 7.3-rc2** (the

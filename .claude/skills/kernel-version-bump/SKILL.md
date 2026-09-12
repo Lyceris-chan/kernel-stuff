@@ -3,6 +3,12 @@ name: kernel-version-bump
 description: Bump sleepy-kernel to a new Linux RC or release version, and refresh the squashed CachyOS branch patches. Use when asked to update or bump the kernel version, move to a new -rcN, or regenerate the CachyOS 01xx branch squashes. Also covers editing PKGBUILD's _major/_minor/_srcname and the resulting version string.
 ---
 
+> **Package location (2026-09-12).** The repo is single-package: everything this
+> skill touches lives in `sleepy-next/`. Unless a step says otherwise, `cd
+> sleepy-next` first so paths like `PKGBUILD`, `patches/...`, `config`,
+> `net-tune/` and `PATCH_SOURCES.md` resolve. From the repo root, prefix them
+> with `sleepy-next/`.
+
 # Kernel version bump
 
 ## 1. Verify the target tag exists

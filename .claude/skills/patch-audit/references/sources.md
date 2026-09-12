@@ -1,5 +1,11 @@
 # Source access & fetch guide
 
+> **Package location (2026-09-12).** The repo is single-package: everything this
+> skill touches lives in `sleepy-next/`. Unless a step says otherwise, `cd
+> sleepy-next` first so paths like `PKGBUILD`, `patches/...`, `config`,
+> `net-tune/` and `PATCH_SOURCES.md` resolve. From the repo root, prefix them
+> with `sleepy-next/`.
+
 Per-source fetch commands, archive-access workarounds, and extraction
 gotchas. Referenced from `SKILL.md`.
 

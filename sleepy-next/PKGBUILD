@@ -182,7 +182,7 @@ _rcver=rc2
 
 pkgver=7.3.0_rc2
 _tagrel=1
-pkgrel=6
+pkgrel=7
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -324,6 +324,14 @@ source=(
   "patches/2100-2199/2128-zstd-use-ZSTD_cpuSupportsBmi2-in-ZSTD_initStaticCCtx.patch"
   "patches/2100-2199/2129-zstd-skip-BMI2-probe-when-dynamic-BMI2-dispatch-disabled.patch"
   "patches/2100-2199/2130-zstd-probe-CPU-for-BMI2-support-only-once.patch"
+  "patches/2100-2199/2131-mm-mglru-separate-folio-generation-update-from-LRU-accounting.patch"
+  "patches/2100-2199/2132-mm-mglru-batch-update-lrugen-nr-pages-in-inc-min-seq.patch"
+  "patches/2100-2199/2133-mm-mglru-enhance-cold-hot-inversion-handling-in-inc-min-seq.patch"
+  "patches/2100-2199/2134-mm-mglru-exclude-folios-promoted-by-aging-from-protected-in-inc-min-seq.patch"
+  "patches/2100-2199/2135-mm-mglru-make-LRU-folio-prefetch-helper-an-inline-function.patch"
+  "patches/2100-2199/2136-mm-mglru-move-folios-from-oldest-gen-to-second-oldest-gen-from-head-to-t.patch"
+  "patches/2100-2199/2137-mm-mglru-batch-move-folios-to-the-second-oldest-gen-s-LRU.patch"
+  "patches/2100-2199/2138-mm-memcg-trim-the-per-cpu-charge-stock-instead-of-draining-it.patch"
   "patches/2200-2299/2200-7.2-nap-v0.5.0.patch"
   "patches/2300-2399/2300-scripts-mksysmap-drop-the-module-info-symbols.patch"
   "patches/2300-2399/2301-scripts-mksysmap-fix-escape-of-in-the-pi.patch"
@@ -348,6 +356,7 @@ source=(
   "patches/2300-2399/2320-rust-make-exports-o-depend-on-the-headers-generated.patch"
   "patches/2300-2399/2321-kbuild-build-rust-crates-in-parallel-with-the-rest.patch"
   "patches/2300-2399/2322-kbuild-use-pigz-for-gzip-compression-if-available.patch"
+  "patches/2400-2499/2400-sched-Set-need-resched-flags-before-tracing.patch"
   "patches/9000-9099/9007-drm-gfx12-Program-DB_RING_CONTROL.patch"
   "patches/9000-9099/9011-drm-amdgpu-Respect-noretry-flag-for-retry-faults-on-GFX12.1.patch"
   "patches/9000-9099/9012-drm-amdgpu-gfxhub-Enable-retry-fault-interrupts-when-needed.patch"
@@ -557,6 +566,9 @@ EOF
 
     # === CONFIG: Use CachyOS base config, then make olddefconfig to silently resolve new options ===
     echo "Setting config..."
+    # `../config` is $srcdir/config — makepkg's copy of the `config` entry in
+    # source=(), i.e. this package's own sleepy-next/config. (cwd here is
+    # $srcdir/$_srcname, so `..` is $srcdir, not the package directory.)
     cp ../config .config
     
     # Apply our minimal overrides BEFORE olddefconfig so they stick
@@ -566,7 +578,7 @@ EOF
     scripts/config -d MEDIA_PLATFORM_SUPPORT -d MEDIA_ANALOG_TV_SUPPORT -d MEDIA_DIGITAL_TV_SUPPORT -d MEDIA_RADIO_SUPPORT -d MEDIA_SDR_SUPPORT -d DVB_CORE
     scripts/config -d IIO -d INFINIBAND -d ISDN -d CAN -d PARPORT -d FIREWIRE -d PCMCIA -d GAMEPORT -d MOST -d GREYBUS -d COMEDI -d ANDROID_BINDER_IPC -d ANDROID_BINDERFS -d ANDROID_BINDER_DEVICES -d F2FS_FS
     scripts/config -d DRM_I915 -d DRM_XE -d DRM_NOUVEAU -d DRM_VGEM -d DRM_VMWGFX -d DRM_GMA500 -d DRM_UDL -d DRM_AST -d DRM_MGAG200 -d DRM_QXL -d DRM_VIRTIO_GPU
-    scripts/config -e LRU_GEN -e LRU_GEN_ENABLED -e LRU_GEN_WALKS_MMU -e LRU_MARIE -e CPU_IDLE_GOV_NAP -e MQ_IOSCHED_ADIOS -e MQ_IOSCHED_KYBER --set-str DEFAULT_IOSCHED "kyber" -m USB_VIDEO_CLASS -m I2C_CHARDEV -m R8169 -d TCP_CONG_BBR -e TCP_CONG_BBR3 -e DEFAULT_BBR3 --set-str DEFAULT_TCP_CONG "bbr3"
+    scripts/config -e LRU_GEN -e LRU_GEN_ENABLED -e LRU_GEN_WALKS_MMU -e LRU_MARIE -e CPU_IDLE_GOV_NAP -e MQ_IOSCHED_KYBER --set-str DEFAULT_IOSCHED "kyber" -m USB_VIDEO_CLASS -m I2C_CHARDEV -m R8169 -d TCP_CONG_BBR -e TCP_CONG_BBR3 -e DEFAULT_BBR3 --set-str DEFAULT_TCP_CONG "bbr3"
     # ASPM: OFF (was PERFORMANCE). There is no Kconfig "off" policy for PCIe ASPM —
     # the choice is BIOS-default/powersave/powersupersave/performance. The real
     # "off" is the runtime pcie_aspm=off param (the drm/amd !5538 SMU bus-drop
@@ -718,7 +730,7 @@ _package() {
                 'linux-firmware: firmware images needed for some devices'
                 'modprobed-db: Keeps track of EVERY kernel module that has ever been probed - useful for those of us who yes "" | make localmodconfig'
                 'scx-scheds: to use sched-ext schedulers')
-    provides=(VIRTUALBOX-GUEST-MODULES WIREGUARD-MODULE KSMBD-MODULE V4L2LOOPBACK-MODULE NTSYNC-MODULE VHBA-MODULE ADIOS-MODULE)
+    provides=(VIRTUALBOX-GUEST-MODULES WIREGUARD-MODULE KSMBD-MODULE V4L2LOOPBACK-MODULE NTSYNC-MODULE VHBA-MODULE)
 
     cd "$_srcname"
 
@@ -732,9 +744,21 @@ _package() {
     # Used by mkinitcpio to name the kernel
     echo "$pkgbase" | install -Dm644 /dev/stdin "$modulesdir/pkgbase"
 
-    # net-tune is owned by the linux-sleepy package (the two kernels share the
-    # identical service); shipping it here too would conflict with pacman's
-    # file-ownership check when both kernels are installed side by side.
+    # net-tune: unified CAKE SQM + low-latency ethernet tuning service.
+    # This package owns net-tune as of 2026-09-12: it was previously shipped by
+    # the 7.2 `linux-sleepy` package, which was dropped, so the side-by-side
+    # pacman file-ownership conflict that kept it out of here no longer applies.
+    echo "Installing net-tune service (SQM + latency tuning)..."
+    install -Dm755 "$startdir/net-tune/net-tune.sh" -t "$pkgdir/usr/local/bin/"
+    install -Dm644 "$startdir/net-tune/net-tune.service" -t "$pkgdir/usr/lib/systemd/system/"
+    if [ -f "$startdir/src/net-tune.conf" ]; then
+        install -Dm644 "$startdir/src/net-tune.conf" -t "$pkgdir/etc/"
+    else
+        install -Dm644 "$startdir/net-tune/net-tune.conf" -t "$pkgdir/etc/"
+    fi
+    install -d "$pkgdir/etc/systemd/system/multi-user.target.wants"
+    ln -s /usr/lib/systemd/system/net-tune.service "$pkgdir/etc/systemd/system/multi-user.target.wants/net-tune.service"
+
     echo "Installing modules..."
     ZSTD_CLEVEL=19 make "${BUILD_FLAGS[@]}" INSTALL_MOD_PATH="$pkgdir/usr" INSTALL_MOD_STRIP=1 \
         DEPMOD=/doesnt/exist  modules_install  # Suppress depmod
@@ -942,7 +966,7 @@ for _p in "${pkgname[@]}"; do
 done
 
 b2sums=('d8522ffee4af76eacdba75a8116376e9c21621ed0b22cbd381b816cd71f9fc25d1682fede84cfe51d854eb817a5836304023c4848a817f51f5a94a44ccd13f88'
-        '23f570909d870d709e9b9f414d8a9f543da492085c0ed457e6896d995e5cd608f7e45f3bdc96a5f09b595fb04e24babd6b9811ed03ea8d9598996aea0e890a9b'
+        'bec733001dd0f5ff9993f3bef81aadb7acf98517d3e5056fcfde7bcbb21eaedb64e8d71e534517e8fcbee6f9c86c131fcaef75d8634f169d809f04747dee7ad1'
         'ff25ac7c89880886b454064ba57bd1196fb747cb80c7663d7981006cc603151aee075ebe1b49b1a92866ad2a212d1e599ce622f63bfd140ad64d37b463c17aad'
         '0806d7b3b8e4e9044c14843fc53255ff92b12aaf3b8e0d0490bbf6266aaa6b01872476ce34a65c5b694cda9a1d82e84a38df16dbb9c798ae9aa6d1c9097b32aa'
         '007cf65f43e18e1425239bcd7502ea2b65105858e94bf20810adbd684619d773cf85b2bff98e2dfb4c9f8b3f58477d5f6251ffeaf2dfeba494ef1d98053682f8'
@@ -1041,6 +1065,14 @@ b2sums=('d8522ffee4af76eacdba75a8116376e9c21621ed0b22cbd381b816cd71f9fc25d1682fe
         'c096823c41fb07bd9974ae2189ffeb1f98c31730eb9f8e3ccafe4e3d30b9b9c207b592672698e3f7b5369cdc3baf5375c15f15fc87551fdb27dfbe97e318a66e'
         'eb5b6994b1341e7c05c49ba79336febc87dffe40e5008a81a9afdf931c8d2c00fb69fcf4d70923ba999993dd2e8e9ebf768d5809ee219a22e94f632944553539'
         '5626968774bad1795494928621f43e19945a1ecbd26c4dccd432a329277c26f04fc4ae02fde5560c503aed0fcd9bfda219de5c47e29a226149723fa5a7dbb721'
+        'cba1e7420661569cef5f2f60191c4d81be9b8c990ed848f789f389622878ab8dbe8c36c0c490bfdfe7b9c812f12f8c8c4158ec71337cddd821fddf770f84d69b'
+        'a2a0a299c9211a8cb6c98f1bf06bae38933286ca79610e2a952f754b755af8ff6e586234a6b91f1b1ebfe29ed6bf983033b156b01e6ca8b9d7a2847f9de2efc7'
+        'c275f203cdd186828f12d859cc8c0ba90a98104df04fe8d82126cce7f1aa3a6b880adec403502aa6ecfc67c2dcba72141275fe466ead3af33a066815863815a5'
+        '0d167c3da91ff7878c36fcd7a079e919d371b94415e4b1d2fcaa63e871cf4c355c8c76b70680a485427b1fd18a4e1172d83f38fae7acf9cc13968f59a1e03e4d'
+        '6633adfa2ee52e96105a220d265cc2dc12b85027ea066c95124f0befbacdb04482e2d5df29843e5c4ecc07d1b1da1aebd4ffd93cc4977e24ae9083605eab6c1b'
+        '1de4a0b5f2c7c12d30e2bb409186b53c90931dd511918725bd8cbeed74a659c6962fe98d984e23f928efaddc3aa42c50c05488af76e89b9fa94fdca43ce00f95'
+        'e5470ff289048d20cdc063c39a9009e3337a07c156ca8b854c415d3c0e194f7fc64b613d96e4f63091f467f5373d6bcc492b02f67e95777d29d772d085556329'
+        'dc50c148556a72ef4e327c94ed734a7431991332d796fec1e4ddbc675defe0dcc3a47180cdb38d68d381ea014373cd0a4fe35323dda58c9959348cfe633da415'
         'dc4e862e8f9fa7e8ead895908459757afd1027c24b960ae3d289a7212e29575bce3ce4627d5fd73edf211ee162dfa545e1642c5b16e8156f3dce50af8ef3c256'
         '478e0814cdbc83c33b63857158e00d203201805fc587982ea9bb7470866768b88feefab1ce77bcfe55783966c9d3428af6aa53947aa25bb314412f8af6d15387'
         'f5614caf38a72bf2321cc38dba0a5e119684705ebb6de33e577e2f918489b89ac42a6f0ab4149452d7a919129b251fa9e9d662cd4bf4e25b6bd3e494e8eff011'
@@ -1065,6 +1097,7 @@ b2sums=('d8522ffee4af76eacdba75a8116376e9c21621ed0b22cbd381b816cd71f9fc25d1682fe
         'b7b9b275e24cc84851c097454a9cbe44e752b7fb9d1314d97a549fc57c2c70be63f2c9398fbc863a6b00f66bfeb6e2986a5562083c55025a97e8d1cf226f8a31'
         '34fc7168a843052c3ef4639f71ba92395c76aa038b0b3318b9325dacdc0fa34a015b2a6c8ea147d1d56923296a3ffb0c61eba5a1a467b14c854ecf6de2d71792'
         '08e29326bc4eae545eccfe765919502c7143cc6b8d1b3f512239ba59647281d112336734f6a2ec3b557c4a5146534a1af19ce0214a06d544a2000030595a3d3d'
+        '7bd2f351f7304fe12489e67976e866b2f346e8cd50d44f590639d10a4856ff80d3b28d31f4c78b96ed92b7f21c499c3087b9bcd4d1155ea0bc017588dd5792c9'
         'bdc839d1629f22095c5907e62b7a1a4edfcedebe0cf7e430897ae87aa331cbad28e28cef106ae38c05cafa585fa19ddc019579f1b73fcfaa69d8a8bd40ba8111'
         '19f9c61f1f9f8b8fc53679ed26f8e8d8c59667d9ca07f10a3d04d7cb6f6e6a7eb63a82bd0474c0d97f6438fbf82bacb03bc9d07021945bceb14896f91a181eaa'
         'fbd6f7b4c4f3a371c17fe6859528aa2ab79e37c04e9191d91eebc4afc15f3145b25148a9c6248d1983ee93360e776ab71dc36896e43260978efd19849c0025e7'
