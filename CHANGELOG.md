@@ -9,6 +9,26 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.3.0-rc2-6-sleepy-next] — 2026-09-12
+
+### Changed
+- **LRU-MARIE updated to the author's official 0.11.1 7.3 port.** firelzrd now
+  ships `patches/testing/0001-linux7.3-rc1-lru_marie-0.11.1.patch` — an
+  *author-written* 7.3 port that applies cleanly to our rc2 base (0 hunk
+  failures). It supersedes our hand-rebased 0.11.0, which needed a
+  "legacy writeout" shim to re-provide the per-folio swap helpers the 7.3 base
+  deleted; the author instead adapts MARIE to the native 7.3
+  `swap_ops.h`/`swap_io_ctx` path. Two build-artifact sections the patch
+  accidentally bundles (`localversion`, `scripts/setlocalversion`) were
+  stripped. Series = **147 patches**.
+
+### Verified (source audit, 2026-09-12)
+- Source clones audited for staleness/corruption: `linux-pm`, `sirlucjan` and
+  `lore-mirror` were behind and were re-fetched; `drm-next` was re-cloned
+  earlier after a corrupt pack. All remote-tracking refs are now fresh.
+
+---
+
 ## [7.3.0-rc2-5-sleepy-next] — 2026-09-10
 
 ### Added
