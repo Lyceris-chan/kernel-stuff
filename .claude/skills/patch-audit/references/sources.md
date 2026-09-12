@@ -146,3 +146,32 @@ the "never access lore" rule stands unless separately verified.)
   against the in-tree `2200-7.2-nap-v0.5.0.patch`.
 
 ---
+
+## Reaching gitlab.freedesktop.org without git (learned 2026-09-12)
+
+GitLab is **Anubis-protected for browser-like clients** but **not** for plain
+`curl`. A headless browser (Helium/Chromium) just gets the challenge page
+(`Oh noes!` / `/.within.website/x/xess/`) and cannot clear the PoW
+non-interactively — do not try to reach GitLab through a browser.
+
+Use the **REST API with plain `curl` (NO User-Agent)** instead. It answers in
+~0.1 s even when the git transport times out:
+
+```bash
+API=https://gitlab.freedesktop.org/api/v4/projects
+P=agd5f%2Flinux          # the AMD staging fork we clone; NOT drm%2Famd
+curl -s "$API/$P/repository/branches?search=amd-staging"
+curl -s "$API/$P/repository/commits?ref_name=amd-staging-drm-next&per_page=20"
+curl -s "$API/$P/repository/commits/<sha>/diff"        # per-commit hunks (JSON)
+curl -s "$API/$P/repository/files/<url%2Fencoded%2Fpath>/raw?ref=<ref>"
+curl -s "$API/drm%2Famd/issues?state=opened&per_page=50"
+```
+
+- `drm%2Famd` = the group **issue tracker** (work items) — correct for issues.
+- `agd5f%2Flinux` = the **code**. The `drm/amd` *project* code is a stale group
+  mirror whose `master` is from 2025 — do not clone or query it for code.
+- There is **no GitHub or kernel.org mirror** of agd5f/linux (`api.github.com`
+  and `git.kernel.org` both 404).
+- `git ls-remote`/`fetch` against `agd5f/linux` does work — it is just
+  intermittently slow on the huge ref advertisement; retry before declaring it
+  unreachable.

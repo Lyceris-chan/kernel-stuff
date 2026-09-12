@@ -125,6 +125,7 @@ The CachyOS squashes are generated **against the actual series state** (rc7 + th
   `--depth=1`). A corrupt pack (`pack has N unresolved deltas`) also needs a
   re-clone. `gitlab.freedesktop.org` is intermittently unreachable — when it
   times out, cover drm content via `repos/linux-next` and retry later.
+- **GitLab: use the REST API, not a browser** (2026-09-12). gitlab.freedesktop.org is Anubis-gated for browser-like clients; headless Helium gets the challenge and cannot clear the PoW. Plain `curl` with **no User-Agent** works (~0.1 s). Code project = `agd5f%2Flinux`; `drm%2Famd` is the stale group mirror (master from 2025) — its only use is the issue tracker. No GitHub/kernel.org mirror exists. endpoints: `/repository/{branches,commits}`, `/commits/<sha>/diff`, `/files/<path>/raw?ref=`.
 - **`ld.mold` cannot link the kernel** — re-verified 2026-09-12 on mold 2.42.1:
   it rejects `OUTPUT_ARCH(...)`, `ENTRY(...)` and `SECTIONS{}` in `-T` scripts
   with `unknown linker script token`, and `arch/x86/kernel/vmlinux.lds` opens
