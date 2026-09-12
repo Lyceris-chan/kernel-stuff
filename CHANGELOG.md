@@ -25,6 +25,9 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
   `multi-user.target.wants`. Its config comes from `/etc/net-tune.conf`, or the
   shipped template — which defaults to `ENABLE_SQM=yes` at **80/80 Mbit** — when
   a build is non-interactive. Set your real line rate there.
+- **`/etc/net-tune.conf` is now a pacman backup file** (`backup=()`). Without it
+  pacman would overwrite local edits on every kernel upgrade, which matters now
+  that the service ships enabled with a placeholder line rate.
 
 ### Added
 - **MGLRU v3 (`2131`–`2137`).** Barry Song's `mm/mglru: speed up
