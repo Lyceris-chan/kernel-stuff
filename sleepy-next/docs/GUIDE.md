@@ -42,21 +42,28 @@ echo profile_peak | sudo tee /sys/class/drm/card1/device/power_dpm_force_perform
 
 ## net-tune (CAKE SQM + latency tuning)
 
-One systemd unit applies low-latency ethernet tuning (`ENABLE_LATENCY`) and
-CAKE shaping (`ENABLE_SQM`), each toggleable in `/etc/net-tune.conf` (SQM on by
-default, 80/80 Mbit). BBR3 is the compiled-in default; the service only shapes
-CAKE.
+One systemd unit applies low-latency Ethernet tuning (`ENABLE_LATENCY`) and CAKE
+shaping (`ENABLE_SQM`), each toggleable in `/etc/net-tune.conf`. SQM ships on at
+80/80 Mbit, so set your real line rate. BBR3 is the compiled-in default; the
+service only shapes CAKE.
 
-```bash
-sudo systemctl enable --now net-tune.service
-journalctl -u net-tune -n 20     # expect: "net-tune: OK - CAKE shaping active"
-```
-
-Download shaping needs the `ingress` qdisc (`CONFIG_NET_SCH_INGRESS=y`) and the
-named `ifb4cake` device; the service logs an `ERROR` if either is missing.
+See [`../net-tune/README.md`](../net-tune/README.md) for configuration,
+requirements, and verification.
 
 ## Known issues
 
+- **Display artifact (the "box")** — a rectangle over application windows that
+  does not appear in screenshots, disappears when the cursor moves over it, and
+  shows on whichever monitor last had VRR toggled. **This is a COSMIC
+  (cosmic-comp) bug, not a kernel one**: it hands fullscreen content to an
+  overlay plane. Fix it in `/etc/environment` and log back in:
+
+  ```
+  COSMIC_DISABLE_OVERLAY_SCANOUT=1
+  ```
+
+  `COSMIC_DISABLE_DIRECT_SCANOUT=1` also works, because it removes the overlay
+  bit too. See `LESSONS.md` for the full diagnosis.
 - **BTF symbol collision**: old `TCP_CONG_BBR` and `TCP_CONG_BBR3` define the
   same BTF kfunc — the old BBR stays disabled.
 - **DWARF5 required** with Clang 23 + pahole 1.31 (`DEBUG_INFO_DWARF5`).
@@ -64,3 +71,6 @@ named `ifb4cake` device; the service logs an `ERROR` if either is missing.
   REG_WAIT hang). The DCN4 flip-schedule patches that made these worse
   (`9051`/`9052`) were dropped — AMD reverted them upstream.
 - **`pcie_aspm=off`** slightly raises idle PCIe power draw (the !5538 stopgap).
+- **LRU-MARIE and MGLRU are mutually exclusive**, and **scx full-switch mode
+  bypasses CFS load balancing** — carried patches for either subsystem do
+  nothing while the other owns it.

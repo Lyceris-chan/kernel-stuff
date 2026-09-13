@@ -1,12 +1,7 @@
 ---
 name: patch-cleanup
 description: >
-  Clean up the sleepy-kernel workspace after a maintenance session: cross-check
-  patch files on disk against the PKGBUILD source=() array, delete dropped or
-  deferred patch files only after confirming they are unreferenced, and remove
-  scratch scripts and build artifacts. Use when asked to clean up, remove
-  leftover/orphaned patch files, delete scratch or build artifacts, or reconcile
-  the patch tree with the PKGBUILD.
+  Reconciles the on-disk patch tree with the PKGBUILD source=() array, then removes orphaned patch files and build artifacts. Use when asked to clean up the workspace, remove leftover patch files, or check the series against source=().
 ---
 
 > **Package location (2026-09-12).** The repo is single-package: everything this

@@ -1,6 +1,7 @@
 ---
 name: patch-audit
-description: Ingest or upgrade a specific kernel patch for sleepy-kernel — add a named patch or commit SHA, swap an existing patch to a newer revision (e.g. a v2-to-v4 swap), or verify a candidate's provenance and eligibility (symbols exist, applies cleanly, hardware-relevant) before it goes in. Use when given a specific patch, commit, or series to bring into the tree, or when asked to audit/verify a patch source or PATCH_SOURCES.md provenance. For the periodic all-source sweep, use the patch-sweep skill instead.
+description: >
+  Ingests or upgrades one named kernel patch — adds a commit or series, swaps a revision, and verifies provenance, symbol existence, and that it applies cleanly. Use when given a specific patch, commit, or series to bring into the tree, or to audit an existing entry. For the periodic all-source sweep, use patch-sweep instead.
 ---
 
 > **Package location (2026-09-12).** The repo is single-package: everything this
@@ -15,11 +16,17 @@ Never scrape `lore.kernel.org` — its anti-bot protection blocks agents.
 
 ## Reference tree
 
-All apply-checks and symbol greps target the **base tree** of the package you
-are editing: `repos/linux-7.2@<tag>` for the root `linux-sleepy` package, or a
-`git worktree` of `repos/linux-next` at the `_srctag` (e.g. `v7.3-rc2`) for
-`sleepy-next`. Create one with
-`git -C repos/linux-next worktree add /tmp/ref <tag>`.
+All apply-checks and symbol greps target the **base tree**: a `git worktree` of
+`repos/linux-next` checked out at the PKGBUILD's `_srctag` (`v7.3-rc2` today).
+Create one with
+
+```bash
+git -C repos/linux-next worktree add --detach repos/_ref v7.3-rc2
+```
+
+Keep worktrees under `repos/` — never in `/tmp`. Remember that a worktree which
+already has the series applied is the *wrong* tree for a forward check: use a
+fresh one, or `git checkout -- . && git clean -fdq` first.
 
 ## Source access
 

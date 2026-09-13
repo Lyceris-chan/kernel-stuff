@@ -40,6 +40,23 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 - The full **175-patch series applies to a pristine `v7.3-rc2` worktree with 0
   failures** (cumulative `patch -Np1 --forward`).
 
+### Fixed outside the kernel — the display artifact ("the box")
+A rectangular artifact over application windows had been misattributed to the
+kernel since August. Its decisive traits — absent from screenshots, dismissed by
+moving the cursor over it, and appearing on whichever monitor last had VRR
+toggled — identified it as **a COSMIC (cosmic-comp) bug**: the compositor hands
+fullscreen content to an **overlay plane**. Two settings each clear it, in
+`/etc/environment` followed by a re-login:
+
+```
+COSMIC_DISABLE_OVERLAY_SCANOUT=1     # sufficient on its own
+COSMIC_DISABLE_DIRECT_SCANOUT=1      # also works — it removes the overlay bit too
+```
+
+No kernel change is involved. `dcdebugmask=0x800` (IPS off) fixed this in August
+and had stopped working, which was the signal that the cause had changed. Full
+evidence chain in `LESSONS.md`.
+
 ### Note — the EEVDF fixes are largely inert here
 `scx_loader` is active with `default_sched = "scx_cake"` (live `state=enabled`,
 `ops=cake_1.2.1`), and rc2 gates the CFS balance path behind

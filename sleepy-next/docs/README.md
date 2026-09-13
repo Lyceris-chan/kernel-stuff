@@ -3,10 +3,10 @@
 `linux-sleepy-next` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
 built from **mainline Linux 7.3-rc2** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 142 targeted
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 175 targeted
 upstream/local patches. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0_rc2-3` · **Artifact:** `linux-sleepy-next-7.3.0_rc2-3-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0_rc2-10` · **Artifact:** `linux-sleepy-next-7.3.0_rc2-10-x86_64.pkg.tar.zst`
 
 ## Target hardware
 
@@ -57,23 +57,27 @@ States.
 
 ## Patch series
 
-147 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+175 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 
 | Range | Category |
 |---|---|
 | `0001–0049` | Handmade local (SMU14, DCN401, GFX12) |
 | `0050–0099` | Upstream EDID/display ML patches |
 | `0101–0113` | CachyOS squashes |
-| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TLB) |
+| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) |
 | `1100–1199` | AMD Display (DCN4/42B, FRL, colorops) |
 | `1200–1299` | AMD PM (amd-pstate, ACPI CPPC) |
-| `2000–2099` | Block / I/O schedulers |
-| `2100–2199` | Memory (zstd, LRU-MARIE, gup batching) |
+| `2000–2099` | Block / I/O (bfq, mq-deadline, zram, io_uring) |
+| `2100–2199` | Memory (zstd, LRU-MARIE, MGLRU, gup batching) |
 | `2200–2299` | CPU idle (NAP) |
 | `2300–2399` | Build system / kbuild |
+| `2400–2499` | Core scheduler (non-CachyOS) |
+| `2500–2599` | x86 / arch core |
+| `2600–2699` | Time / timers |
 | `9000–9099` | agd5f staging backports |
 
 ## Documentation
 
-`GUIDE.md` (this directory) covers toolchain, PROFILE_PEAK, and net-tune.
+`GUIDE.md` (this directory) covers toolchain, PROFILE_PEAK, troubleshooting, and
+net-tune. `../net-tune/README.md` documents the SQM service.
 `../../CLAUDE.md` holds the maintenance rules; `../PATCH_SOURCES.md` the ledger.

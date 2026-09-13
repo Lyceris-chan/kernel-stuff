@@ -1,6 +1,7 @@
 ---
 name: kernel-version-bump
-description: Bump sleepy-kernel to a new Linux RC or release version, and refresh the squashed CachyOS branch patches. Use when asked to update or bump the kernel version, move to a new -rcN, or regenerate the CachyOS 01xx branch squashes. Also covers editing PKGBUILD's _major/_minor/_srcname and the resulting version string.
+description: >
+  Bumps sleepy-kernel to a new Linux RC or release and refreshes the CachyOS 01xx squashes that no longer apply. Use when asked to move to a new -rcN or release, or to regenerate the CachyOS branch squashes.
 ---
 
 > **Package location (2026-09-12).** The repo is single-package: everything this
@@ -20,14 +21,11 @@ curl -I -s "https://git.kernel.org/torvalds/t/linux-<X.Y-rcN>.tar.gz"
 Stop and tell the user if this 404s — don't guess a nearby tag or round to one
 that exists.
 
-**Pre-RC fallback — sleepy-next linux-next preview (learned 2026-08-26):**
-when the NEXT mainline RC (e.g. 7.3-rc1) doesn't exist yet but the merge
-window is open, don't bump a `linux-7.2`-family PKGBUILD to a nonexistent
-tag. The 7.3 preview kernel is the separate **`sleepy-next/`** package, built
-from a `next-YYYYMMDD` snapshot (bump its `_srctag`, then run the patch-sweep
-Step-9 linux-next sweep). The earlier wannabe preview worktree (branch
-`wannabe-7.3`, doc `WANNABE-7.3.md`) was removed 2026-09-02 — do not recreate
-it; its content now lives in the sleepy-next series.
+**linux-next snapshots are a fallback, not a target.** There is one package
+(`sleepy-next/`), and it tracks **mainline RCs**. Only build from a
+`next-YYYYMMDD` snapshot when the RC line is genuinely unusable — bump
+`_srctag` to the snapshot and run the `patch-sweep` linux-next step afterwards.
+Never bump to a tag that does not exist yet.
 
 **Tarball source URL:** the `cdn.kernel.org/pub/linux/kernel/v7.x/testing/`
 URL 404s right after a tag is cut (the cdn mirrors RC tarballs late). Point
@@ -46,8 +44,8 @@ the clean tree (use `git apply --check`, NOT `patch --dry-run` — it reports
 false "corrupt patch" errors on mbox-format files):
 
 ```bash
-git -C repos/linux-7.2-rcN apply --check <patch>.patch     # forward check
-git -C repos/linux-7.2-rcN apply --check -R <patch>.patch  # already-applied check
+git -C repos/linux-next apply --check <patch>.patch     # forward check
+git -C repos/linux-next apply --check -R <patch>.patch  # already-applied check
 ```
 
 - Reverse check passes (forward fails) → already applied upstream → drop it,

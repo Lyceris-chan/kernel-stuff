@@ -1,18 +1,12 @@
 # sleepy-kernel
 
-Custom Arch Linux kernel package built for a single AMD Zen 4 + RDNA 4 desktop.
-Uses a sanitized CachyOS patchset as the base, with additional upstream and
-local patches filtered to this hardware.
+Custom Arch Linux kernel for a single AMD Zen 4 + RDNA 4 desktop, built from a
+sanitized CachyOS patchset plus upstream and local patches filtered to this
+hardware.
 
 One package: `sleepy-next/PKGBUILD` (`linux-sleepy-next`, currently **Linux
-7.3-rc2**). Track mainline RCs; linux-next snapshots are a preview base only
-when the RC line is unusable.
-
-**Single-package repo since 2026-09-12.** The repo previously carried a second
-package at the root — a 7.2 `linux-sleepy` build. It was dropped; its
-`PKGBUILD`, `patches/`, `config`, `disable_configs.py` and `net-tune/` live only
-in git history. Everything belongs under `sleepy-next/` now, and `net-tune` is
-shipped by `linux-sleepy-next`.
+7.3-rc2**). Track mainline RCs; linux-next snapshots are a preview base only when
+the RC line is unusable.
 
 ## Target hardware
 
@@ -27,22 +21,6 @@ shipped by `linux-sleepy-next`.
 
 **If a patch does not target one of these components, it does not go in.**
 
-## Documentation
-
-| File | Purpose |
-|---|---|
-| `README.md` | Repo entry point — points at the package and its docs |
-| `sleepy-next/docs/GUIDE.md` | End-user guide: toolchain, differences from vanilla, build instructions |
-| `sleepy-next/docs/README.md` | Package overview, target hardware, build and install |
-| `CHANGELOG.md` | Per-release summary of what changed, by kernel version + pkgrel |
-| `sleepy-next/PATCH_SOURCES.md` | Per-patch provenance ledger — authors, commit hashes, source URLs, revisions |
-| `LESSONS.md` | Full incident log ("do not repeat") — the durable rules are below; the context is there |
-
-Local Google documentation style guides (committed reference copies, CC-By 3.0
-with attribution in `.claude/style-guides/README.md`) live in
-`.claude/style-guides/`; the documentation skills consult them before editing
-docs.
-
 ## Repository layout
 
 | Path | Purpose |
@@ -50,253 +28,159 @@ docs.
 | `sleepy-next/PKGBUILD` | Arch build script — version vars, `source=()`, `prepare()` applies the series + config overrides |
 | `sleepy-next/config` | Base `.config` (from CachyOS) |
 | `sleepy-next/disable_configs.py` | Strips unwanted driver configs before `olddefconfig` |
-| `sleepy-next/patches/<range>/NNNN-*.patch` | The patch series, one folder per number range (see Patch numbering). `NNNN-*.patch` symlinks are auto-created inside `sleepy-next/` by the PKGBUILD for makepkg 7.1.0 basename resolution and are gitignored. |
+| `sleepy-next/patches/<range>/NNNN-*.patch` | The patch series, one folder per range (see Patch numbering). `NNNN-*.patch` symlinks are auto-created inside `sleepy-next/` by the PKGBUILD for makepkg 7.1.0 basename resolution, and are gitignored. |
 | `sleepy-next/net-tune/` | Unified CAKE SQM + latency tuning systemd service |
 | `sleepy-next/docs/` | User-facing package docs |
 | `repos/` | Cloned upstream git repos for patch extraction (gitignored; never clone into `/tmp`) |
 | `sleepy-next/src/`, `sleepy-next/pkg/` | Build artifacts — never commit |
 
-**Deleted files (do not recreate):** root-level `PKGBUILD`, `config`, `patches/`,
-`disable_configs.py`, `net-tune/`, `GUIDE.md`, `PATCH_SOURCES.md`, `.SRCINFO`
-(the dropped 7.2 `linux-sleepy` package — see History in `README.md`);
-`cake-sqm.sh`, `cake-sqm.service`, `sqm-qos/`, `net-latency/` (replaced by the
-unified `net-tune/` service).
+## Documentation
 
-## Skills — task-specific procedures live in `.claude/skills/`
+| File | Purpose |
+|---|---|
+| `README.md` | Repo entry point |
+| `sleepy-next/docs/README.md` | Package overview, target hardware, build and install |
+| `sleepy-next/docs/GUIDE.md` | End-user guide: toolchain, differences from vanilla, troubleshooting |
+| `CHANGELOG.md` | Per-release summary, by kernel version + pkgrel |
+| `sleepy-next/PATCH_SOURCES.md` | Per-patch provenance ledger |
+| `LESSONS.md` | Incident log and the full durable findings — **read this before repeating a past mistake** |
 
-Each skill owns one full workflow. Invoke it instead of re-deriving the steps; CLAUDE.md records only the durable rules.
+## Skills
+
+Task-specific procedures live in `.claude/skills/`. Invoke the matching skill
+instead of re-deriving the steps; this file records only the durable rules.
 
 | Skill | Use when |
 |---|---|
-| `kernel-build` | building with makepkg, triaging a build failure, verifying BTF/vmlinux after a build |
-| `kernel-version-bump` | bumping to a new Linux RC/release, refreshing the CachyOS `01xx` squashes |
-| `patch-audit` | ingesting a **single named patch/commit**, swapping a patch for a newer revision, verifying provenance |
-| `patch-sweep` | running the **periodic six-source sweep** for new hardware-relevant patches |
-| `patch-cachy-branches` | refreshing the `0101`–`0109` CachyOS branch squashes from sirlucjan |
-| `patch-cleanup` | reconciling on-disk patches with `source=()`, removing orphaned patches/artifacts |
-| `docs-maintenance` | updating README/PATCH_SOURCES/GUIDE and committing a maintenance result |
+| `kernel-build` | building with makepkg, triaging a build failure, verifying BTF |
+| `kernel-version-bump` | bumping to a new RC or release, refreshing the CachyOS `01xx` squashes |
+| `patch-audit` | ingesting one named patch or commit, swapping a revision, verifying provenance |
+| `patch-sweep` | the periodic six-source sweep for new hardware-relevant patches |
+| `patch-cachy-branches` | refreshing the `0101`–`0109` CachyOS squashes from sirlucjan |
+| `patch-cleanup` | reconciling on-disk patches with `source=()`, removing orphans |
+| `docs-maintenance` | updating docs and committing a maintenance result |
 
 ## Patch numbering
 
 Each range is a category; use the next unused number in the correct range.
 
-| Range | Category | Source / how to obtain |
+| Range | Category | Source |
 |---|---|---|
-| `0001–0049` | Handmade local patches (Sleepy/Antigravity) | SMU14, DCN401, GFX12 hand-written fixes for this hardware |
-| `0050–0099` | Upstream EDID/display ML patches not yet landed | `b4` mbox or freedesktop archives — verify with `git apply --check` against `repos/linux-7.2-rc7` |
-| `0101–0113` | CachyOS branch squashes (0106 = off-target drops; 0110–0113 = CachyOS/linux-fork backports) | sirlucjan `-sep` dirs (see `patch-cachy-branches`); 0110–0113 from CachyOS/linux fork |
+| `0001–0049` | Handmade local patches | SMU14, DCN401, GFX12 fixes for this hardware |
+| `0050–0099` | Upstream EDID/display ML patches not yet landed | `b4` mbox or freedesktop archives |
+| `0101–0113` | CachyOS branch squashes (`0106` = off-target drops) | sirlucjan `-sep` dirs; `0110`–`0113` from the CachyOS/linux fork |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | drm-next / agd5f |
-| `1100–1199` | AMD Display (DCN4, DCN42B, PSR, Replay, pstate, MCIF ARB) | drm-next |
-| `1200–1299` | AMD Power Management (amd-pstate, cpufreq) | linux-pm / sirlucjan |
-| `2000–2099` | Block / I/O schedulers (bfq, mq-deadline) | sirlucjan |
-| `2100–2199` | Memory management (zstd, LRU-MARIE) | sirlucjan |
-| `2200–2299` | CPU idle (NAP governor) | sirlucjan `nap-patches/` (firelzrd's repo is BORE-only) |
-| `2300–2399` | Build system / kbuild | ML (e.g. the kbuild build-speedup series, `2300`–`2322`) |
-| `2400–2499` | Core scheduler (non-CachyOS) | sched-ext / lkml ML (e.g. Righi's need-resched tracing fix, `2400`) |
-| `9000–9099` | agd5f staging backports | `git format-patch` from agd5f/linux — **verify all symbols exist in rc mainline first** |
+| `1100–1199` | AMD Display (DCN4, DCN42B, FRL, colorops) | drm-next |
+| `1200–1299` | AMD Power Management (amd-pstate, CPPC) | linux-pm / sirlucjan |
+| `2000–2099` | Block / I/O (bfq, mq-deadline, zram, io_uring) | sirlucjan / akpm |
+| `2100–2199` | Memory management (zstd, LRU-MARIE, MGLRU) | sirlucjan / akpm |
+| `2200–2299` | CPU idle (NAP governor) | sirlucjan `nap-patches/` |
+| `2300–2399` | Build system / kbuild | ML (the build-speedup series, `2300`–`2322`) |
+| `2400–2499` | Core scheduler (non-CachyOS) | sched-ext / lkml |
+| `2500–2599` | x86 / arch core | tip / lkml |
+| `2600–2699` | Time / timers | lkml |
+| `9000–9099` | agd5f staging backports | `git format-patch` from agd5f/linux — **verify every referenced symbol exists in rc mainline first** |
 
-All sirlucjan directories now live under `repos/sirlucjan-kernel-patches/7.3-rc/`.
-Note that sirlucjan **dropped the whole `7.2-rc` line** (commit `226df437`), so
-older provenance paths recorded against `7.2/` or `7.2-rc/` no longer resolve —
-including the `2200` NAP source (`7.3-rc/` has no `nap-patches`; NAP survives
-only under `7.0/` and `6.19/`). Our `2200` patch is unaffected; only its
-documented source path is stale.
-The CachyOS squashes are generated **against the actual series state** (rc7 + the `00xx` local/upstream patches), not a clean rc — the pre-CachyOS patches touch shared files like `drm_edid.c`. Two known conflicts handled inside the squashes: `0151` duplicates `0055`, and `0053` must be dropped when the hdmi branch is present.
-
-## Durable findings (hardware + patch traps)
-
-- **GC 12.0 ≠ GC 12.1.** Navi 48 (RX 9070 XT) is GC IP **(12,0,1)** → uses
-  `gfx_v12_0.c`. `gfx_v12_1.c` is a *different chip* — amd-staging commits
-  touching it (e.g. "Remove gfxoff calls in GC v12.1") are **not ours**. Check
-  `IP_VERSION(12,0,x)` vs `IP_VERSION(12,1,0)` in `amdgpu_discovery.c` before
-  adopting any gfx12 patch.
-- **Never carry the DCN4 flip-schedule patches `9051`/`9052`.** AMD reverted
-  both upstream (*"Because it causes some regression"*, `dml2_core_dcn4_calcs.c`,
-  DCN4 = this GPU). They make the flip-bandwidth math more conservative and
-  mis-schedule flips — the prime suspect for scanout artifacts.
-- **VRR/VSDB lives upstream now.** linux-next 0908 has the Alex Huang rework
-  (common EDID parser, `parse_hdmi_amd_vsdb()` removed). Prefer upstream; do not
-  re-introduce local force-enable hacks (an old local MCCS hack was replaced by
-  the upstream `1145`).
-- **Patch headers = upstream quality.** AI-assisted patches need a *named human
-  author* (`Sleepy <sleepy@localhost>`), a matching `Signed-off-by:`, and an
-  `Assisted-by: Claude <noreply@anthropic.com>` trailer. Strip leftover
-  `[PATCH n/N]` series numbering from subjects.
-- **Audit with a cumulative apply.** `git apply --check` and single-patch
-  dry-runs give false negatives; the authoritative test is applying the whole
-  series in order with `patch -p1 --forward -F2` and detecting both `FAILED`
-  and `Skipping patch`/`Reversed` (a skipped patch is an inert no-op, not a
-  success). Use a fresh worktree at the base tag.
-- **lore.kernel.org git endpoints are NOT Anubis-gated** (only the web UI is):
-  `git clone --mirror https://lore.kernel.org/<list>/<epoch>` works (e.g.
-  `lkml/20`, `rust-for-linux/0`); messages are commits, raw email is blob `m`.
-  **But the epoch digit is a time shard, not a list id** (2026-09-12).
-  `/<list>/0` is the *oldest* shard, so a mirror of it can have its newest
-  message years in the past while `refs/heads/master` still matches the remote
-  — fresh-looking and silently useless (a full `netdev/0` mirror ended at
-  2017-11-02). Probe with `git ls-remote` and clone the **highest** epoch:
-  netdev `0,1,2,3` (use `/3`), linux-fsdevel `0,1` (use `/1`), linux-mm `0,1,2`
-  (use `/2`; `/0` ends 2021). io-uring, linux-block, linux-nvme, linux-pm are
-  `/0` only. `--shallow-since` fails **server-side** for `netdev/*` and
-  `linux-fsdevel/*` (`error processing shallow info: 4`, reproducible) but works
-  for the single-epoch lists; shallow-clone the highest epoch instead.
-- **Match a Message-ID with an anchored header regex, never a substring grep.**
-  Grepping a raw email for `20260911…` anywhere in the body also matches every
-  *reply* that quotes it, so the file you extract is someone else's reply, not
-  the patch. Use `grep -m1 -oE '^Message-I[Dd]: <PREFIX[^>]*>'`.
-- **Never `git format-patch` a lore mirror** (2026-09-13). In a lore mirror each
-  *email* is a commit, so `format-patch -1 <sha>` produces a diff **of the email
-  headers**, not the code — the file then contains DKIM/Received noise plus the
-  hunk text as context. It fails to apply and `patch --forward` reports
-  "Skipping patch", which reads exactly like *already applied* and produced three
-  false "nothing to do" verdicts in one session. Extract the blob `m` and
-  MIME-decode the body instead (Python `email`), as with quoted-printable mails.
-  Real git clones (torvalds, linux-next, akpm-mm, drm-next) are fine — only the
-  lore mirrors are message-per-commit.
-- **There is exactly one package, and it lives in `sleepy-next/`**
-  (single-package repo since 2026-09-12). Always confirm you are testing the
-  live tree with `grep -m1 '^_major=' sleepy-next/PKGBUILD` and, for a built
-  artifact, `.BUILDINFO`'s `builddir` in the newest `*.pkg.tar.zst`. A stale
-  second patch tree used to exist at the repo root (174 files for the dropped
-  7.2 package); applying it to a 7.3-rc2 base produced ~97 spurious failures,
-  which is the wrong series rather than a broken one. If you ever see a large
-  block of failures, check *which* tree you applied before concluding anything.
-- **The live `prepare()` dry-run-gates every patch** and prints
-  `SKIPPED: <reason>` for a miss, then deletes `.rej` files — so a past build
-  tree with zero `.rej` does *not* prove every patch applied. Check the build
-  output for `SKIPPED`, and still run the cumulative apply.
-- **Build time is ~8 min** with the kbuild speedup series (`2300`–`2322`).
-  A full rebuild is cheap — prefer rebuilding over guessing.
-- **Verify clones are FRESH before trusting a sweep** (2026-09-12). Stale and
-  corrupt clones repeatedly produced wrong "nothing new" conclusions. Check the
-  *remote-tracking ref you actually read* against the remote, not the local
-  branch (`git rev-parse refs/remotes/origin/<b>` vs
-  `git ls-remote <url> refs/heads/<b>`). **Shallow clones cannot always
-  fast-forward** — `git fetch` reports success but the ref never moves; if the
-  SHAs differ after a fetch, **re-clone** (`--shallow-since`, never
-  `--depth=1`). A corrupt pack (`pack has N unresolved deltas`) also needs a
-  re-clone. `gitlab.freedesktop.org` is intermittently unreachable — when it
-  times out, cover drm content via `repos/linux-next` and retry later.
-- **GitLab: use the REST API, not a browser** (2026-09-12). gitlab.freedesktop.org is Anubis-gated for browser-like clients; headless Helium gets the challenge and cannot clear the PoW. Plain `curl` with **no User-Agent** works (~0.1 s). Code project = `agd5f%2Flinux`; `drm%2Famd` is the stale group mirror (master from 2025) — its only use is the issue tracker. No GitHub/kernel.org mirror exists. endpoints: `/repository/{branches,commits}`, `/commits/<sha>/diff`, `/files/<path>/raw?ref=`.
-- **`ld.mold` cannot link the kernel** — re-verified 2026-09-12 on mold 2.42.1:
-  it rejects `OUTPUT_ARCH(...)`, `ENTRY(...)` and `SECTIONS{}` in `-T` scripts
-  with `unknown linker script token`, and `arch/x86/kernel/vmlinux.lds` opens
-  with `OUTPUT_ARCH`, so it fails immediately. This is an upstream mold
-  limitation (partial ld-script support), not a local misconfiguration — there
-  is no flag or workaround. Keep `ld.lld` (`LD=ld.lld`).
+CachyOS squashes are generated **against the actual series state**, not a clean
+rc — the pre-CachyOS patches touch shared files like `drm_edid.c`. Two known
+conflicts are handled inside the squashes: `0151` duplicates `0055`, and `0053`
+must be dropped when the hdmi branch is present. sirlucjan directories live under
+`repos/sirlucjan-kernel-patches/7.3-rc/`.
 
 ## Full maintenance cycle
 
-When asked to "update the kernel", "bump to a new RC", or "check for new patches", run the matching phases in order (a "check for new patches" request is phase 2 alone; a "build it" request is phase 3 alone):
+Run the matching phases in order. A "check for new patches" request is phase 2
+alone; a "build it" request is phase 3 alone.
 
-1. **Version bump** — bump `_major`/`_minor`/`_rcver`/`_srcname` in PKGBUILD; rebase every patch; regenerate only the CachyOS squashes that fail `git apply --check`. Report every drop/regeneration with reasons before going further. → `kernel-version-bump`
-2. **Patch audit** — check all six sources (drm-next, linux-next, linux-pm, amd-gfx ML, dri-devel ML, sirlucjan) plus the drm/amd work_items tracker for anything new; list candidates with source and priority before adding. → `patch-sweep`
-3. **Build and fix** — `rm -rf src pkg && makepkg -f -s -c`; on failure diagnose per the rules below and keep iterating until the build succeeds or a MUST NOT rule blocks you. → `kernel-build`
+1. **Version bump** — bump `_major`/`_minor`/`_rcver`/`_srcname`; rebase every
+   patch; regenerate only the CachyOS squashes that fail. Report every drop and
+   regeneration with its reason. → `kernel-version-bump`
+2. **Patch audit** — check all six sources plus the drm/amd work-items tracker;
+   list candidates with source and priority before adding anything. → `patch-sweep`
+3. **Build and fix** — `rm -rf src pkg && makepkg -f -s -c`; iterate until it
+   succeeds or a MUST NOT rule blocks you. → `kernel-build`
 
 ## YOU MUST
 
-1. Compile with `CC=clang LD=ld.lld LLVM=1 LLVM_IAS=1`. The PKGBUILD downloads a pre-built LLVM toolchain from kernel.org. Never change the toolchain.
+1. Compile with `CC=clang LD=ld.lld LLVM=1 LLVM_IAS=1`. The PKGBUILD downloads a
+   pre-built LLVM toolchain from kernel.org. Never change the toolchain.
 2. `rm -rf src pkg` before every build. Old patched files cause false conflicts.
-3. `updpkgsums` after any `source=()` change **or any patch-file edit** (checksums must match 1:1).
-4. Keep every patch's original `From:`/`Date:`/`Subject:`/`Signed-off-by:` headers intact. For our **own** patches, normalise to upstream quality: a named human author (`Sleepy <sleepy@localhost>`), a matching `Signed-off-by:`, an `Assisted-by: Claude <noreply@anthropic.com>` trailer, and no leftover `[PATCH n/N]` series numbering.
-5. `patch --dry-run -Np1 < ../patchfile.patch` (and `git apply --check`) before adding any patch.
-6. Resolve conflicts yourself — fix hunk offsets, regenerate from source, or drop the patch. Don't stall waiting on the user.
+3. `updpkgsums` after any `source=()` change **or any patch-file edit**.
+4. Keep every patch's original `From:`/`Date:`/`Subject:`/`Signed-off-by:`
+   intact. For our **own** patches use a named human author
+   (`Sleepy <sleepy@localhost>`), a matching `Signed-off-by:`, an
+   `Assisted-by: Claude <noreply@anthropic.com>` trailer, and no leftover
+   `[PATCH n/N]` series numbering.
+5. `patch --dry-run -Np1` (and `git apply --check`) before adding any patch.
+6. Resolve conflicts yourself — fix offsets, regenerate from source, or drop the
+   patch. Do not stall waiting on the user.
 7. Clone with `--shallow-since="YYYY-MM-DD"` — never `--depth=1`.
 8. Document every new patch in `PATCH_SOURCES.md` before adding it to `PKGBUILD`.
-9. Verify BTF after every build. Both `CONFIG_TCP_CONG_BBR` (old) and `CONFIG_TCP_CONG_BBR3` define the same BTF kfunc symbol; only one can be built-in. The old BBR must stay disabled.
-10. Use `DEBUG_INFO_DWARF5` (not `DWARF_TOOLCHAIN_DEFAULT`) with Clang 23 + pahole 1.31 — the default produces DWARF pahole 1.31 cannot convert to BTF.
+9. Verify BTF after every build. `CONFIG_TCP_CONG_BBR` (old) and
+   `CONFIG_TCP_CONG_BBR3` define the same BTF kfunc symbol, so only one can be
+   built-in — the old BBR must stay disabled.
+10. Use `DEBUG_INFO_DWARF5` (not `DWARF_TOOLCHAIN_DEFAULT`) with Clang 23 and
+    pahole 1.31 — the default produces DWARF pahole 1.31 cannot convert to BTF.
 
 ## YOU MUST NOT
 
-1. Never use `ld.mold` — crashes on kernel vDSO linker scripts (`fatal: unknown linker script token SECTIONS`).
-2. Never access `lore.kernel.org` — anti-bot blocks automated agents. Use git repos or `lists.freedesktop.org` archives. The **drm/amd work items tracker** (`https://gitlab.freedesktop.org/drm/amd/-/work_items`) IS accessible — plain `curl` with **no User-Agent** returns real content (issues + events API; notes API is 401-gated).
-3. Never hand-write or fabricate a patch diff. No traceable commit or mailing-list submission → tell the user, don't invent one. **AI-assisted patches ARE allowed** (2026-08-03): a named human author, `Signed-off-by`, an `Assisted-by:` trailer, and traceable provenance are required; fabricated diffs with no source remain forbidden. **Patches must be clean and non-hallucinated** (2026-08-26): every patch must pass `git apply --check` AND `patch -p1 --dry-run` against the reference tree before being added; a patch that only applies with heavy fuzz, that I generated without a traceable source, or whose hunks reference symbols/context I invented must be reported to the user, not silently carried.
-4. Never use `pip --break-system-packages` (or `pip install --user` against a managed Python). Install Python tooling in a venv, or via the distro package manager (pacman/AUR).
-5. Never add patches for hardware we don't have (Intel/Nvidia GPUs, ARM/SoC, Apple T2, laptop amps, TV tuners).
-6. Never clone into `/tmp` — use `repos/` in the workspace.
-7. Never run `make menuconfig`/`nconfig` unless the user explicitly asks.
-8. Never remove a patch without explicit user approval, even if it looks irrelevant.
+1. Never use `ld.mold` — it cannot link the kernel.
+2. Never access `lore.kernel.org` with a browser-like client; the web UI is
+   anti-bot gated. Use lore **git mirrors**, `lists.freedesktop.org` archives, or
+   the **drm/amd work-items tracker** (plain `curl` with **no User-Agent**).
+3. Never hand-write or fabricate a patch diff. No traceable commit or
+   mailing-list submission → tell the user, do not invent one. AI-assisted
+   patches **are** allowed with a named human author, `Signed-off-by`, an
+   `Assisted-by:` trailer, and traceable provenance. Every patch must pass both
+   `git apply --check` and `patch -p1 --dry-run` against the reference tree; one
+   that needs heavy fuzz, lacks a traceable source, or references symbols I
+   invented must be reported, not silently carried.
+4. Never use `pip --break-system-packages`, or `pip install --user` against a
+   managed Python. Use a venv, or pacman/AUR.
+5. Never add patches for hardware we do not have (Intel/Nvidia, ARM/SoC,
+   Apple T2, laptop amps, TV tuners).
+6. Never clone into `/tmp` — use `repos/`.
+7. Never run `make menuconfig`/`nconfig` unless explicitly asked.
+8. Never remove a patch without explicit user approval.
 9. Never use `8.8.8.8` in network scripts — use Quad9 (`9.9.9.9`).
-10. Never set `LLVM` to a path. `tools/bpf/resolve_btfids/Makefile` checks `ifeq ($(LLVM),1)`; a path value breaks BTF ID resolution. Prepend the LLVM `bin/` to `$PATH` and set `LLVM=1`.
+10. Never set `LLVM` to a path. `tools/bpf/resolve_btfids/Makefile` checks
+    `ifeq ($(LLVM),1)`, so a path value breaks BTF ID resolution. Prepend the
+    LLVM `bin/` to `$PATH` and set `LLVM=1`.
 
-## Kconfig essentials
+## Critical traps
 
-The `scripts/config` calls below are already in `prepare()`. Full reference (incl. why each exists) is in `kernel-build/reference.md`.
+Evidence, exact commands, and the source-access mechanics are in `LESSONS.md`.
+The short version:
 
-```bash
-# CPU + compiler
-scripts/config -d GENERIC_CPU -e MZEN4
-scripts/config -d LTO_NONE -e LTO_CLANG_THIN
-scripts/config -d CC_OPTIMIZE_FOR_PERFORMANCE -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
-# TCP congestion (BBR3 only — old BBR causes BTF symbol collision)
-scripts/config -d TCP_CONG_BBR -e TCP_CONG_BBR3 -e DEFAULT_BBR3 --set-str DEFAULT_TCP_CONG "bbr3"
-# Kernel command line (appended to bootloader params, does not override)
-# pcie_aspm=off = !5538 SMU bus-drop stopgap; amdgpu.aspm=0/runpm=0 = conservative
-# amdgpu-side stopgaps for the silent gaming freeze (SMU IF 0x2e vs 0x33). DPM stays on.
-scripts/config -e CMDLINE_BOOL --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 elevator=kyber pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0" -d CMDLINE_OVERRIDE
-# BTF / debug (Clang 23 requires DWARF5)
-scripts/config -e DEBUG_KERNEL -d DEBUG_INFO_NONE -d DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT -e DEBUG_INFO_DWARF5 -e DEBUG_INFO_BTF
-# BPF infrastructure (bpftune, sched-ext)
-scripts/config -e BPF_SYSCALL -e BPF_TRACING -e BPF_EVENTS -e BPF_KPROBE_OVERRIDE \
-               -e KPROBES -e KPROBE_EVENTS -e UPROBES -e UPROBE_EVENTS \
-               -e KALLSYMS -e KALLSYMS_ALL \
-               -e FTRACE -e FTRACE_SYSCALLS -e DYNAMIC_FTRACE -e FUNCTION_TRACER -e FUNCTION_GRAPH_TRACER
-# Memory management + CPU idle
-scripts/config -e LRU_GEN -e LRU_GEN_ENABLED -e LRU_GEN_WALKS_MMU -e LRU_MARIE
-scripts/config -e CPU_IDLE_GOV_NAP
-# CAKE SQM ingress — NET_SCH_INGRESS is REQUIRED for download shaping; u32 is the classifier
-scripts/config -e NET_SCH_INGRESS -e NET_CLS_ACT -m IFB -m NET_ACT_MIRRED -m NET_CLS_U32
-# Bloat removal
-scripts/config -d DRM_I915 -d DRM_XE -d DRM_NOUVEAU
-scripts/config -d IIO -d INFINIBAND -d ISDN -d CAN
-scripts/config -d SECURITY_APPARMOR -d AUDIT -d AUDITSYSCALL
-```
+- **GC 12.0 ≠ GC 12.1.** Navi 48 is GC IP **(12,0,1)** → `gfx_v12_0.c`.
+  `gfx_v12_1.c` is a different chip. Check `IP_VERSION` before any gfx12 patch.
+- **Never carry `9051`/`9052`** (DCN4 flip-schedule) — AMD reverted both upstream.
+- **Audit with a cumulative apply**: the whole series in order with
+  `patch -p1 --forward -F2`, flagging `FAILED` **and** `Skipping patch`/
+  `Reversed` (a skipped patch is an inert no-op, not a success). Single-patch
+  dry-runs and `git apply --check` give false negatives. Use a fresh worktree at
+  the base tag.
+- **A patch that applies can still do nothing.** `select`ed config symbols,
+  `--set-str` on a symbol that no longer exists, MGLRU under LRU-MARIE, and
+  `fair.c` under scx full-switch mode are all inert. Confirm the subsystem is
+  actually owned by the code you are patching.
+- **Verify clones are fresh before trusting a sweep**, and **never
+  `git format-patch` a lore mirror** (it diffs email headers, not code). Each has
+  produced a confidently wrong "nothing to do" conclusion.
+- **Build time is ~8 min** — prefer rebuilding over guessing.
 
-After `olddefconfig`, disable these again (dependency resolution re-enables them):
-```bash
-scripts/config -d TCP_CONG_BBR       # BTF symbol collision with BBR3
-scripts/config -d CHROMEOS_PRIVACY_SCREEN
-scripts/config -d VIRT_DRIVERS
-scripts/config -d PCI_TSM
-scripts/config -d VIRTIO_FS
-scripts/config -d X86_PLATFORM_DRIVERS_UNIWILL
-```
+## Configuration and packaging reference
 
-## net-tune service (CAKE SQM + latency tuning)
-
-`net-tune/` ships one systemd service that applies low-latency ethernet settings
-(`ENABLE_LATENCY`) and CAKE SQM shaping (`ENABLE_SQM`), each independently
-toggleable in `/etc/net-tune.conf`. The shipped template defaults `ENABLE_SQM=yes`
-(80/80 Mbit), so an unattended build installs shaping — it does not silently disable
-it. BBR3 is the kernel-compiled default; the SQM part only applies CAKE. The route
-probe uses Quad9 (`9.9.9.9`), never `8.8.8.8`.
-
-Ingress shaping requires the `ingress` qdisc (`CONFIG_NET_SCH_INGRESS=y`) and a
-**named** `ifb4cake` device (created explicitly with `ip link add ifb4cake type ifb`);
-the u32 match-all idiom is used for the ingress redirect. The service verifies both
-CAKE halves after applying and logs `net-tune: OK - CAKE shaping active (...)` or an
-`ERROR` to journald — a missing ingress is no longer silent. Verify by hand:
-`tc qdisc show dev <iface>` (expect root `cake` AND `qdisc ingress ffff:`),
-`ip link show ifb4cake` (expect `state UP`, `qdisc cake`), and
-`tc filter show dev <iface> ingress` (expect a `mirred` redirect).
-
-## Version string
-
-```bash
-echo "-$pkgrel" > localversion.10-pkgrel
-echo "-${pkgbase#linux-}" > localversion.20-pkgname
-scripts/config --set-str LOCALVERSION ""
-```
-
-Result: `uname -r` → `7.2.0-rc7-1-sleepy`.
+The `scripts/config` overrides, the net-tune service, and the version-string
+mechanics are documented in `kernel-build/reference.md`,
+`sleepy-next/net-tune/README.md`, and `sleepy-next/docs/GUIDE.md`. Do not
+duplicate them here.
 
 ## Local model routing
 
-When running with a local LLM server (not the hosted Anthropic API), `.claude/settings.json`
-sets `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_MODEL`,
-`ANTHROPIC_SMALL_FAST_MODEL`, and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` in its `env` block.
-`CLAUDE_CODE_AUTO_COMPACT_WINDOW` prevents hard-stops from tokenizer drift between Claude Code
-and the local server. On compaction, preserve: the current patch series (number range + subject),
-its `PATCH_SOURCES.md` status, and any uncommitted diff. Push heavy one-shot work (cloning repos,
-diffing archives) into subagents. Compact deliberately at phase boundaries; treat each version
-bump as its own session.
+`.claude/settings.json` points `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` and
+`ANTHROPIC_MODEL` at a local LLM server when one is in use. On compaction,
+preserve the current patch series (numbers and subjects), its
+`PATCH_SOURCES.md` status, and any uncommitted diff. Push heavy one-shot work
+(cloning repos, diffing archives) into subagents, and treat each version bump as
+its own session.

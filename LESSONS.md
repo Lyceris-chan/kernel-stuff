@@ -152,3 +152,178 @@ our 9070 XT (Gigabyte B850 board) alongside the `nowatchdog` removal. The
 display-stall class (!4753/!5203/!5571/!5320) is under active investigation by
 AMD (FAMS2 + a `pp_dpm_mclk` sysfs fix `d81e52fc`, newer than rc7) — no merged
 fix to backport yet; monitor via the GraphQL comment check each sweep.
+
+---
+
+## 2026-09-13 — the display "box" root-caused: cosmic-comp overlay-plane scanout
+
+**Symptom (as finally described precisely).** A rectangular artifact over
+application windows. Decisive traits: it does **not** appear in screenshots; it
+can be **dismissed by moving the cursor over it**; it appears on **one monitor at
+a time**, moving to whichever monitor last had **VRR toggled**; and it persists
+**regardless of the VRR state itself** (the *toggle*, not the mode, matters).
+
+**What was ruled out, with evidence.** All four connectors report
+`PSR support 0, sink PSR ver 0, DPCD caps 0x0`, so PSR/Replay cannot be
+involved. The `Failed to setup vendor infoframe … -22` warning seen every boot is
+**benign** — `drm_hdmi_vendor_infoframe_from_display_mode()` documents the EINVAL
+as *"safely ignored"* for non-4K modes, and `hv_frame` is `memset` first. PSR,
+Replay, and the infoframe warning were all red herrings that had previously been
+treated as candidates.
+
+**The misattribution to chase.** The August diagnosis in `PKGBUILD` was: on
+DCN401, IPS/DPG pipe-gating makes `hubp2_is_flip_pending()` return false
+(`hubp->power_gated`) while a flip is still pending, so the VUPDATE_NO_LOCK
+handler delivers the flip event before hardware latches → the compositor
+re-paints a buffer still being scanned → a fixed content-tracking square. That
+was real and `dcdebugmask=0x800` did fix it in August — but the box **returned
+with `0x800` still in effect**, so that was no longer the cause. (Leo Li's own
+comment in `f64a9be56536` concedes the same gap: *"…DCN HUBP may be clock-gated,
+so the flip-pending status may be undefined"* — AMD's fix is knowingly
+unreliable there.)
+
+**Root cause.** **`cosmic-comp` handing fullscreen content to an overlay plane.**
+Two reproducible levers, both of which clear it:
+
+| Setting (in `/etc/environment`, then re-login) | Effect |
+|---|---|
+| `COSMIC_DISABLE_OVERLAY_SCANOUT=1` | fixes the box on its own; the cursor can no longer take an overlay plane |
+| `COSMIC_DISABLE_DIRECT_SCANOUT=1` | also fixes it, because it removes the overlay bit too |
+
+Verified in the installed binary (`strings` on `/usr/bin/cosmic-comp`):
+`COSMIC_DISABLE_DIRECT_SCANOUT`, `COSMIC_DISABLE_OVERLAY_SCANOUT`,
+`COSMIC_DISABLE_CURSOR_PLANE`, `COSMIC_RENDER_DEVICE`. The binary also contains
+the exact code paths that explain the traits — `skipping primary plane, no
+damage`, `clearing previous direct scan-out on primary plane, damaging complete
+output`, `Failed to switch primary-plane scanout flags`. **`modetest -M amdgpu
+-p` was the key evidence**: all three overlay planes and all four cursor planes
+were **inactive**, so COSMIC uses a **software cursor** composited into the
+primary plane — which is precisely why moving the cursor generates damage and
+clears a stale region, and why the artifact never reaches a screenshot (which is
+rendered from the compositor's own pipeline, not the client buffer on an overlay
+plane).
+
+**Durable rules from this.**
+
+1. **`modetest -M amdgpu -c -e -p` first** for any display artifact — which
+   planes are actually live tells you which mechanism is even possible. (The
+   user is in the `video` group, so no root is needed.)
+2. **Trait-driven reasoning beats commit archaeology.** "Not in screenshots" +
+   "cursor dismisses it" + "per-output" narrowed it to a userspace scanout path;
+   no amount of reading DCN commits would have got there.
+3. **A past fix that stopped working means the cause changed.** `0x800` working
+   in August and failing in September was the signal to stop re-testing
+   `dcdebugmask` bits (FAMS `0x20000` and clock-gating `0x8` were already ruled
+   out in the `PKGBUILD` comment) and look elsewhere.
+4. **Do not attribute a display artifact to the kernel just because the machine
+   runs a custom kernel.** The box reproduced on stock kernels too — consistent
+   with a compositor cause all along.
+
+---
+
+## Durable findings — moved out of `CLAUDE.md` (2026-09-13)
+
+`CLAUDE.md` is loaded into every session; its budget is small. These are the
+long-form versions of findings that are now one-line pointers there. **Read this
+file before acting on any of them.**
+
+### Patch-source access
+
+- **lore.kernel.org git endpoints are NOT Anubis-gated** (only the web UI is):
+  `git clone --mirror https://lore.kernel.org/<list>/<epoch>` works (e.g.
+  `lkml/20`, `rust-for-linux/0`); messages are commits, raw email is blob `m`.
+- **The epoch digit is a time shard, not a list id** (2026-09-12). `/<list>/0` is
+  the *oldest* shard, so a mirror of it can have its newest message years in the
+  past while `refs/heads/master` still matches the remote — fresh-looking and
+  silently useless (a full `netdev/0` mirror ended at 2017-11-02). Probe with
+  `git ls-remote` and clone the **highest** epoch: netdev `0,1,2,3` (use `/3`),
+  linux-fsdevel `0,1` (use `/1`), linux-mm `0,1,2` (use `/2`; `/0` ends 2021).
+  io-uring, linux-block, linux-nvme, linux-pm are `/0` only. `--shallow-since`
+  fails **server-side** for `netdev/*` and `linux-fsdevel/*`
+  (`error processing shallow info: 4`, reproducible) but works for the
+  single-epoch lists; shallow-clone the highest epoch instead.
+- **Match a Message-ID with an anchored header regex, never a substring grep.**
+  Grepping a raw email for `20260911…` anywhere in the body also matches every
+  *reply* that quotes it, so the file you extract is someone else's reply, not
+  the patch. Use `grep -m1 -oE '^Message-I[Dd]: <PREFIX[^>]*>'`.
+- **Never `git format-patch` a lore mirror** (2026-09-13). In a lore mirror each
+  *email* is a commit, so `format-patch -1 <sha>` produces a diff **of the email
+  headers**, not the code — the file then contains DKIM/Received noise plus the
+  hunk text as context. It fails to apply and `patch --forward` reports
+  "Skipping patch", which reads exactly like *already applied* and produced three
+  false "nothing to do" verdicts in one session. Extract the blob `m` and
+  MIME-decode the body instead (Python `email`), as with quoted-printable mails.
+  Real git clones (torvalds, linux-next, akpm-mm, drm-next) are fine — only the
+  lore mirrors are message-per-commit.
+- **GitLab: use the REST API, not a browser** (2026-09-12).
+  gitlab.freedesktop.org is Anubis-gated for browser-like clients; headless
+  Helium gets the challenge and cannot clear the PoW. Plain `curl` with **no
+  User-Agent** works (~0.1 s). Code project = `agd5f%2Flinux`; `drm%2Famd` is the
+  stale group mirror (master from 2025) — its only use is the issue tracker.
+  No GitHub/kernel.org mirror exists. Endpoints:
+  `/repository/{branches,commits}`, `/commits/<sha>/diff`, `/files/<path>/raw?ref=`.
+- **Verify clones are FRESH before trusting a sweep** (2026-09-12). Stale and
+  corrupt clones repeatedly produced wrong "nothing new" conclusions. Check the
+  *remote-tracking ref you actually read* against the remote, not the local
+  branch (`git rev-parse refs/remotes/origin/<b>` vs
+  `git ls-remote <url> refs/heads/<b>`). **Shallow clones cannot always
+  fast-forward** — `git fetch` reports success but the ref never moves; if the
+  SHAs differ after a fetch, **re-clone** (`--shallow-since`, never `--depth=1`).
+  A corrupt pack (`pack has N unresolved deltas`) also needs a re-clone.
+  `gitlab.freedesktop.org` is intermittently unreachable — when it times out,
+  cover drm content via `repos/linux-next` and retry later.
+
+### Hardware traps
+
+- **GC 12.0 ≠ GC 12.1.** Navi 48 (RX 9070 XT) is GC IP **(12,0,1)** → uses
+  `gfx_v12_0.c`. `gfx_v12_1.c` is a *different chip* — amd-staging commits
+  touching it are **not ours**. Check `IP_VERSION(12,0,x)` vs `IP_VERSION(12,1,0)`
+  in `amdgpu_discovery.c` before adopting any gfx12 patch.
+- **Never carry the DCN4 flip-schedule patches `9051`/`9052`.** AMD reverted both
+  upstream (*"Because it causes some regression"*, `dml2_core_dcn4_calcs.c`,
+  DCN4 = this GPU). They make the flip-bandwidth math more conservative and
+  mis-schedule flips — the prime suspect for scanout artifacts.
+- **`ld.mold` cannot link the kernel** — re-verified 2026-09-12 on mold 2.42.1: it
+  rejects `OUTPUT_ARCH(...)`, `ENTRY(...)` and `SECTIONS{}` in `-T` scripts with
+  `unknown linker script token`, and `arch/x86/kernel/vmlinux.lds` opens with
+  `OUTPUT_ARCH`, so it fails immediately. An upstream mold limitation (partial
+  ld-script support), not a local misconfiguration — there is no flag or
+  workaround. Keep `ld.lld` (`LD=ld.lld`).
+
+### Behaviour that silently does nothing
+
+- **A `select`ed symbol cannot be disabled** by `disable_configs.py` — disable the
+  selector instead, or accept the bloat; verify the built `.config` afterwards.
+- **`scripts/config --set-str` on a symbol that no longer exists is silently
+  dropped by `olddefconfig`.** Found twice: `MQ_IOSCHED_ADIOS` (no patch adds
+  `block/adios.c` — the package advertised an `ADIOS-MODULE` it never shipped)
+  and `DEFAULT_IOSCHED` (not a Kconfig symbol since the blk-mq rework; the
+  effective NVMe scheduler actually comes from udev's `60-ioschedulers.rules`).
+  `grep` the tree for the symbol before trusting a `--set-str`/`-e` line.
+- **LRU-MARIE makes MGLRU inert** (`lru_gen_enabled()` returns false while Marie
+  owns aging), and **scx full-switch mode makes the CFS balance path inert**
+  (`scheduler_tick()` gates `sched_balance_trigger()` behind
+  `!scx_switched_all()`). Both mean carried MGLRU and `fair.c` patches earn
+  nothing while those are active — check what actually owns the subsystem before
+  crediting a patch with a win.
+- **The live `prepare()` dry-run-gates every patch** and prints
+  `SKIPPED: <reason>` for a miss, then deletes `.rej` files — so a past build tree
+  with zero `.rej` does *not* prove every patch applied. Check the build output
+  for `SKIPPED`, and still run the cumulative apply.
+- **`0110-cachy-config-hooks.patch` applies only with fuzz** on rc2 — its
+  `bus_lock.c` hunk carries `CONFIG_PROC_SYSCTL` context where rc2 has
+  `CONFIG_SYSCTL`. `git apply --check` rejects it; `patch -p1 --forward -F2`
+  accepts it. Harmless today, but exactly the trap above.
+
+### Repository identity
+
+- **There is exactly one package, and it lives in `sleepy-next/`**
+  (single-package since 2026-09-12). Confirm with
+  `grep -m1 '^_major=' sleepy-next/PKGBUILD` and, for a built artifact with
+  `.BUILDINFO`'s `builddir`. A stale second patch tree used to exist at the repo
+  root (174 files for the dropped 7.2 package); applying it to a 7.3-rc2 base
+  produced ~97 spurious failures — the wrong series, not a broken one. If you see
+  a large block of failures, check *which* tree you applied before concluding
+  anything.
+- **Build time is ~8 min** with the kbuild speedup series (`2300`–`2322`). A full
+  rebuild is cheap — prefer rebuilding over guessing.

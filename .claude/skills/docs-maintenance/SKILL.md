@@ -1,12 +1,7 @@
 ---
 name: docs-maintenance
 description: >
-  Update sleepy-kernel documentation and commit the result after a maintenance
-  session. Keep the README "Target audience" and "What this kernel adds"
-  sections accurate, record provenance for every patch change in
-  PATCH_SOURCES.md, write commit-message bodies as Why/How, and commit with a
-  clean git state. Use when asked to update README.md / PATCH_SOURCES.md /
-  GUIDE.md, write a commit message, or commit a maintenance result.
+  Updates sleepy-kernel documentation and commits the result after a maintenance session: README, GUIDE, PATCH_SOURCES.md, and CHANGELOG.md. Use when asked to update the docs, record patch provenance, write a commit message, or commit a maintenance result.
 ---
 
 > **Package location (2026-09-12).** The repo is single-package: everything this

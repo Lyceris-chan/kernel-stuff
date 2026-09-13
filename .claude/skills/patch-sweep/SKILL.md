@@ -1,16 +1,7 @@
 ---
 name: patch-sweep
 description: >
-  Run the periodic patch sweep for sleepy-kernel, checking drm-next,
-  drm-misc-next (TTM / dmemcg / dmabuf — e.g. the Valve aggressive-TTM
-  dmemcg-protect series), agd5f/amd-staging-drm-next, linux-next, linux-pm,
-  the amd-gfx and dri-devel mailing lists, sirlucjan, firelzrd, the GitLab
-  drm/amd work-items tracker, AND the x86/security line (torvalds x86_bugs /
-  SRSO / MCE — Zen 4 CPU mitigations like the Safe-RET interrupt fix).
-  Produces a triage report and dry-runs clean candidates against the reference
-  rc tree.
-  Use when asked to "check for new patches", "sync sources", or "run a patch
-  sweep". For a single named patch/commit, use the patch-audit skill instead.
+  Runs the periodic multi-source sweep for new hardware-relevant patches across the upstream kernel trees, mailing lists, distro patchsets, and the drm/amd work-items tracker, then triages and dry-runs the candidates. Use when asked to check for new patches or to sync sources.
 ---
 
 > **Package location (2026-09-12).** The repo is single-package: everything this
@@ -44,7 +35,7 @@ description: >
   changes the process directory to the repo, so a relative patch path like
   `patches/<range>/NNNN-....patch` resolves against the repo and errors "can't
   open patch". Always write
-  `git -C repos/linux-7.2 apply --check "$PWD/patches/<range>/NNNN-....patch"`.
+  `git -C repos/linux-next apply --check "$PWD/patches/<range>/NNNN-....patch"`.
   Patches live in `patches/<range>/` folders (2026-08-11); root-level
   `NNNN-*.patch` entries are gitignored build symlinks, not the source of truth.
 - **Capture real exit codes, never `| head && echo OK`.** `git apply --check f 2>&1 |
@@ -82,9 +73,9 @@ description: >
 for repo in repos/drm-next repos/agd5f-linux repos/linux-pm repos/amd-staging-drm-next repos/drm-misc; do
   git -C "$repo" fetch --shallow-since=2026-08-01 origin 2>&1 | tail -3 &
 done
-# torvalds mainline (x86/security line). repos/linux-7.2-rc6 is a shallow
+# torvalds mainline (x86/security line). repos/linux-next is a shallow
 # torvalds clone with full history to the rc7 tag — fetch to get the latest.
-git -C repos/linux-7.2-rc6 fetch --shallow-since=2026-08-01 origin 2>&1 | tail -3 &
+git -C repos/linux-next fetch --shallow-since=2026-08-01 origin 2>&1 | tail -3 &
 git -C repos/sirlucjan-kernel-patches pull 2>&1 | tail -3 &
 git -C repos/firelzrd-bore-scheduler pull 2>&1 | tail -3 &
 wait
@@ -130,26 +121,26 @@ git -C repos/linux-pm log --since="$SINCE" --oneline --all -E \
 
 # sirlucjan: new/updated third-party performance patches (no --grep; list dirs)
 echo "=== sirlucjan 7.2-rc (new version dirs) ==="
-ls repos/sirlucjan-kernel-patches/7.2/ | grep -E "fixes-v|lru-marie-v|preempt-ipi-v|nap"
+ls repos/sirlucjan-kernel-patches/7.3-rc/ | grep -E "fixes-v|lru-marie-v|preempt-ipi-v|nap"
 ```
 
 ## Step 2b — x86/security scan (Zen 4 CPU mitigations)
 
 Added 2026-08-10 after the Phoronix Safe-RET / Zapscape disclosures. The
 GPU/drm sweep misses CPU-side security fixes that affect our Zen 4 7700.
-Scan torvalds mainline (repos/linux-7.2-rc6 holds full history to the rc7
+Scan torvalds mainline (repos/linux-next holds full history to the rc7
 tag; fetch it in Step 1) for speculative-execution / SRSO / MCE / entry
 fixes since the last sweep:
 
 ```bash
 # SRSO / Safe-RET / speculative execution mitigations (x86_bugs, entry)
-git -C repos/linux-7.2-rc6 log --since="$SINCE" --oneline --all -E \
+git -C repos/linux-next log --since="$SINCE" --oneline --all -E \
   --grep="x86/bugs|SRSO|Safe.?RET|speculat|ibrs|IBPB|entry_64|ist_enter|retbleed" 2>/dev/null | head -20
 # Machine check / RAS (MCE can present as hard resets on Zen 4)
-git -C repos/linux-7.2-rc6 log --since="$SINCE" --oneline --all -E \
+git -C repos/linux-next log --since="$SINCE" --oneline --all -E \
   --grep="x86/mce|machine.check|mce_intel|mce_amd|threshold" 2>/dev/null | head -10
 # KVM/security follow-ups (Zapscape class)
-git -C repos/linux-7.2-rc6 log --since="$SINCE" --oneline --all -E \
+git -C repos/linux-next log --since="$SINCE" --oneline --all -E \
   --grep="KVM: x86|kvm.*mmu|kvm.*shadow" 2>/dev/null | head -10
 ```
 
@@ -251,7 +242,7 @@ that IS a candidate for our tree.
 Use `git apply --check` (not `patch --dry-run`) against the clean reference tree:
 
 ```bash
-TREE="repos/linux-7.2"
+TREE="repos/linux-next"
 
 check_commit() {
   local repo="$1" sha="$2"
@@ -301,19 +292,19 @@ already exist in the clean rc7 tree (not just in a staging branch). If the
 patch fails here it depends on staging infrastructure and must be dropped.
 ```bash
 # For GPU/display patches:
-grep -r "<unique_symbol>" repos/linux-7.2/drivers/gpu/drm/amd/ | head
+grep -r "<unique_symbol>" repos/linux-next/drivers/gpu/drm/amd/ | head
 # For PM patches:
-grep -r "<unique_symbol>" repos/linux-7.2/drivers/cpufreq/ | head
+grep -r "<unique_symbol>" repos/linux-next/drivers/cpufreq/ | head
 # For block patches:
-grep -r "<unique_symbol>" repos/linux-7.2/block/ | head
+grep -r "<unique_symbol>" repos/linux-next/block/ | head
 ```
 If `grep` returns nothing for any referenced symbol, DROP the candidate.
 
 **Check 3 — Applies cleanly.** Use `git apply --check` (NOT `patch --dry-run`)
 against the clean reference tree:
 ```bash
-git -C repos/linux-7.2 apply --check <candidate>.patch       # forward check
-git -C repos/linux-7.2 apply --check -R <candidate>.patch    # already-applied check
+git -C repos/linux-next apply --check <candidate>.patch       # forward check
+git -C repos/linux-next apply --check -R <candidate>.patch    # already-applied check
 ```
 - Forward check passes → CLEAN, proceed to Check 4.
 - Reverse check passes (forward fails) → already applied upstream, DROP it.

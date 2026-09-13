@@ -111,7 +111,7 @@ gotchas. Referenced from `SKILL.md`.
 - **Tree-target triage — amdgpu_dm split (learned 2026-08-26):** a patch touching
   `amdgpu_dm_connector.c` / `amdgpu_dm_freesync.c` targets the 7.3+ amdgpu_dm split; the
   same content on 7.2 lives in the MONOLITHIC `amdgpu_dm.c`. Verify `git apply --check`
-  against the right reference tree (`repos/linux-7.2` for the PKGBUILD series,
+  against the right reference tree (`repos/linux-next` for the PKGBUILD series,
   `repos/linux-next@<next-tag>` for the sleepy-next 7.3 preview — the wannabe worktree is
   gone) BEFORE deciding applicability — "No such file" on
   `amdgpu_dm_connector.c` means the patch is 7.3-only.
@@ -142,15 +142,14 @@ the "never access lore" rule stands unless separately verified.)
 
 ### 6. `sirlucjan` NAP governor (NOT firelzrd)
 - **IMPORTANT (learned this session):** the NAP governor source is
-  `repos/sirlucjan-kernel-patches/7.2/nap-patches/`, which contains
+  `repos/sirlucjan-kernel-patches/7.0/nap-patches/`, which contains
   `0001-7.2-nap-v0.5.0.patch`. firelzrd's repo
   (`repos/firelzrd-bore-scheduler`) has **NO** `nap-patches/` directory — its
   `patches/` only contains `additions/`, `legacy/`, `stable/`, `testing/` and is
   BORE-scheduler only. Do not look for NAP patches there.
 - Fetch: `git -C repos/sirlucjan-kernel-patches pull`
-- Audit: `ls repos/sirlucjan-kernel-patches/7.2/nap-patches/` and compare
+- Audit: `ls repos/sirlucjan-kernel-patches/7.0/nap-patches/` and compare
   against the in-tree `2200-7.2-nap-v0.5.0.patch`.
-
 ---
 
 ## Reaching gitlab.freedesktop.org without git (learned 2026-09-12)
