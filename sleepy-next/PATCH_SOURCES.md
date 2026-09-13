@@ -1,6 +1,57 @@
 # sleepy-next — patch provenance
 
-## 2026-09-13 — HDMI RGB quantization fix + five verified fixes (164 patches, pkgrel 8)
+## 2026-09-13 — HDMI RGB quantization fix + six verified fixes (165 patches)
+
+**Added — `1158`, DMCUB busy-wait fix.** Sultan Alsawaf (kerneltoast),
+`drm/amd/display: Fix high busy wait load in dmub_srv_wait_for_idle()`, commit
+`dfd0e5aa6aad` on his `kernel_x86_laptop` tree (branch `v6.16-sultan`,
+2025-08-25).
+
+`dmub_srv_wait_for_idle()` polls with `udelay(1)` in a loop bounded by
+`timeout_us`, and callers pass up to **100000** — i.e. as much as 100 ms of pure
+CPU spinning, per call, in the DMCUB path that **DCN401 uses**
+(`dc_dmub_srv.c:165,283`). The patch replaces the fixed 1 µs spin with
+progressive backoff: 1 µs for the first 3 iterations, then 10 µs, then 100 µs,
+using `usleep_range()` when `preemptible()` so the CPU can actually idle.
+Verified live here: `CONFIG_PREEMPT=y` and `CONFIG_PREEMPT_COUNT=y`, so the
+sleeping path is taken.
+
+Applies cleanly — `rc=0`, offset 178 only (the hunk header is stale from a 6.16
+base; the context is byte-identical in rc2). Out-of-tree, so it will not arrive
+on a version bump; it is a self-contained function, which keeps the carry cost
+low. Note it fixes `wait_for_idle()` only — `wait_for_pending()` immediately
+above it has the same pattern and is untouched.
+
+**Evaluated and not taken from the same tree:**
+- The kswapd trio (`1e10be67699e`, `0a28ea9693cb`, `4632bdecee3e` — *Stop kswapd
+  early* / *Don't stop kswapd on a per-node basis* / *Increment kswapd_waiters*)
+  is a genuinely desktop-targeted series, but it **fails to apply**: 2 of 3 hunks
+  in `mm/page_alloc.c` and the `mm/internal.h` hunk are rejected, because LRU-MARIE
+  (`2101`) rewrites those same files. It needs a deliberate rebase against the
+  series state, not a mechanical fix.
+- `47b020a24ae3` (*Revert "cpumask: limit FORCE_NR_CPUS to just the UP case"*) is
+  inert unless `CONFIG_NR_CPUS` is exactly 16 **and** `CONFIG_FORCE_NR_CPUS=y`
+  (ours is 512 for hotplug headroom). Upstream restricted it to UP precisely
+  because a wrong `NR_CPUS` breaks the kernel — **not worth the risk**.
+- `e5b7e9d87ace` (*Lower the non-hugetlbpage pageblock size*) is **superseded
+  upstream** by `CONFIG_PAGE_BLOCK_MAX_ORDER` (currently 10 in our config), so it
+  is a config-only lever — and lowering it with `TRANSPARENT_HUGEPAGE_ALWAYS=y`
+  + `HUGETLBFS=y` risks both THP success and 2 MB hugetlb (the Kconfig help says
+  so). Not taken.
+
+**Already carried, confirmed at runtime (do not re-add):**
+`vm.watermark_boost_factor=0` and `vm.compaction_proactiveness=0` are live via
+the CachyOS `0110` config hooks under `CONFIG_CACHY` (which `PKGBUILD` forces on
+with `scripts/config -e CACHY` — note `config:43` still reads
+`# CONFIG_CACHY is not set`, so the config file alone is misleading here). And
+our `0111-cachy-acpi-disable-bus-master-check-for-AMD.patch` **is** kerneltoast's
+patch verbatim, re-applied to 7.3 by CachyOS under the same `From:` line — his
+work is already partly ingested.
+
+**kdrag0n and tytydraco: nothing applicable.** Every kernel repo of theirs is
+Android/ARM/device-specific (kdrag0n's kernel work is device trees plus GKI 6.1
+under the GrapheneOS org; tytydraco has no kernel patch repo at all), and all
+their generic mainline commits are already ancestors of `v7.3-rc2`.
 
 **Added — five upstream fixes from the MM/PM/sched sweep**, each verified with a
 cumulative apply on top of the full series (all clean, small offsets only):

@@ -289,6 +289,7 @@ source=(
   "patches/1100-1199/1155-drm-amd-display-Propagate-HDMI-RGB-quantization-selectability.patch"
   "patches/1100-1199/1156-drm-amd-display-Honor-Broadcast-RGB-for-BT-2020-RGB-output.patch"
   "patches/1100-1199/1157-drm-amd-display-Rebuild-InfoFrames-on-output-color-space-changes.patch"
+  "patches/1100-1199/1158-drm-amd-display-Fix-high-busy-wait-load-in-dmub_srv_wait_for_idle.patch"
   "patches/1200-1299/1201-cpufreq-amd-pstate-Update-cppc_req_cached-before-w.patch"
   "patches/1200-1299/1202-cpufreq-amd-pstate-Add-per-core-EPP-boost-for-rec.patch"
   "patches/1200-1299/1203-Documentation-amd-pstate-Document-the-epp_boost-pa.patch"
@@ -1042,6 +1043,7 @@ b2sums=('d8522ffee4af76eacdba75a8116376e9c21621ed0b22cbd381b816cd71f9fc25d1682fe
         'cced780232e02e15bf031c874975e8eb9ced19c126d2d16ace65a87d0f475399ec5791b9285a3ecc1f18bcdb9d597c75733522f8fa66c7d77578dcb4ff5053bf'
         '33f65c51971df48aac4d8ce579d83abeecd879d73a0f1d8a26e1342b8fea769ff1c0568116871fd5c0b65047b5e96f52470898d7f05bfc472c91c3da8f9f0f60'
         '92fc5261a02b38b6814852aa221445f9f200f3cc9388fcb0c39b12a15377d1927f430a238f46417f8ab9df84aaddc70d97d87f9510998d7497605ff7be070a24'
+        'ad147f9e2dcdde8711da72143ca4cac37e676a5005991f7cd5a74e6a60400f001a06f0ead3ea981ba6b90be5ae84c4bae16196e595b1e66632d9ba7a6ec761d2'
         'e9d464ebf525cd8d93d48f1cbedea0197bd9d0142085da7d83ec3dfda0174483a0fea4077055fd7d1ad9180563dc6dfb77e4f52f9bcb023b7c7d7c9fb5c39ece'
         '9d3e36dbc5c9c5342d2991c4665278ed075073196251e59280bd12f1d6812a37d31db58f5cb978b926e2dcd0a32365960a414b69d10f463bd8f68cedbb4bb6ae'
         '52fe01328f544e023666eab1fd378ae0a0eb47385d495403a55a933f71beedcf295300767c1e43feb46366915fae8bea3b9137f11d16ed194a1fcf71d95aec0d'
