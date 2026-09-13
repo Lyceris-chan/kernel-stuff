@@ -2,7 +2,7 @@
 
 Full incident log for sleepy-kernel. Kept out of `CLAUDE.md` so the operating
 manual stays short; CLAUDE.md carries only the durable rules. Read this before
-repeating a past mistake. Patch numbers are current as of 7.3-rc2; see
+repeating a past mistake. Patch numbers are current as of 7.3-rc3; see
 `sleepy-next/PATCH_SOURCES.md` for per-patch provenance and renumber history.
 
 | Mistake | What happened | Rule |

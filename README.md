@@ -4,7 +4,7 @@ Custom Arch Linux kernel for one machine: an AMD Ryzen 7 7700 (Zen 4) desktop
 with a Radeon RX 9070 XT (Navi 48 / RDNA 4).
 
 The single package lives in [`sleepy-next/`](sleepy-next/) and builds
-`linux-sleepy-next`, currently based on **Linux 7.3-rc2**.
+`linux-sleepy-next`, currently based on **Linux 7.3-rc3**.
 
 This is not a general-purpose kernel; the configuration is opinionated for the
 hardware above.

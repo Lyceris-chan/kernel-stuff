@@ -1,8 +1,17 @@
-From 20260701161721.85681-2-timur.kristof@gmail.com Mon Sep 17 00:00:00 2001
+From nobody Mon Sep 17 00:00:00 2001
 From: timur.kristof at gmail.com (=?UTF-8?q?Timur=20Krist=C3=B3f?=)
 Date: Wed,  1 Jul 2026 18:17:08 +0200
 Subject: [PATCH 01/14] drm/amdgpu: Respect noretry flag for retry faults on
  GFX12.1
+Message-ID: <20260701161721.85681-2-timur.kristof@gmail.com>
+
+When retry faults are disabled (amdgpu.noretry=1),
+the ENABLE_RETRY_FAULT_INTERRUPT bit should be programmed to 0.
+
+Note that retry faults are enabled by default on GFX12.1
+so this just fixes the case when they are explicitly disabled.
+
+Signed-off-by: Timur Kristóf <timur.kristof@gmail.com>
 
 ---
  drivers/gpu/drm/amd/amdgpu/gfxhub_v12_1.c | 4 ++--

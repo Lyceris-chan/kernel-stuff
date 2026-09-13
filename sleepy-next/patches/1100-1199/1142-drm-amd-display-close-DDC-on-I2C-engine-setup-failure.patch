@@ -9,6 +9,7 @@ Cc: "Rodrigo Siqueira" <siqueira@igalia.com>,
 	<linux-kernel@vger.kernel.org>, 
 	"NepNep7601" <neptune@imm0nv1nhtv.is-a.dev>
 Subject: [PATCH v2 2/2] drm/amd/display: close DDC on I2C engine setup failure
+Message-ID: <20260826204457.4666-2-neptune@imm0nv1nhtv.is-a.dev>
 Date: Thu, 27 Aug 2026 03:44:57 +0700
 X-Lms-Return-Path: <lba+26a8f5052+867ed5+vger.kernel.org+neptune@imm0nv1nhtv.is-a.dev>
 

@@ -1,8 +1,18 @@
-From 20260701161721.85681-3-timur.kristof@gmail.com Mon Sep 17 00:00:00 2001
+From nobody Mon Sep 17 00:00:00 2001
 From: timur.kristof at gmail.com (=?UTF-8?q?Timur=20Krist=C3=B3f?=)
 Date: Wed,  1 Jul 2026 18:17:09 +0200
 Subject: [PATCH 02/14] drm/amdgpu/gfxhub: Enable retry fault interrupts when
  needed
+Message-ID: <20260701161721.85681-3-timur.kristof@gmail.com>
+
+Enable retry fault interrupts when initializing the GFXHUB
+system aperture registers according to whether retrying
+page faults is enabled in amdgpu (ie. amdgpu.noretry=0).
+
+Needs to be done for each GFXHUB version at once,
+because none of them actually enabled this interrupt.
+
+Signed-off-by: Timur Kristóf <timur.kristof@gmail.com>
 
 ---
  drivers/gpu/drm/amd/amdgpu/gfxhub_v11_5_0.c | 9 +++++++--

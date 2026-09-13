@@ -1,8 +1,15 @@
-From 20260701161721.85681-4-timur.kristof@gmail.com Mon Sep 17 00:00:00 2001
+From nobody Mon Sep 17 00:00:00 2001
 From: timur.kristof at gmail.com (=?UTF-8?q?Timur=20Krist=C3=B3f?=)
 Date: Wed,  1 Jul 2026 18:17:10 +0200
 Subject: [PATCH 03/14] drm/amdgpu/ih: Don't perturb HW registers when
  accessing soft IH ring
+Message-ID: <20260701161721.85681-4-timur.kristof@gmail.com>
+
+The soft IH ring is implemented entirely in software.
+We shouldn't read (or write) any HW registers when accessing it.
+
+Signed-off-by: Timur Kristóf <timur.kristof@gmail.com>
+Reviewed-by: Tvrtko Ursulin <tvrtko.ursulin@igalia.com>
 
 ---
  drivers/gpu/drm/amd/amdgpu/ih_v6_0.c   | 7 +++++++

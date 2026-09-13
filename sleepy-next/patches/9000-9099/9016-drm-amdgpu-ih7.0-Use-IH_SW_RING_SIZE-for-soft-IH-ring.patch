@@ -1,8 +1,17 @@
-From 20260701161721.85681-7-timur.kristof@gmail.com Mon Sep 17 00:00:00 2001
+From nobody Mon Sep 17 00:00:00 2001
 From: timur.kristof at gmail.com (=?UTF-8?q?Timur=20Krist=C3=B3f?=)
 Date: Wed,  1 Jul 2026 18:17:13 +0200
 Subject: [PATCH 06/14] drm/amdgpu/ih7.0: Use IH_SW_RING_SIZE for soft IH ring
  instead of PAGE_SIZE
+Message-ID: <20260701161721.85681-7-timur.kristof@gmail.com>
+
+When there are a lot of retry faults happening, the soft IH ring
+can fill up really quickly and possibly overflow. PAGE_SIZE was
+too small, use IH_SW_RING_SIZE to match what other GPU generations
+are doing.
+
+Signed-off-by: Timur Kristóf <timur.kristof@gmail.com>
+Reviewed-by: Tvrtko Ursulin <tvrtko.ursulin@igalia.com>
 
 ---
  drivers/gpu/drm/amd/amdgpu/ih_v7_0.c | 5 +----

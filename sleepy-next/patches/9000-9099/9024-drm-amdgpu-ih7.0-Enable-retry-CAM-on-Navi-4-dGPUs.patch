@@ -1,7 +1,16 @@
-From 20260701161721.85681-15-timur.kristof@gmail.com Mon Sep 17 00:00:00 2001
+From nobody Mon Sep 17 00:00:00 2001
 From: timur.kristof at gmail.com (=?UTF-8?q?Timur=20Krist=C3=B3f?=)
 Date: Wed,  1 Jul 2026 18:17:21 +0200
 Subject: [PATCH 14/14] drm/amdgpu/ih7.0: Enable retry CAM on Navi 4 dGPUs
+Message-ID: <20260701161721.85681-15-timur.kristof@gmail.com>
+
+The retry CAM can filter interrupts which occur repeatedly,
+such as page fault interrupts when retry faults are enabled.
+This makes processing those interrupts much more efficient,
+because the CPU won't have to deal with processing the same
+interrupt repeatedly.
+
+Signed-off-by: Timur Kristóf <timur.kristof@gmail.com>
 
 ---
  drivers/gpu/drm/amd/amdgpu/ih_v7_0.c | 3 ++-

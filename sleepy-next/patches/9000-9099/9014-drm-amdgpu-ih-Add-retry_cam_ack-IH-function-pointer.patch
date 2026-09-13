@@ -1,7 +1,20 @@
-From 20260701161721.85681-5-timur.kristof@gmail.com Mon Sep 17 00:00:00 2001
+From nobody Mon Sep 17 00:00:00 2001
 From: timur.kristof at gmail.com (=?UTF-8?q?Timur=20Krist=C3=B3f?=)
 Date: Wed,  1 Jul 2026 18:17:11 +0200
 Subject: [PATCH 04/14] drm/amdgpu/ih: Add retry_cam_ack IH function pointer
+Message-ID: <20260701161721.85681-5-timur.kristof@gmail.com>
+
+No functional changes.
+
+This is a refactor to allow different filter CAM implementation
+in subsequent commits. The actual new implementations are
+going to be in subsequent commits.
+
+Instead of writing the doorbell in amdgpu_gmc_handle_retry_fault()
+directly, add an IH function pointer which can be defined in
+a different way for different IH versions.
+
+Signed-off-by: Timur Kristóf <timur.kristof@gmail.com>
 
 ---
  drivers/gpu/drm/amd/amdgpu/amdgpu_gmc.c | 7 ++++++-

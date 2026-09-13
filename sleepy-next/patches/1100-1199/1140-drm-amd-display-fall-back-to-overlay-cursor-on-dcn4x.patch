@@ -1,5 +1,6 @@
 From: James Lin <PingLei.Lin@amd.com>
 Subject: [PATCH] drm/amd/display: fall back to overlay cursor on dcn4x when top plane doesn't fill CRTC
+Message-ID: <20260818202139.4172592-2-IVAN.LIPSKI@amd.com>
 
 amdgpu_dm_crtc_get_cursor_mode() returns DM_CURSOR_NATIVE_MODE early and
 unconditionally for dcn4.x. That early return was added because these ASICs

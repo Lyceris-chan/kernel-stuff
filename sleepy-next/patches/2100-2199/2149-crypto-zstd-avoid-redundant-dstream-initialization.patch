@@ -1,0 +1,86 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Usama Arif <usama.arif@linux.dev>
+To: davem@davemloft.net, dsterba@suse.com, Herbert Xu <herbert@gondor.apana.org.au>, linux-crypto@vger.kernel.org, linux-kernel@vger.kernel.org, terrelln@fb.com
+Cc: hannes@cmpxchg.org, yosry@kernel.org, nphamcs@gmail.com, chengming.zhou@linux.dev, shakeel.butt@linux.dev, kernel-team@meta.com, Usama Arif <usama.arif@linux.dev>
+Subject: [PATCH 2/2] crypto: zstd - Avoid redundant dstream initialization
+Date: Tue, 25 Aug 2026 15:06:02 -0700
+Message-ID: <20260825220616.3842633-3-usama.arif@linux.dev>
+
+zstd_decompress() initializes the shared workspace as a DStream before
+entering the walk loop. If the first source and destination fragments
+each span the whole request it then hands off to zstd_decompress_one(),
+which initializes that same ctx->wksp as a DCtx, discarding the DStream
+setup without having decompressed a byte. The two are in fact the same
+routine, as ZSTD_initStaticDStream() is a tail call to
+ZSTD_initStaticDCtx() and zstd_init_dstream() discards its
+max_window_size argument, so the work was done twice byte for byte.
+
+zswap takes this path whenever the stored object lies within a single
+zsmalloc page, which is the common case; an object straddling a page
+boundary comes back from zs_obj_read_sg_begin() as a two-entry source
+scatterlist and streams instead.
+
+Defer the DStream initialization to the first walk iteration that reaches
+the streaming path, guarded by a flag because that iteration can be
+reached more than once. Within this function ctx->dctx is read only by
+the zstd_decompress_stream() call immediately below, so no stale context
+can be picked up. As in the previous patch the new call site runs with
+the walk's fragments mapped and has to release them before failing.
+
+For a 4 KB crypto_acomp benchmark for decompression, twelve runs of nine
+30K operation rounds, on the bare-metal host the median per-round mean
+request time fell from 2,317 ns to 1,998 ns (13.8%).
+In the one-vCPU KVM guest it fell from 3,516 ns to 2,265 ns (35.6%).
+
+Signed-off-by: Usama Arif <usama.arif@linux.dev>
+---
+ crypto/zstd.c | 20 ++++++++++++++------
+ 1 file changed, 14 insertions(+), 6 deletions(-)
+
+diff --git a/crypto/zstd.c b/crypto/zstd.c
+index d64472f3e11e5..76bdaca327330 100644
+--- a/crypto/zstd.c
++++ b/crypto/zstd.c
+@@ -215,6 +215,7 @@ static int zstd_decompress_one(struct acomp_req *req, struct zstd_ctx *ctx,
+ 
+ static int zstd_decompress(struct acomp_req *req)
+ {
++	bool stream_initialized = false;
+ 	struct crypto_acomp_stream *s;
+ 	unsigned int total_out = 0;
+ 	unsigned int scur, dcur;
+@@ -232,12 +233,6 @@ static int zstd_decompress(struct acomp_req *req)
+ 	if (ret)
+ 		goto out;
+ 
+-	ctx->dctx = zstd_init_dstream(ZSTD_MAX_SIZE, ctx->wksp, ctx->wksp_size);
+-	if (!ctx->dctx) {
+-		ret = -EINVAL;
+-		goto out;
+-	}
+-
+ 	do {
+ 		scur = acomp_walk_next_src(&walk);
+ 		if (scur) {
+@@ -263,6 +258,19 @@ static int zstd_decompress(struct acomp_req *req)
+ 				goto out;
+ 			}
+ 
++			if (!stream_initialized) {
++				ctx->dctx = zstd_init_dstream(ZSTD_MAX_SIZE, ctx->wksp,
++							      ctx->wksp_size);
++				if (!ctx->dctx) {
++					/* Release in the reverse of the map order. */
++					acomp_walk_done_dst(&walk, 0);
++					acomp_walk_done_src(&walk, 0);
++					ret = -EINVAL;
++					goto out;
++				}
++				stream_initialized = true;
++			}
++
+ 			outbuf.pos = 0;
+ 			outbuf.dst = (u8 *)walk.dst.virt.addr;
+ 			outbuf.size = dcur;
+-- 
+2.53.0-Meta

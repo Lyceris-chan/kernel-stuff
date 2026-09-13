@@ -1,5 +1,6 @@
 From: Harry Wentland <harry.wentland@amd.com>
 Subject: [PATCH] drm/amd/display: pull colorops into state when recreating a plane
+Message-ID: <20260825153539.213495-1-harry.wentland@amd.com>
 
 When should_reset_plane() forces a plane's dc_plane_state to be recreated
 (e.g. on every ALLOW_MODESET commit on DCN < 3.2), fill_dc_plane_attributes()

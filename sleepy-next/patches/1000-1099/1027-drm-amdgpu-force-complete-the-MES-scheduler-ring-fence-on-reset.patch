@@ -5,6 +5,28 @@ Subject: [PATCH] drm/amdgpu: force complete the MES scheduler ring fence on
  reset
 Message-ID: <20260806075653.711275-1-Jesse.Zhang@amd.com>
 
+The MES scheduler ring has no drm scheduler (no_scheduler = true), so it is
+skipped by the force-completion loop in amdgpu_device_pre_asic_reset(). It
+uses a polling fence whose hw value lives in wb (GTT) memory and survives a
+MODE1 reset, while fence_drv.sync_seq keeps advancing for every packet.
+
+When the reset is triggered because MES itself stopped responding, the
+timed-out packets advance sync_seq past the last hw fence value MES wrote.
+After resume the first MES submission polls forever on a seq that is never
+written back, failing the resume and wedging the box on a second reset:
+
+  amdgpu: MES ring buffer is full.
+  amdgpu: *ERROR* ring gfx_0.0.0 test failed (-110)
+  amdgpu: resume of IP block <gfx_v11_0> failed -110
+  amdgpu: GPU reset end with ret = -110
+
+Force complete the MES scheduler ring fence together with the scheduler
+rings so its hw fence is realigned to sync_seq.
+
+Signed-off-by: Jesse Zhang <Jesse.Zhang@amd.com>
+
+---
+
  drivers/gpu/drm/amd/amdgpu/amdgpu_device.c | 12 ++++++++++++
  1 file changed, 12 insertions(+)
 

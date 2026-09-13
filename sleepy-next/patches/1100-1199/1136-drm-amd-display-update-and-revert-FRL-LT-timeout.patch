@@ -1,7 +1,8 @@
-From f000000000000000000000000000000000000002 Mon Sep 17 00:00:00 2001
+From nobody Mon Sep 17 00:00:00 2001
 From: Relja Vojvodic <Relja.Vojvodic@amd.com>
 Date: Wed, 5 Aug 2026 14:36:32 +0800
 Subject: [PATCH] drm/amd/display: Update and revert FRL LT Timeout
+Message-ID: <20260805063937.2145774-21-chiahsuan.chung@amd.com>
 
 [Why & How]
 - Revert logic to fallback to polling if LT no timeout is set

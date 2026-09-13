@@ -1,7 +1,13 @@
-From 20260701161721.85681-9-timur.kristof@gmail.com Mon Sep 17 00:00:00 2001
+From nobody Mon Sep 17 00:00:00 2001
 From: timur.kristof at gmail.com (=?UTF-8?q?Timur=20Krist=C3=B3f?=)
 Date: Wed,  1 Jul 2026 18:17:15 +0200
 Subject: [PATCH 08/14] drm/amdgpu/gmc12: Pass cam_index to retry fault handler
+Message-ID: <20260701161721.85681-9-timur.kristof@gmail.com>
+
+This is necessary if we want to make use of the filter CAM.
+
+Signed-off-by: Timur Kristóf <timur.kristof@gmail.com>
+Reviewed-by: Tvrtko Ursulin <tvrtko.ursulin@igalia.com>
 
 ---
  drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c | 5 ++++-

@@ -1,6 +1,7 @@
 From: Vladimir.Marioukhine@amd.com (Marioukhine, Vladimir)
 Date: Mon, 17 Aug 2026 15:36:19 +0000
 Subject: [PATCH] drm/amdkfd: fix integer overflow in queue ring buffer size calculation
+Message-ID: <SA1PR12MB8600EE73548498C578990CF49FDC2@SA1PR12MB8600.namprd12.prod.outlook.com>
 
 queue_size and metadata_queue_size are u64 fields copied directly from
 user-supplied ring_size and metadata_ring_size ioctl arguments. When

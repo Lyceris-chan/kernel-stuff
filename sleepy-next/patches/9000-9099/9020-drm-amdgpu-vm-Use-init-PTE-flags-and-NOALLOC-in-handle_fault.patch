@@ -1,8 +1,20 @@
-From 20260701161721.85681-11-timur.kristof@gmail.com Mon Sep 17 00:00:00 2001
+From nobody Mon Sep 17 00:00:00 2001
 From: timur.kristof at gmail.com (=?UTF-8?q?Timur=20Krist=C3=B3f?=)
 Date: Wed,  1 Jul 2026 18:17:17 +0200
 Subject: [PATCH 10/14] drm/amdgpu/vm: Use init PTE flags and NOALLOC in
  amdgpu_vm_handle_fault()
+Message-ID: <20260701161721.85681-11-timur.kristof@gmail.com>
+
+PTE_IS_PTE seems necessary for handling retry faults on GFX12.
+
+For reference see:
+amdgpu_vm_pte_update_flags() that explains the problem
+svm_range_get_pte_flags() that uses the flag on GFX12
+
+Also add NOALLOC on GFX10.3+ as we don't need to allocate
+the fault handling PTE in the infinity cache (MALL).
+
+Signed-off-by: Timur Kristóf <timur.kristof@gmail.com>
 
 ---
  drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c | 8 ++++++--

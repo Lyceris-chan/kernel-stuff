@@ -1,8 +1,20 @@
-From 20260701161721.85681-10-timur.kristof@gmail.com Mon Sep 17 00:00:00 2001
+From nobody Mon Sep 17 00:00:00 2001
 From: timur.kristof at gmail.com (=?UTF-8?q?Timur=20Krist=C3=B3f?=)
 Date: Wed,  1 Jul 2026 18:17:16 +0200
 Subject: [PATCH 09/14] drm/amdgpu/gmc12: Use AMDGPU_PTE_IS_PTE flag for
  init_pte_flags on GFX12.0
+Message-ID: <20260701161721.85681-10-timur.kristof@gmail.com>
+
+This flag seems to work around a "fault priority problem"
+and is necessary for handling faults on GFX12.
+The kernel seems unable to mitigate retry faults on GFX12
+without this flag.
+
+For reference see:
+amdgpu_vm_pte_update_flags() that explains the problem
+svm_range_get_pte_flags() that uses the flag on GFX12
+
+Signed-off-by: Timur Kristóf <timur.kristof@gmail.com>
 
 ---
  drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c | 3 ++-

@@ -3,6 +3,26 @@ Date: Wed,  5 Aug 2026 07:02:21 -0700
 Subject: [PATCH] drm/amd/pm: Fix incorrect avg vcn utilization in gpu_metrics
 Message-ID: <20260805140227.44868-1-boqun@kernel.org>
 
+In a Strix Halo system, a >100 average_vcn_activity in gpu_metrics can
+be observed by running the following command:
+
+    ffmpeg -hwaccel vappi -vappi_device /dev/dri/renderD128 -i \
+    ~/sample-10s.mp4 -vf hwupload,scale_vappi=format=nv12 -c:v \
+    h264_vappi /tmp/output.mp4
+
+This is incorrect because the value is supposed to be in [0-100] range.
+
+The cause of the issue is that the metrics.VcnActivity reported by
+smu_cmn_get_metrics_table() is a permyriad value instead of a percentage
+value (e.g. smu_v14_0_0_get_smu_metrics_data() has a division by 100 to
+report the vcn_busy_percent). Therefore fix this by applying the same
+division in smu_v14_0_0_get_gpu_metrics().
+
+Reported-by: Mark Janes <mjanes@netflix.com>
+Signed-off-by: Boqun Feng <boqun@kernel.org>
+
+---
+
 
  drivers/gpu/drm/amd/pm/swsmu/smu14/smu_v14_0_0_ppt.c | 3 ++-
  1 file changed, 2 insertions(+), 1 deletion(-)

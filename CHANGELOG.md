@@ -15,6 +15,70 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc3-1-sleepy-next]: 2026-09-13
+
+### Changed
+- **Base moved to Linux 7.3-rc3.** `pkgrel` restarts at 1, and the series drops
+  from 176 patches to 169.
+
+### Removed
+- **Ten patches that rc3 merges upstream**: `1155`–`1157` and `1153` (the HDMI
+  RGB quantization series and its VTEM companion), `2300` and `2301` (kbuild
+  `mksysmap`), `2401` and `2402` (the EEVDF fixes), `2501` (AMD MCE threshold
+  interrupts) and `2600` (hrtimer). Each was confirmed present in a pristine
+  rc3 tree by checking that the lines it adds are already there.
+- **`1145`** (the HF-VSDB MCCS FreeSync guard). rc3 rewrites
+  `amdgpu_dm_update_freesync_caps()`, so the block the patch guarded no longer
+  exists — it cannot be rebased without re-authoring it, and the rc3 code
+  supersedes its purpose.
+
+### Added
+- **Four memory-management fixes**, each verified to apply on top of the whole
+  series:
+  - **`2144`** xarray: fix the index jumping backwards in `xas_find()`. A syzbot
+    use-after-free: the index moves backwards while a multi-index entry is
+    concurrently split, and `filemap_map_pages()` then dereferences a page-table
+    page already freed through `tlb_remove_table_rcu()`.
+  - **`2145`** mm/vma: unaccount correctly when `mmap_prepare()` fails, which
+    otherwise leaks security accounting over the `RLIMIT_AS` budget. The
+    regression source is in the base tree.
+  - **`2146`** mm/mlock: use the IRQ-safe accessor for `NR_MLOCK` in
+    `__munlock_folio()`, where a bio-completion softirq can corrupt the counter.
+  - **`2147`** mm/memcg: clear the folio's memcg after updating the per-memcg
+    stats, so the swapcache counter stops drifting. This machine swaps
+    constantly, so its `memory.stat` was reporting swapcache that had already
+    gone.
+
+### Fixed
+- **The patch files themselves**, following the provenance audit:
+  - the `Cc:` label restored in the 23 kbuild patches, where a stripped field
+    name had left a 36-line address list orphaned under `Message-Id`;
+  - mail-transport headers stripped from `2138` and `2400` (15 and 63 lines),
+    completing an earlier strip that had left debris behind;
+  - 43 files had a placeholder or fabricated value in their `From <id> Mon Sep
+    17` slot replaced with `nobody`, so no false commit id remains anywhere in
+    the series;
+  - 28 files gained the `Message-ID` of their original submission, recovered
+    from the lore git mirrors;
+  - 16 files had their commit-message body restored from the original mail,
+    which also restored the `Signed-off-by` they were missing.
+
+### Verified
+- The 169-patch series applies to a pristine `v7.3-rc3` tree with 0 failures and
+  0 silently skipped patches (cumulative `patch -p1 --forward -F2`).
+
+### Evaluated and not carried
+- **`drm/amd/display: Try RGB before YCbCr 4:4:4 in stream validation`**
+  (Adrian Betschart, dri-devel 2026-09-11). Its `amdgpu_dm_connector.c` hunk
+  applies, but both hunks in the KUnit file fail, and that file is not built
+  here. Carrying an extracted subset would mean shipping a behaviour change to
+  stream validation — an ordering preference rather than a bug fix — so it is
+  deferred rather than forced.
+- **`drm/amd/display: invalidate DP CEC state on s3 suspend`** (Dan Himebauch,
+  dri-devel 2026-09-12, reported tested on an RX 9070 XT). The mail is
+  MIME-encoded and did not survive conversion intact. CEC is not used here, so
+  it is deferred.
+
 ## [7.3.0-rc2-11-sleepy-next]: 2026-09-13
 
 ### Changed

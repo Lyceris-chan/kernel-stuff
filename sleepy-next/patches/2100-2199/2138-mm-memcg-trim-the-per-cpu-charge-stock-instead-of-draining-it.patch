@@ -14,23 +14,8 @@ Cc: Michal Hocko <mhocko@suse.com>,
 Subject: [PATCH v2] memcg: trim the per-cpu charge stock instead of draining it
 Date: Wed, 19 Aug 2026 18:20:10 -0700
 Message-ID: <20260820012010.2016086-1-shakeel.butt@linux.dev>
-X-Mailer: git-send-email 2.53.0
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-X-Rspam-User: 
-X-Stat-Signature: kku4eyq8eiswx6pjd6yteu1p879h8g9j
-X-Rspamd-Server: rspam09
-X-Rspamd-Queue-Id: 9379710000B
-X-HE-Tag: 1787188831-770444
-X-HE-Meta: U2FsdGVkX19xL6a6X99fJt8vEg8dDZIB7rOL6iUJB6Jq+rH9FZ7e5dftWEgJAU15DRk37+7kF5cUVexbYVHWFlsZ6OtOOMoWJlOeufAGNHBnhcGyrXudX1YpRX9dbbPW2GGIQ5zcl5GciAj8D3MmwHE9fLcnKN5EjphqjgdvZ/JswKyfDjW14/5NUJgaQJOnhdZeHfcYPEIKUuY8J4zwRIRF+WVBd2s6+qiddpfYgTirG5io4swg0hHnsozoNGC3edyhewuPbhkgTcmTf2aEw3CkwOdYAoQ/z8pHTRNwu22BWtWLNNfAbWb8RWXax5xT5XDqnhTHam2nj4DqXQRxHBcWzOsjwvR83cCxTTUPDFORrc8E9t/rdDg2/vlC/19KGA6cXEIYmhV7RzZ6EBZzZbUqdJ5GiiYT7QL+A8cU/5r82S0MuiyIYCbb3REkArt1DYRysHljEB2XK1aD/MyqRVcvlYeT8flcCkbA51vAQ46qK3vTrLX71foT0gYBTqw1A67fZM7YiwneVBy47TocNkexdB29ggF38G/uwYZo5Hpj0mdP+2XXhu/3IAd476817P0X9aKUV8rPVVj9dF17ErVUAo1c2lCeKDkj25u/ZhmWNkGrjMM34BnPmuWJDn3wdEZfE/SlGgnnhfDYzgz1a1gufPfEA9LkrhmGHIb4IoWizxlatU+tfNr9plEO8s1Q3qZCoxIQ9w1IYuKpin1WBxscbg7glWeEayYpD0FeR+eZaIWdJ2hzSd31AnW8U4u2tp2iXmKJU2wInOZbjQfcS0CnrMOXmHCV40dnhhMM06xJkjBE7F01V4ermYxKXTFfF1LdIa4Cla/mMNUAc4Br7+Uo6JljwqYnAlhpdch+6Xp+QC1Cz6LVvg2ehQrFxkHNPoIYv2Mqdl4Mk8nl2/RDfcTA5ljZjaBciZImiP/PFwNuYBNdkHFIFZIIOk+r9JpEi0BFi/SBYt4edheO0YU
- xYVi0kZX
- eJiUn8G9owXot+s4h6s2zHDo5yXIJzlVSR5olCZulm1ULiGmObwq3QEC9dznwAtGBWknVqqEVrJss7Tz1gdvZMuZM9Bluszs4dgz1K4onCWkC9F1ZoNz0yPD0CC+3KX71AmsG3UAPj9TQrS0OOZ7hKDCfgpv7tlSrQ550zKfJ+g9fGWY9Z9FoGdcA6Netwa1YHgyNXW77ZgLXpmbhuQbGWCc0GQkF+7ATeaMV1vzm0mrsWsyS29+yda2MGVyD5NSgZ47rntgwQTTohSntrNKnbwYzUG2nH1NCCpkb+aRnsXhTJLipeNXgPLnk2QyYhCz8SY7ggdOYVYPaRdtSXMpvU6Rn9dwZ/FTpogcfj6FcyivI3TIfNiTH4lFe4K9VTVk2Mp2aN6fn85FvdL6kkjv7gwoZ1LXqhmH7/j7mdfMgjLH8ZbxNHAvLu8o2lw==
-Sender: owner-linux-mm@kvack.org
-Precedence: bulk
-X-Loop: owner-majordomo@kvack.org
-List-ID: <linux-mm.kvack.org>
-List-Subscribe: <mailto:majordomo@kvack.org>
-List-Unsubscribe: <mailto:majordomo@kvack.org>
 
 Joy reported that an application generating a request/response traffic
 pattern spends 44.6% to 57.0% of CPU in the memcg charge/uncharge path

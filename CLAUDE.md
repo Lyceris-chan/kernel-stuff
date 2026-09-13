@@ -5,7 +5,7 @@ sanitized CachyOS patchset plus upstream and local patches filtered to this
 hardware.
 
 One package: `sleepy-next/PKGBUILD` (`linux-sleepy-next`, currently **Linux
-7.3-rc2**). Track mainline RCs; linux-next snapshots are a preview base only
+7.3-rc3**). Track mainline RCs; linux-next snapshots are a preview base only
 when the RC line is unusable.
 
 ## Target hardware

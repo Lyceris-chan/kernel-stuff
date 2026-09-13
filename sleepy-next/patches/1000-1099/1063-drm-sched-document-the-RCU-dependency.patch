@@ -1,6 +1,7 @@
 From: Christian König <ckoenig.leichtzumerken@gmail.com>
 Date: Wed, 09 Sep 2026 15:14:24 +0200
 Subject: [PATCH 2/2] drm/sched: document the RCU dependency
+Message-ID: <20260909131808.2201-3-christian.koenig@amd.com>
 Signed-off-by: Christian König <ckoenig.leichtzumerken@gmail.com>
 
 Tvrkos patches added RCU protection to the returned strings from
