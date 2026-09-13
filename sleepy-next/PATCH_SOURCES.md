@@ -165,29 +165,29 @@ left for a build-tested change rather than a documentation pass.
 | `2142` | mm/vmscan: avoid pointless large folio splits without swap | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-08-30 | `bd7fcb0dea86` |
 | `2143` | zstd: fix DDict hash-set probe index wrap-around | Piotr Gorski | 2026-09-02 | — |
 | `2200` | 7.2-nap-v0.5.0 | Masahito S | 2026-06-05 | `04aef34448bb` |
-| `2300` | scripts/mksysmap: drop the MODULE_INFO() symbols from kallsyms | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2301` | scripts/mksysmap: fix escape of '$' in the __pi_ pattern | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2302` | kallsyms: index symbols by token to speed up table compression | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2303` | kallsyms: output binary data to speed output and kallsyms assembly | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2304` | kbuild: do not sort nm output where the order is irrelevant | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2305` | kbuild: only emit vmlinux relocations when required | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2306` | elf-parse: add section flags, symbol binding and a read-only mapping | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2307` | kallsyms: reimplement mksysmap in C | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2308` | kbuild: do not allocate .modinfo in vmlinux | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2309` | kbuild: cache list, composite object state per object | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2310` | kbuild: implement and use depcheck to check dependency timestamps | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2311` | kbuild: avoid re-running compiler and linker probes | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2312` | modpost: hash module source per-file, not per-byte | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2313` | modpost: cache section relocation mismatch state | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2314` | modpost: emit module descriptors as assembly | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2315` | kbuild: batch module finalisation | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2316` | modpost: perform srcversion hashing in parallel | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2317` | objtool: cache relocations and function dead end state, do less work | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2318` | objtool: decode instructions and resolve branch targets in parallel | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2319` | kbuild: rust: parallelise rustc front end | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2320` | rust: make exports.o depend on the headers generated for it | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2321` | kbuild: build rust crates in parallel with the rest of the build | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
-| `2322` | kbuild: use pigz for gzip compression if available | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `000000000000` |
+| `2300` | scripts/mksysmap: drop the MODULE_INFO() symbols from kallsyms | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-1-5dc1ac01672d@kernel.org` |
+| `2301` | scripts/mksysmap: fix escape of '$' in the __pi_ pattern | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-2-5dc1ac01672d@kernel.org` |
+| `2302` | kallsyms: index symbols by token to speed up table compression | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-3-5dc1ac01672d@kernel.org` |
+| `2303` | kallsyms: output binary data to speed output and kallsyms assembly | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-4-5dc1ac01672d@kernel.org` |
+| `2304` | kbuild: do not sort nm output where the order is irrelevant | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-5-5dc1ac01672d@kernel.org` |
+| `2305` | kbuild: only emit vmlinux relocations when required | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-6-5dc1ac01672d@kernel.org` |
+| `2306` | elf-parse: add section flags, symbol binding and a read-only mapping | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-7-5dc1ac01672d@kernel.org` |
+| `2307` | kallsyms: reimplement mksysmap in C | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-8-5dc1ac01672d@kernel.org` |
+| `2308` | kbuild: do not allocate .modinfo in vmlinux | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-9-5dc1ac01672d@kernel.org` |
+| `2309` | kbuild: cache list, composite object state per object | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-10-5dc1ac01672d@kernel.org` |
+| `2310` | kbuild: implement and use depcheck to check dependency timestamps | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-11-5dc1ac01672d@kernel.org` |
+| `2311` | kbuild: avoid re-running compiler and linker probes | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-12-5dc1ac01672d@kernel.org` |
+| `2312` | modpost: hash module source per-file, not per-byte | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-13-5dc1ac01672d@kernel.org` |
+| `2313` | modpost: cache section relocation mismatch state | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-14-5dc1ac01672d@kernel.org` |
+| `2314` | modpost: emit module descriptors as assembly | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-15-5dc1ac01672d@kernel.org` |
+| `2315` | kbuild: batch module finalisation | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-16-5dc1ac01672d@kernel.org` |
+| `2316` | modpost: perform srcversion hashing in parallel | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-17-5dc1ac01672d@kernel.org` |
+| `2317` | objtool: cache relocations and function dead end state, do less work | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-18-5dc1ac01672d@kernel.org` |
+| `2318` | objtool: decode instructions and resolve branch targets in parallel | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-19-5dc1ac01672d@kernel.org` |
+| `2319` | kbuild: rust: parallelise rustc front end | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-20-5dc1ac01672d@kernel.org` |
+| `2320` | rust: make exports.o depend on the headers generated for it | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-21-5dc1ac01672d@kernel.org` |
+| `2321` | kbuild: build rust crates in parallel with the rest of the build | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-22-5dc1ac01672d@kernel.org` |
+| `2322` | kbuild: use pigz for gzip compression if available | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-23-5dc1ac01672d@kernel.org` |
 | `2400` | sched: Set need-resched flags before tracing | Andrea Righi | 2026-09-11 | `20260911213300.1305763-1-arighi@nvidia.com` |
 | `2401` | sched/eevdf: Fix augmented max_slice | Vincent Guittot | 2026-09-07 | `9a8bc9bb4c3f` |
 | `2402` | sched/eevdf: Fix rb augmented with multi fields | Vincent Guittot | 2026-09-09 | `51b0e68cfa0a` |
@@ -195,20 +195,20 @@ left for a build-tested change rather than a documentation pass.
 | `2501` | x86/MCE/AMD: Fix inverted interrupt enablement during storm handling | Jasjeet Rangi | 2026-08-12 | `d2929113b15b` |
 | `2600` | hrtimer: Use hard expiry when updating timers on the same base | Andrea Parri | 2026-09-10 | `c5dcb3aadc18` |
 | `9007` | drm/gfx12: Program DB_RING_CONTROL | Alex Deucher | 2026-06-26 | `402ebe22b267` |
-| `9011` | drm/amdgpu: Respect noretry flag for retry faults on GFX12.1 | Timur Kristóf | 2026-07-01 | — |
-| `9012` | drm/amdgpu/gfxhub: Enable retry fault interrupts when needed | Timur Kristóf | 2026-07-01 | — |
-| `9013` | drm/amdgpu/ih: Don't perturb HW registers when accessing soft IH ring | Timur Kristóf | 2026-07-01 | — |
-| `9014` | drm/amdgpu/ih: Add retry_cam_ack IH function pointer | Timur Kristóf | 2026-07-01 | — |
-| `9015` | drm/amdgpu/ih6.1: Use IH_SW_RING_SIZE for soft IH ring instead of PAGE_SIZE | Timur Kristóf | 2026-07-01 | — |
-| `9016` | drm/amdgpu/ih7.0: Use IH_SW_RING_SIZE for soft IH ring instead of PAGE_SIZE | Timur Kristóf | 2026-07-01 | — |
-| `9017` | drm/amdgpu/gmc11: Pass cam_index to retry fault handler | Timur Kristóf | 2026-07-01 | — |
-| `9018` | drm/amdgpu/gmc12: Pass cam_index to retry fault handler | Timur Kristóf | 2026-07-01 | — |
-| `9019` | drm/amdgpu/gmc12: Use AMDGPU_PTE_IS_PTE flag for init_pte_flags on GFX12.0 | Timur Kristóf | 2026-07-01 | — |
-| `9020` | drm/amdgpu/vm: Use init PTE flags and NOALLOC in amdgpu_vm_handle_fault() | Timur Kristóf | 2026-07-01 | — |
-| `9021` | drm/amdgpu/ih6.0: Use MMIO ACK for retry CAM on IH 6.0 | Timur Kristóf | 2026-07-01 | — |
-| `9022` | drm/amdgpu/ih7.0: Use MMIO ACK instead of doorbell for retry CAM on IH 7.0 | Timur Kristóf | 2026-07-01 | — |
-| `9023` | drm/amdgpu/ih6.0: Enable retry CAM on Navi 3 dGPUs | Timur Kristóf | 2026-07-01 | — |
-| `9024` | drm/amdgpu/ih7.0: Enable retry CAM on Navi 4 dGPUs | Timur Kristóf | 2026-07-01 | — |
+| `9011` | drm/amdgpu: Respect noretry flag for retry faults on GFX12.1 | Timur Kristóf | 2026-07-01 | `20260701161721.85681-2-timur.kristof@gmail.com` |
+| `9012` | drm/amdgpu/gfxhub: Enable retry fault interrupts when needed | Timur Kristóf | 2026-07-01 | `20260701161721.85681-3-timur.kristof@gmail.com` |
+| `9013` | drm/amdgpu/ih: Don't perturb HW registers when accessing soft IH ring | Timur Kristóf | 2026-07-01 | `20260701161721.85681-4-timur.kristof@gmail.com` |
+| `9014` | drm/amdgpu/ih: Add retry_cam_ack IH function pointer | Timur Kristóf | 2026-07-01 | `20260701161721.85681-5-timur.kristof@gmail.com` |
+| `9015` | drm/amdgpu/ih6.1: Use IH_SW_RING_SIZE for soft IH ring instead of PAGE_SIZE | Timur Kristóf | 2026-07-01 | `20260701161721.85681-6-timur.kristof@gmail.com` |
+| `9016` | drm/amdgpu/ih7.0: Use IH_SW_RING_SIZE for soft IH ring instead of PAGE_SIZE | Timur Kristóf | 2026-07-01 | `20260701161721.85681-7-timur.kristof@gmail.com` |
+| `9017` | drm/amdgpu/gmc11: Pass cam_index to retry fault handler | Timur Kristóf | 2026-07-01 | `20260701161721.85681-8-timur.kristof@gmail.com` |
+| `9018` | drm/amdgpu/gmc12: Pass cam_index to retry fault handler | Timur Kristóf | 2026-07-01 | `20260701161721.85681-9-timur.kristof@gmail.com` |
+| `9019` | drm/amdgpu/gmc12: Use AMDGPU_PTE_IS_PTE flag for init_pte_flags on GFX12.0 | Timur Kristóf | 2026-07-01 | `20260701161721.85681-10-timur.kristof@gmail.com` |
+| `9020` | drm/amdgpu/vm: Use init PTE flags and NOALLOC in amdgpu_vm_handle_fault() | Timur Kristóf | 2026-07-01 | `20260701161721.85681-11-timur.kristof@gmail.com` |
+| `9021` | drm/amdgpu/ih6.0: Use MMIO ACK for retry CAM on IH 6.0 | Timur Kristóf | 2026-07-01 | `20260701161721.85681-12-timur.kristof@gmail.com` |
+| `9022` | drm/amdgpu/ih7.0: Use MMIO ACK instead of doorbell for retry CAM on IH 7.0 | Timur Kristóf | 2026-07-01 | `20260701161721.85681-13-timur.kristof@gmail.com` |
+| `9023` | drm/amdgpu/ih6.0: Enable retry CAM on Navi 3 dGPUs | Timur Kristóf | 2026-07-01 | `20260701161721.85681-14-timur.kristof@gmail.com` |
+| `9024` | drm/amdgpu/ih7.0: Enable retry CAM on Navi 4 dGPUs | Timur Kristóf | 2026-07-01 | `20260701161721.85681-15-timur.kristof@gmail.com` |
 | `9034` | drm/amdgpu: fix VM update overrun on non-4K page kernels | Junrui Luo via B4 Relay | 2026-08-06 | `20260806-amdgpu-fixes-v1-2-ce247012d4da@outlook.com` |
 | `9035` | drm/amdgpu: add the BO-va mapping offset when kmapping an IB | Junrui Luo via B4 Relay | 2026-08-08 | `20260808-amdgpu-fixes-v2-1-36d66398601f@outlook.com` |
 | `9038` | drm/amdgpu: reject PRT mappings as user queue buffer VAs | Junrui Luo via B4 Relay | 2026-08-11 | `20260811-amdgpu-fixes-v1-2-4954a417b8ff@outlook.com` |
@@ -219,6 +219,72 @@ left for a build-tested change rather than a documentation pass.
 | `9049` | drm/amdgpu: recompute the dw estimate after allocating a new VM update job | YuBiao Wang | 2026-07-29 | `39e5b1e4f4b3` |
 | `9050` | drm/amdgpu: Update no-retry PTE flags for GFX12 | Mukul Joshi | 2025-12-04 | `9b7ce74b7867` |
 | `9054` | drm/amd/display: Guard amdgpu_dm_irq_schedule_work against NULL irq_wq | Ivan Lipski | 2026-08-18 | `0372d4c817bc` |
+
+## Header and identifier defects
+
+Audited 2026-09-13. Every patch in `source=()` carries a subject, an author and
+a date, and all 176 appear in the index above. The defects below are in the
+patch files themselves. None of them affects whether a patch applies, because
+the build never reads the header block.
+
+### Ids that cannot be commit ids (29 patches)
+
+Four of the values in a `From <id> Mon Sep 17` line cannot be commit ids.
+Absence from the local clones would prove nothing on its own, because `repos/`
+holds shallow, pruned clones (`drm-misc` has 47 commits, `akpm-mm` 484,
+`linux-next` is shallow), so each of these is judged on the shape of the value:
+
+| Patches | Recorded | Why it cannot be real |
+|---|---|---|
+| `1135`, `1136` | `f000…0001`, `f000…0002` | Sequential placeholders. |
+| `2300`–`2322` (23) | `0000…0000` | The all-zeros object name. |
+| `1145` | `91c48e2f…1a0b9c8` | 41 hex characters; a commit id has 40. |
+
+Three more read `From nobody Mon Sep 17`, which is what `git format-patch`
+writes when it cannot name the commit: `0055`, `0058` and `1027`.
+
+Each of those is identified elsewhere, either in the file or in this ledger.
+The kbuild series is identified by its submission
+(`20260908-build-speedup-v1-1-5dc1ac01672d@kernel.org`), `0055`, `0058` and
+`1027` by a `Message-ID` header, and `1135`, `1136` and `1145` by their
+mailing-list series, noted below.
+
+### A genuine id in the wrong field (14 patches)
+
+`9011`–`9024` carry their **Message-ID in the commit-id slot**, so a tool
+looking for a commit hash finds
+`20260701161721.85681-2-timur.kristof@gmail.com`. The value is real and the
+patches are traceable; it is simply in the wrong field. The index above reads
+the slot for exactly this reason.
+
+### No identifier at all (15 patches)
+
+These carry neither a usable commit id nor a `Message-ID` header, so the index
+shows `—` against them and they are identified only by their mailing-list series
+and date in the per-patch notes: `1061`, `1062`, `1063`, `1135`, `1136`, `1138`,
+`1140`, `1142`, `1145`, `1155`, `1156`, `1157`, `2008`, `2143` and `9046`.
+
+### A corrupted header block (25 patches)
+
+- `2300`–`2322` (23 patches): about 36 lines of a `Cc:` address list are
+  orphaned under `Message-Id`. The 3-character `Cc:` label was stripped and the
+  list left as continuations of the preceding field, so the header is malformed
+  and, read literally, claims the Message-ID holds a list of names.
+- `2400`: 6 orphaned continuation lines left behind when the mail-transport
+  headers were stripped, so debris belonging to `X-Microsoft-Antispam` and
+  friends still sits in the header block.
+
+### Commit messages that were never extracted (16 patches)
+
+`1027`, `1055` and the whole `9011`–`9024` series have no commit-message body:
+the file runs from the header block straight to the diffstat. The patch's own
+explanation is missing, and so is its `Signed-off-by` trailer. In total 21
+patches lack that trailer, which also counts the five generated squashes
+(`0101`–`0103`, `2101`, `2200`) where a single DCO line would not be meaningful.
+
+Recovering those bodies means re-fetching the original mails. They cannot be
+reconstructed from what is on disk, and writing a `Signed-off-by` by hand would
+fabricate an attestation.
 
 ## Per-patch notes
 

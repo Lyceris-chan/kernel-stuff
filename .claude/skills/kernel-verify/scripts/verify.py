@@ -221,6 +221,43 @@ def check_unique_numbers(package_dir: pathlib.Path, entries: list[str]) -> None:
         record("fast", "unique patch numbers", "PASS", f"{len(seen)} distinct numbers")
 
 
+def check_identifiers(package_dir: pathlib.Path, entries: list[str]) -> None:
+    """The `From <id> Mon Sep 17` line must carry a real commit id, or none.
+
+    This is a WARN, not a FAIL: 29 patches already carry a placeholder or a
+    malformed value, and repairing them means editing patch files and re-running
+    updpkgsums. The check exists because the all-zeros object name was written
+    into 23 patches at once by an extraction tool, silently, and nothing caught
+    it — `check_headers` only looks for the presence of `From:` and `Subject:`.
+    """
+    bad = []
+    for entry in entries:
+        path = package_dir / entry
+        if not path.is_file():
+            continue
+        first = path.read_text(encoding="utf-8", errors="replace").split("\n", 1)[0]
+        m = re.match(r"^From (\S+) Mon Sep 17", first)
+        if not m:
+            continue  # mail-format patch: the id lives in the Message-ID header
+        token = m.group(1)
+        if re.fullmatch(r"0{40}", token):
+            bad.append(f"{path.name}: all-zeros id")
+        elif re.fullmatch(r"[0-9a-f]{40}", token):
+            if re.match(r"^f0{6,}", token):
+                bad.append(f"{path.name}: placeholder id f000...")
+        elif "@" in token:
+            continue  # a Message-ID in the commit-id slot; real, wrong field
+        elif token == "nobody":
+            bad.append(f"{path.name}: 'From nobody' — no commit id")
+        else:
+            bad.append(f"{path.name}: {len(token)} hex chars, not a 40-char id")
+    if bad:
+        record("fast", "identifier sanity", "WARN",
+               f"{len(bad)} patch(es) carry no real commit id: {bad[:3]}")
+    else:
+        record("fast", "identifier sanity", "PASS", f"{len(entries)} patches")
+
+
 def check_provenance(package_dir: pathlib.Path, ledger: pathlib.Path, entries: list[str]) -> None:
     """Report patch numbers not individually named in PATCH_SOURCES.md.
 
@@ -526,6 +563,7 @@ def main() -> int:
         check_unique_numbers(package_dir, entries)
         check_checksums(package_dir, entries, b2sum_sets(pkgbuild))
         check_headers(package_dir, entries)
+        check_identifiers(package_dir, entries)
         check_provenance(package_dir, package_dir / "PATCH_SOURCES.md", entries)
         check_doc_claims(root, entries)
         check_skills(root)
