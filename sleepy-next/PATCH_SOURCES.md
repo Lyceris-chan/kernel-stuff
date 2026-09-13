@@ -8,12 +8,13 @@ Provenance for every patch in `source=()` of `sleepy-next/PKGBUILD`.
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
 
-The patch index is generated from the patch headers, so the author and the
-identifier are whatever the patch file itself carries. Where a patch came from a
+The patch index is generated from the patch headers. Where a patch came from a
 git branch the identifier is a commit hash; where it came from a mailing list it
-is the submission `Message-ID`. Where the header carries neither, the field
-reads `—`, and the patch is identified by its series and date in the per-patch
-notes below.
+is the submission `Message-ID`. Sixteen patch files carry no usable identifier
+in their own header — 15 numbers, because `1140` is used twice — so their
+original submissions were recovered from the lore git mirrors and are supplied
+by the generator instead. Every row below therefore has a source. The defects
+themselves are recorded under "Header and identifier defects".
 
 ## Series at a glance
 
@@ -89,27 +90,27 @@ left for a build-tested change rather than a documentation pass.
 | `1056` | drm/sched: Lock drm_sched_entity_is_idle() | Philipp Stanner | 2026-08-13 | `0e118b936dc5` |
 | `1058` | drm/amdgpu: Track suboptimal always-valid BOs in soft-evicted state | Natalie Vock | 2026-04-14 | `eb1170e956c4` |
 | `1060` | drm/amdgpu: cancel hang_detect_work before taking userq_mutex | vitaly.prosyak at amd.com | 2026-08-27 | `20260827222531.127950-1-vitaly.prosyak@amd.com` |
-| `1061` | drm/ttm: fix swapped-out resources never leaving their bulk_move range | Vadim Nikitushkin | 2026-09-09 | — |
-| `1062` | dma-buf/dma-fence: fix checking signaling bit for timeline and driver name | Christian König | 2026-09-09 | — |
-| `1063` | drm/sched: document the RCU dependency | Christian König | 2026-09-09 | — |
-| `1135` | drm/amd/display: fix HPD program filter programming | Charlene Liu | 2026-08-05 | — |
-| `1136` | drm/amd/display: Update and revert FRL LT Timeout | Relja Vojvodic | 2026-08-05 | — |
-| `1138` | drm/amd/display: pull colorops into state when recreating a plane | Harry Wentland | — | — |
+| `1061` | drm/ttm: fix swapped-out resources never leaving their bulk_move range | Vadim Nikitushkin | 2026-09-09 | `20260909205028.13799-1-bub4z0r@gmail.com` |
+| `1062` | dma-buf/dma-fence: fix checking signaling bit for timeline and driver name | Christian König | 2026-09-09 | `20260909131808.2201-2-christian.koenig@amd.com` |
+| `1063` | drm/sched: document the RCU dependency | Christian König | 2026-09-09 | `20260909131808.2201-3-christian.koenig@amd.com` |
+| `1135` | drm/amd/display: fix HPD program filter programming | Charlene Liu | 2026-08-05 | `20260805063937.2145774-13-chiahsuan.chung@amd.com` |
+| `1136` | drm/amd/display: Update and revert FRL LT Timeout | Relja Vojvodic | 2026-08-05 | `20260805063937.2145774-21-chiahsuan.chung@amd.com` |
+| `1138` | drm/amd/display: pull colorops into state when recreating a plane | Harry Wentland | — | `20260825153539.213495-1-harry.wentland@amd.com` |
 | `1140` | drm/amd/display: clamp force_min_dcfclk to dcn42b range | Tom Chung | 2026-08-05 | `20260805063937.2145774-11-chiahsuan.chung@amd.com` |
-| `1140` | drm/amd/display: fall back to overlay cursor on dcn4x when top plane doesn't fill CRTC | James Lin | — | — |
+| `1140` | drm/amd/display: fall back to overlay cursor on dcn4x when top plane doesn't fill CRTC | James Lin | — | `20260818202139.4172592-2-IVAN.LIPSKI@amd.com` |
 | `1141` | drm/amd/display: skip receiver power control without AUX | "NepNep7601" | 2026-08-27 | `20260826204457.4666-1-neptune@imm0nv1nhtv.is-a.dev` |
-| `1142` | drm/amd/display: close DDC on I2C engine setup failure | "NepNep7601" | 2026-08-27 | — |
+| `1142` | drm/amd/display: close DDC on I2C engine setup failure | "NepNep7601" | 2026-08-27 | `20260826204457.4666-2-neptune@imm0nv1nhtv.is-a.dev` |
 | `1143` | drm/amd/display: fall back to software I2C on hardware engine failure | "NepNep7601" | 2026-08-27 | `20260826170549.21985-1-neptune@imm0nv1nhtv.is-a.dev` |
 | `1144` | drm/amd/display: Enable HDMI FRL by default | Fangzhi Zuo | 2026-08-27 | `20260827155409.1426730-1-jerry.zuo@amd.com` |
-| `1145` | drm/amd/display: Keep FreeSync for HF-VSDB VRR sinks in MCCS fallback | Fangzhi Zuo | 2026-09-01 | — |
+| `1145` | drm/amd/display: Keep FreeSync for HF-VSDB VRR sinks in MCCS fallback | Fangzhi Zuo | 2026-09-01 | `20260901191251.2653684-4-jerry.zuo@amd.com` |
 | `1150` | drm: Add passive_vrr properties for passive/desktop VRR | Tomasz Pakuła | 2026-09-01 | `21311d5b6fd4` |
 | `1151` | drm/amd/display: Use passive_vrr properties in amdgpu | Tomasz Pakuła | 2026-09-01 | `1508cfd62df5` |
 | `1152` | drm/amd/display: Emit VTEM for HF-VSDB VRR on TMDS links | Fangzhi Zuo | 2026-08-20 | `fabf2169cb45` |
 | `1153` | drm/amd/display: Fix HF-VSDB DSC bpc detection to be cumulative | Fangzhi Zuo | 2026-08-26 | `aa173a504e3b` |
 | `1154` | drm/amd/display: Fix NULL deref of new_stream->sink in VTEM guard | Fangzhi Zuo | 2026-08-31 | `a69d7c8a99b4` |
-| `1155` | drm/amd/display: Propagate HDMI RGB quantization selectability | Satyajit Roy | 2026-08-30 | — |
-| `1156` | drm/amd/display: Honor Broadcast RGB for BT.2020 RGB output | Satyajit Roy | 2026-08-30 | — |
-| `1157` | drm/amd/display: Rebuild InfoFrames on output color space changes | Satyajit Roy | 2026-08-30 | — |
+| `1155` | drm/amd/display: Propagate HDMI RGB quantization selectability | Satyajit Roy | 2026-08-30 | `20260830035120.937992-2-edu042sjroy@proton.me` |
+| `1156` | drm/amd/display: Honor Broadcast RGB for BT.2020 RGB output | Satyajit Roy | 2026-08-30 | `20260830035120.937992-3-edu042sjroy@proton.me` |
+| `1157` | drm/amd/display: Rebuild InfoFrames on output color space changes | Satyajit Roy | 2026-08-30 | `20260830035120.937992-4-edu042sjroy@proton.me` |
 | `1158` | drm/amd/display: Fix high busy wait load in dmub_srv_wait_for_idle() | Sultan Alsawaf | 2025-08-25 | `dfd0e5aa6aad` |
 | `1201` | cpufreq/amd-pstate: Update cppc_req_cached before writing the MSR | David Vernet | 2026-07-28 | `20260728073150.54964-3-void@manifault.com` |
 | `1202` | cpufreq/amd-pstate: Add per-core EPP boost for recently-busy CPUs | David Vernet | 2026-07-28 | `20260728073150.54964-4-void@manifault.com` |
@@ -137,7 +138,7 @@ left for a build-tested change rather than a documentation pass.
 | `2005` | sched_ext: Skip per-CPU data allocation for built-in DSQs | Qiurong Fang | 2026-08-27 | `20260827082329.3368255-1-fangqiurong@kylinos.cn` |
 | `2006` | zram: convert to SG-list zsmalloc object read API | Sergey Senozhatsky | 2026-09-07 | `abaa6b12ca8a` |
 | `2007` | zsmalloc: remove old object read API | Sergey Senozhatsky | 2026-09-07 | `f2ae543ebcc5` |
-| `2008` | io_uring/io-wq: stop a single cancel after one running match | Mark Amirkan via B4 Relay | 2026-09-13 | — |
+| `2008` | io_uring/io-wq: stop a single cancel after one running match | Mark Amirkan via B4 Relay | 2026-09-13 | `20260913-b4-send-io-wq-cancel-v1-1-dcfe47275c6e@gmail.com` |
 | `2100` | zstd-7.2: merge v1.6.0 into kernel tree | Piotr Gorski | 2026-06-29 | `4d96a5c62121` |
 | `2101` | linux7.3-rc1-lru_marie-0.11.1 | Masahito S | 2026-09-08 | `5a4bbbb3854c` |
 | `2120` | mm/gup: break out gup_fill_pages() helper | Rik van Riel | 2026-08-10 | `7afdec79e9f0` |
@@ -163,7 +164,7 @@ left for a build-tested change rather than a documentation pass.
 | `2140` | mm/page_alloc: avoid direct compaction for costly __GFP_NORETRY allocations | Salvatore Dipietro | 2026-09-11 | `60adb47f4fa3` |
 | `2141` | mm: filemap: retain mapped dropbehind folios | Wenjie Qi | 2026-08-30 | `848d2ce2fce1` |
 | `2142` | mm/vmscan: avoid pointless large folio splits without swap | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-08-30 | `bd7fcb0dea86` |
-| `2143` | zstd: fix DDict hash-set probe index wrap-around | Piotr Gorski | 2026-09-02 | — |
+| `2143` | zstd: fix DDict hash-set probe index wrap-around | Piotr Gorski | 2026-09-02 | `sirlucjan 7.3-rc/zstd-dev-patches-sep/0001 (commit 9e0330ca)` |
 | `2200` | 7.2-nap-v0.5.0 | Masahito S | 2026-06-05 | `04aef34448bb` |
 | `2300` | scripts/mksysmap: drop the MODULE_INFO() symbols from kallsyms | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-1-5dc1ac01672d@kernel.org` |
 | `2301` | scripts/mksysmap: fix escape of '$' in the __pi_ pattern | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-2-5dc1ac01672d@kernel.org` |
@@ -215,7 +216,7 @@ left for a build-tested change rather than a documentation pass.
 | `9039` | drm/amdgpu/userq: bound the eviction fence rearm retry loop | Junrui Luo via B4 Relay | 2026-08-11 | `20260811-amdgpu-fixes-v1-3-4954a417b8ff@outlook.com` |
 | `9040` | drm/amdgpu: free userptr HMM ranges on the CS error path | Junrui Luo via B4 Relay | 2026-08-11 | `20260811-amdgpu-fixes-v1-5-4954a417b8ff@outlook.com` |
 | `9044` | drm/amdgpu/userq: skip unmapped queues in amdgpu_userq_wait_for_signal | Jesse Zhang | 2026-08-18 | `20260818072959.3356764-1-Jesse.Zhang@amd.com` |
-| `9046` | drm/amdkfd: fix integer overflow in queue ring buffer size calculation | Vladimir Marioukhine | 2026-08-17 | — |
+| `9046` | drm/amdkfd: fix integer overflow in queue ring buffer size calculation | Vladimir Marioukhine | 2026-08-17 | `SA1PR12MB8600EE73548498C578990CF49FDC2@SA1PR12MB8600.namprd12.prod.outlook.com` |
 | `9049` | drm/amdgpu: recompute the dw estimate after allocating a new VM update job | YuBiao Wang | 2026-07-29 | `39e5b1e4f4b3` |
 | `9050` | drm/amdgpu: Update no-retry PTE flags for GFX12 | Mukul Joshi | 2025-12-04 | `9b7ce74b7867` |
 | `9054` | drm/amd/display: Guard amdgpu_dm_irq_schedule_work against NULL irq_wq | Ivan Lipski | 2026-08-18 | `0372d4c817bc` |
@@ -253,16 +254,9 @@ mailing-list series, noted below.
 
 `9011`–`9024` carry their **Message-ID in the commit-id slot**, so a tool
 looking for a commit hash finds
-`20260701161721.85681-2-timur.kristof@gmail.com`. The value is real and the
-patches are traceable; it is simply in the wrong field. The index above reads
-the slot for exactly this reason.
-
-### No identifier at all (15 patches)
-
-These carry neither a usable commit id nor a `Message-ID` header, so the index
-shows `—` against them and they are identified only by their mailing-list series
-and date in the per-patch notes: `1061`, `1062`, `1063`, `1135`, `1136`, `1138`,
-`1140`, `1142`, `1145`, `1155`, `1156`, `1157`, `2008`, `2143` and `9046`.
+`20260701161721.85681-2-timur.kristof@gmail.com` instead. The value is real and
+the patches are traceable; it is simply in the wrong field. The index above
+reads the slot for exactly this reason.
 
 ### A corrupted header block (25 patches)
 
@@ -285,6 +279,48 @@ patches lack that trailer, which also counts the five generated squashes
 Recovering those bodies means re-fetching the original mails. They cannot be
 reconstructed from what is on disk, and writing a `Signed-off-by` by hand would
 fabricate an attestation.
+
+### Sources recovered for the 15 patches with no in-file id
+
+These carried neither a usable commit id nor a `Message-ID`. Their origin was
+recovered on 2026-09-13 by searching the lore git mirrors — where each email is
+a commit and the raw mail is the blob named `m` — and reading the `Message-ID`
+from the original submission.
+
+| Patch | Original submission | List and date |
+|---|---|---|
+| `1061` | `20260909205028.13799-1-bub4z0r@gmail.com` | dri-devel, 2026-09-09 |
+| `1062` | `20260909131808.2201-2-christian.koenig@amd.com` | dri-devel, 2026-09-09 |
+| `1063` | `20260909131808.2201-3-christian.koenig@amd.com` | dri-devel, 2026-09-09 |
+| `1135` | `20260805063937.2145774-13-chiahsuan.chung@amd.com` | amd-gfx, 2026-08-05, `[12/34]` |
+| `1136` | `20260805063937.2145774-21-chiahsuan.chung@amd.com` | amd-gfx, 2026-08-05, `[20/34]` |
+| `1138` | `20260825153539.213495-1-harry.wentland@amd.com` | amd-gfx, 2026-08-25 |
+| `1140` clamp | `20260805063937.2145774-11-chiahsuan.chung@amd.com` | amd-gfx, 2026-08-05, `[10/34]` |
+| `1140` cursor | `20260818202139.4172592-2-IVAN.LIPSKI@amd.com` | amd-gfx, 2026-08-18, `[01/82]` |
+| `1142` | `20260826204457.4666-2-neptune@imm0nv1nhtv.is-a.dev` | amd-gfx, 2026-08-26, v2 |
+| `1145` | `20260901191251.2653684-4-jerry.zuo@amd.com` | amd-gfx, 2026-09-01, v1 |
+| `1155` | `20260830035120.937992-2-edu042sjroy@proton.me` | amd-gfx, 2026-08-30, 1/3 |
+| `1156` | `20260830035120.937992-3-edu042sjroy@proton.me` | amd-gfx, 2026-08-30, 2/3 |
+| `1157` | `20260830035120.937992-4-edu042sjroy@proton.me` | amd-gfx, 2026-08-30, 3/3 |
+| `2008` | `20260913-b4-send-io-wq-cancel-v1-1-dcfe47275c6e@gmail.com` | io-uring, 2026-09-13 |
+| `9046` | `SA1PR12MB8600EE73548498C578990CF49FDC2@SA1PR12MB8600.namprd12.prod.outlook.com` | amd-gfx, 2026-08-12 |
+
+Four of these are corroborated rather than merely found. `1061` and `1062`
+resolve to the ids the ledger already recorded (`5c816ea300b1`,
+`b50e7d2af5e9`); `1155`–`1157` confirm the series cover
+`20260830035120.937992-1-edu042sjroy@proton.me`; and `1140` cursor was pinned by
+comparing hunk headers against two candidate submissions, where the `[v2]` mail
+has different hunk shapes and so is not the source.
+
+`2143` is not from a mailing list. It is an extracted subset of sirlucjan's
+`7.3-rc/zstd-dev-patches-sep/0001-zstd-7.3-merge-changes-from-dev-tree.patch`,
+added in commit `9e0330ca` on 2026-09-11; both changed lines appear verbatim
+there.
+
+The recovered values live in the index generator rather than in the patch files,
+so the checksums stay valid. Writing a `Message-ID:` header into each of the 16
+files would make them self-identifying, but that changes `b2sums` and belongs in
+a change that is re-audited afterwards.
 
 ## Per-patch notes
 
