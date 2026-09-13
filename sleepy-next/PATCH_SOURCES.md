@@ -1,5 +1,82 @@
 # sleepy-next — patch provenance
 
+## 2026-09-13 — HDMI RGB quantization fix + five verified fixes (164 patches, pkgrel 8)
+
+**Added — five upstream fixes from the MM/PM/sched sweep**, each verified with a
+cumulative apply on top of the full series (all clean, small offsets only):
+
+| Patch | Subject / author | Why it is on-target here |
+|---|---|---|
+| `2139` | `mm: vmscan: avoid anon scanning for GFP_NOIO with low swapcache` — Bo Zhang, 2026-09-08, `09c1d29a3d1e` / `20260908062649.1045883-1-zhangbo56@xiaomi.com` (akpm `mm-unstable`) | The commit message is explicitly about **zRAM** (*"particularly true on systems using zRAM, where swapcache is relatively rare"*): avoids >150 ms `shrink_folio_list()` passes that reclaim nothing. Its `lru_gen_enabled()` guard passes through under Marie, and it uses `vmscan_can_reclaim_anon_pages()` — the wrapper `2101` adds for exactly this — so unlike the MGLRU work this is **live here**. |
+| `2140` | `mm/page_alloc: avoid direct compaction for costly __GFP_NORETRY allocations` — Salvatore Dipietro, 2026-09-11, `60adb47f4fa3` / `20260911142102.2294202-1-dipiets@amazon.it` | Suppresses direct compaction and the `drain_all_pages()` cross-CPU IPI storm for costly `__GFP_NORETRY` orders. Its regression source `5d8edfb900d5` (iomap large-folio writes) **is in rc2**. Desktop-stutter class. |
+| `2401` | `sched/eevdf: Fix augmented max_slice` — Vincent Guittot, 2026-09-07, `9a8bc9bb4c3f` | 2-line initialisation of `se->max_slice` before `__enqueue_entity()`. rc2 **contains the regression source** `6e3c0a4e1ad1` ("Fix lag clamp"), so we carry the bug today. |
+| `2402` | `sched/eevdf: Fix rb augmented with multi fields` — Vincent Guittot, 2026-09-09, `51b0e68cfa0a` | Adds `RB_DECLARE_CALLBACKS_MULTI` so all **three** augmented EEVDF fields propagate on rotate/copy; previously only one did, corrupting the rbtree the scheduler depends on. Applied after `2401` (its ancestor). |
+| `2500` | `x86/mm: Fix user-space data loss with MADV_FREE and THP` — Vernon Yang, `f7491d7c81db` | **1-line real data-loss fix**: `pmd_modify()` masks out `_PAGE_DIRTY` (line 809 in rc2) where `pte_modify()`/`pud_modify()` do not, so pages rewritten after `MADV_FREE` on a PMD-mapped THP can be discarded. Needs THP + reclaim pressure + `MADV_FREE` (jemalloc → Firefox/Chrome): all true here. `Cc: stable`, `Reviewed-by` Edgecombe, `Tested-by` Falcato. |
+
+Note on `2500`: the fix was sent twice, and merged into **two** tip trees —
+`821eaec4482a` (`[PATCH] x86/mm: Fix pmd_modify() dropping the dirty bit`,
+2026-09-03) and `f7491d7c81db` (`[tip: x86/mm] x86/mm: Fix user-space data loss
+with MADV_FREE and THP`, 2026-09-08). The hunks are **byte-identical**; we carry
+one, under the merged tip subject.
+
+**Not taken from that sweep, deliberately:** the other two commits in
+`sched-urgent-2026-09-13` (`c23810313bdf`, `f5741d2b3451`) are *proxy-execution*
+work, not standalone fixes; sirlucjan's zstd 7.3 refresh breaks our `2128`/`2130`
+BMI2 patches and needs a rebase; the MCE v6 series arrives via Outlook and would
+need reconstruction (see `LESSONS.md`); `r8169` LTR is latent only while we boot
+`pcie_aspm=off`.
+
+### HDMI RGB quantization fix (`1155`–`1157`)
+
+**Added — the HDMI RGB quantization series (`1155`–`1157`).** Satyajit Roy,
+`[PATCH 0/3] drm/amd/display: Fix HDMI RGB quantization updates`, posted
+2026-08-30 (`20260830035120.937992-1-edu042sjroy@proton.me`, amd-gfx):
+
+| Patch | Subject |
+|---|---|
+| `1155` | `drm/amd/display: Propagate HDMI RGB quantization selectability` |
+| `1156` | `drm/amd/display: Honor Broadcast RGB for BT.2020 RGB output` |
+| `1157` | `drm/amd/display: Rebuild InfoFrames on output color space changes` |
+
+**Why.** drm/amd work item **!5812** (2026-09-12) reports that on an RX 9070 XT
+(DCN401) *"toggling Adaptive Sync between 'Never' and 'Automatic'/'Always'
+reproduces or clears [raised black levels / washed out colours] immediately,
+every time"*. The mechanism: `resource_build_info_frame()` derives colorimetry
+and RGB quantization from `stream->output_color_space`, but the InfoFrame-update
+predicates did not include `output_color_space` — so a commit that changes the
+colour space (which is what a VRR toggle is) reprograms the output CSC while the
+sink keeps the **previous AVI InfoFrame range**. Source and sink then disagree
+about RGB limited-vs-full range. `1157` is the fix: it adds
+`stream_update->output_color_space ||` to the three predicates in
+`dc/core/dc.c` (`check_update_surfaces_for_stream`,
+`commit_planes_do_stream_update_sequence`, `commit_planes_do_stream_update`).
+Verified after applying: all three insertions landed in the intended
+predicates.
+
+**Provenance / status.** Post-rc2 — `merge-base --is-ancestor` confirms
+`bdcd0411d7d1` (`Propagate HDMI RGB quantization selectability`, linux-next
+20260911) and `a56a5007452c` (amd-staging) are **not** in `v7.3-rc2`, so our
+HDMI path does not have the fix. The series is in linux-next and
+`amd-staging-drm-next`, i.e. accepted AMD work. We carry `6eb4c13a3845`
+("Support 'Broadcast RGB' drm property") in the rc2 base, so the property itself
+already exists.
+
+**Extraction note.** The mails are **quoted-printable** encoded; they must be
+decoded with a MIME parser before applying, or every hunk fails
+(`=09` is a tab). Decoded here with Python's `email` module, headers preserved.
+Production payload is small: 1 line in `amdgpu_dm_helpers.c`, the connector
+colour-space handling in `amdgpu_dm_connector.c`, and the 3 lines in `dc.c`.
+`1156` also touches the KUnit file `amdgpu_dm/tests/amdgpu_dm_connector_test.c`,
+which is not built (`CONFIG_KUNIT` is unset on this machine).
+
+**Caveat recorded honestly:** a quantization-range desync is *screen-global*, so
+this does not by itself explain a rectangular "box" artifact. It is carried as a
+real, on-target correctness fix whose trigger (a VRR-toggle atomic commit on
+DCN401 over HDMI) matches the user's trigger exactly.
+
+**Audit.** The full **159-patch series applies to pristine v7.3-rc2 with 0
+failures** (cumulative `patch -Np1 --forward`).
+
 ## 2026-09-12 — MM/sched optimizations + ADIOS cleanup (156 patches, pkgrel 7)
 
 Six-source sweep (linux-mm, akpm `mm-unstable`, linux-pm, sched-ext/lkml,

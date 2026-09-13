@@ -1,0 +1,58 @@
+From: Satyajit Roy <edu042sjroy@proton.me>
+Date: Sun, 30 Aug 2026 03:51:58 +0000
+Subject: [PATCH 1/3] drm/amd/display: Propagate HDMI RGB quantization selectability
+Signed-off-by: Satyajit Roy <edu042sjroy@proton.me>
+
+From: Satyajit Roy <sroy14@alum.utk.edu>
+
+DC uses dc_edid_caps.qs_bit when constructing the HDMI AVI InfoFrame
+quantization-range field. Although DRM parses the sink capability into
+drm_display_info, DM never copies it into the DC EDID capabilities. The
+field therefore remains zero and the AVI quantization range stays at its
+default value.
+
+Copy rgb_quant_range_selectable for HDMI sinks and extend the existing
+EDID-capability KUnit test to cover it.
+
+Fixes: 6eb4c13a3845 ("drm/amd/display: Support "Broadcast RGB" drm property")
+Signed-off-by: Satyajit Roy <sroy14@alum.utk.edu>
+---
+ drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c       | 1 +
+ .../drm/amd/display/amdgpu_dm/tests/amdgpu_dm_helpers_test.c    | 2 ++
+ 2 files changed, 3 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c
+index ab15ceec4da..e49a8dda512 100644
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c
+@@ -218,6 +218,7 @@ enum dc_edid_status dm_helpers_parse_edid_caps(
+ 	edid_caps->edid_hdmi = connector->display_info.is_hdmi;
+ 
+ 	if (edid_caps->edid_hdmi) {
++		edid_caps->qs_bit = connector->display_info.rgb_quant_range_selectable;
+ 		populate_hdmi_info_from_connector(link->dc->config.enable_frl, &connector->display_info.hdmi, edid_caps);
+ 		drm_dbg_driver(connector->dev, "%s: HDMI_FRL [%s] max_frl_rate %d\n", __func__, connector->name, edid_caps->max_frl_rate);
+ 		if (edid_caps->frl_dsc_support)
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/tests/amdgpu_dm_helpers_test.c b/drivers/gpu/drm/amd/display/amdgpu_dm/tests/amdgpu_dm_helpers_test.c
+index d4232648d8e..b13f258740c 100644
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/tests/amdgpu_dm_helpers_test.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/tests/amdgpu_dm_helpers_test.c
+@@ -412,12 +412,14 @@ static void dm_test_parse_edid_caps_hdmi_frl(struct kunit *test)
+ 
+ 	/* Drive the HDMI/FRL branch */
+ 	connector->display_info.is_hdmi = true;
++	connector->display_info.rgb_quant_range_selectable = true;
+ 	connector->display_info.hdmi.scdc.supported = true;
+ 	connector->display_info.hdmi.max_lanes = 4;
+ 	connector->display_info.hdmi.max_frl_rate_per_lane = 12;
+ 
+ 	KUNIT_EXPECT_EQ(test, dm_helpers_parse_edid_caps(link, dc_edid, edid_caps), EDID_OK);
+ 	KUNIT_EXPECT_TRUE(test, edid_caps->edid_hdmi);
++	KUNIT_EXPECT_EQ(test, edid_caps->qs_bit, 1);
+ 	KUNIT_EXPECT_TRUE(test, edid_caps->scdc_present);
+ 	/* max_lanes 4 + max_frl_rate_per_lane 12 -> rate index 6 */
+ 	KUNIT_EXPECT_EQ(test, edid_caps->max_frl_rate, 6);
+-- 
+2.51.1
+
+

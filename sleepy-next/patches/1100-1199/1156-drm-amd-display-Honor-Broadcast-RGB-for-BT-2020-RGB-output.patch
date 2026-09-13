@@ -1,0 +1,118 @@
+From: Satyajit Roy <edu042sjroy@proton.me>
+Date: Sun, 30 Aug 2026 03:52:06 +0000
+Subject: [PATCH 2/3] drm/amd/display: Honor Broadcast RGB for BT.2020 RGB output
+Signed-off-by: Satyajit Roy <edu042sjroy@proton.me>
+
+From: Satyajit Roy <sroy14@alum.utk.edu>
+
+amdgpu_dm_get_output_color_space() applies the Broadcast RGB connector
+property to default RGB output, but always selects full-range output for
+BT.2020 RGB. Consequently, explicitly selecting Limited has no effect on
+the output CSC or AVI InfoFrame when HDR uses BT.2020 RGB.
+
+Select COLOR_SPACE_2020_RGB_LIMITEDRANGE when the output encoding is RGB
+and Broadcast RGB is Limited. Keep Automatic and Full at full range, and
+leave YCbCr output unchanged.
+
+Add KUnit coverage for limited-range RGB output through both BT.2020
+connector colorspace values.
+
+Fixes: 6eb4c13a3845 ("drm/amd/display: Support "Broadcast RGB" drm property")
+Signed-off-by: Satyajit Roy <sroy14@alum.utk.edu>
+---
+ .../display/amdgpu_dm/amdgpu_dm_connector.c   | 10 +++--
+ .../tests/amdgpu_dm_connector_test.c          | 37 +++++++++++++++++++
+ 2 files changed, 44 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
+index 8a35e4df13c..f2f6a2a0db9 100644
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
+@@ -758,10 +758,14 @@ amdgpu_dm_get_output_color_space(const struct dc_crtc_timing *dc_crtc_timing,
+ 		break;
+ 	case DRM_MODE_COLORIMETRY_BT2020_RGB:
+ 	case DRM_MODE_COLORIMETRY_BT2020_YCC:
+-		if (dc_crtc_timing->pixel_encoding == PIXEL_ENCODING_RGB)
+-			color_space = COLOR_SPACE_2020_RGB_FULLRANGE;
+-		else
++		if (dc_crtc_timing->pixel_encoding == PIXEL_ENCODING_RGB) {
++			if (connector_state->hdmi.broadcast_rgb == DRM_HDMI_BROADCAST_RGB_LIMITED)
++				color_space = COLOR_SPACE_2020_RGB_LIMITEDRANGE;
++			else
++				color_space = COLOR_SPACE_2020_RGB_FULLRANGE;
++		} else {
+ 			color_space = COLOR_SPACE_2020_YCBCR_LIMITED;
++		}
+ 		break;
+ 	case DRM_MODE_COLORIMETRY_DEFAULT: /* ITU601 */
+ 	default:
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/tests/amdgpu_dm_connector_test.c b/drivers/gpu/drm/amd/display/amdgpu_dm/tests/amdgpu_dm_connector_test.c
+index 76334fb840d..29bbe9f7826 100644
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/tests/amdgpu_dm_connector_test.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/tests/amdgpu_dm_connector_test.c
+@@ -570,6 +570,23 @@ static void dm_test_output_color_space_bt2020_rgb(struct kunit *test)
+ 			(int)COLOR_SPACE_2020_RGB_FULLRANGE);
+ }
+ 
++/**
++ * dm_test_output_color_space_bt2020_rgb_limited - Test limited BT.2020 RGB
++ * @test: The KUnit test context
++ */
++static void dm_test_output_color_space_bt2020_rgb_limited(struct kunit *test)
++{
++	struct dc_crtc_timing timing = {};
++	struct drm_connector_state state = {};
++
++	timing.pixel_encoding = PIXEL_ENCODING_RGB;
++	state.colorspace = DRM_MODE_COLORIMETRY_BT2020_RGB;
++	state.hdmi.broadcast_rgb = DRM_HDMI_BROADCAST_RGB_LIMITED;
++
++	KUNIT_EXPECT_EQ(test, (int)amdgpu_dm_get_output_color_space(&timing, &state),
++			(int)COLOR_SPACE_2020_RGB_LIMITEDRANGE);
++}
++
+ /**
+  * dm_test_output_color_space_bt2020_ycc - Test Output color space bt2020 ycc
+  * @test: The KUnit test context
+@@ -641,6 +658,24 @@ static void dm_test_output_color_space_bt2020_ycc_rgb_encoding(struct kunit *tes
+ 			(int)COLOR_SPACE_2020_RGB_FULLRANGE);
+ }
+ 
++/**
++ * dm_test_output_color_space_bt2020_ycc_rgb_encoding_limited - Test limited
++ * BT.2020 RGB output selected through the BT.2020 YCC connector colorspace
++ * @test: The KUnit test context
++ */
++static void dm_test_output_color_space_bt2020_ycc_rgb_encoding_limited(struct kunit *test)
++{
++	struct dc_crtc_timing timing = {};
++	struct drm_connector_state state = {};
++
++	timing.pixel_encoding = PIXEL_ENCODING_RGB;
++	state.colorspace = DRM_MODE_COLORIMETRY_BT2020_YCC;
++	state.hdmi.broadcast_rgb = DRM_HDMI_BROADCAST_RGB_LIMITED;
++
++	KUNIT_EXPECT_EQ(test, (int)amdgpu_dm_get_output_color_space(&timing, &state),
++			(int)COLOR_SPACE_2020_RGB_LIMITEDRANGE);
++}
++
+ /**
+  * dm_test_output_color_space_bt2020_rgb_ycc_encoding - Test Output color space
+  * bt2020 rgb with non-rgb pixel encoding falls back to limited ycbcr
+@@ -8409,10 +8444,12 @@ static struct kunit_case amdgpu_dm_connector_tests[] = {
+ 	KUNIT_CASE(dm_test_output_color_space_bt709_y_only),
+ 	KUNIT_CASE(dm_test_output_color_space_oprgb),
+ 	KUNIT_CASE(dm_test_output_color_space_bt2020_rgb),
++	KUNIT_CASE(dm_test_output_color_space_bt2020_rgb_limited),
+ 	KUNIT_CASE(dm_test_output_color_space_bt2020_ycc),
+ 	KUNIT_CASE(dm_test_output_color_space_default_ycbcr709_y_only),
+ 	KUNIT_CASE(dm_test_output_color_space_default_ycbcr601),
+ 	KUNIT_CASE(dm_test_output_color_space_bt2020_ycc_rgb_encoding),
++	KUNIT_CASE(dm_test_output_color_space_bt2020_ycc_rgb_encoding_limited),
+ 	KUNIT_CASE(dm_test_output_color_space_bt2020_rgb_ycc_encoding),
+ 	/* Tests for amdgpu_dm_convert_dc_color_depth_into_bpc */
+ 	KUNIT_CASE(dm_test_convert_color_depth_bpc_mappings),
+-- 
+2.51.1
+
+

@@ -9,6 +9,60 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.3.0-rc2-8-sleepy-next] — 2026-09-13
+
+### Added
+- **HDMI RGB quantization fix (`1155`–`1157`).** Satyajit Roy's
+  `[PATCH 0/3] drm/amd/display: Fix HDMI RGB quantization updates`
+  (amd-gfx, 2026-08-30). Post-rc2 upstream work: `dc_resource`'s
+  `resource_build_info_frame()` derives colorimetry and RGB quantization from
+  `stream->output_color_space`, but the InfoFrame-update predicates did not
+  include `output_color_space` — so a commit that changes the colour space
+  reprograms the output CSC while the sink keeps the previous AVI InfoFrame
+  range, leaving the source and sink disagreeing about RGB limited-vs-full
+  range. `1157` adds the missing predicate to the three sites in
+  `dc/core/dc.c`.
+  This was prompted by drm/amd work item **!5812**, which reports on an
+  RX 9070 XT (DCN401) that toggling Adaptive Sync reproduces or clears visibly
+  raised black levels and washed-out colour, every time — the same
+  VRR-toggle trigger seen on this machine. Note the desync is screen-global, so
+  this is carried as an on-target correctness fix, not as a confirmed cure for
+  the rectangular artifact the machine also shows.
+  The mails are quoted-printable; they must be MIME-decoded before applying.
+
+### Added
+- **Five upstream fixes (`2139`, `2140`, `2401`, `2402`, `2500`)** from the
+  MM/PM/sched sweep, each verified to apply on top of the full series:
+  - `2139` — `mm: vmscan: avoid anon scanning for GFP_NOIO with low swapcache`
+    (Bo Zhang). Explicitly a **zRAM** optimisation, and live here (it uses the
+    `vmscan_can_reclaim_anon_pages()` wrapper LRU-MARIE adds).
+  - `2140` — `mm/page_alloc: avoid direct compaction for costly __GFP_NORETRY
+    allocations` (Salvatore Dipietro). Removes a cross-CPU drain-IPI storm on
+    the buffered-write path; its regression source is in rc2.
+  - `2401` / `2402` — `sched/eevdf: Fix augmented max_slice` and `Fix rb
+    augmented with multi fields` (Vincent Guittot). rc2 carries the regression
+    source for the first, and the second fixes rbtree corruption from only one
+    of three augmented fields propagating.
+  - `2500` — `x86/mm: Fix user-space data loss with MADV_FREE and THP`
+    (Vernon Yang). A one-line **data-loss** fix: `pmd_modify()` was masking out
+    `_PAGE_DIRTY` where `pte_modify()`/`pud_modify()` do not. `Cc: stable`.
+
+### Verified
+- The full **164-patch series applies to a pristine `v7.3-rc2` worktree with 0
+  failures** (cumulative `patch -Np1 --forward`).
+
+### Note
+- A full audit of the **drm/amd work-items tracker** (2,200 items scanned)
+  found exactly one hardware-relevant fix that applies to rc2 — the HDMI RGB
+  quantization series above (`1155`–`1157`). Everything else on our hardware
+  has **no upstream patch at all**: the `flip_done`/pageflip-timeout freeze
+  family (~25 items, several for the 9070 XT) is unpatched, and the SMU
+  driver/firmware IF mismatch (`0x2e` vs `0x33`, !5538) is still unfixed in rc2
+  *and* drm-next, so the ASM/runtime-PM stopgaps stay necessary. Palazzi's
+  cursor-vblank patch (!5799) no longer applies — its target was rewritten by
+  the VUPDATE_NO_LOCK rework `f64a9be56536` in rc2 — though the underlying bug
+  class survives and would need a rebase onto `dm_arm_vblank_event()`.
+
 ## [7.3.0-rc2-7-sleepy-next] — 2026-09-12
 
 ### Changed

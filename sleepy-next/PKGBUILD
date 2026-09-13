@@ -182,7 +182,7 @@ _rcver=rc2
 
 pkgver=7.3.0_rc2
 _tagrel=1
-pkgrel=7
+pkgrel=8
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -286,6 +286,9 @@ source=(
   "patches/1100-1199/1152-drm-amd-display-emit-VTEM-for-HF-VSDB-VRR-on-TMDS-links.patch"
   "patches/1100-1199/1153-drm-amd-display-fix-HF-VSDB-DSC-bpc-detection-cumulative.patch"
   "patches/1100-1199/1154-drm-amd-display-fix-NULL-deref-new_stream-sink-VTEM-guard.patch"
+  "patches/1100-1199/1155-drm-amd-display-Propagate-HDMI-RGB-quantization-selectability.patch"
+  "patches/1100-1199/1156-drm-amd-display-Honor-Broadcast-RGB-for-BT-2020-RGB-output.patch"
+  "patches/1100-1199/1157-drm-amd-display-Rebuild-InfoFrames-on-output-color-space-changes.patch"
   "patches/1200-1299/1201-cpufreq-amd-pstate-Update-cppc_req_cached-before-w.patch"
   "patches/1200-1299/1202-cpufreq-amd-pstate-Add-per-core-EPP-boost-for-rec.patch"
   "patches/1200-1299/1203-Documentation-amd-pstate-Document-the-epp_boost-pa.patch"
@@ -332,6 +335,8 @@ source=(
   "patches/2100-2199/2136-mm-mglru-move-folios-from-oldest-gen-to-second-oldest-gen-from-head-to-t.patch"
   "patches/2100-2199/2137-mm-mglru-batch-move-folios-to-the-second-oldest-gen-s-LRU.patch"
   "patches/2100-2199/2138-mm-memcg-trim-the-per-cpu-charge-stock-instead-of-draining-it.patch"
+  "patches/2100-2199/2139-mm-vmscan-avoid-anon-scanning-for-GFP_NOIO-with-low-swapcache.patch"
+  "patches/2100-2199/2140-mm-page_alloc-avoid-direct-compaction-for-costly-NORETRY-allocations.patch"
   "patches/2200-2299/2200-7.2-nap-v0.5.0.patch"
   "patches/2300-2399/2300-scripts-mksysmap-drop-the-module-info-symbols.patch"
   "patches/2300-2399/2301-scripts-mksysmap-fix-escape-of-in-the-pi.patch"
@@ -357,6 +362,9 @@ source=(
   "patches/2300-2399/2321-kbuild-build-rust-crates-in-parallel-with-the-rest.patch"
   "patches/2300-2399/2322-kbuild-use-pigz-for-gzip-compression-if-available.patch"
   "patches/2400-2499/2400-sched-Set-need-resched-flags-before-tracing.patch"
+  "patches/2400-2499/2401-sched-eevdf-Fix-augmented-max_slice.patch"
+  "patches/2400-2499/2402-sched-eevdf-Fix-rb-augmented-with-multi-fields.patch"
+  "patches/2500-2599/2500-x86-mm-Fix-user-space-data-loss-with-MADV_FREE-and-THP.patch"
   "patches/9000-9099/9007-drm-gfx12-Program-DB_RING_CONTROL.patch"
   "patches/9000-9099/9011-drm-amdgpu-Respect-noretry-flag-for-retry-faults-on-GFX12.1.patch"
   "patches/9000-9099/9012-drm-amdgpu-gfxhub-Enable-retry-fault-interrupts-when-needed.patch"
@@ -1031,6 +1039,9 @@ b2sums=('d8522ffee4af76eacdba75a8116376e9c21621ed0b22cbd381b816cd71f9fc25d1682fe
         'ad647ad8480f67a4040d1a4fbaab47ebba1445a45499ee5cb4ee09fe4c0c880da4bfa7ca4c502be262b58f6a3758edd4e016f79d2314b354eec76d053dc3ddf4'
         'fa2a79bc7082529de87c1d14833793f590d792a947209d71e62ce2513212e8ebd10bbd3596ef5cf3ba88fef003510685087e778e0c4d97490f7dbc5d8b7ccd43'
         '4dc78d22bde0da22bd52e790f068b01964120a2ac4947f8401734273c4991f0764694342125bd22cd0da3e088fbdee0039743cac88ddce7327bbda499675f5fd'
+        'cced780232e02e15bf031c874975e8eb9ced19c126d2d16ace65a87d0f475399ec5791b9285a3ecc1f18bcdb9d597c75733522f8fa66c7d77578dcb4ff5053bf'
+        '33f65c51971df48aac4d8ce579d83abeecd879d73a0f1d8a26e1342b8fea769ff1c0568116871fd5c0b65047b5e96f52470898d7f05bfc472c91c3da8f9f0f60'
+        '92fc5261a02b38b6814852aa221445f9f200f3cc9388fcb0c39b12a15377d1927f430a238f46417f8ab9df84aaddc70d97d87f9510998d7497605ff7be070a24'
         'e9d464ebf525cd8d93d48f1cbedea0197bd9d0142085da7d83ec3dfda0174483a0fea4077055fd7d1ad9180563dc6dfb77e4f52f9bcb023b7c7d7c9fb5c39ece'
         '9d3e36dbc5c9c5342d2991c4665278ed075073196251e59280bd12f1d6812a37d31db58f5cb978b926e2dcd0a32365960a414b69d10f463bd8f68cedbb4bb6ae'
         '52fe01328f544e023666eab1fd378ae0a0eb47385d495403a55a933f71beedcf295300767c1e43feb46366915fae8bea3b9137f11d16ed194a1fcf71d95aec0d'
@@ -1076,6 +1087,8 @@ b2sums=('d8522ffee4af76eacdba75a8116376e9c21621ed0b22cbd381b816cd71f9fc25d1682fe
         '1de4a0b5f2c7c12d30e2bb409186b53c90931dd511918725bd8cbeed74a659c6962fe98d984e23f928efaddc3aa42c50c05488af76e89b9fa94fdca43ce00f95'
         'e5470ff289048d20cdc063c39a9009e3337a07c156ca8b854c415d3c0e194f7fc64b613d96e4f63091f467f5373d6bcc492b02f67e95777d29d772d085556329'
         'dc50c148556a72ef4e327c94ed734a7431991332d796fec1e4ddbc675defe0dcc3a47180cdb38d68d381ea014373cd0a4fe35323dda58c9959348cfe633da415'
+        '8d8504a5060b1fca595d3b892f3709f712e46c67594304d6e63fddacad4aeffed24fa1e843f0390e946eb792fb0dcafbf3b0970a75fc5a68970ec2a7ff69b1d2'
+        '0e78ba14e22246ea53e7db445233ab50783dba533cf3bb90b3f387a44147c282d6e856aee34e8f43dd854e8a5a6a792bcda56a70cbc5589451bf91627efffab1'
         'dc4e862e8f9fa7e8ead895908459757afd1027c24b960ae3d289a7212e29575bce3ce4627d5fd73edf211ee162dfa545e1642c5b16e8156f3dce50af8ef3c256'
         '478e0814cdbc83c33b63857158e00d203201805fc587982ea9bb7470866768b88feefab1ce77bcfe55783966c9d3428af6aa53947aa25bb314412f8af6d15387'
         'f5614caf38a72bf2321cc38dba0a5e119684705ebb6de33e577e2f918489b89ac42a6f0ab4149452d7a919129b251fa9e9d662cd4bf4e25b6bd3e494e8eff011'
@@ -1101,6 +1114,9 @@ b2sums=('d8522ffee4af76eacdba75a8116376e9c21621ed0b22cbd381b816cd71f9fc25d1682fe
         '34fc7168a843052c3ef4639f71ba92395c76aa038b0b3318b9325dacdc0fa34a015b2a6c8ea147d1d56923296a3ffb0c61eba5a1a467b14c854ecf6de2d71792'
         '08e29326bc4eae545eccfe765919502c7143cc6b8d1b3f512239ba59647281d112336734f6a2ec3b557c4a5146534a1af19ce0214a06d544a2000030595a3d3d'
         '7bd2f351f7304fe12489e67976e866b2f346e8cd50d44f590639d10a4856ff80d3b28d31f4c78b96ed92b7f21c499c3087b9bcd4d1155ea0bc017588dd5792c9'
+        '7e2e4f3965ca256a118de8c2d513304a5ef366ddc5a992c429b5f7fbdd77e94e4d6f808de83e6a64389e57a6ec2abf86219f08a90922febe99ca4ec0a1311065'
+        'e05e77b2762596b375eee3513d8f511d568008443b5821a87966f0abf0a6472124b29ac760a4364bbd16992b528e7470f40adff70a77ce5b29ce113e61ef274e'
+        'a4681f0bc7de2d075d438181facd30f86c4654963f7139d9d355bafa323f79cd8cf692ab2fbca0da7f561193bc2d7c3ba73808f3a0223cef7f180ef998735898'
         'bdc839d1629f22095c5907e62b7a1a4edfcedebe0cf7e430897ae87aa331cbad28e28cef106ae38c05cafa585fa19ddc019579f1b73fcfaa69d8a8bd40ba8111'
         '19f9c61f1f9f8b8fc53679ed26f8e8d8c59667d9ca07f10a3d04d7cb6f6e6a7eb63a82bd0474c0d97f6438fbf82bacb03bc9d07021945bceb14896f91a181eaa'
         'fbd6f7b4c4f3a371c17fe6859528aa2ab79e37c04e9191d91eebc4afc15f3145b25148a9c6248d1983ee93360e776ab71dc36896e43260978efd19849c0025e7'
