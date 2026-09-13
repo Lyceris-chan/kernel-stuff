@@ -193,6 +193,34 @@ def check_headers(package_dir: pathlib.Path, entries: list[str]) -> None:
         record("fast", "patch headers", "PASS", f"{len(entries)} patches")
 
 
+def check_unique_numbers(package_dir: pathlib.Path, entries: list[str]) -> None:
+    """No two patches in source=() share a number.
+
+    Every other check works on sets of numbers, so a collision is invisible to
+    them: the count simply comes out one short. That is how two different
+    display patches both shipped as `1140`. A duplicated number makes "patch
+    1140" ambiguous in the ledger, in the changelog, and in any bug report.
+
+    A WARN, not a FAIL: the collision predates this check, and renumbering a
+    patch means editing source=() and re-running updpkgsums, which belongs in a
+    build-tested change rather than a documentation pass. Tighten this to FAIL
+    once the series has no collisions.
+    """
+    seen: dict[int, list[str]] = {}
+    for entry in entries:
+        if not entry.endswith(".patch"):
+            continue
+        number = int(re.match(r"(\d+)", pathlib.Path(entry).name).group(1))
+        seen.setdefault(number, []).append(pathlib.Path(entry).name)
+    clashes = {n: names for n, names in seen.items() if len(names) > 1}
+    if clashes:
+        detail = "; ".join(f"{n}: {', '.join(names)}" for n, names in sorted(clashes.items()))
+        record("fast", "unique patch numbers", "WARN",
+               f"{len(clashes)} collision(s), renumber one: {detail}")
+    else:
+        record("fast", "unique patch numbers", "PASS", f"{len(seen)} distinct numbers")
+
+
 def check_provenance(package_dir: pathlib.Path, ledger: pathlib.Path, entries: list[str]) -> None:
     """Report patch numbers not individually named in PATCH_SOURCES.md.
 
@@ -495,6 +523,7 @@ def main() -> int:
 
     if args.tier in ("fast", "all"):
         check_sources(package_dir, entries)
+        check_unique_numbers(package_dir, entries)
         check_checksums(package_dir, entries, b2sum_sets(pkgbuild))
         check_headers(package_dir, entries)
         check_provenance(package_dir, package_dir / "PATCH_SOURCES.md", entries)

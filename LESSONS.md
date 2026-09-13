@@ -244,10 +244,11 @@ file before acting on any of them.**
   `--shallow-since` fails **server-side** for `netdev/*` and `linux-fsdevel/*`
   (`error processing shallow info: 4`, reproducible) but works for the
   single-epoch lists; shallow-clone the highest epoch instead.
-- **Match a Message-ID with an anchored header regex, never a substring grep.**
-  Grepping a raw email for `20260911…` anywhere in the body also matches every
+- **Match a Message-ID with an anchored header regex, never a substring match.**
+  Searching a raw email for `20260911…` anywhere in the body also matches every
   *reply* that quotes it, so the file you extract is someone else's reply, not
-  the patch. Use `grep -m1 -oE '^Message-I[Dd]: <PREFIX[^>]*>'`.
+  the patch. Use `rg -m1 -o '^Message-I[Dd]: <PREFIX[^>]*>'`. Note that `rg -E`
+  means `--encoding`, not extended regex; the pattern above needs no flag.
 - **Never `git format-patch` a lore mirror** (2026-09-13). In a lore mirror each
   *email* is a commit, so `format-patch -1 <sha>` produces a diff **of the email
   headers**, not the code — the file then contains DKIM/Received noise plus the
@@ -304,7 +305,8 @@ file before acting on any of them.**
   `block/adios.c` — the package advertised an `ADIOS-MODULE` it never shipped)
   and `DEFAULT_IOSCHED` (not a Kconfig symbol since the blk-mq rework; the
   effective NVMe scheduler actually comes from udev's `60-ioschedulers.rules`).
-  `grep` the tree for the symbol before trusting a `--set-str`/`-e` line.
+  Search the tree for the symbol with `rg` before trusting a `--set-str` or `-e`
+  line.
 - **LRU-MARIE makes MGLRU inert** (`lru_gen_enabled()` returns false while Marie
   owns aging), and **scx full-switch mode makes the CFS balance path inert**
   (`scheduler_tick()` gates `sched_balance_trigger()` behind
@@ -323,8 +325,8 @@ file before acting on any of them.**
 ### Repository identity
 
 - **There is exactly one package, and it lives in `sleepy-next/`**
-  (single-package since 2026-09-12). Confirm with `grep -m1 '^_major='
-  sleepy-next/PKGBUILD` and, for a built artifact with `.BUILDINFO`'s
+  (single-package since 2026-09-12). Confirm with `rg -m1 '^_major='
+  sleepy-next/PKGBUILD` and, for a built artifact, with `.BUILDINFO`'s
   `builddir`. A stale second patch tree used to exist at the repo root (174
   files for the dropped 7.2 package); applying it to a 7.3-rc2 base produced ~97
   spurious failures — the wrong series, not a broken one. If you see a large

@@ -29,7 +29,7 @@ results for a hook or CI to consume.
 
 | Tier | Cost | Needs | Checks |
 |---|---|---|---|
-| `fast` | seconds | nothing | `source=()` files exist; `b2sums` current; patch headers intact and no `[PATCH n/N]`; every patch number documented in `PATCH_SOURCES.md`; documented patch count and base version match the PKGBUILD; skills satisfy the Agent Skills spec; no dangling symlinks |
+| `fast` | seconds | nothing | `source=()` files exist; no two patches share a number; `b2sums` current; patch headers intact and no `[PATCH n/N]`; every patch number documented in `PATCH_SOURCES.md`; documented patch count and base version match the PKGBUILD; skills satisfy the Agent Skills spec; no dangling symlinks |
 | `series` | ~1–2 min | `repos/linux-next` | the whole series applies cumulatively to the base tag |
 | `deep` | minutes | a prepared kernel tree | `checkpatch.pl --strict` on the patches we authored; `sparse` (`make C=1`) over the directories the series touches |
 
@@ -60,6 +60,10 @@ Each check exists because this project has actually got it wrong:
   single most common cause of a build that refuses to start.
 - **Patch numbers documented** — a patch in `source=()` but absent from
   `PATCH_SOURCES.md` is a provenance failure.
+- **No duplicate patch numbers** — every other check works on *sets* of numbers,
+  so a collision comes out one short and stays invisible; only a check that
+  keeps the full list can see it. Two different DCN4 patches both shipped as
+  `1140`, which made "patch 1140" ambiguous in the ledger and the changelog.
 - **Documented claims** — `docs/README.md` has twice claimed a stale patch count
   and base version while `PKGBUILD` moved on.
 - **Dangling symlinks** — dropped patches leave their `NNNN-*.patch` symlink
