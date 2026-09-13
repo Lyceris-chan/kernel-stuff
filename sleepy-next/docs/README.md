@@ -40,9 +40,24 @@ cd sleepy-next
 rm -rf src pkg
 updpkgsums          # after any source=()/patch edit
 makepkg -f -s -c
-sudo pacman -U linux-sleepy-next-*.pkg.tar.zst linux-sleepy-next-headers-*.pkg.tar.zst
-sudo grub-mkconfig -o /boot/grub/grub.cfg   # or your bootloader
+sudo pacman -U linux-sleepy-next-<version>-x86_64.pkg.tar.zst \
+               linux-sleepy-next-headers-<version>-x86_64.pkg.tar.zst
 ```
+
+Name the packages explicitly instead of globbing
+`linux-sleepy-next-*.pkg.tar.zst`: older builds stay in this directory, so the
+glob installs several versions at once.
+
+Pacman regenerates the boot entry itself. The hook
+`/usr/share/libalpm/hooks/sdboot-kernel-update.hook` fires on
+`usr/lib/modules/*/vmlinuz` and runs `sdboot-manage autogen`; the `mkinitcpio`
+hook rebuilds the initramfs in the same transaction. To do it by hand, run
+`sudo sdboot-manage autogen`.
+
+This machine boots **systemd-boot**, so there is no `grub-mkconfig` step. The
+effective default entry comes from an EFI variable, not from
+`/boot/loader/loader.conf` — check it with `bootctl status`, which is
+authoritative, rather than by reading that file.
 
 The build prompts for CAKE SQM speeds (default on, 80/80 Mbit); non-interactive
 builds install the shipped config.
