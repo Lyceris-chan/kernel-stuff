@@ -182,7 +182,7 @@ _rcver=rc2
 
 pkgver=7.3.0_rc2
 _tagrel=1
-pkgrel=8
+pkgrel=9
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
