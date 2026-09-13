@@ -1,0 +1,39 @@
+From: Christian König <ckoenig.leichtzumerken@gmail.com>
+Date: Wed, 09 Sep 2026 15:14:24 +0200
+Subject: [PATCH 2/2] drm/sched: document the RCU dependency
+Signed-off-by: Christian König <ckoenig.leichtzumerken@gmail.com>
+
+Tvrkos patches added RCU protection to the returned strings from
+get_timeline_name()/get_driver_name() callbacks of the dma_fence
+backends.
+
+This fixed use after free problems for a couple of drivers, but we never
+documented the consequences for the drm_sched_fence.
+
+Add a few words on the function documentation to note that we need an
+RCU grace period between signaling the last scheduler fence and
+scheduler teardown.
+
+Signed-off-by: Christian König <christian.koenig@amd.com>
+---
+ drivers/gpu/drm/scheduler/sched_main.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/gpu/drm/scheduler/sched_main.c b/drivers/gpu/drm/scheduler/sched_main.c
+index 6cb6f9546493..22103cb07782 100644
+--- a/drivers/gpu/drm/scheduler/sched_main.c
++++ b/drivers/gpu/drm/scheduler/sched_main.c
+@@ -1203,6 +1203,10 @@ static void drm_sched_cancel_remaining_jobs(struct drm_gpu_scheduler *sched)
+  * is implemented, all jobs will be canceled through it and afterwards cleaned
+  * up through &struct drm_sched_backend_ops.free_job. If cancel_job is not
+  * implemented, memory could leak.
++ *
++ * The scheduler fences timeline name is returned protected by the signaled
++ * status and RCU, so an RCU grace period is necessary between signaling the
++ * last scheduler fence and tearing down the scheduler who originated it.
+  */
+ void drm_sched_fini(struct drm_gpu_scheduler *sched)
+ {
+-- 
+2.43.0
+

@@ -1,5 +1,52 @@
 # sleepy-next — patch provenance
 
+## 2026-09-13 (later) — ten upstream fixes from the distro-patchset / stable sweep (175 patches, pkgrel 10)
+
+All ten apply cleanly (cumulative, 175/175, 0 failures). Eight are `Cc: stable`
+bug fixes; two are `mm-new` material not yet merged.
+
+| Patch | Subject / author / id | Why it is on-target here |
+|---|---|---|
+| `1061` | `drm/ttm: fix swapped-out resources never leaving their bulk_move range` — Vadim Nikitushkin, `5c816ea300b1`, `Cc: stable #v7.1+`, `Closes` drm/amd#5387 | **UAF.** `ttm_tt_swapout()` returns a *page count*, but `ttm_bo_swapout_cb()` gates the bulk_move bookkeeping on `if (!ret)` (rc2 `ttm_bo.c:1437`), so the removal is skipped on every successful swapout and a range endpoint in `pos->first/last` is left pointing at freed memory. amdgpu uses bulk_move; the trigger is swapout/hibernation. **Trap: the same fix was merged *botched* as `3db7d7d58341`** (wrong hunk) — carry only the one-hunk original, which is what we did. |
+| `1062` | `dma-buf/dma-fence: fix checking signaling bit for timeline and driver name` — Christian König, `b50e7d2af5e9`, `CC: stable #7.2+` | **UAF.** `ops` is only cleared when no release/wait op exists, so most amdgpu/drm_sched fences lose RCU protection after signalling → the returned name string can be freed underneath. Culprit `035219a760ed` is an rc2 ancestor. Hit via tracepoints/debugfs/dmesg on exactly the GPU paths we debug. Came as `[PATCH 1/2]`. |
+| `1063` | `drm/sched: document the RCU dependency` — same series, `[PATCH 2/2]` | Comment-only companion documenting the invariant `1062` relies on. Carried for series integrity; no behaviour change. |
+| `2006` | `zram: convert to SG-list zsmalloc object read API` — Senozhatsky, `abaa6b12ca8a` (akpm `mm-new`) | We run zram-on-zstd swap (30.9 G, ~1.8 G in use). The SG API is already in rc2 (`zs_obj_read_sg_begin/end`) but `zram_drv.c` still calls the linearising, copying `zs_obj_read_begin()` — less CPU per decompress. |
+| `2007` | `zsmalloc: remove old object read API` — `f2ae543ebcc5` | Second half of the same series; removes the now-unused API. Must be applied after `2006`. |
+| `2008` | `io_uring/io-wq: stop a single cancel after one running match` — `39f6223d4002`, `Cc: stable` | One `IORING_ASYNC_CANCEL_ONE` currently cancels in *both* the bounded and unbounded accounts, killing an unrelated op. rc2 `io-wq.c:1184` discards the `bool`. |
+| `2141` | `mm: filemap: retain mapped dropbehind folios` — Wenjie Qi, `848d2ce2fce1`, `Cc: stable`, `Fixes fb7d3bc41493` | Don't unmap mapped folios on dropbehind; also fixes a sleeping-in-atomic warning. Dropbehind is `fadvise(DONTNEED)` / streaming I/O — browsers and compositors. |
+| `2142` | `mm/vmscan: avoid pointless large folio splits without swap` — Barry Song + Xueyuan Chen, `bd7fcb0dea86` (akpm `mm-new`, Ack Hildenbrand, R-b Baolin Wang) | Uses `-E2BIG` from `folio_alloc_swap()` as the *only* split signal. When swap is exhausted — i.e. **zram full** — splitting an mTHP cannot make swapout progress, it only destroys the mTHP. Verified against our `2101` MARIE tree: the hunk lands at `vmscan.c:1561` as `if (ret != -E2BIG)`. |
+| `2501` | `x86/MCE/AMD: Fix inverted interrupt enablement during storm handling` — Jasjeet Rangi, `d2929113b15b`, `Cc: stable`, `Fixes 5c4663ed1eac` | Enables threshold IRQs when a storm *ends* and disables them when it starts — backwards. The culprit **is** in rc2, and this is the CPU we actually run. Also queued for rc3, so free at the next bump. |
+| `2600` | `hrtimer: Use hard expiry when updating timers on the same base` — Parri, `c5dcb3aadc18`, `Cc: stable` | Rearming a queued timer with slack left the timerqueue mis-sorted, so next-event selection could fire *earlier* than the head's hard expiry. Mistimed wakeups affect compositor timers, `timerfd`, and `poll`/`epoll` — i.e. frame pacing. **New range `2600–2699` = time / timers.** |
+
+**Framing finding recorded (2026-09-13):** `scx_loader` is active with
+`default_sched = "scx_cake"` (live: `state=enabled`, `ops=cake_1.2.1`), and rc2
+gates the CFS balance path behind `if (!scx_switched_all())` in
+`scheduler_tick()`. So **the CFS load-balancing half is bypassed on this
+machine** — every `kernel/sched/fair.c` patchset item (BORE, cambyses, POC
+selector, `detach_tasks`, newidle decay) is inert here, and our `2401`/`2402`
+are at best partially live (the balance trigger is definitively gated off; the
+EEVDF rbtree half depends on whether the fair class still enqueues under
+full-switch, which was not verified). Same class of caution as the MGLRU
+finding above: harmless and correct if scx is ever not loaded, but not earning
+their keep while it is.
+
+**Evaluated and rejected from the same sweep:**
+
+- **linux-zen** — no 7.3 line (tags stop at `v7.2.4-zen2`); `zen-sauce` is now mostly Alfred Chen's out-of-tree `sched/alt` (BMQ/PDS), which we cannot adopt (we run EEVDF + sched-ext). Its `ZEN_INTERACTIVE` tunables are already duplicated by our `0110` config hooks, and rc2 already contains the whole dmem-ttm-v8 series.
+- **linux-tkg / XanMod** — mostly duplicates of `0110`. XanMod's one interesting item (firelzrd's `le9uo` working-set protection) hooks `shrink_folio_list()`/`get_scan_count()`, which our MARIE replaces, and its own last port is 7.1-rc1 (2026-05-01). Its "rwsem spin faster" flag drops `cpu_relax()` from the spin loop — bad on SMP. **Snake oil rejected:** `VM_READAHEAD_PAGES`, `dirty_ratio=50`, Polly (our prebuilt LLVM has none), `-fmodulo-sched`/`-fivopts` (GCC-only).
+- **Clear Linux** — dead: orgs archived 2025-08; last kernel 6.15.7. Only config-level items remained.
+- **evdev `call_rcu` instead of `synchronize_rcu`** (XanMod = zen = tkg, identical payload; Kenny Levinsen, 2020) — genuinely attractive on paper (author: 1000× open/close 27.1 s → 0.018 s, and VT switches / compositor restarts close many evdev fds, which is our COSMIC case). **Not taken:** never merged upstream in five years, and I did not establish *why*. That is a question worth answering before carrying it, not an assumption to make.
+- **`nvme: bump genctr when cancelling a request`** (`7f607455c3b9`, 2026-09-13) — 2 hunks fail to apply against rc2; needs a rebase. Phison E16 relevant, so worth revisiting.
+- **`finish_task_switch() always-inline`** (zen/tkg) — the author's −34.8% figure is for spectre_v2 *retpolines*; this box reports `Enhanced / Automatic IBRS`, so only the ~−8.6% clang function-level case applies (sub-0.3% end-to-end) at the cost of forcing ~20 functions inline. Skipped.
+
+**Config-only levers noted, not applied:** `preempt=lazy` on the cmdline (runtime-switchable here; A/B only, interacts with scx), `rq_affinity=2` per disk, `vm.compact_unevictable_allowed=0`, `kernel.sched_cfs_bandwidth_slice_us=3000`.
+
+**Caveat recorded for future audits:** `0110-cachy-config-hooks.patch` applies
+only **with fuzz** on rc2 — its `bus_lock.c` hunk has `CONFIG_PROC_SYSCTL`
+context where rc2 has `CONFIG_SYSCTL`. `git apply --check` rejects it; the
+build's `patch -p1 --forward -F2` accepts it. Harmless today, but it is precisely
+the "0 `.rej` does not prove application" trap in `LESSONS.md`.
+
 ## 2026-09-13 — HDMI RGB quantization fix + six verified fixes (165 patches)
 
 **Added — `1158`, DMCUB busy-wait fix.** Sultan Alsawaf (kerneltoast),

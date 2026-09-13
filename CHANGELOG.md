@@ -9,6 +9,65 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.3.0-rc2-10-sleepy-next] — 2026-09-13
+
+### Added
+- **Ten upstream fixes (`1061`–`1063`, `2006`–`2008`, `2141`, `2142`, `2501`,
+  `2600`)** from the distro-patchset and stable sweep. Eight are `Cc: stable`
+  bug fixes; two are `mm-new` material. Highlights:
+  - `1061` `drm/ttm` bulk_move — a **use-after-free**: `ttm_tt_swapout()` returns
+    a page count but `ttm_bo_swapout_cb()` gates its bookkeeping on `if (!ret)`,
+    so swapped-out resources never leave their bulk_move range and a range
+    endpoint is left dangling (`Closes` drm/amd#5387). Carried as the one-hunk
+    original, *not* the botched merge `3db7d7d58341`.
+  - `1062`/`1063` `dma-fence` — a **use-after-free** where most amdgpu/drm_sched
+    fences lose RCU protection after signalling; plus its doc companion.
+  - `2141` `mm/filemap` — retain mapped dropbehind folios (`Cc: stable`; also
+    fixes a sleeping-in-atomic warning on the `fadvise(DONTNEED)` path).
+  - `2142` `mm/vmscan` — stop splitting mTHPs pointlessly when swap is exhausted,
+    i.e. for us **when zram is full**; splitting cannot make progress and only
+    destroys the huge page.
+  - `2501` `x86/MCE/AMD` — threshold IRQs were enabled when a storm *starts* and
+    disabled when it ends; the culprit commit is in rc2.
+  - `2600` `hrtimer` — rearming a queued timer with slack left the timerqueue
+    mis-sorted, so the next event could fire before the head's hard expiry
+    (compositor timers, `timerfd`, `poll`/`epoll` — frame pacing).
+  - `2006`/`2007` zram → SG-list zsmalloc read API (less CPU per decompress; we
+    run zram-on-zstd swap), `2008` io_uring cancel-one correctness.
+- **New range `2600–2699` = time / timers.**
+
+### Verified
+- The full **175-patch series applies to a pristine `v7.3-rc2` worktree with 0
+  failures** (cumulative `patch -Np1 --forward`).
+
+### Note — the EEVDF fixes are largely inert here
+`scx_loader` is active with `default_sched = "scx_cake"` (live `state=enabled`,
+`ops=cake_1.2.1`), and rc2 gates the CFS balance path behind
+`if (!scx_switched_all())` in `scheduler_tick()`. So the **CFS load-balancing
+half is bypassed on this machine**, which makes the `2401`/`2402` EEVDF fixes —
+and every `fair.c` patchset item (BORE, cambyses, POC selector) — inert or
+partially inert while scx_cake runs. They are harmless and correct if scx is
+ever not loaded, but they are not earning their keep meanwhile. Same class of
+finding as the MGLRU/`2101` interaction recorded above.
+
+Also recorded: `0110-cachy-config-hooks.patch` applies only **with fuzz** on
+rc2 (`CONFIG_PROC_SYSCTL` context vs rc2's `CONFIG_SYSCTL`) — harmless, but it
+is exactly the "0 `.rej` does not prove application" trap in `LESSONS.md`.
+
+## [7.3.0-rc2-9-sleepy-next] — 2026-09-13
+
+### Added
+- **`1158` — DMCUB busy-wait fix** (Sultan Alsawaf / kerneltoast, commit
+  `dfd0e5aa6aad` on `kernel_x86_laptop`). `dmub_srv_wait_for_idle()` polls with
+  `udelay(1)` in a loop bounded by `timeout_us`, and callers pass up to
+  **100000** — as much as 100 ms of pure CPU spinning per call, in the DMCUB
+  path DCN401 uses (`dc_dmub_srv.c:165,283`). Replaced with progressive backoff
+  (1 µs ×3, then 10 µs, then 100 µs) using `usleep_range()` when `preemptible()`,
+  so the CPU can reach idle. Verified live: `CONFIG_PREEMPT=y` and
+  `PREEMPT_COUNT=y`, so the sleeping path is taken. Out-of-tree, so it will not
+  arrive on a version bump; a self-contained function, so the carry cost is low.
+  Applies clean (offset 178 = stale hunk header from his 6.16 base).
+
 ## [7.3.0-rc2-8-sleepy-next] — 2026-09-13
 
 ### Added
