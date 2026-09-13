@@ -144,6 +144,15 @@ The CachyOS squashes are generated **against the actual series state** (rc7 + th
   Grepping a raw email for `20260911…` anywhere in the body also matches every
   *reply* that quotes it, so the file you extract is someone else's reply, not
   the patch. Use `grep -m1 -oE '^Message-I[Dd]: <PREFIX[^>]*>'`.
+- **Never `git format-patch` a lore mirror** (2026-09-13). In a lore mirror each
+  *email* is a commit, so `format-patch -1 <sha>` produces a diff **of the email
+  headers**, not the code — the file then contains DKIM/Received noise plus the
+  hunk text as context. It fails to apply and `patch --forward` reports
+  "Skipping patch", which reads exactly like *already applied* and produced three
+  false "nothing to do" verdicts in one session. Extract the blob `m` and
+  MIME-decode the body instead (Python `email`), as with quoted-printable mails.
+  Real git clones (torvalds, linux-next, akpm-mm, drm-next) are fine — only the
+  lore mirrors are message-per-commit.
 - **There is exactly one package, and it lives in `sleepy-next/`**
   (single-package repo since 2026-09-12). Always confirm you are testing the
   live tree with `grep -m1 '^_major=' sleepy-next/PKGBUILD` and, for a built
