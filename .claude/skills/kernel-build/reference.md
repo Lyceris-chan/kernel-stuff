@@ -3,6 +3,14 @@
 Detail doc for the `kernel-build` skill. Load it when touching `prepare()`,
 `scripts/config`, version strings, or the net-tune service.
 
+## Contents
+
+- [`scripts/config` calls in `prepare()`](#scriptsconfig-calls-in-prepare) — and what to re-disable after `olddefconfig`
+- [Config traps](#config-traps) — settings that silently do nothing
+- [Version string](#version-string)
+- [net-tune](#net-tune)
+- [Why not `ld.mold`](#why-not-ldmold)
+
 ## `scripts/config` calls in `prepare()`
 
 These mirror `sleepy-next/PKGBUILD`. Read the PKGBUILD for the authoritative

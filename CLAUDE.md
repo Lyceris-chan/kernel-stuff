@@ -155,11 +155,12 @@ The short version:
 - **GC 12.0 ≠ GC 12.1.** Navi 48 is GC IP **(12,0,1)** → `gfx_v12_0.c`.
   `gfx_v12_1.c` is a different chip. Check `IP_VERSION` before any gfx12 patch.
 - **Never carry `9051`/`9052`** (DCN4 flip-schedule) — AMD reverted both upstream.
-- **Audit with a cumulative apply**: the whole series in order with
-  `patch -p1 --forward -F2`, flagging `FAILED` **and** `Skipping patch`/
-  `Reversed` (a skipped patch is an inert no-op, not a success). Single-patch
-  dry-runs and `git apply --check` give false negatives. Use a fresh worktree at
-  the base tag.
+- **Audit with a cumulative apply** — run
+  `python3 .claude/skills/kernel-build/scripts/audit_series.py`. It applies the
+  whole series in order to a throwaway worktree at the base tag and flags
+  `FAILED` **and** `Skipping patch`/`Reversed` (a skipped patch is an inert
+  no-op, not a success). Single-patch dry-runs and `git apply --check` give
+  false negatives. Exit 0 = clean, 1 = failures, 2 = environment problem.
 - **A patch that applies can still do nothing.** `select`ed config symbols,
   `--set-str` on a symbol that no longer exists, MGLRU under LRU-MARIE, and
   `fair.c` under scx full-switch mode are all inert. Confirm the subsystem is

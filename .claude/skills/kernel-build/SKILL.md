@@ -58,6 +58,26 @@ The only special-case reverse-apply in `prepare()` is for `1101`
 (`drm-amd-display-enable-pstate-for-dcn4-non-emulation-builds.patch`), which is
 reverse-applied with `patch -Np1 --forward -R` to keep `.pstate_enabled = false`.
 
+## Audit the full series before building
+
+Run the bundled script rather than rebuilding the loop by hand — it is the
+authoritative check, and it is faster than a failed build:
+
+```bash
+python3 .claude/skills/kernel-build/scripts/audit_series.py
+```
+
+It reads `source=()`, creates a throwaway worktree at the base tag derived from
+`_srctag`, applies all patches in order, and removes the worktree afterwards.
+Exit status: `0` clean, `1` one or more patches failed or were skipped, `2` an
+environment problem (with a message saying which). Flags: `--tag`, `--keep`,
+`--quiet`.
+
+It exists because neither of the obvious shortcuts is sufficient —
+`git apply --check` gives false negatives, and `patch --forward` returns
+success when it *skips* a patch that is already applied, which is an inert
+no-op rather than a pass.
+
 ## On failure, in this order (triage checklist)
 
 ### 1. Patch application failures

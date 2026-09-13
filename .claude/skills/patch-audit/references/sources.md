@@ -9,6 +9,17 @@
 Per-source fetch commands, archive-access workarounds, and extraction
 gotchas. Referenced from `SKILL.md`.
 
+## Contents
+
+- [1. `drm-next`](#1-drm-next-amd-gpu--display--smu--rdna-4)
+- [2. `linux-next`](#2-linux-next-mainline-integration-tree)
+- [3. `linux-pm`](#3-linux-pm-cpu-power--freq--zen-4-amd-pstate)
+- [4. `amd-gfx` and `dri-devel` mailing lists](#4-amd-gfx--dri-devel-mailing-lists)
+- [4b. drm/amd work-items tracker — access workaround](#4b-drmamd-work-items-tracker-gitlabfreedesktoporg--access-workaround-learned-2026-08-03)
+- [5. `sirlucjan`](#5-sirlucjan-third-party-performance-patches)
+- [6. `sirlucjan` NAP governor (not firelzrd)](#6-sirlucjan-nap-governor-not-firelzrd)
+- [Reaching gitlab.freedesktop.org without git](#reaching-gitlabfreedesktoporg-without-git-learned-2026-09-12)
+
 ### Detailed Source Access & Fetch Guide
 
 ### 1. `drm-next` (AMD GPU / Display / SMU / RDNA 4)
