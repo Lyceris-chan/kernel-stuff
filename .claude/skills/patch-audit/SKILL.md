@@ -44,7 +44,7 @@ Run these in order. Copy the commands exactly — do not improvise.
 
 2. **Check Symbol Presence**:
    ```bash
-   grep -r "<unique_symbol>" <base-tree>/drivers/gpu/drm/amd/
+   rg "<unique_symbol>" <base-tree>/drivers/gpu/drm/amd/
    ```
    Run this for EVERY function/macro the patch references. If any symbol is
    absent from the clean base tree, the patch depends on staging infrastructure
@@ -54,7 +54,7 @@ Run these in order. Copy the commands exactly — do not improvise.
    upstream prerequisite series adds (e.g. `adev->gfx.userq_priv_fault_work` /
    `userq_priv_fault_slots`, added by the gfx11 priv-fault worker in drm-next
    AFTER the base release). For every `adev->xxx.field` / `->member` the patch touches, grep
-   that member name in the clean tree's `.h`/`.c` (`grep -rn "userq_priv_fault_work" <base-tree>/drivers/gpu/drm/amd/amdgpu/`). Absent member
+   that member name in the clean tree's `.h`/`.c` (`rg -n "userq_priv_fault_work" <base-tree>/drivers/gpu/drm/amd/amdgpu/`). Absent member
    → DROP and defer to the next version move; do not backport the prerequisite
    series during a bump.
 
@@ -97,12 +97,18 @@ Run these in order. Copy the commands exactly — do not improvise.
    | `00xx` | Local / hand-selected (0001–0049) or EDID/display ML (0050–0099) |
    | `01xx` | CachyOS branch squashes (0101–0109, one per branch) |
    | `10xx` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) |
-   | `11xx` | AMD Display (DCN4, DCN42B, PSR) |
-   | `12xx` | AMD Power Management (amd-pstate, cpufreq) |
-   | `20xx` | Block / I/O schedulers (bfq, mq-deadline) |
-   | `21xx` | Memory management (zstd, LRU-MARIE) |
+   | `11xx` | AMD Display (DCN4, DCN42B, FRL, colorops) |
+   | `12xx` | AMD Power Management (amd-pstate, CPPC) |
+   | `20xx` | Block / I/O (bfq, mq-deadline, zram, io_uring) |
+   | `21xx` | Memory management (zstd, LRU-MARIE, MGLRU, gup batching) |
    | `22xx` | CPU idle (NAP governor) |
+   | `23xx` | Build system / kbuild (the build-speedup series) |
+   | `24xx` | Core scheduler, non-CachyOS |
+   | `25xx` | x86 / arch core |
+   | `26xx` | Time / timers |
    | `90xx` | agd5f staging backports |
+
+   A new category gets a new range; add it to this table when you create one.
    ```bash
    cp <source.patch> patches/<range>/NNNN-short-description.patch
    ```
@@ -128,38 +134,24 @@ Run these in order. Copy the commands exactly — do not improvise.
 
 ## Auditing the whole series (is every patch still needed + clean?)
 
-Run this after a base bump or before a release. Work in a **fresh worktree** at
-the base tag (`git -C repos/linux-next worktree add .wt-audit <tag>`).
+Run this after a base bump or before a release:
 
 ```bash
-# Apply the series cumulatively, exactly as prepare() does, classifying each.
-# The authoritative test — git apply --check and per-patch dry-runs give false
-# negatives, and `patch --forward` exits 0 when it SKIPS a reversed patch.
-python3 - <<'PY'
-import re, subprocess
-ps=[x.strip().strip('"') for x in re.search(r'^source=\((.*?)^\)',
-      open('PKGBUILD').read(), re.S|re.M).group(1).split('\n')
-      if x.strip().strip('"').endswith('.patch')]
-T='repos/linux-next/.wt-audit'; clean=[]; noop=[]; fail=[]
-for i,b in enumerate(ps,1):
-    d=subprocess.run(['patch','-p1','--forward','--dry-run','-F2'],cwd=T,
-        stdin=open(b),capture_output=True,text=True); o=d.stdout+d.stderr
-    if 'Reversed (or previously applied)' in o or 'Skipping patch' in o:
-        noop.append((i,b)); continue
-    if 'FAILED' in o or 'malformed' in o:
-        fail.append((i,b,o.strip().split('\n')[0][:70])); continue
-    subprocess.run(['patch','-p1','--forward','-F2'],cwd=T,stdin=open(b),capture_output=True)
-    clean.append((i,b))
-print(f"CLEAN={len(clean)} NO-OP={len(noop)} FAIL={len(noop and 0 or 0)+len(fail)}")
-for i,b in noop: print("  NO-OP (drop):", b)
-for i,b,d in fail: print("  FAIL:", b, "|", d)
-PY
+python3 .claude/skills/kernel-build/scripts/audit_series.py
 ```
 
-- **NO-OP** = already in the base → drop it (a skipped patch is inert).
-- **FAIL** = needs rebasing or dropping; check whether the base superseded it.
-- After the audit, re-run the full apply and confirm **0 `.rej`** and that the
-  key hooks/symbols each patch adds are present.
+(Run it from the repository root — the script locates the root itself, so the
+working directory does not matter.)
+
+See the `kernel-build` skill for what it does and what its exit codes mean. It is
+the same check described there — apply the series cumulatively, in order, and
+flag both `FAILED` and `Skipping patch`/`Reversed`.
+
+- **`Skipping patch` / `Reversed`** = already in the base → drop it (a skipped
+  patch is inert, not a success).
+- **`FAILED`** = needs rebasing or dropping; check whether the base superseded it.
+
+The script creates and removes its own worktree, so it leaves nothing behind.
 
 **Rebasing a large patch (LRU-MARIE)**: see
 [`references/marie-rebase.md`](references/marie-rebase.md) — never hand-edit

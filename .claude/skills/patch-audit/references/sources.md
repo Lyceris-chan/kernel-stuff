@@ -49,7 +49,7 @@ gotchas. Referenced from `SKILL.md`.
   whether a newer daily snapshot even exists — the tree publishes `next-YYYYMMDD`
   tags on working days only:
   ```bash
-  git ls-remote --tags repos/linux-next 'next-*' | awk -F/ '{print $NF}' | grep -v "\^{}" | sort -V | tail -1
+  git ls-remote --tags repos/linux-next 'next-*' | awk -F/ '{print $NF}' | rg -v "\^{}" | sort -V | tail -1
   ```
   If the latest tag is one you already have locally (compare against
   `git -C repos/linux-next describe --tags master`), skip the fetch entirely —
@@ -113,7 +113,7 @@ gotchas. Referenced from `SKILL.md`.
   symbol another carried patch adds, renumber so that patch comes FIRST (1127→1128→1129 order).
   The definitive check is `prepare()`/`makepkg -o` applying the whole series in order.
 - **Per-message extraction gotchas (learned 2026-08-26):** thread.html message links are
-  `<LI><A HREF="NNNNN.html">subject` (bare 6-digit msgid, not `msgNNNNN.html`) — grep with
+  `<LI><A HREF="NNNNN.html">subject` (bare 6-digit msgid, not `msgNNNNN.html`) — rg with
   `-oE '<LI><A HREF="[0-9]+\.html">[^<]*'` to find the ORIGINAL submission (replies quote the
   patch and break spacing). dri-devel pages use U+00A0 nbsp for indentation
   (`.replace('&nbsp;',' ').replace('\xa0',' ')`) and may carry a trailing HTML attachment

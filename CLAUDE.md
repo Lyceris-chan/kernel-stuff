@@ -62,24 +62,14 @@ instead of re-deriving the steps; this file records only the durable rules.
 
 ## Patch numbering
 
-Each range is a category; use the next unused number in the correct range.
+Each range is a category; use the next unused number in the correct range, and
+add a new range when a patch fits no existing category. **The authoritative
+range table lives in the `patch-audit` skill** — read it there rather than
+keeping a second copy here:
 
-| Range | Category | Source |
-|---|---|---|
-| `0001–0049` | Handmade local patches | SMU14, DCN401, GFX12 fixes for this hardware |
-| `0050–0099` | Upstream EDID/display ML patches not yet landed | `b4` mbox or freedesktop archives |
-| `0101–0113` | CachyOS branch squashes (`0106` = off-target drops) | sirlucjan `-sep` dirs; `0110`–`0113` from the CachyOS/linux fork |
-| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | drm-next / agd5f |
-| `1100–1199` | AMD Display (DCN4, DCN42B, FRL, colorops) | drm-next |
-| `1200–1299` | AMD Power Management (amd-pstate, CPPC) | linux-pm / sirlucjan |
-| `2000–2099` | Block / I/O (bfq, mq-deadline, zram, io_uring) | sirlucjan / akpm |
-| `2100–2199` | Memory management (zstd, LRU-MARIE, MGLRU) | sirlucjan / akpm |
-| `2200–2299` | CPU idle (NAP governor) | sirlucjan `nap-patches/` |
-| `2300–2399` | Build system / kbuild | ML (the build-speedup series, `2300`–`2322`) |
-| `2400–2499` | Core scheduler (non-CachyOS) | sched-ext / lkml |
-| `2500–2599` | x86 / arch core | tip / lkml |
-| `2600–2699` | Time / timers | lkml |
-| `9000–9099` | agd5f staging backports | `git format-patch` from agd5f/linux — **verify every referenced symbol exists in rc mainline first** |
+```bash
+rg -n 'xx` *\|' .claude/skills/patch-audit/SKILL.md
+```
 
 CachyOS squashes are generated **against the actual series state**, not a clean
 rc — the pre-CachyOS patches touch shared files like `drm_edid.c`. Two known
@@ -146,6 +136,18 @@ alone; a "build it" request is phase 3 alone.
 10. Never set `LLVM` to a path. `tools/bpf/resolve_btfids/Makefile` checks
     `ifeq ($(LLVM),1)`, so a path value breaks BTF ID resolution. Prepend the
     LLVM `bin/` to `$PATH` and set `LLVM=1`.
+
+## Tooling
+
+**IMPORTANT — use `rg` (ripgrep), never `grep`.** ripgrep is installed and is
+faster, respects `.gitignore` (so it skips `repos/`, `src/` and `pkg/` without
+exclusions), and handles the recursive searches this repo needs:
+
+```bash
+rg -n 'pattern' sleepy-next/          # recursive, with line numbers
+rg -l 'pattern' .claude/skills/       # filenames only
+rg -c 'pattern' CLAUDE.md             # match count per file
+```
 
 ## Critical traps
 

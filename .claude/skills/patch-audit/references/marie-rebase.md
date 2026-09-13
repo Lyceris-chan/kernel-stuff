@@ -40,7 +40,7 @@ to the author's** (a hard requirement — do not "improve" it).
 ## Pitfalls
 
 - `patch --forward` exits **0 when it skips** a reversed/already-applied patch —
-  always grep the output for `Skipping patch` / `Reversed`, or a no-op patch
+  always rg the output for `Skipping patch` / `Reversed`, or a no-op patch
   looks like a success.
 - `git apply --check` passing does **not** mean GNU `patch` will accept it (the
   tool `prepare()` actually runs).

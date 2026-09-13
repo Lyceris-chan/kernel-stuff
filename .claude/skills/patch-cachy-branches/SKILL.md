@@ -41,7 +41,7 @@ git -C repos/sirlucjan-kernel-patches pull
 ## Step 2 — Identify latest `-sep` directory for each branch
 
 ```bash
-ls repos/sirlucjan-kernel-patches/7.3-rc/ | grep -E "bbr3|cgroup|fixes|hdmi|preempt|vesa|kbuild|cpu-cachy|nap"
+ls repos/sirlucjan-kernel-patches/7.3-rc/ | rg "bbr3|cgroup|fixes|hdmi|preempt|vesa|kbuild|cpu-cachy|nap"
 ```
 
 For versioned branches choose the highest-numbered version. **Current versions

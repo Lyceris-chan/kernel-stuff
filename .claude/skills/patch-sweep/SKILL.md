@@ -56,7 +56,7 @@ description: >
 # Linux-next is huge and slow to fetch. Check first whether a newer daily
 # snapshot (next-YYYYMMDD tag) exists at all; if the latest tag equals what
 # we already have locally, SKIP the linux-next fetch — there is no new content.
-#   git ls-remote --tags repos/linux-next 'next-*' | awk -F/ '{print $NF}' | grep -v "\^{}" | sort -V | tail -1
+#   git ls-remote --tags repos/linux-next 'next-*' | awk -F/ '{print $NF}' | rg -v "\^{}" | sort -V | tail -1
 #   git -C repos/linux-next describe --tags master   # what we already have
 # Tags are published on working days only — weekends have no new snapshot.
 # CAVEAT (learned 2026-08-04): ls-remote --tags on kernel.org's linux-next may
@@ -121,7 +121,7 @@ git -C repos/linux-pm log --since="$SINCE" --oneline --all -E \
 
 # sirlucjan: new/updated third-party performance patches (no --grep; list dirs)
 echo "=== sirlucjan 7.2-rc (new version dirs) ==="
-ls repos/sirlucjan-kernel-patches/7.3-rc/ | grep -E "fixes-v|lru-marie-v|preempt-ipi-v|nap"
+ls repos/sirlucjan-kernel-patches/7.3-rc/ | rg "fixes-v|lru-marie-v|preempt-ipi-v|nap"
 ```
 
 ## Step 2b — x86/security scan (Zen 4 CPU mitigations)
@@ -219,7 +219,7 @@ curl -s "https://gitlab.freedesktop.org/api/graphql" -H "Content-Type: applicati
 
 Sweep flow: (1) search issues by hardware keyword —
 `curl -s "https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/issues?search=<kw>&state=all&per_page=100"` —
-then (2) pull notes for each relevant iid via GraphQL and grep for
+then (2) pull notes for each relevant iid via GraphQL and rg for
 `([0-9a-f]{12,40})|fixed by|patch|commit|in progress|merged`. The HTML issue page
 (`/-/issues/<iid>`) renders the description but comments are Vue-lazy-loaded, so
 GraphQL is the reliable route for comments. (2026-08-10 scan: no SMU-IF driver
@@ -233,7 +233,7 @@ VBIOS-resident PMFW. During SMU power transitions the GPU can drop off the PCIe
 bus (`device lost from bus!`, SMU message `response:0xFFFFFFFF`), black-screen,
 and hang/reboot the system — with `nowatchdog` on the cmdline, nothing is
 logged. This is a VBIOS/firmware issue, not a kernel patch fix. Each sweep,
-grep issue titles for: `SMU`, `lost from bus`, `reboot`, `black screen`,
+rg issue titles for: `SMU`, `lost from bus`, `reboot`, `black screen`,
 `IF version`, `Navi 48`, `9070`. If AMD lands a driver-side IF-compat fix,
 that IS a candidate for our tree.
 
@@ -251,7 +251,7 @@ check_commit() {
   [ -s "$tmp" ] || { echo "NO-OBJ: $sha"; return; }
   fwd=$(git -C "$TREE" apply --check "$tmp" 2>&1)
   rev=$(git -C "$TREE" apply --check -R "$tmp" 2>&1)
-  subj=$(grep "^Subject:" "$tmp" | head -1)
+  subj=$(rg "^Subject:" "$tmp" | head -1)
   if [ -z "$fwd" ]; then
     echo "CLEAN  : $sha $subj"
   elif [ -z "$rev" ]; then
@@ -269,11 +269,11 @@ Every candidate must pass all four checks. Copy the commands exactly.
 
 **Check 0 — Upstream reverts + wrong-chip traps (learned 2026-09-09).**
 Two failure modes that cost a full debug cycle each:
-- **Reverts**: grep the ML/repo for `Revert "..."` of a patch we already carry.
+- **Reverts**: rg the ML/repo for `Revert "..."` of a patch we already carry.
   If AMD is reverting it (*"Because it causes some regression"*), drop ours —
   e.g. the DCN4 flip-schedule pair `9051`/`9052` (in `dml2_core_dcn4_calcs.c`).
   ```bash
-  zcat /tmp/amd-gfx-*.txt.gz 2>/dev/null | grep -E '^Subject:.*Revert' | sort -u
+  zcat /tmp/amd-gfx-*.txt.gz 2>/dev/null | rg '^Subject:.*Revert' | sort -u
   ```
 - **Wrong chip**: a `gfx12` patch may target GC **12.1** (`gfx_v12_1.c`) — a
   different ASIC. Our Navi 48 is GC IP **(12,0,1)** → `gfx_v12_0.c`. Verify in
@@ -292,11 +292,11 @@ already exist in the clean rc7 tree (not just in a staging branch). If the
 patch fails here it depends on staging infrastructure and must be dropped.
 ```bash
 # For GPU/display patches:
-grep -r "<unique_symbol>" repos/linux-next/drivers/gpu/drm/amd/ | head
+rg "<unique_symbol>" repos/linux-next/drivers/gpu/drm/amd/ | head
 # For PM patches:
-grep -r "<unique_symbol>" repos/linux-next/drivers/cpufreq/ | head
+rg "<unique_symbol>" repos/linux-next/drivers/cpufreq/ | head
 # For block patches:
-grep -r "<unique_symbol>" repos/linux-next/block/ | head
+rg "<unique_symbol>" repos/linux-next/block/ | head
 ```
 If `grep` returns nothing for any referenced symbol, DROP the candidate.
 

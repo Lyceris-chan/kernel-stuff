@@ -142,7 +142,7 @@ them): `BPF_SYSCALL`, `DEBUG_INFO_BTF`, `DEBUG_INFO_BTF_MODULES`, `FTRACE`,
 
 ```bash
 scripts/config -g <OPT>          # repeat for each option above
-file vmlinux | grep BTF          # confirm BTF is actually present
+file vmlinux | rg BTF          # confirm BTF is actually present
 ```
 
 Missing BTF almost always means stale `pahole`, not a config regression.

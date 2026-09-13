@@ -46,7 +46,7 @@ real files under `patches/` only, and use the full `patches/<range>/...` path
 
 ```bash
 # 1a. Full patch paths referenced by PKGBUILD source=()
-grep -oE '"patches/[0-9]+-[0-9]+/[0-9]+-[^"]+\.patch"' PKGBUILD | tr -d '"' | sort -u > /tmp/pkgsrc.txt
+rg -o '"patches/[0-9]+-[0-9]+/[0-9]+-[^"]+\.patch"' PKGBUILD | tr -d '"' | sort -u > /tmp/pkgsrc.txt
 
 # 1b. Real patch files physically present under patches/
 find patches -name '*.patch' -type f | sort > /tmp/ondisk.txt
@@ -74,8 +74,8 @@ as "dropped"/"deferred" is safe to remove the file; an active entry means
 investigate):
 
 ```bash
-grep -c "<candidate>.patch" PKGBUILD        # must print 0
-grep -n "<candidate>.patch" PATCH_SOURCES.md # read the context line
+rg -c "<candidate>.patch" PKGBUILD        # must print 0
+rg -n "<candidate>.patch" PATCH_SOURCES.md # read the context line
 ```
 
 Examples of candidates that legitimately appear here: files using an old naming

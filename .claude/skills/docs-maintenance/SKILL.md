@@ -86,3 +86,24 @@ git commit -m "<subject>
 ```
 
 Never run `rm -rf .git` on a repo whose history must be preserved — ask first.
+
+## 5. Validate the skills
+
+Any session that adds or edits a skill must validate it against the Agent Skills
+specification before committing:
+
+```bash
+python3 .claude/skills/docs-maintenance/scripts/validate_skills.py
+```
+
+It checks the rules that actually break discovery or loading: `name` length,
+character set, hyphen rules and **whether it matches the directory name**;
+`description` length and third-person voice; unrecognised frontmatter keys; body
+length under 500 lines; and whether reference files stay one level deep and carry
+a table of contents past 100 lines. Exit status: `0` clean, `1` violations,
+`2` no skills directory found.
+
+The specification is the authority, not this script — it is at
+<https://agentskills.io/specification>. The authoring guidance, including the
+third-person description rule and the progressive-disclosure patterns, is at
+<https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices>.

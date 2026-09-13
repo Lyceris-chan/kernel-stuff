@@ -25,7 +25,7 @@ Download one the same way, with the browser UA:
   curl -s -A "$UA" "https://lists.freedesktop.org/archives/dri-devel/${MONTH}/thread.html" -o /tmp/dri-thread.html
 Message links in thread.html are <LI><A HREF="NNNNN.html">[PATCH n/N] subject
 (msgid is a bare 6-digit number, NOT "msgNNNNN.html"). Extract subjects:
-  grep -oE '<LI><A HREF="[0-9]+\.html">[^<]*' /tmp/dri-thread.html \
+  rg -o '<LI><A HREF="[0-9]+\.html">[^<]*' /tmp/dri-thread.html \
     | sed -E 's/<LI><A HREF="([0-9]+)\.html">/\1: /'
 The date/subject/author indexes only contain navigation links — use thread.html.
 ML message extraction (learned 2026-08-26) — per-message pages are unreliable
@@ -36,7 +36,7 @@ as raw patches. Known gotchas:
     lines as <LI><A HREF=...>mailing-list links; always
     .replace('&nbsp;',' ').replace('\xa0',' ') before git apply.
   * Some messages are replies that quote the patch (broken spacing). Find the
-    ORIGINAL [PATCH] message via the thread.html grep above instead.
+    ORIGINAL [PATCH] message via the thread.html rg above instead.
   * Pages may carry a trailing "-------------- next part --------------" HTML
     attachment after the "-- 2.xx.x" diff terminator — truncate at "-- ".
   * After extraction always `git apply --check`; if a hunk is stale against a
