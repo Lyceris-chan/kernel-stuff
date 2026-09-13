@@ -29,3 +29,7 @@ config-7.2.*
 config-7.3.*
 # Local tool state
 .kiro/
+
+# Python bytecode and checkpatch scratch
+__pycache__/
+.checkpatch-*
