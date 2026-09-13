@@ -8,9 +8,9 @@ to the author's** (a hard requirement — do not "improve" it).
 ## Method (learned 2026-09-07)
 
 1. **Fresh tree at the new base** (a `git worktree` of the base tag).
-2. **Apply the patch, collect rejects** — `patch -p1 --forward -F2 < 2101.patch`.
-   Typically 1–4 hunks fail, all in host files.
-3. **Fix the rejects in-tree** against the base's actual API (e.g. rc2 dropped
+2. **Apply the patch, collect rejects** — `patch -p1 --forward -F2 <
+   2101.patch`. Typically 1–4 hunks fail, all in host files.
+3. **Fix the rejects in-tree** against the base's actual API (for example, rc2 dropped
    the `long val`/`WARN` path in `mem_cgroup_get_zone_lru_size`; rc2 renamed
    `__swap_writeout` → `__swap_writepage`). Keep the change minimal and
    semantically identical to the author's intent.
@@ -30,9 +30,9 @@ to the author's** (a hard requirement — do not "improve" it).
    existing file — `patch` then treats it as a new file and prints
    `which already exists! Skipping patch`.
 6. **Verify** on a fresh tree: `patch -p1 --forward -F2` must report 0 `FAILED`,
-   produce 0 `.rej`, and the hooks must be present:
-   `lru_marie_zone_size_read` in `memcontrol.h`, `kcompressd` in `swap.h`,
-   `nr_swap_write_failed` bump in `page_io.c`, `include/linux/lru_marie.h` created.
+   produce 0 `.rej`, and the hooks must be present: `lru_marie_zone_size_read`
+   in `memcontrol.h`, `kcompressd` in `swap.h`, `nr_swap_write_failed` bump in
+   `page_io.c`, `include/linux/lru_marie.h` created.
 7. **Fidelity check** — compare each `mm/lru_marie/*` file against the original
    patch's added lines; expect byte-identical except the documented one-line
    compile fixes.

@@ -14,9 +14,9 @@ description: >
 
 **Scope: `0101`–`0109` only.** `0110`–`0113` (`CONFIG_CACHY` config hooks, the
 ACPI bus-master check, amdgpu S5-eviction skip, and the micro-opts bundle) are
-curated backports from the **CachyOS/linux fork**, not sirlucjan branch squashes.
-**Never regenerate them with this skill's sirlucjan workflow** — they are
-maintained by hand and have no sirlucjan source to refresh from.
+curated backports from the **CachyOS/linux fork**, not sirlucjan branch
+squashes. **Never regenerate them with this skill's sirlucjan workflow** — they
+are maintained by hand and have no sirlucjan source to refresh from.
 
 ## Source
 
@@ -32,13 +32,13 @@ only under `7.0/` and `6.19/`. Our carried `2200` patch is unaffected; only its
 recorded source path is stale, so there is no upstream NAP refresh available
 from that source.
 
-## Step 1 — Update the repo
+## Step 1: update the repo
 
 ```bash
 git -C repos/sirlucjan-kernel-patches pull
 ```
 
-## Step 2 — Identify latest `-sep` directory for each branch
+## Step 2: identify latest `-sep` directory for each branch
 
 ```bash
 ls repos/sirlucjan-kernel-patches/7.3-rc/ | rg "bbr3|cgroup|fixes|hdmi|preempt|vesa|kbuild|cpu-cachy|nap"
@@ -51,7 +51,7 @@ to expect (as of the 7.2-rc maintenance session):** `fixes` = `-v11-sep`
 0.9.3 = same as our `2101`; no regen needed).
 For all others, the single `-sep` directory is canonical.
 
-## Step 3 — Branch selection table
+## Step 3: branch selection table
 
 | Branch | sirlucjan directory | Squash patch | Keep? |
 |--------|---------------------|--------------|-------|
@@ -70,7 +70,7 @@ For all others, the single `-sep` directory is canonical.
 | `gaming-sched` | any | — | ❌ sched-ext conflict |
 | `clang-patches` | any | — | ❌ LLVM Polly risk |
 
-## Step 4 — Off-target filtering for the `fixes` branch
+## Step 4: off-target filtering for the `fixes` branch
 
 The `fixes` branch is squashed **in full** into `0105-cachy-fixes.patch` (all
 25 patches in v11, including off-target hardware). `0106-cachy-drops.patch`
@@ -106,7 +106,7 @@ is not in the drop list either.)
 `mm/mglru`, `mm/vmscan`, **`drivers/pci/quirks.c` (PCI Skip Target Speed quirk,
 added in v11 — saves ~2s boot on empty/clamped PCIe slots)**.
 
-## Step 5 — Squash each branch to one patch
+## Step 5: squash each branch to one patch
 
 Do **not** copy each `-sep` file individually. Apply each branch's patches
 **in order** to the series tree, then emit the cumulative `git diff` as one
@@ -151,7 +151,7 @@ rm -rf src && makepkg -o
 
 If it fails, hand off to the `kernel-build` skill for `.rej` triage.
 
-## Step 6 — Known conflict checks
+## Step 6: known conflict checks
 
 ### 0151 vs 0055 conflict (applies to the hdmi SQUASH)
 
@@ -173,7 +173,7 @@ squash input list (do not apply it before running `git diff`).
 still `#includes` it via `amdgpu_dm.c`. When the hdmi squash is in the series,
 **do not include `0053`**.
 
-## Step 7 — Verify patch integrity
+## Step 7: verify patch integrity
 
 Every patch must have a real author (not `Antigravity` / `claude` / AI) and a
 traceable commit or message-ID. Check with:
@@ -190,7 +190,7 @@ of a whole branch wrapped as a single `format-patch`, so it carries one
 generated header rather than the individual upstream authors' `From:` lines.
 Provenance for every squashed hunk is tracked per-patch in `PATCH_SOURCES.md`.
 
-## Step 8 — vma_flags_t compile fix (only needed for pre-v12 LRU-MARIE)
+## Step 8: vma_flags_t compile fix (only needed for pre-v12 LRU-MARIE)
 
 After adding the `fixes` branch (squashed into `0105-cachy-fixes.patch`; the
 `mm: vmscan: convert folio_referenced() to use vma_flags_t` change is inside
@@ -210,7 +210,7 @@ if (referenced_ptes > 0 && vma_flags_test(&vma_flags, VMA_EXEC_BIT) && folio_is_
 
 This is an in-tree source edit only, not a new patch file.
 
-## Step 9 — Update PKGBUILD and checksums
+## Step 9: update PKGBUILD and checksums
 
 ```bash
 # Update source=() to list only the patches in the correct order

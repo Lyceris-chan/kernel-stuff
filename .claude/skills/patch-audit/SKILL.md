@@ -48,15 +48,16 @@ Run these in order. Copy the commands exactly — do not improvise.
    ```
    Run this for EVERY function/macro the patch references. If any symbol is
    absent from the clean base tree, the patch depends on staging infrastructure
-   and must be DROPPED (see the agd5f staging lesson in `LESSONS.md`).
-   **Cover struct members too** (learned 2026-08-10, patch `1025`): a patch can
-   apply cleanly yet not compile when it references a `struct` field an
-   upstream prerequisite series adds (e.g. `adev->gfx.userq_priv_fault_work` /
+   and must be DROPPED (see the agd5f staging lesson in `LESSONS.md`). **Cover
+   struct members too** (learned 2026-08-10, patch `1025`): a patch can apply
+   cleanly yet not compile when it references a `struct` field an upstream
+   prerequisite series adds (for example, `adev->gfx.userq_priv_fault_work` /
    `userq_priv_fault_slots`, added by the gfx11 priv-fault worker in drm-next
-   AFTER the base release). For every `adev->xxx.field` / `->member` the patch touches, grep
-   that member name in the clean tree's `.h`/`.c` (`rg -n "userq_priv_fault_work" <base-tree>/drivers/gpu/drm/amd/amdgpu/`). Absent member
-   → DROP and defer to the next version move; do not backport the prerequisite
-   series during a bump.
+   AFTER the base release). For every `adev->xxx.field` / `->member` the patch
+   touches, grep that member name in the clean tree's `.h`/`.c` (`rg -n
+   "userq_priv_fault_work" <base-tree>/drivers/gpu/drm/amd/amdgpu/`). Absent
+   member → DROP and defer to the next version move; do not backport the
+   prerequisite series during a bump.
 
 3. **Forward apply check** — patch must apply to the clean base tree:
    ```bash
@@ -67,13 +68,13 @@ Run these in order. Copy the commands exactly — do not improvise.
    - Error output = context shifted or prereqs missing. Fix hunk offsets,
      regenerate from source, or drop the patch. Do not silently force it.
    - **`git apply --check` can pass while GNU `patch -p1 --forward` rejects**
-     (learned 2026-08-03): ambiguous leading context (e.g. `if (r)` appears many
-     times in `gfx_v12_0_sw_init`) or a hunk touching a file absent from the base
-     (DCN6 `dcn60_resource.c`) both fool `git apply`. ALWAYS confirm with
-     `patch -p1 --forward --dry-run`. For a file absent from the base, strip that
-     file's hunks + its stats line + fix the "N files changed" summary as a
-     documented backport adjustment. Capture git's real exit code —
-     `git apply ... > log 2>&1; echo $?` — never `| head && echo OK`.
+     (learned 2026-08-03): ambiguous leading context (for example, `if (r)` appears many
+     times in `gfx_v12_0_sw_init`) or a hunk touching a file absent from the
+     base (DCN6 `dcn60_resource.c`) both fool `git apply`. ALWAYS confirm with
+     `patch -p1 --forward --dry-run`. For a file absent from the base, strip
+     that file's hunks + its stats line + fix the "N files changed" summary as a
+     documented backport adjustment. Capture git's real exit code — `git apply
+     ... > log 2>&1; echo $?` — never `| head && echo OK`.
 
 4. **Already-applied check** — confirm it is NOT already in the tree:
    ```bash
@@ -143,13 +144,14 @@ python3 .claude/skills/kernel-build/scripts/audit_series.py
 (Run it from the repository root — the script locates the root itself, so the
 working directory does not matter.)
 
-See the `kernel-build` skill for what it does and what its exit codes mean. It is
-the same check described there — apply the series cumulatively, in order, and
+See the `kernel-build` skill for what it does and what its exit codes mean. It
+is the same check described there — apply the series cumulatively, in order, and
 flag both `FAILED` and `Skipping patch`/`Reversed`.
 
 - **`Skipping patch` / `Reversed`** = already in the base → drop it (a skipped
   patch is inert, not a success).
-- **`FAILED`** = needs rebasing or dropping; check whether the base superseded it.
+- **`FAILED`** = needs rebasing or dropping; check whether the base superseded
+  it.
 
 The script creates and removes its own worktree, so it leaves nothing behind.
 
@@ -157,10 +159,10 @@ The script creates and removes its own worktree, so it leaves nothing behind.
 [`references/marie-rebase.md`](references/marie-rebase.md) — never hand-edit
 hunk headers; regenerate the changed file-sections with `diff -u`.
 
-## Replacing / upgrading an existing patch (e.g., a v2 → v4 revision swap)
+## Replacing / upgrading an existing patch (for example, a v2 → v4 revision swap)
 
 **Note on `00xx` local patches:** the local Antigravity patches live in the
-`00xx` range (e.g. the PROFILE_PEAK family `0003`/`0004`) and are routinely
+`00xx` range (for example, the PROFILE_PEAK family `0003`/`0004`) and are routinely
 revised in place — `0004` (deep sleep in PROFILE_PEAK) went to **v4** on
 2026-08-02. When you swap in a new revision you keep the same number, filename,
 and series position.
@@ -191,5 +193,4 @@ applies the entire series (`0001` → `2200`) in order, stopping at the first
 failure. If it fails, diagnose per the `kernel-build` skill (read the `.rej`,
 regenerate the shifted patch from source, or report).
 
-Then update the `PATCH_SOURCES.md` entry: note the new version and date (e.g.
-`0004` ... **v4** (2026-08-02): ...) and what changed.
+Then update the `PATCH_SOURCES.md` entry: note the new version and date (for example, `0004` ... **v4** (2026-08-02): ...) and what changed.

@@ -32,7 +32,7 @@ deferred patches.
   ```
 - Confirm every command's output before running the next step.
 
-## Step 1 — Build the two lists
+## Step 1: build the two lists
 
 Extract every patch filename that `PKGBUILD` references, and list every `.patch`
 file on disk. (Files must be `sort`-ed for the diff below.)
@@ -56,12 +56,12 @@ echo "=== in PKGBUILD source=() ==="; cat /tmp/pkgsrc.txt
 echo "=== on disk ==="; cat /tmp/ondisk.txt
 ```
 
-If `1a` printed nothing, the regex did not match — inspect the actual `source=()`
-format first (each entry is `patches/<range>/NNNN-....patch`) before continuing.
-Ignore `*.patch` symlinks at the repo root — they are build artifacts, not
-patches.
+If `1a` printed nothing, the regex did not match — inspect the actual
+`source=()` format first (each entry is `patches/<range>/NNNN-....patch`) before
+continuing. Ignore `*.patch` symlinks at the repo root — they are build
+artifacts, not patches.
 
-## Step 2 — Find orphaned patches (on disk, NOT in source=())
+## Step 2: find orphaned patches (on disk, NOT in source=())
 
 ```bash
 echo "=== ON DISK but NOT in PKGBUILD (candidates for deletion) ==="
@@ -80,9 +80,10 @@ rg -n "<candidate>.patch" PATCH_SOURCES.md # read the context line
 
 Examples of candidates that legitimately appear here: files using an old naming
 scheme (`0013-...`, `0014-...`, `0015-...`), a deferred/never-applied upstream
-patch, or a patch you regenerated under a new number leaving the old copy behind.
+patch, or a patch you regenerated under a new number leaving the old copy
+behind.
 
-## Step 3 — Delete orphaned patches (only the confirmed ones)
+## Step 3: delete orphaned patches (only the confirmed ones)
 
 ```bash
 # One file at a time — never a wildcard that could hit an active patch.
@@ -103,7 +104,7 @@ If a file you deleted still shows in `comm -13` output (see Step 5) it means it
 was actually referenced — restore it immediately from git:
 `git checkout -- patches/<range>/<file>.patch`.
 
-## Step 4 — Remove scratch scripts and build artifacts
+## Step 4: remove scratch scripts and build artifacts
 
 ```bash
 # Build directories / extracted source
@@ -124,7 +125,7 @@ Never delete `disable_configs.py`, `PKGBUILD`, `config`, the `net-tune/`,
 `sqm-qos/` (legacy), or `repos/` directories. Only build artifacts and your own
 scratch files go.
 
-## Step 5 — Final verification (both directions)
+## Step 5: final verification (both directions)
 
 ```bash
 find patches -name '*.patch' -type f | sort > /tmp/ondisk2.txt
@@ -141,7 +142,7 @@ Both directions must be empty. If either prints a file:
 - "in PKGBUILD missing on disk" → you deleted an active patch; restore with
   `git checkout -- <file>.patch`.
 
-## Step 6 — Wrap up
+## Step 6: wrap up
 
 ```bash
 # If and only if source=() itself changed during the session:

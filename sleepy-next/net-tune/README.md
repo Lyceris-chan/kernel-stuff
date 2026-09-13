@@ -4,8 +4,8 @@ One systemd service that applies low-latency Ethernet settings and CAKE SQM
 shaping. Each half is independently toggleable in `/etc/net-tune.conf`.
 
 `linux-sleepy-next` owns this service: a build installs it, enables it through
-`multi-user.target.wants`, and marks `/etc/net-tune.conf` as a pacman backup file
-so local edits survive kernel upgrades.
+`multi-user.target.wants`, and marks `/etc/net-tune.conf` as a pacman backup
+file so local edits survive kernel upgrades.
 
 ## Configuration
 
@@ -28,10 +28,11 @@ The route probe uses Quad9 (`9.9.9.9`), never `8.8.8.8`.
 ## Requirements
 
 Ingress shaping needs the `ingress` qdisc, which needs
-`CONFIG_NET_SCH_INGRESS=y`, plus a **named** `ifb4cake` device created explicitly
-with `ip link add ifb4cake type ifb` (the `ifb` module's own `numifbs=` parameter
-would name it `ifb0`). The u32 match-all idiom performs the ingress redirect.
-BBR3 is the kernel-compiled TCP default; this service only adds CAKE.
+`CONFIG_NET_SCH_INGRESS=y`, plus a **named** `ifb4cake` device created
+explicitly with `ip link add ifb4cake type ifb` (the `ifb` module's own
+`numifbs=` parameter would name it `ifb0`). The u32 match-all idiom performs the
+ingress redirect. BBR3 is the kernel-compiled TCP default; this service only
+adds CAKE.
 
 ## Verify
 

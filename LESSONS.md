@@ -1,4 +1,4 @@
-# Lessons learned — do not repeat
+# Lessons learned: do not repeat
 
 Full incident log for sleepy-kernel. Kept out of `CLAUDE.md` so the operating
 manual stays short; CLAUDE.md carries only the durable rules. Read this before
@@ -32,23 +32,23 @@ repeating a past mistake. Patch numbers are current as of 7.3-rc2; see
 | Backported agd5f staging patch 2008 | Referenced `amdgpu_userq_process_reset_irq` and `AMDGPU_CTXID0_DOORBELL_ID_MASK` which exist only in `agd5f/linux amdgpu_userq.h` but **not in Linux 7.2-rc5 mainline** — caused `undeclared identifier` compile errors | Before adding any `2xxx` patch, `grep -r <new_symbol> src/linux-*/drivers/` to confirm all referenced functions and macros exist in the current mainline tree. If missing, the patch depends on staging infrastructure and must be dropped. |
 | 0xxx patches had gaps (0013–0015 missing) | Caused confusing jump from 0012 → 0016 with no explanation | Always use the next consecutive number in the correct category range. Renumbering after-the-fact requires: rename files, update `source=()`, run `updpkgsums`, update `PATCH_SOURCES.md`, update `CLAUDE.md`, update `README.md`, update any `prepare()` reverse-apply lines. |
 | All 1xxx patches in one undifferentiated range | Mixed GPU core, display, power management, block, MM, and cpuidle into one range — impossible to tell category from number alone | Use the category-based subcategory scheme: `1000–1099` GPU core, `1100–1199` display, `1200–1299` PM, `2000–2099` block, `2100–2199` MM, `2200–2299` cpuidle, `9000–9099` agd5f staging. |
-| Used monolithic CachyOS mega-patch | Single 900 KB diff caused FreeSync collision with upstream hdmi branch; impossible to exclude off-target patches | Switch to sirlucjan per-branch `-sep` files squashed to one patch per branch (`0101`–`0109`). Off-target branches (`snd-codecs`, `t2`, etc.) are never squashed; off-target patches inside `fixes` are reverted by `0106-cachy-drops`. |
+| Used monolithic CachyOS mega-patch | Single 900 KB diff caused FreeSync collision with upstream hdmi branch; impossible to exclude off-target patches | Switch to sirlucjan per-branch `-sep` files squashed to one patch per branch (`0101`–`0109`). Off-target branches (`snd-codecs`, `t2`) are never squashed; off-target patches inside `fixes` are reverted by `0106-cachy-drops`. |
 | Added `0151` (HDMI HF-VSDB) when `0055` was already applied | `0151` adds the same `drm_hdmi_vrr_cap` struct as `0055` (Fangzhi Zuo 2/4). Patch shows as "Reversed" at apply time. | If `0055` is in the series, exclude `0151` from the `0107-cachy-hdmi` squash. The two patches add identical content to `drm_edid.c` and `drm_connector.h`. |
 | Applied `0053` (remove DMCU parser) before CachyOS hdmi branch | `0053` deletes `dc_edid_parser.h`. The CachyOS hdmi branch still includes `amdgpu_dm.c` which includes that header. Compile fails with "file not found". | When the CachyOS hdmi branch is present, drop `0053`. The DMCU parser cleanup is moot because the hdmi branch already refactored the callers. |
 | Attempted to backport Fangzhi Zuo 1/4, 3/4, 4/4 (HDMI FRL patches) | These patches target `amdgpu_dm_connector.c` which was split from `amdgpu_dm.c` by Alex Hung (agd5f `0e967e086e75`) in April 2026. That split is not in rc5. | Defer until the `amdgpu_dm_connector.c` split lands in mainline (expected 7.3). Only `0055` (2/4, touches `drm_edid.c` only) and `0058` (FRL cap restore) are safe to add now. |
 | `vm_flags & VM_EXEC` in LRU-MARIE after `fixes` branch applied | Sirlucjan `fixes` branch (squashed in `0105`) renames `vm_flags` → `vma_flags` with new type `vma_flags_t`. LRU-MARIE's `#ifdef CONFIG_LRU_MARIE` block still used the old `(vm_flags & VM_EXEC)` expression — compile error: invalid operands to binary expression. | In-tree fix: change `(vm_flags & VM_EXEC)` to `vma_flags_test(&vma_flags, VMA_EXEC_BIT)` in `mm/vmscan.c` inside the `CONFIG_LRU_MARIE` block. This is an in-tree source edit, not a patch file. **Update (2026-08-03, rc6): no longer required — LRU-MARIE v12 (`2101`) already ships the `vma_flags_test(&vma_flags, VMA_EXEC_BIT)` form.** |
 | `amdgpu_dm_connector.c` split required by upstream HDMI patches | Fangzhi Zuo's July 2026 HDMI series was written against agd5f tree where `amdgpu_dm.c` was split. Applied against rc5 (no split) → "No such file or directory" error. | Check `find repos/linux-7.2-rcN -name "amdgpu_dm_connector.c"` before applying any patch targeting that file. If absent, defer the patch. |
 | Validated a candidate only against a **clean** rc7 tree and it applied; it FAILED GNU patch on the actual series state | The PPT-limits refactor `6c9e0328` (9026) applies cleanly to clean rc7 but its 77-line `smu_get_power_limit()` hunk in `amdgpu_smu.c` was rejected by `patch -p1 --forward` on the series tree because the carried CachyOS `01xx` micro-opts patches shift the surrounding context — same for the cascade 9027/9028 | **The authoritative dry-run is always against the full series-applied tree** (repos/linux-7.2-rc7-series, rebuilt via `bash /tmp/apply_series.sh`), with `patch -p1 --forward` — a clean result on clean rc7 proves nothing about our tree. When a framework refactor fails there, drop/defer it (it lands via drm-next at the next bump) rather than hand-forcing hunk offsets on a sensitive subsystem |
-| DCN401 GPIO lookup table patch (`334cbfa3c`) fails to compile | `drm/amd/display: convert dcn401 GPIO translation to lookup tables` uses `DC_GPIO_GENERIC_A`, `DC_GPIO_HPD_A`, etc. which come from a prerequisite GPIO infrastructure patch not in rc5. | Verify all symbol names used in a patch exist in the tree: `grep -r "DC_GPIO_GENERIC_A" src/linux-*/drivers/gpu/drm/amd/`. If absent, the patch depends on staging prerequisites and must be dropped. |
+| DCN401 GPIO lookup table patch (`334cbfa3c`) fails to compile | `drm/amd/display: convert dcn401 GPIO translation to lookup tables` uses `DC_GPIO_GENERIC_A`, `DC_GPIO_HPD_A` which come from a prerequisite GPIO infrastructure patch not in rc5. | Verify all symbol names used in a patch exist in the tree: `grep -r "DC_GPIO_GENERIC_A" src/linux-*/drivers/gpu/drm/amd/`. If absent, the patch depends on staging prerequisites and must be dropped. |
 | `git apply --check` better than `patch --dry-run` | `patch --dry-run` treats mbox-format patches differently and reports false "corrupt patch" errors. `git apply --check` handles both `git format-patch` and mbox formats correctly. | Use `git apply --check <file>` for dry-run testing. Use `git apply --check -R <file>` to test if a patch is already applied (reverse check). |
-| Outlook-sent ML patches arrive whitespace-mangled | The GFX12 CRIU fix (`1026`, amd-gfx 2026-08-04) came from a Microsoft-hosted address; lists.freedesktop.org stored it with every context line's leading space stripped and tabs→spaces, so neither `git apply --check` nor GNU `patch` could apply it verbatim. The `+`/`-` content was intact. | If the diff body's added lines survive but context is mangled, reconstruct against rc7 ground truth (use a sibling file the commit message says it's "modeled after" — e.g. the v11 MQD manager) and verify content-identical modulo whitespace before adopting. Pass BOTH `git apply --check` and `patch -p1 --forward --dry-run`. |
+| Outlook-sent ML patches arrive whitespace-mangled | The GFX12 CRIU fix (`1026`, amd-gfx 2026-08-04) came from a Microsoft-hosted address; lists.freedesktop.org stored it with every context line's leading space stripped and tabs→spaces, so neither `git apply --check` nor GNU `patch` could apply it verbatim. The `+`/`-` content was intact. | If the diff body's added lines survive but context is mangled, reconstruct against rc7 ground truth (use a sibling file the commit message says it's "modeled after" — for example, the v11 MQD manager) and verify content-identical modulo whitespace before adopting. Pass BOTH `git apply --check` and `patch -p1 --forward --dry-run`. |
 | `.orig`/`.rej` files from `patch` got committed into squashed patches | `patch` leaves `.orig`/`.rej` backup files next to modified sources; `git add -A` swept them into the squashed CachyOS patches as garbage hunks | Always `find . -name '*.orig' -delete; find . -name '*.rej' -delete` before `git add -A` when generating squashed patches |
 | Editing a patch's commit-message body changed its BLAKE2 checksum | Rewriting the 11 handmade patch descriptions (message bodies) invalidated their `b2sums`, so `makepkg` failed the source-validity check | Run `updpkgsums` after ANY change to a `.patch` file — not just `source=()` edits — then re-verify the full series applies |
 | `-m V4L2_LOOPBACK` in `prepare()` did nothing | `v4l2loopback` is an out-of-tree module, not a kernel config symbol; `scripts/config -m V4L2_LOOPBACK` is silently dropped by `olddefconfig` | For UVC webcams (incl. Android USB-webcam mode) enable the in-kernel driver instead: `-m USB_VIDEO_CLASS` (uvcvideo). v4l2loopback is installed via AUR (`v4l2loopback-dkms`) when needed |
 | Dropped the out-of-tree `r8125` module | The custom Realtek module blacklisted `r8169`; after removing it the NIC had no driver because `CONFIG_R8169` was not enabled | The in-kernel `r8169` covers the RTL8125B — when dropping `r8125`, set `_build_r8125=no` AND enable `-m R8169` in `prepare()` |
-| `disable_configs.py` cannot disable symbols that are `select`ed | `RESCTRL_FS` (AMD resctrl) and `SND_INTEL_NHLT` (HDA/audio) came back after `olddefconfig` because another option hard-`select`s them | For `select`-forced symbols, disable the selector (e.g. `X86_RESCTRL`) instead, or accept the tiny bloat; verify the built `.config` after each build |
+| `disable_configs.py` cannot disable symbols that are `select`ed | `RESCTRL_FS` (AMD resctrl) and `SND_INTEL_NHLT` (HDA/audio) came back after `olddefconfig` because another option hard-`select`s them | For `select`-forced symbols, disable the selector (for example, `X86_RESCTRL`) instead, or accept the tiny bloat; verify the built `.config` after each build |
 | CAKE flow-isolation directions are easy to get backwards | egress (upload) must use `dual-srchost`, ingress (download) `dual-dsthost` (per tc-cake(8)); a first draft had them swapped | Use `tc qdisc replace` and follow tc-cake(8): egress `dual-srchost nat ack-filter`, ingress `dual-dsthost wash nat`, with `rtt regional` and `overhead ethernet` for a direct Ethernet handoff |
-| A clean `git apply --check -R` on a candidate means it is ALREADY in the base tree | Sweeps kept re-proposing `f8ee6447e`, `7e1b4bdb0`, etc. that were already in rc5 | Treat a clean reverse check as "already in rc5" — record it and do not add it; only add candidates where the forward check is clean and the reverse check fails |
+| A clean `git apply --check -R` on a candidate means it is ALREADY in the base tree | Sweeps kept re-proposing `f8ee6447e`, `7e1b4bdb0` that were already in rc5 | Treat a clean reverse check as "already in rc5" — record it and do not add it; only add candidates where the forward check is clean and the reverse check fails |
 | cdn.kernel.org lagged the rc6 tag | `updpkgsums` 404'd on `cdn.kernel.org/pub/linux/kernel/v7.x/testing/linux-7.2-rc6.tar.gz` right after the tag was cut — the cdn mirrors RC tarballs late | Use `https://git.kernel.org/torvalds/t/linux-<tag>.tar.gz` in `source=()` when the cdn 404s |
 | gitlab.freedesktop.org persistent HTTP 503 | `drm-next` and `amd-staging-drm-next` fetches failed with `RPC failed; HTTP 503` for hours, blocking the sweep | Don't block the cycle: cover drm-next via `linux-next` and the AMD staging branch via `agd5f-linux`, and retry gitlab in the background |
 | `patch` leaves `.orig` backups in a git worktree | Regenerating the `01xx` squashes staged `.orig` backups created by `patch`, and they leaked into the squash as huge bogus deletions (`0105` ballooned 51 KB → 628 KB) | `find . -name '*.orig' -delete; find . -name '*.rej' -delete` after EVERY patch phase, before `git add`/`git diff` |
@@ -62,13 +62,13 @@ repeating a past mistake. Patch numbers are current as of 7.3-rc2; see
 | net-tune's download shaping silently never worked: `CONFIG_NET_SCH_INGRESS` was not set in the kernel, and the script used the `matchall` classifier (`CONFIG_NET_CLS_MATCHALL` also not set) | The ingress qdisc (`tc qdisc ... handle ffff: ingress`) cannot exist without NET_SCH_INGRESS, so every subsequent filter/mirred step failed behind `2>/dev/null \|\| true` — uploads shaped, downloads bufferbloated at line rate (102 ms spikes) | PKGBUILD must enable `NET_SCH_INGRESS` (=y) plus `IFB`/`NET_ACT_MIRRED`/`NET_CLS_U32` (=m) for CAKE SQM ingress; the script uses the u32 match-all idiom (`tc filter ... protocol all u32 match u32 0 0 action mirred egress redirect dev ifb4cake`). Verify the running kernel: `zcat /proc/config.gz \| grep NET_SCH_INGRESS`. net-tune.sh now checks for the ingress qdisc and logs a targeted ERROR |
 | `ENABLE_SQM=no` in the shipped `net-tune.conf` → net-tune.service applied latency tuning ONLY; no CAKE anywhere | The 07:52 build's `prepare()` prompt was skipped (no TTY), so `package()` fell back to the repo template, which defaulted `ENABLE_SQM=no`. Service "active (exited)" with status 0, root qdisc stayed `fq` (default), no `ifb4cake`, no ingress filter — bufferbloat test showed 103 ms download spikes with upload looking clean | The shipped template must default `ENABLE_SQM=yes` so an unattended build installs shaping, and the interactive prompt must default to Y (explicit "n" writes a disabled conf). A "successful" service run is not proof of shaping — verify with `tc qdisc show dev <iface>` (root `cake` AND `ingress ffff:`), `ip link show ifb4cake`, and `tc filter show dev <iface> ingress`. Fixed in pkgrel=2 |
 | Installing a pkgrel-bumped kernel over the running one deletes the running kernel's module tree | `pacman -U linux-sleepy-...rc6-2` while `rc6-1` is running upgrades the package and removes the old version's `/usr/lib/modules/7.2.0-rc6-1-sleepy/`. The still-running `-1` kernel then has zero modules, so `modprobe ifb` fails silently and net-tune logged `ERROR - ifb4cake missing` | The `-1`/`-2` vmlinuz and modules are byte-identical, so the reboot is trivial — but it is **required**: the running kernel must match the installed module dir before any `modprobe`. "No reboot needed" only holds when the module tree for the running kernel stays valid; after any pkgrel bump, reboot before exercising module-dependent features |
-| `git apply --check` passes but GNU `patch` (the prepare() tool) REJECTS the same patch — the reverse of the older lesson | The gfx12 IP-dump ordering fix (`4ef372319`) and the FFE defaults patch both passed `git apply --check` against the series tree but `patch -p1 --forward` (what `prepare()` actually runs) failed: git-apply tolerates offset/search where GNU patch is strict, and a hunk's leading `if (r)` context is ambiguous across sw_init's many error checks. Also 1127/1133 needed `execute_clk_mgr_block_sequence`/`notify_cstate_disable` context from LATER patches, so the source order had to be 1127→1128→1129 | **Always validate every candidate with the exact tool prepare() uses: `patch -p1 --forward --dry-run < patch`** against the series tree — not just `git apply --check`. When a patch's hunk context references symbols/fields another patch adds, that other patch MUST be numbered earlier in `source=()`. If a patch still won't apply under `patch` despite clean `git apply`, DROP it and document the reason (e.g. 9025) rather than hand-forcing it |
+| `git apply --check` passes but GNU `patch` (the prepare() tool) REJECTS the same patch — the reverse of the older lesson | The gfx12 IP-dump ordering fix (`4ef372319`) and the FFE defaults patch both passed `git apply --check` against the series tree but `patch -p1 --forward` (what `prepare()` actually runs) failed: git-apply tolerates offset/search where GNU patch is strict, and a hunk's leading `if (r)` context is ambiguous across sw_init's many error checks. Also 1127/1133 needed `execute_clk_mgr_block_sequence`/`notify_cstate_disable` context from LATER patches, so the source order had to be 1127→1128→1129 | **Always validate every candidate with the exact tool prepare() uses: `patch -p1 --forward --dry-run < patch`** against the series tree — not just `git apply --check`. When a patch's hunk context references symbols/fields another patch adds, that other patch MUST be numbered earlier in `source=()`. If a patch still won't apply under `patch` despite clean `git apply`, DROP it and document the reason (for example, 9025) rather than hand-forcing it |
 | `git -C <repo> apply --check <relative-path>.patch` fails with "can't open patch" | `git -C` changes the process CWD to the repo, so a relative patch path is resolved against the repo, not your shell's directory — every candidate check seemed to "fail" until absolute paths were used | Use absolute paths (or `$PWD/` prefix) for the patch file with `git -C <repo> apply --check "$PWD/file.patch"`. The repo-root patch files are NOT inside the kernel tree |
 | `git apply --check 2>&1 | head -3 && echo CLEAN` always prints CLEAN | The pipeline's exit status is `head`'s (0), masking git's failure — a false "it applies" signal that cost several prepare() iterations | Capture the REAL exit code: `git apply --check file > log 2>&1; echo "exit: $?"` and inspect `log`. Never trust `&& echo OK` after a pipeline |
 | Mailing-list series extraction needs `git mailinfo`, not raw mbox bodies | Extracting a 14-patch series (retry-fault v3) from the monthly amd-gfx mbox: raw `[PATCH N/14]` message bodies are usable but the Subject can contain folded header newlines that produce broken filenames (embedded `\n`), and quoted replies pollute thread mboxes | Split the full monthly mbox (`repos/mailing-lists/amd-gfx-2026-July.mbox`), find the original `[PATCH n/N]` submissions by Message-ID prefix, run `git mailinfo <msgfile> <bodyfile>` per message, and reconstruct each patch with `From:`/`Date:`/`Subject:` headers. Name files `NNNN-short-desc.patch` with NO embedded newlines — sanitize the Subject before using it in a filename |
-| A patch touching files absent from rc6 (e.g. `dcn60_resource.c` = DCN6, a future die) makes GNU `patch` reject the whole hunk, while `git apply` may tolerate it | The Roman.Li FFE-defaults patch (39/41) touched dcn30–dcn42b + dcn60; rc6 has no `dcn60/` directory, so prepare() aborted on that hunk even though `git apply --check` was clean | When a ML/staging patch spans a file that does not exist in rc6, strip that file's hunks as a **documented backport adjustment** (remove the `diff --git` block + its stats line + fix the "N files changed" line), then verify with `patch -p1 --forward --dry-run`. Record the strip in PATCH_SOURCES.md |
+| A patch touching files absent from rc6 (for example, `dcn60_resource.c` = DCN6, a future die) makes GNU `patch` reject the whole hunk, while `git apply` may tolerate it | The Roman.Li FFE-defaults patch (39/41) touched dcn30–dcn42b + dcn60; rc6 has no `dcn60/` directory, so prepare() aborted on that hunk even though `git apply --check` was clean | When a ML/staging patch spans a file that does not exist in rc6, strip that file's hunks as a **documented backport adjustment** (remove the `diff --git` block + its stats line + fix the "N files changed" line), then verify with `patch -p1 --forward --dry-run`. Record the strip in PATCH_SOURCES.md |
 | A `git apply --check`-clean patch can still FAIL TO COMPILE — apply-clean ≠ symbol-clean | 1025 (drm/amdgpu/gfx12 priv-fault user-queue recovery, drm-next `30f07c06`) applied cleanly to the rc7 series but the build died in `gfx_v12_0.c`: it references `adev->gfx.userq_priv_fault_work`/`userq_priv_fault_slots`, struct members that only exist via the gfx11 priv-fault worker infra landed in drm-next AFTER rc7 (`amdgpu_gfx.h` has only `userq_sch_*` in rc7) | The symbol-existence check must cover **struct members and helper functions the patch references, not just the files it touches**. Grep the referenced identifiers against the clean tree (`grep -rn "userq_priv_fault_work" repos/linux-7.2-rc7/drivers/gpu/drm/amd/`). If a member is added by an upstream prerequisite series absent from the base, DROP the patch and defer to the next version move — do not backport the whole prerequisite series in a bump |
-| Editing a `.patch` file with substring-based Edit calls can corrupt its format | The Edit tool matches a bare substring inside a `+`-prefixed patch line, so a multi-line replacement inserts the NEW lines WITHOUT the leading `+` — they become context lines and the patch's added-line counts go wrong (the MARIE 0.9.3 concede-print edit did exactly this) | For structural edits to a patch file (adding/moving hunks), apply them with a **line-based Python script** that matches full lines including the `+`/`-`/space prefix (assert count==1 before replacing). Single-line in-place value changes (e.g. `"0.9.2"`→`"0.9.3"`) are safe with Edit since the `+` stays. After ANY patch-file edit, re-verify with `patch --dry-run -Np1` against the series tree |
+| Editing a `.patch` file with substring-based Edit calls can corrupt its format | The Edit tool matches a bare substring inside a `+`-prefixed patch line, so a multi-line replacement inserts the NEW lines WITHOUT the leading `+` — they become context lines and the patch's added-line counts go wrong (the MARIE 0.9.3 concede-print edit did exactly this) | For structural edits to a patch file (adding/moving hunks), apply them with a **line-based Python script** that matches full lines including the `+`/`-`/space prefix (assert count==1 before replacing). Single-line in-place value changes (for example, `"0.9.2"`→`"0.9.3"`) are safe with Edit since the `+` stays. After ANY patch-file edit, re-verify with `patch --dry-run -Np1` against the series tree |
 | Adopting an upstream version bump wholesale can REGRESS local fixes | The firelzrd LRU-MARIE 0.9.3 patch is based on 7.2-rc1 and reverted our `vma_flags_test(&vma_flags, VMA_EXEC_BIT)` fix back to the old `(vm_flags & VM_EXEC)` API; it also restructures the `root_reclaim`/`lru_gen_shrink_node` `#ifdef` block | When bumping a carried patch's version, apply the **version delta** onto our already-series-adjusted patch rather than replacing it with the upstream tarball patch. For MARIE specifically: the 0.9.2→0.9.3 delta is the orphaned-L1-bit self-heal fix + `marie_dbg_orphan_bit[2]` counters + version string — keep our `vma_flags` fix and our block structure |
 | A stray backgrounded shell holding the reference tree's git index lock blocks EVERY foreground `git checkout` on that tree for minutes | A backgrounded apply-loop's `git checkout -q -- . && git clean -qfd` on `repos/linux-7.2-rc7` grabbed the index lock and then wedged at 0% CPU; every later foreground `git apply`/`git checkout` in that repo blocked behind it, producing silent 2-minute tool timeouts that looked like patch slowness | Before diagnosing a "slow" git operation on the reference tree, check for stray processes (`ps aux | grep -E "zsh.*linux-7.2-rc7|git checkout"`) and kill them; check `.git/index.lock` in the tree. Prefer writing multi-step shell logic to a script file and running `bash /tmp/x.sh` over long inline loops, and always capture the real exit status (`set -o pipefail`) so a pipeline's last command doesn't mask a failure |
 | Regenerating a revert-patch (`0106-cachy-drops`) with `patch -R` silently SKIPS hunks it can't reverse, leaving an inconsistent tree (a `goto` without its label → `undeclared label` build error) | Reversing the `0022` usbcore-quirk member of the fixes branch with `patch --reverse -f` (stderr discarded) dropped some config.c hunks — the build then failed with `use of undeclared label 'store_and_parse'` in `drivers/usb/core/config.c`. The off-target revert is only correct when it returns those files byte-identical to the pre-fixes baseline | Generate squashes and their reverts by **git diff between commits**, never by reverse-applying the source patches: commit the series baseline, commit the full branch application, then `git diff <baseline> <full> > 01xx-squash.patch` and `git diff <full> <baseline> -- <off-target-files> > 01xx-drops.patch`. Verify the net effect by applying the drops onto the full state and `git diff --quiet <baseline>` for every off-target file |
@@ -76,7 +76,7 @@ repeating a past mistake. Patch numbers are current as of 7.3-rc2; see
 
 ---
 
-## 2026-08-10 hardware investigation — blackscreen + self-reboot root cause
+## 2026-08-10 hardware investigation: blackscreen + self-reboot root cause
 
 `last -x` and the persistent journal revealed boot `e2839a9` (2026-08-09
 16:29 → 21:36, 5 h) ended in a **silent hard reset**: journal stops abruptly
@@ -104,7 +104,7 @@ boot-time clocksource message separately); (4) reduce SMU DPM transitions as a
 stopgap (LACT `power_dpm_force_performance_level=high`); (5) file/bump a bug
 against !5538. The patch-sweep skill now greps for this class every run.
 
-### 2026-08-10 follow-up — full journal cross-check (log1.txt + log2.txt)
+### 2026-08-10 follow-up: full journal cross-check (log1.txt + log2.txt)
 
 `log2.txt` is a `journalctl` export spanning Aug 05 → Aug 10 (grabbed via
 `sudo journalctl` on Aug 10 07:54). `log1.txt` is the dmesg of a 7.2.0-rc6
@@ -155,21 +155,22 @@ fix to backport yet; monitor via the GraphQL comment check each sweep.
 
 ---
 
-## 2026-09-13 — the display "box" root-caused: cosmic-comp overlay-plane scanout
+## 2026-09-13: the display "box" root-caused: cosmic-comp overlay-plane scanout
 
 **Symptom (as finally described precisely).** A rectangular artifact over
 application windows. Decisive traits: it does **not** appear in screenshots; it
-can be **dismissed by moving the cursor over it**; it appears on **one monitor at
-a time**, moving to whichever monitor last had **VRR toggled**; and it persists
-**regardless of the VRR state itself** (the *toggle*, not the mode, matters).
+can be **dismissed by moving the cursor over it**; it appears on **one monitor
+at a time**, moving to whichever monitor last had **VRR toggled**; and it
+persists **regardless of the VRR state itself** (the *toggle*, not the mode,
+matters).
 
-**What was ruled out, with evidence.** All four connectors report
-`PSR support 0, sink PSR ver 0, DPCD caps 0x0`, so PSR/Replay cannot be
-involved. The `Failed to setup vendor infoframe … -22` warning seen every boot is
-**benign** — `drm_hdmi_vendor_infoframe_from_display_mode()` documents the EINVAL
-as *"safely ignored"* for non-4K modes, and `hv_frame` is `memset` first. PSR,
-Replay, and the infoframe warning were all red herrings that had previously been
-treated as candidates.
+**What was ruled out, with evidence.** All four connectors report `PSR support
+0, sink PSR ver 0, DPCD caps 0x0`, so PSR/Replay cannot be involved. The `Failed
+to setup vendor infoframe … -22` warning seen every boot is **benign** —
+`drm_hdmi_vendor_infoframe_from_display_mode()` documents the EINVAL as *"safely
+ignored"* for non-4K modes, and `hv_frame` is `memset` first. PSR, Replay, and
+the infoframe warning were all red herrings that had previously been treated as
+candidates.
 
 **The misattribution to chase.** The August diagnosis in `PKGBUILD` was: on
 DCN401, IPS/DPG pipe-gating makes `hubp2_is_flip_pending()` return false
@@ -182,8 +183,8 @@ comment in `f64a9be56536` concedes the same gap: *"…DCN HUBP may be clock-gate
 so the flip-pending status may be undefined"* — AMD's fix is knowingly
 unreliable there.)
 
-**Root cause.** **`cosmic-comp` handing fullscreen content to an overlay plane.**
-Two reproducible levers, both of which clear it:
+**Root cause.** **`cosmic-comp` handing fullscreen content to an overlay
+plane.** Two reproducible levers, both of which clear it:
 
 | Setting (in `/etc/environment`, then re-login) | Effect |
 |---|---|
@@ -221,7 +222,7 @@ plane).
 
 ---
 
-## Durable findings — moved out of `CLAUDE.md` (2026-09-13)
+## Durable findings: moved out of `CLAUDE.md` (2026-09-13)
 
 `CLAUDE.md` is loaded into every session; its budget is small. These are the
 long-form versions of findings that are now one-line pointers there. **Read this
@@ -230,16 +231,17 @@ file before acting on any of them.**
 ### Patch-source access
 
 - **lore.kernel.org git endpoints are NOT Anubis-gated** (only the web UI is):
-  `git clone --mirror https://lore.kernel.org/<list>/<epoch>` works (e.g.
-  `lkml/20`, `rust-for-linux/0`); messages are commits, raw email is blob `m`.
-- **The epoch digit is a time shard, not a list id** (2026-09-12). `/<list>/0` is
-  the *oldest* shard, so a mirror of it can have its newest message years in the
-  past while `refs/heads/master` still matches the remote — fresh-looking and
-  silently useless (a full `netdev/0` mirror ended at 2017-11-02). Probe with
-  `git ls-remote` and clone the **highest** epoch: netdev `0,1,2,3` (use `/3`),
-  linux-fsdevel `0,1` (use `/1`), linux-mm `0,1,2` (use `/2`; `/0` ends 2021).
-  io-uring, linux-block, linux-nvme, linux-pm are `/0` only. `--shallow-since`
-  fails **server-side** for `netdev/*` and `linux-fsdevel/*`
+  `git clone --mirror https://lore.kernel.org/<list>/<epoch>` works (for
+  example, `lkml/20`, `rust-for-linux/0`); messages are commits, raw email is
+  blob `m`.
+- **The epoch digit is a time shard, not a list id** (2026-09-12). `/<list>/0`
+  is the *oldest* shard, so a mirror of it can have its newest message years in
+  the past while `refs/heads/master` still matches the remote — fresh-looking
+  and silently useless (a full `netdev/0` mirror ended at 2017-11-02). Probe
+  with `git ls-remote` and clone the **highest** epoch: netdev `0,1,2,3` (use
+  `/3`), linux-fsdevel `0,1` (use `/1`), linux-mm `0,1,2` (use `/2`; `/0` ends
+  2021). io-uring, linux-block, linux-nvme, linux-pm are `/0` only.
+  `--shallow-since` fails **server-side** for `netdev/*` and `linux-fsdevel/*`
   (`error processing shallow info: 4`, reproducible) but works for the
   single-epoch lists; shallow-clone the highest epoch instead.
 - **Match a Message-ID with an anchored header regex, never a substring grep.**
@@ -250,50 +252,53 @@ file before acting on any of them.**
   *email* is a commit, so `format-patch -1 <sha>` produces a diff **of the email
   headers**, not the code — the file then contains DKIM/Received noise plus the
   hunk text as context. It fails to apply and `patch --forward` reports
-  "Skipping patch", which reads exactly like *already applied* and produced three
-  false "nothing to do" verdicts in one session. Extract the blob `m` and
+  "Skipping patch", which reads exactly like *already applied* and produced
+  three false "nothing to do" verdicts in one session. Extract the blob `m` and
   MIME-decode the body instead (Python `email`), as with quoted-printable mails.
   Real git clones (torvalds, linux-next, akpm-mm, drm-next) are fine — only the
   lore mirrors are message-per-commit.
 - **GitLab: use the REST API, not a browser** (2026-09-12).
   gitlab.freedesktop.org is Anubis-gated for browser-like clients; headless
   Helium gets the challenge and cannot clear the PoW. Plain `curl` with **no
-  User-Agent** works (~0.1 s). Code project = `agd5f%2Flinux`; `drm%2Famd` is the
-  stale group mirror (master from 2025) — its only use is the issue tracker.
+  User-Agent** works (~0.1 s). Code project = `agd5f%2Flinux`; `drm%2Famd` is
+  the stale group mirror (master from 2025) — its only use is the issue tracker.
   No GitHub/kernel.org mirror exists. Endpoints:
-  `/repository/{branches,commits}`, `/commits/<sha>/diff`, `/files/<path>/raw?ref=`.
+  `/repository/{branches,commits}`, `/commits/<sha>/diff`,
+  `/files/<path>/raw?ref=`.
 - **Verify clones are FRESH before trusting a sweep** (2026-09-12). Stale and
   corrupt clones repeatedly produced wrong "nothing new" conclusions. Check the
   *remote-tracking ref you actually read* against the remote, not the local
-  branch (`git rev-parse refs/remotes/origin/<b>` vs
-  `git ls-remote <url> refs/heads/<b>`). **Shallow clones cannot always
-  fast-forward** — `git fetch` reports success but the ref never moves; if the
-  SHAs differ after a fetch, **re-clone** (`--shallow-since`, never `--depth=1`).
-  A corrupt pack (`pack has N unresolved deltas`) also needs a re-clone.
-  `gitlab.freedesktop.org` is intermittently unreachable — when it times out,
-  cover drm content via `repos/linux-next` and retry later.
+  branch (`git rev-parse refs/remotes/origin/<b>` vs `git ls-remote <url>
+  refs/heads/<b>`). **Shallow clones cannot always fast-forward** — `git fetch`
+  reports success but the ref never moves; if the SHAs differ after a fetch,
+  **re-clone** (`--shallow-since`, never `--depth=1`). A corrupt pack (`pack has
+  N unresolved deltas`) also needs a re-clone. `gitlab.freedesktop.org` is
+  intermittently unreachable — when it times out, cover drm content via
+  `repos/linux-next` and retry later.
 
 ### Hardware traps
 
 - **GC 12.0 ≠ GC 12.1.** Navi 48 (RX 9070 XT) is GC IP **(12,0,1)** → uses
   `gfx_v12_0.c`. `gfx_v12_1.c` is a *different chip* — amd-staging commits
-  touching it are **not ours**. Check `IP_VERSION(12,0,x)` vs `IP_VERSION(12,1,0)`
-  in `amdgpu_discovery.c` before adopting any gfx12 patch.
-- **Never carry the DCN4 flip-schedule patches `9051`/`9052`.** AMD reverted both
-  upstream (*"Because it causes some regression"*, `dml2_core_dcn4_calcs.c`,
-  DCN4 = this GPU). They make the flip-bandwidth math more conservative and
-  mis-schedule flips — the prime suspect for scanout artifacts.
-- **`ld.mold` cannot link the kernel** — re-verified 2026-09-12 on mold 2.42.1: it
-  rejects `OUTPUT_ARCH(...)`, `ENTRY(...)` and `SECTIONS{}` in `-T` scripts with
-  `unknown linker script token`, and `arch/x86/kernel/vmlinux.lds` opens with
-  `OUTPUT_ARCH`, so it fails immediately. An upstream mold limitation (partial
-  ld-script support), not a local misconfiguration — there is no flag or
-  workaround. Keep `ld.lld` (`LD=ld.lld`).
+  touching it are **not ours**. Check `IP_VERSION(12,0,x)` vs
+  `IP_VERSION(12,1,0)` in `amdgpu_discovery.c` before adopting any gfx12 patch.
+- **Never carry the DCN4 flip-schedule patches `9051`/`9052`.** AMD reverted
+  both upstream (*"Because it causes some regression"*,
+  `dml2_core_dcn4_calcs.c`, DCN4 = this GPU). They make the flip-bandwidth math
+  more conservative and mis-schedule flips — the prime suspect for scanout
+  artifacts.
+- **`ld.mold` cannot link the kernel** — re-verified 2026-09-12 on mold 2.42.1:
+  it rejects `OUTPUT_ARCH(...)`, `ENTRY(...)` and `SECTIONS{}` in `-T` scripts
+  with `unknown linker script token`, and `arch/x86/kernel/vmlinux.lds` opens
+  with `OUTPUT_ARCH`, so it fails immediately. An upstream mold limitation
+  (partial ld-script support), not a local misconfiguration — there is no flag
+  or workaround. Keep `ld.lld` (`LD=ld.lld`).
 
 ### Behaviour that silently does nothing
 
-- **A `select`ed symbol cannot be disabled** by `disable_configs.py` — disable the
-  selector instead, or accept the bloat; verify the built `.config` afterwards.
+- **A `select`ed symbol cannot be disabled** by `disable_configs.py` — disable
+  the selector instead, or accept the bloat; verify the built `.config`
+  afterwards.
 - **`scripts/config --set-str` on a symbol that no longer exists is silently
   dropped by `olddefconfig`.** Found twice: `MQ_IOSCHED_ADIOS` (no patch adds
   `block/adios.c` — the package advertised an `ADIOS-MODULE` it never shipped)
@@ -306,10 +311,10 @@ file before acting on any of them.**
   `!scx_switched_all()`). Both mean carried MGLRU and `fair.c` patches earn
   nothing while those are active — check what actually owns the subsystem before
   crediting a patch with a win.
-- **The live `prepare()` dry-run-gates every patch** and prints
-  `SKIPPED: <reason>` for a miss, then deletes `.rej` files — so a past build tree
-  with zero `.rej` does *not* prove every patch applied. Check the build output
-  for `SKIPPED`, and still run the cumulative apply.
+- **The live `prepare()` dry-run-gates every patch** and prints `SKIPPED:
+  <reason>` for a miss, then deletes `.rej` files — so a past build tree with
+  zero `.rej` does *not* prove every patch applied. Check the build output for
+  `SKIPPED`, and still run the cumulative apply.
 - **`0110-cachy-config-hooks.patch` applies only with fuzz** on rc2 — its
   `bus_lock.c` hunk carries `CONFIG_PROC_SYSCTL` context where rc2 has
   `CONFIG_SYSCTL`. `git apply --check` rejects it; `patch -p1 --forward -F2`
@@ -318,12 +323,11 @@ file before acting on any of them.**
 ### Repository identity
 
 - **There is exactly one package, and it lives in `sleepy-next/`**
-  (single-package since 2026-09-12). Confirm with
-  `grep -m1 '^_major=' sleepy-next/PKGBUILD` and, for a built artifact with
-  `.BUILDINFO`'s `builddir`. A stale second patch tree used to exist at the repo
-  root (174 files for the dropped 7.2 package); applying it to a 7.3-rc2 base
-  produced ~97 spurious failures — the wrong series, not a broken one. If you see
-  a large block of failures, check *which* tree you applied before concluding
-  anything.
-- **Build time is ~8 min** with the kbuild speedup series (`2300`–`2322`). A full
-  rebuild is cheap — prefer rebuilding over guessing.
+  (single-package since 2026-09-12). Confirm with `grep -m1 '^_major='
+  sleepy-next/PKGBUILD` and, for a built artifact with `.BUILDINFO`'s
+  `builddir`. A stale second patch tree used to exist at the repo root (174
+  files for the dropped 7.2 package); applying it to a 7.3-rc2 base produced ~97
+  spurious failures — the wrong series, not a broken one. If you see a large
+  block of failures, check *which* tree you applied before concluding anything.
+- **Build time is ~8 min** with the kbuild speedup series (`2300`–`2322`). A
+  full rebuild is cheap — prefer rebuilding over guessing.

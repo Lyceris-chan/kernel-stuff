@@ -21,9 +21,9 @@ python3 .claude/skills/kernel-verify/scripts/verify.py --tier deep --tree <prepa
 python3 .claude/skills/kernel-verify/scripts/verify.py --tier all --tree <tree>
 ```
 
-Exit status is `0` when every check passed, `1` when one failed, and `2` when the
-environment is unusable (no PKGBUILD, bad `--tree`). `--json` emits the results
-for a hook or CI to consume.
+Exit status is `0` when every check passed, `1` when one failed, and `2` when
+the environment is unusable (no PKGBUILD, bad `--tree`). `--json` emits the
+results for a hook or CI to consume.
 
 ## What the tiers cost and cover
 
@@ -33,16 +33,16 @@ for a hook or CI to consume.
 | `series` | ~1–2 min | `repos/linux-next` | the whole series applies cumulatively to the base tag |
 | `deep` | minutes | a prepared kernel tree | `checkpatch.pl --strict` on the patches we authored; `sparse` (`make C=1`) over the directories the series touches |
 
-**A missing tool is a `SKIP` with the reason, never a silent pass** — that is the
-point of the tiering. `--tier all` without `--tree` runs the sparse check as a
-skip and says why.
+**A missing tool is a `SKIP` with the reason, never a silent pass** — that is
+the point of the tiering. `--tier all` without `--tree` runs the sparse check as
+a skip and says why.
 
 ## The wrong tools, and why
 
 Do not reach for `cppcheck` here. It cannot parse kernel headers or the macro
 soup in `linux/`, and no kernel developer runs it on the tree — it produces
-thousands of false positives and hides real findings. The kernel's own tooling is
-strictly better and is what this suite uses:
+thousands of false positives and hides real findings. The kernel's own tooling
+is strictly better and is what this suite uses:
 
 | Tool | Role | Availability here |
 |---|---|---|
@@ -56,19 +56,19 @@ strictly better and is what this suite uses:
 
 Each check exists because this project has actually got it wrong:
 
-- **`b2sums` current** — forgetting `updpkgsums` after a patch edit is the single
-  most common cause of a build that refuses to start.
+- **`b2sums` current** — forgetting `updpkgsums` after a patch edit is the
+  single most common cause of a build that refuses to start.
 - **Patch numbers documented** — a patch in `source=()` but absent from
   `PATCH_SOURCES.md` is a provenance failure.
 - **Documented claims** — `docs/README.md` has twice claimed a stale patch count
   and base version while `PKGBUILD` moved on.
 - **Dangling symlinks** — dropped patches leave their `NNNN-*.patch` symlink
   behind, which misleads the next audit.
-- **Cumulative apply** — neither `git apply --check` nor a single-patch dry-run is
-  sufficient; see the `kernel-build` skill.
-- **checkpatch on our own patches only** — `0001`–`0049` are the ones we wrote, so
-  upstream style applies to them. Backports are reviewed upstream already, and
-  running checkpatch over 130 of them buries the signal.
+- **Cumulative apply** — neither `git apply --check` nor a single-patch dry-run
+  is sufficient; see the `kernel-build` skill.
+- **checkpatch on our own patches only** — `0001`–`0049` are the ones we wrote,
+  so upstream style applies to them. Backports are reviewed upstream already,
+  and running checkpatch over 130 of them buries the signal.
 
 ## Deep tier needs a prepared tree
 

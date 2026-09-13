@@ -1,6 +1,6 @@
-# sleepy-next — patch provenance
+# sleepy-next: patch provenance
 
-## 2026-09-13 (later) — ten upstream fixes from the distro-patchset / stable sweep (175 patches, pkgrel 10)
+## 2026-09-13 (later): ten fixes from the distro/stable sweep (pkgrel 10)
 
 All ten apply cleanly (cumulative, 175/175, 0 failures). Eight are `Cc: stable`
 bug fixes; two are `mm-new` material not yet merged.
@@ -14,9 +14,9 @@ bug fixes; two are `mm-new` material not yet merged.
 | `2007` | `zsmalloc: remove old object read API` — `f2ae543ebcc5` | Second half of the same series; removes the now-unused API. Must be applied after `2006`. |
 | `2008` | `io_uring/io-wq: stop a single cancel after one running match` — `39f6223d4002`, `Cc: stable` | One `IORING_ASYNC_CANCEL_ONE` currently cancels in *both* the bounded and unbounded accounts, killing an unrelated op. rc2 `io-wq.c:1184` discards the `bool`. |
 | `2141` | `mm: filemap: retain mapped dropbehind folios` — Wenjie Qi, `848d2ce2fce1`, `Cc: stable`, `Fixes fb7d3bc41493` | Don't unmap mapped folios on dropbehind; also fixes a sleeping-in-atomic warning. Dropbehind is `fadvise(DONTNEED)` / streaming I/O — browsers and compositors. |
-| `2142` | `mm/vmscan: avoid pointless large folio splits without swap` — Barry Song + Xueyuan Chen, `bd7fcb0dea86` (akpm `mm-new`, Ack Hildenbrand, R-b Baolin Wang) | Uses `-E2BIG` from `folio_alloc_swap()` as the *only* split signal. When swap is exhausted — i.e. **zram full** — splitting an mTHP cannot make swapout progress, it only destroys the mTHP. Verified against our `2101` MARIE tree: the hunk lands at `vmscan.c:1561` as `if (ret != -E2BIG)`. |
+| `2142` | `mm/vmscan: avoid pointless large folio splits without swap` — Barry Song + Xueyuan Chen, `bd7fcb0dea86` (akpm `mm-new`, Ack Hildenbrand, R-b Baolin Wang) | Uses `-E2BIG` from `folio_alloc_swap()` as the *only* split signal. When swap is exhausted — that is, **zram full** — splitting an mTHP cannot make swapout progress, it only destroys the mTHP. Verified against our `2101` MARIE tree: the hunk lands at `vmscan.c:1561` as `if (ret != -E2BIG)`. |
 | `2501` | `x86/MCE/AMD: Fix inverted interrupt enablement during storm handling` — Jasjeet Rangi, `d2929113b15b`, `Cc: stable`, `Fixes 5c4663ed1eac` | Enables threshold IRQs when a storm *ends* and disables them when it starts — backwards. The culprit **is** in rc2, and this is the CPU we actually run. Also queued for rc3, so free at the next bump. |
-| `2600` | `hrtimer: Use hard expiry when updating timers on the same base` — Parri, `c5dcb3aadc18`, `Cc: stable` | Rearming a queued timer with slack left the timerqueue mis-sorted, so next-event selection could fire *earlier* than the head's hard expiry. Mistimed wakeups affect compositor timers, `timerfd`, and `poll`/`epoll` — i.e. frame pacing. **New range `2600–2699` = time / timers.** |
+| `2600` | `hrtimer: Use hard expiry when updating timers on the same base` — Parri, `c5dcb3aadc18`, `Cc: stable` | Rearming a queued timer with slack left the timerqueue mis-sorted, so next-event selection could fire *earlier* than the head's hard expiry. Mistimed wakeups affect compositor timers, `timerfd`, and `poll`/`epoll` — that is, frame pacing. **New range `2600–2699` = time / timers.** |
 
 **Framing finding recorded (2026-09-13):** `scx_loader` is active with
 `default_sched = "scx_cake"` (live: `state=enabled`, `ops=cake_1.2.1`), and rc2
@@ -32,22 +32,46 @@ their keep while it is.
 
 **Evaluated and rejected from the same sweep:**
 
-- **linux-zen** — no 7.3 line (tags stop at `v7.2.4-zen2`); `zen-sauce` is now mostly Alfred Chen's out-of-tree `sched/alt` (BMQ/PDS), which we cannot adopt (we run EEVDF + sched-ext). Its `ZEN_INTERACTIVE` tunables are already duplicated by our `0110` config hooks, and rc2 already contains the whole dmem-ttm-v8 series.
-- **linux-tkg / XanMod** — mostly duplicates of `0110`. XanMod's one interesting item (firelzrd's `le9uo` working-set protection) hooks `shrink_folio_list()`/`get_scan_count()`, which our MARIE replaces, and its own last port is 7.1-rc1 (2026-05-01). Its "rwsem spin faster" flag drops `cpu_relax()` from the spin loop — bad on SMP. **Snake oil rejected:** `VM_READAHEAD_PAGES`, `dirty_ratio=50`, Polly (our prebuilt LLVM has none), `-fmodulo-sched`/`-fivopts` (GCC-only).
-- **Clear Linux** — dead: orgs archived 2025-08; last kernel 6.15.7. Only config-level items remained.
-- **evdev `call_rcu` instead of `synchronize_rcu`** (XanMod = zen = tkg, identical payload; Kenny Levinsen, 2020) — genuinely attractive on paper (author: 1000× open/close 27.1 s → 0.018 s, and VT switches / compositor restarts close many evdev fds, which is our COSMIC case). **Not taken:** never merged upstream in five years, and I did not establish *why*. That is a question worth answering before carrying it, not an assumption to make.
-- **`nvme: bump genctr when cancelling a request`** (`7f607455c3b9`, 2026-09-13) — 2 hunks fail to apply against rc2; needs a rebase. Phison E16 relevant, so worth revisiting.
-- **`finish_task_switch() always-inline`** (zen/tkg) — the author's −34.8% figure is for spectre_v2 *retpolines*; this box reports `Enhanced / Automatic IBRS`, so only the ~−8.6% clang function-level case applies (sub-0.3% end-to-end) at the cost of forcing ~20 functions inline. Skipped.
+- **linux-zen** — no 7.3 line (tags stop at `v7.2.4-zen2`); `zen-sauce` is now
+  mostly Alfred Chen's out-of-tree `sched/alt` (BMQ/PDS), which we cannot adopt
+  (we run EEVDF + sched-ext). Its `ZEN_INTERACTIVE` tunables are already
+  duplicated by our `0110` config hooks, and rc2 already contains the whole
+  dmem-ttm-v8 series.
+- **linux-tkg / XanMod** — mostly duplicates of `0110`. XanMod's one interesting
+  item (firelzrd's `le9uo` working-set protection) hooks
+  `shrink_folio_list()`/`get_scan_count()`, which our MARIE replaces, and its
+  own last port is 7.1-rc1 (2026-05-01). Its "rwsem spin faster" flag drops
+  `cpu_relax()` from the spin loop — bad on SMP. **Snake oil rejected:**
+  `VM_READAHEAD_PAGES`, `dirty_ratio=50`, Polly (our prebuilt LLVM has none),
+  `-fmodulo-sched`/`-fivopts` (GCC-only).
+- **Clear Linux** — dead: orgs archived 2025-08; last kernel 6.15.7. Only
+  config-level items remained.
+- **evdev `call_rcu` instead of `synchronize_rcu`** (XanMod = zen = tkg,
+  identical payload; Kenny Levinsen, 2020) — genuinely attractive on paper
+  (author: 1000× open/close 27.1 s → 0.018 s, and VT switches / compositor
+  restarts close many evdev fds, which is our COSMIC case). **Not taken:** never
+  merged upstream in five years, and I did not establish *why*. That is a
+  question worth answering before carrying it, not an assumption to make.
+- **`nvme: bump genctr when cancelling a request`** (`7f607455c3b9`, 2026-09-13)
+  — 2 hunks fail to apply against rc2; needs a rebase. Phison E16 relevant, so
+  worth revisiting.
+- **`finish_task_switch() always-inline`** (zen/tkg) — the author's −34.8%
+  figure is for spectre_v2 *retpolines*; this box reports `Enhanced / Automatic
+  IBRS`, so only the ~−8.6% clang function-level case applies (sub-0.3%
+  end-to-end) at the cost of forcing ~20 functions inline. Skipped.
 
-**Config-only levers noted, not applied:** `preempt=lazy` on the cmdline (runtime-switchable here; A/B only, interacts with scx), `rq_affinity=2` per disk, `vm.compact_unevictable_allowed=0`, `kernel.sched_cfs_bandwidth_slice_us=3000`.
+**Config-only levers noted, not applied:** `preempt=lazy` on the cmdline
+(runtime-switchable here; A/B only, interacts with scx), `rq_affinity=2` per
+disk, `vm.compact_unevictable_allowed=0`,
+`kernel.sched_cfs_bandwidth_slice_us=3000`.
 
 **Caveat recorded for future audits:** `0110-cachy-config-hooks.patch` applies
 only **with fuzz** on rc2 — its `bus_lock.c` hunk has `CONFIG_PROC_SYSCTL`
 context where rc2 has `CONFIG_SYSCTL`. `git apply --check` rejects it; the
-build's `patch -p1 --forward -F2` accepts it. Harmless today, but it is precisely
-the "0 `.rej` does not prove application" trap in `LESSONS.md`.
+build's `patch -p1 --forward -F2` accepts it. Harmless today, but it is
+precisely the "0 `.rej` does not prove application" trap in `LESSONS.md`.
 
-## 2026-09-13 — HDMI RGB quantization fix + six verified fixes (165 patches)
+## 2026-09-13: HDMI RGB quantization fix + six verified fixes (165 patches)
 
 **Added — `1158`, DMCUB busy-wait fix.** Sultan Alsawaf (kerneltoast),
 `drm/amd/display: Fix high busy wait load in dmub_srv_wait_for_idle()`, commit
@@ -55,8 +79,8 @@ the "0 `.rej` does not prove application" trap in `LESSONS.md`.
 2025-08-25).
 
 `dmub_srv_wait_for_idle()` polls with `udelay(1)` in a loop bounded by
-`timeout_us`, and callers pass up to **100000** — i.e. as much as 100 ms of pure
-CPU spinning, per call, in the DMCUB path that **DCN401 uses**
+`timeout_us`, and callers pass up to **100000** — that is, as much as 100 ms of
+pure CPU spinning, per call, in the DMCUB path that **DCN401 uses**
 (`dc_dmub_srv.c:165,283`). The patch replaces the fixed 1 µs spin with
 progressive backoff: 1 µs for the first 3 iterations, then 10 µs, then 100 µs,
 using `usleep_range()` when `preemptible()` so the CPU can actually idle.
@@ -72,26 +96,28 @@ above it has the same pattern and is untouched.
 **Evaluated and not taken from the same tree:**
 - The kswapd trio (`1e10be67699e`, `0a28ea9693cb`, `4632bdecee3e` — *Stop kswapd
   early* / *Don't stop kswapd on a per-node basis* / *Increment kswapd_waiters*)
-  is a genuinely desktop-targeted series, but it **fails to apply**: 2 of 3 hunks
-  in `mm/page_alloc.c` and the `mm/internal.h` hunk are rejected, because LRU-MARIE
-  (`2101`) rewrites those same files. It needs a deliberate rebase against the
-  series state, not a mechanical fix.
-- `47b020a24ae3` (*Revert "cpumask: limit FORCE_NR_CPUS to just the UP case"*) is
-  inert unless `CONFIG_NR_CPUS` is exactly 16 **and** `CONFIG_FORCE_NR_CPUS=y`
-  (ours is 512 for hotplug headroom). Upstream restricted it to UP precisely
-  because a wrong `NR_CPUS` breaks the kernel — **not worth the risk**.
+  is a genuinely desktop-targeted series, but it **fails to apply**: 2 of 3
+  hunks in `mm/page_alloc.c` and the `mm/internal.h` hunk are rejected, because
+  LRU-MARIE (`2101`) rewrites those same files. It needs a deliberate rebase
+  against the series state, not a mechanical fix.
+- `47b020a24ae3` (*Revert "cpumask: limit FORCE_NR_CPUS to just the UP case"*)
+  is inert unless `CONFIG_NR_CPUS` is exactly 16 **and**
+  `CONFIG_FORCE_NR_CPUS=y` (ours is 512 for hotplug headroom). Upstream
+  restricted it to UP precisely because a wrong `NR_CPUS` breaks the kernel —
+  **not worth the risk**.
 - `e5b7e9d87ace` (*Lower the non-hugetlbpage pageblock size*) is **superseded
-  upstream** by `CONFIG_PAGE_BLOCK_MAX_ORDER` (currently 10 in our config), so it
-  is a config-only lever — and lowering it with `TRANSPARENT_HUGEPAGE_ALWAYS=y`
+  upstream** by `CONFIG_PAGE_BLOCK_MAX_ORDER` (currently 10 in our config), so
+  it is a config-only lever — and lowering it with
+  `TRANSPARENT_HUGEPAGE_ALWAYS=y`
   + `HUGETLBFS=y` risks both THP success and 2 MB hugetlb (the Kconfig help says
   so). Not taken.
 
 **Already carried, confirmed at runtime (do not re-add):**
 `vm.watermark_boost_factor=0` and `vm.compaction_proactiveness=0` are live via
 the CachyOS `0110` config hooks under `CONFIG_CACHY` (which `PKGBUILD` forces on
-with `scripts/config -e CACHY` — note `config:43` still reads
-`# CONFIG_CACHY is not set`, so the config file alone is misleading here). And
-our `0111-cachy-acpi-disable-bus-master-check-for-AMD.patch` **is** kerneltoast's
+with `scripts/config -e CACHY` — note `config:43` still reads `# CONFIG_CACHY is
+not set`, so the config file alone is misleading here). And our
+`0111-cachy-acpi-disable-bus-master-check-for-AMD.patch` **is** kerneltoast's
 patch verbatim, re-applied to 7.3 by CachyOS under the same `From:` line — his
 work is already partly ingested.
 
@@ -119,10 +145,10 @@ one, under the merged tip subject.
 
 **Not taken from that sweep, deliberately:** the other two commits in
 `sched-urgent-2026-09-13` (`c23810313bdf`, `f5741d2b3451`) are *proxy-execution*
-work, not standalone fixes; sirlucjan's zstd 7.3 refresh breaks our `2128`/`2130`
-BMI2 patches and needs a rebase; the MCE v6 series arrives via Outlook and would
-need reconstruction (see `LESSONS.md`); `r8169` LTR is latent only while we boot
-`pcie_aspm=off`.
+work, not standalone fixes; sirlucjan's zstd 7.3 refresh breaks our
+`2128`/`2130` BMI2 patches and needs a rebase; the MCE v6 series arrives via
+Outlook and would need reconstruction (see `LESSONS.md`); `r8169` LTR is latent
+only while we boot `pcie_aspm=off`.
 
 ### HDMI RGB quantization fix (`1155`–`1157`)
 
@@ -155,7 +181,7 @@ predicates.
 `bdcd0411d7d1` (`Propagate HDMI RGB quantization selectability`, linux-next
 20260911) and `a56a5007452c` (amd-staging) are **not** in `v7.3-rc2`, so our
 HDMI path does not have the fix. The series is in linux-next and
-`amd-staging-drm-next`, i.e. accepted AMD work. We carry `6eb4c13a3845`
+`amd-staging-drm-next`, that is, accepted AMD work. We carry `6eb4c13a3845`
 ("Support 'Broadcast RGB' drm property") in the rc2 base, so the property itself
 already exists.
 
@@ -175,7 +201,7 @@ DCN401 over HDMI) matches the user's trigger exactly.
 **Audit.** The full **159-patch series applies to pristine v7.3-rc2 with 0
 failures** (cumulative `patch -Np1 --forward`).
 
-## 2026-09-12 — MM/sched optimizations + ADIOS cleanup (156 patches, pkgrel 7)
+## 2026-09-12: MM/sched optimizations + ADIOS cleanup (156 patches, pkgrel 7)
 
 Six-source sweep (linux-mm, akpm `mm-unstable`, linux-pm, sched-ext/lkml,
 block/net/fs, sirlucjan). Nine patches added; all nine were verified by
@@ -237,7 +263,7 @@ sched_ext lazy preemption (inert — `CONFIG_PREEMPT_LAZY` unset), Hugh Dickins'
 26-patch fbatch (needs two `mm-hotfixes-stable` prereqs, perf unproven), Jan
 Kara's deferred inode reclaim (still in review), CPPC v6 (hardening, not perf).
 
-## 2026-09-09 — full series audit (142 patches)
+## 2026-09-09: full series audit (142 patches)
 
 Base moved from linux-next snapshots to mainline **Linux 7.3-rc2** (the
 linux-next 0902+ bases carried unfixed RDNA4 display bugs — see CHANGELOG).
@@ -252,10 +278,11 @@ Full audit of the series against a pristine v7.3-rc2 tree:
   by linux-next 0902–0904.
 - **Added:** `1145` (upstream HF-VSDB MCCS FreeSync fix, Fangzhi Zuo) and the
   23-patch **kbuild build-speedup series** `2300`–`2322` (Lorenzo Stoakes,
-  rust-for-linux 2026-09-08, `20260908-build-speedup-v1-0-5dc1ac01672d@kernel.org`).
+  rust-for-linux 2026-09-08,
+  `20260908-build-speedup-v1-0-5dc1ac01672d@kernel.org`).
 - **New range:** `2300–2399` = build system / kbuild.
 
-### Handmade patches (0001–0007, 0030–0034) — reviewed 2026-09-09
+### Handmade patches (0001–0007, 0030–0034): reviewed 2026-09-09
 
 All 12 are small, single-purpose fixes (1–17 added lines each), verified
 against the rc2 source:
@@ -318,12 +345,12 @@ present as `0055` (the 7.2 series' Fangzhi Zuo HF-VSDB patch).
 ## Verification
 
 Every patch is applied with `patch -p1 --forward -F2` and a dry-run check:
-patches that do not apply cleanly to next-20260825 (e.g. MARIE) are skipped
-entirely, never half-applied. The VRR/ALLM series is verified to apply on
-next-20260825 + the 0050s, with the HF-VSDB VRR fallback and
+patches that do not apply cleanly to next-20260825 (for example, MARIE) are
+skipped entirely, never half-applied. The VRR/ALLM series is verified to apply
+on next-20260825 + the 0050s, with the HF-VSDB VRR fallback and
 `drm_connector_attach_vrr_capable_property` present in the built kernel.
 
-## Added (Phoronix 08-11 WIP — RFC, 7.4-target)
+## Added (Phoronix 08-11 WIP: RFC, 7.4-target)
 
 The `mm/gup` follow_page_mask() batching series (Rik van Riel, Meta; RFC v3,
 lkml `20260811025157.1632867-1-riel@surriel.com`) — up to 12.8× in gup_test on
@@ -347,7 +374,7 @@ it lands upstream (7.4).
   nothing. Local fix (Sleepy + Claude-assisted), applies on top of the
   VRR/ALLM series.
 
-## Fixed (cmdline, 2026-08-26) — DCN401 "box/square" artifact
+## Fixed (cmdline, 2026-08-26): DCN401 "box/square" artifact
 
 Not a patch: `amdgpu.dcdebugmask=0x800` (`DC_DISABLE_IPS`) added to the
 built-in CMDLINE in `PKGBUILD`. On DCN401, IPS/DPG pipe-gating sets
@@ -360,7 +387,7 @@ scanned → a fixed content-tracking square over app windows (the sleepy-next
 gating) did not help; `0x800` (IPS off) fixed it. Re-evaluate when a proper
 DCN401 flip-pending fix lands upstream.
 
-## Added (2026-08-27) — zstd BMI2 probe series (Usama Arif, Meta)
+## Added (2026-08-27): zstd BMI2 probe series (Usama Arif, Meta)
 
 `2128`–`2130`, "zstd: probe the CPU for BMI2 support once, not per context"
 (lkml `20260826122558.2662013-1-usama.arif@linux.dev`, via the lkml
@@ -380,7 +407,7 @@ zswap use zstd). Original `From:`/`Date:`/`Subject:`/`Signed-off-by:` headers
 kept intact (mailing-list noise headers trimmed). Applies cleanly to
 next-20260827 with `patch -p1 --forward -F2` (cumulative order 2128→2129→2130).
 
-## Added (2026-08-27 sweep — 20 patches)
+## Added (2026-08-27 sweep: 20 patches)
 
 Fresh 08-26/27 ML submissions found in the lkml public-inbox mirror
 (`repos/lore-mirror`) and the amd-gfx/dri-devel August archives. All apply
@@ -407,7 +434,7 @@ Deferred (tracked, not merged): the 30-patch Alex Deucher **TLB-invalidation
 v2** upgrade of `1004`–`1017` (under review; swap in a dedicated session);
 gfx12 mes_dbgext; job-based IB refactor; blend-mode v4 (drm-helper piece).
 
-## Added (2026-08-28 — second sweep window, 8 patches)
+## Added (2026-08-28: second sweep window, 8 patches)
 
 Fresh 08-27/28 finds from the amd-staging-drm-next branch (agd5f) and the
 amd-gfx ML. All verified `patch -p1 --forward -F2` against next-20260828.
@@ -417,10 +444,12 @@ amd-gfx ML. All verified `patch -p1 --forward -F2` against next-20260828.
   realloc can encode a 1 GB copy inside the IB pool → GART fault + ring hang.
   Coexists with our `9034` (same file, no hunk overlap).
 - **`9050` — drm/amdgpu: Update no-retry PTE flags for GFX12** (RDNA4 gfx12.0).
-- **`9051`/`9052` — DCN4 flip-schedule pair** (Unify + Fix CalculateFlipSchedule):
-  flip-path bandwidth calc; relevant to the VUPDATE_NO_LOCK "box" class.
+- **`9051`/`9052` — DCN4 flip-schedule pair** (Unify + Fix
+  CalculateFlipSchedule): flip-path bandwidth calc; relevant to the
+  VUPDATE_NO_LOCK "box" class.
 - **`9053` — DCN42 IPS1 rIOMMU hang fix** (DCHVM↔rIOMMU SDP port disconnect).
-- **`9054` — Guard amdgpu_dm_irq_schedule_work against NULL irq_wq** (teardown race).
+- **`9054` — Guard amdgpu_dm_irq_schedule_work against NULL irq_wq** (teardown
+  race).
 - **`1144` — drm/amd/display: Enable HDMI FRL by default** (Jerry Zuo, v2,
   `20260827155409.1426730-1`, Reviewed-by Harry Wentland). Adds `DC_FRL_MASK`
   to the default `amdgpu_dc_feature_mask` so HDMI 2.1 FRL is on.
@@ -448,7 +477,7 @@ cleanly and is kept. Fixed the six `9049`-`9054` amd-staging patches that were
 accidentally empty (re-extracted via `git format-patch` from agd5f; `9053`
 dropped as redundant). `source=()` now matches on-disk exactly (143 patches).
 
-## Sweep 2026-09-02 — base bump to next-20260901, no new fixes worth carrying
+## Sweep 2026-09-02: base bump to next-20260901, no new fixes worth carrying
 
 Full source re-check (linux-next next-20260901 fetched; amd-gfx + dri-devel
 2026-September archives; lkml mirror; drm/amd work-items tracker; CachyOS /
@@ -479,7 +508,7 @@ with reasons:
 Net: no new AMD fixes worth carrying this window; bumped base to
 `next-20260901` for the current mm/mglru + 7.3-rc1 content.
 
-## Dropped (2026-09-02) — 20 non-applying patches removed from sleepy-next
+## Dropped (2026-09-02): 20 non-applying patches removed from sleepy-next
 
 These 20 patches target the vanilla-7.2 / 7.2-era base and do NOT apply to the
 7.3-merge linux-next base (the build was skipping them — verified: each fails
@@ -494,7 +523,7 @@ supersedes), `1206`/`1209` (amd-pstate EPP — base CPPC v4+ path differs),
 — base userq evolved). `2101` (MARIE 0.10.5) retained pending the 0.11.0 port.
 Series now 123 patches.
 
-## Ported (2026-09-02) — LRU-MARIE 0.11.0 onto next-20260901 (replaces 2101 0.10.5)
+## Ported: LRU-MARIE 0.11.0 (replaces 2101)
 
 `2101` is now the **ultracode-ported LRU-MARIE 0.11.0** for the linux-next
 7.3-merge base (firelzrd's vanilla-7.2 patch does NOT apply to next-20260901;

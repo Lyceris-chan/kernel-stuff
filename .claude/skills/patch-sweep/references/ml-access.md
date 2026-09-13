@@ -10,7 +10,7 @@ Mailing list archives (freedesktop, safe to curl)
 IMPORTANT: WebFetch returns HTTP 403 on lists.freedesktop.org. The ONLY
 working method is curl with a browser User-Agent. This is a proven workaround.
 UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
-MONTH=$(date +%Y-%B)   # e.g. 2026-August
+MONTH=$(date +%Y-%B)   # for example, 2026-August
 Option A — monthly .txt.gz mbox (fastest for keyword scanning):
 curl -s -A "$UA" "https://lists.freedesktop.org/archives/amd-gfx/${MONTH}.txt.gz" -o /tmp/amd-gfx-${MONTH}.txt.gz
 [ -s /tmp/amd-gfx-${MONTH}.txt.gz ] && gunzip -f /tmp/amd-gfx-${MONTH}.txt.gz
@@ -19,8 +19,7 @@ curl -s -A "$UA" "https://lists.freedesktop.org/archives/dri-devel/${MONTH}.txt.
 Option B — thread index HTML (use when you need a specific thread):
   https://lists.freedesktop.org/archives/amd-gfx/${MONTH}/thread.html
   https://lists.freedesktop.org/archives/dri-devel/${MONTH}/thread.html
-Per-message pages live at .../{msgid}.html, e.g.:
-  https://lists.freedesktop.org/archives/amd-gfx/2026-August/abcdef1234567890.html
+Per-message pages live at .../{msgid}.html, For example: https://lists.freedesktop.org/archives/amd-gfx/2026-August/abcdef1234567890.html
 Download one the same way, with the browser UA:
   curl -s -A "$UA" "https://lists.freedesktop.org/archives/dri-devel/${MONTH}/thread.html" -o /tmp/dri-thread.html
 Message links in thread.html are <LI><A HREF="NNNNN.html">[PATCH n/N] subject

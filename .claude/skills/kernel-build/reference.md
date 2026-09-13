@@ -5,7 +5,8 @@ Detail doc for the `kernel-build` skill. Load it when touching `prepare()`,
 
 ## Contents
 
-- [`scripts/config` calls in `prepare()`](#scriptsconfig-calls-in-prepare) — and what to re-disable after `olddefconfig`
+- [`scripts/config` calls in `prepare()`](#scriptsconfig-calls-in-prepare) — and
+  what to re-disable after `olddefconfig`
 - [Config traps](#config-traps) — settings that silently do nothing
 - [Version string](#version-string)
 - [net-tune](#net-tune)
@@ -101,8 +102,9 @@ scripts/config -d X86_PLATFORM_DRIVERS_UNIWILL
 - **`--set-str` on a symbol that no longer exists is silently dropped** by
   `olddefconfig`. Two live examples: `DEFAULT_IOSCHED` (gone since the blk-mq
   rework — the effective NVMe scheduler comes from udev's
-  `60-ioschedulers.rules`) and `MQ_IOSCHED_ADIOS` (no patch adds `block/adios.c`).
-  Grep the tree for the symbol before trusting a `--set-str` or `-e` line.
+  `60-ioschedulers.rules`) and `MQ_IOSCHED_ADIOS` (no patch adds
+  `block/adios.c`). Grep the tree for the symbol before trusting a `--set-str`
+  or `-e` line.
 - **A `select`ed symbol cannot be disabled.** `RESCTRL_FS` and `SND_INTEL_NHLT`
   come back after `olddefconfig` because another option hard-selects them.
   Disable the selector instead, or accept the bloat — and verify the built
@@ -128,6 +130,6 @@ manual verification commands.
 
 ## Why not `ld.mold`
 
-Crashes on the kernel's vDSO linker scripts (`unknown linker script token`). If a
-future patch or config change pulls it in as a dependency or default, force back
-to `ld.lld` — never adopt `ld.mold` for this build.
+Crashes on the kernel's vDSO linker scripts (`unknown linker script token`). If
+a future patch or config change pulls it in as a dependency or default, force
+back to `ld.lld` — never adopt `ld.mold` for this build.

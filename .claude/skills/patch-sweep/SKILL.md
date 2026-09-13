@@ -10,7 +10,7 @@ description: >
 > `net-tune/` and `PATCH_SOURCES.md` resolve. From the repo root, prefix them
 > with `sleepy-next/`.
 
-## Local model (Qwen) tips — READ THIS FIRST
+## Local model (Qwen) tips: READ THIS FIRST
 
 - **Copy commands exactly.** Do not improvise, rephrase, or "simplify" any
   command below. A weaker local model that paraphrases produces broken grep
@@ -38,19 +38,20 @@ description: >
   `git -C repos/linux-next apply --check "$PWD/patches/<range>/NNNN-....patch"`.
   Patches live in `patches/<range>/` folders (2026-08-11); root-level
   `NNNN-*.patch` entries are gitignored build symlinks, not the source of truth.
-- **Capture real exit codes, never `| head && echo OK`.** `git apply --check f 2>&1 |
-  head -3 && echo CLEAN` always prints CLEAN because `head`'s exit status wins.
-  Use `git apply --check f > log 2>&1; echo "exit: $?"` and read `log`.
+- **Capture real exit codes, never `| head && echo OK`.** `git apply --check f
+  2>&1 | head -3 && echo CLEAN` always prints CLEAN because `head`'s exit status
+  wins. Use `git apply --check f > log 2>&1; echo "exit: $?"` and read `log`.
 - **`git apply --check` passing is NOT enough** (learned 2026-08-03). The patch
   must also survive `patch -p1 --forward --dry-run`, the exact tool `prepare()`
-  uses. Git-apply tolerates offset/ambiguity that GNU patch rejects (a hunk whose
-  leading `if (r)` context appears many times, or a hunk touching `dcn60_resource.c`
-  — DCN6, absent from rc7). For a file absent from rc7, strip that file's hunks +
-  its stats line + fix the "N files changed" summary as a documented adjustment.
+  uses. Git-apply tolerates offset/ambiguity that GNU patch rejects (a hunk
+  whose leading `if (r)` context appears many times, or a hunk touching
+  `dcn60_resource.c` — DCN6, absent from rc7). For a file absent from rc7, strip
+  that file's hunks + its stats line + fix the "N files changed" summary as a
+  documented adjustment.
 
 # Six-Source Patch Sweep
 
-## Step 1 — Fetch all repos in parallel
+## Step 1: fetch all repos in parallel
 
 ```bash
 # Linux-next is huge and slow to fetch. Check first whether a newer daily
@@ -83,7 +84,7 @@ wait
 # Mailing lists: curl with a browser UA (WebFetch 403s). Full detail:
 # references/ml-access.md
 UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
-MONTH=$(date +%Y-%B)   # e.g. 2026-August
+MONTH=$(date +%Y-%B)   # for example, 2026-August
 curl -s -A "$UA" "https://lists.freedesktop.org/archives/amd-gfx/${MONTH}.txt.gz" -o /tmp/amd-gfx-${MONTH}.txt.gz
 [ -s /tmp/amd-gfx-${MONTH}.txt.gz ] && gunzip -f /tmp/amd-gfx-${MONTH}.txt.gz
 curl -s -A "$UA" "https://lists.freedesktop.org/archives/dri-devel/${MONTH}.txt.gz" -o /tmp/dri-devel-${MONTH}.txt.gz
@@ -92,7 +93,7 @@ curl -s -A "$UA" "https://lists.freedesktop.org/archives/dri-devel/${MONTH}.txt.
 **Never** fetch the `lore.kernel.org` **web UI** — its Anubis anti-bot blocks
 automated agents (a hard block, not a rate limit). The **git endpoints are NOT
 gated**: `git clone --mirror https://lore.kernel.org/<list>/<epoch>` works
-(e.g. `lkml/20`, `rust-for-linux/0`) — messages are commits, raw email is blob
+(for example, `lkml/20`, `rust-for-linux/0`) — messages are commits, raw email is blob
 `m`. Also use the git repos and the `lists.freedesktop.org` archives above.
 
 ## Step 2 — Git repo keyword scan
@@ -104,15 +105,14 @@ Use `--since=LAST_CHECK_DATE` to limit results:
 # the previous sweep's report or the kernel version bump date.
 SINCE="2026-08-01"
 
-# Canonical keyword pattern — copy EXACTLY. Covers GPU core, display, PM,
+# Canonical keyword pattern: copy EXACTLY. Covers GPU core, display, PM,
 # schedulers, block, and memory-management patches for our hardware.
 # Use -E (extended regex) because the pattern contains bare | alternation.
 KEYWORDS="gfx12|navi48|dcn4|dcn42b|smu14|psp14|mmhub_4|sdma_v7|vcn_v5|amd_pstate|amd-pstate|epp_boost|bbr3|bfq|mq-deadline|zstd|marie|cgroup.*dmem"
 
-for repo in repos/drm-next repos/agd5f-linux repos/linux-next; do
-  echo "=== $repo ==="
-  git -C "$repo" log --since="$SINCE" --oneline --all -E --grep="$KEYWORDS" 2>/dev/null | head -30
-done
+for repo in repos/drm-next repos/agd5f-linux repos/linux-next; do echo "===
+$repo ===" git -C "$repo" log --since="$SINCE" --oneline --all -E
+--grep="$KEYWORDS" 2>/dev/null | head -30 done
 
 # linux-pm: amd-pstate / cpufreq keywords (same canonical pattern plus CPPC)
 echo "=== linux-pm ==="
@@ -120,8 +120,9 @@ git -C repos/linux-pm log --since="$SINCE" --oneline --all -E \
   --grep="amd_pstate|amd-pstate|CPPC|k10temp|epp_boost" 2>/dev/null | head -20
 
 # sirlucjan: new/updated third-party performance patches (no --grep; list dirs)
-echo "=== sirlucjan 7.2-rc (new version dirs) ==="
-ls repos/sirlucjan-kernel-patches/7.3-rc/ | rg "fixes-v|lru-marie-v|preempt-ipi-v|nap"
+echo "=== sirlucjan 7.2-rc (new version dirs) ===" ls
+repos/sirlucjan-kernel-patches/7.3-rc/ | rg
+"fixes-v|lru-marie-v|preempt-ipi-v|nap"
 ```
 
 ## Step 2b — x86/security scan (Zen 4 CPU mitigations)
@@ -135,10 +136,12 @@ fixes since the last sweep:
 ```bash
 # SRSO / Safe-RET / speculative execution mitigations (x86_bugs, entry)
 git -C repos/linux-next log --since="$SINCE" --oneline --all -E \
-  --grep="x86/bugs|SRSO|Safe.?RET|speculat|ibrs|IBPB|entry_64|ist_enter|retbleed" 2>/dev/null | head -20
+--grep="x86/bugs|SRSO|Safe.?RET|speculat|ibrs|IBPB|entry_64|ist_enter|retbleed"
+2>/dev/null | head -20
 # Machine check / RAS (MCE can present as hard resets on Zen 4)
 git -C repos/linux-next log --since="$SINCE" --oneline --all -E \
-  --grep="x86/mce|machine.check|mce_intel|mce_amd|threshold" 2>/dev/null | head -10
+--grep="x86/mce|machine.check|mce_intel|mce_amd|threshold" 2>/dev/null | head
+-10
 # KVM/security follow-ups (Zapscape class)
 git -C repos/linux-next log --since="$SINCE" --oneline --all -E \
   --grep="KVM: x86|kvm.*mmu|kvm.*shadow" 2>/dev/null | head -10
@@ -156,29 +159,20 @@ Parse the downloaded mbox with Python:
 ```python
 import mailbox, email.header, re
 
-def decode(h):
-    parts = email.header.decode_header(h or "")
-    return "".join(
-        p.decode(enc or 'utf-8', errors='replace') if isinstance(p, bytes) else p
-        for p, enc in parts
-    )
+def decode(h): parts = email.header.decode_header(h or "") return "".join(
+p.decode(enc or 'utf-8', errors='replace') if isinstance(p, bytes) else p for p,
+enc in parts )
 
 KEYWORDS = re.compile(
-    r'gfx12|navi48|dcn4|dcn42b|smu14|psp14|mmhub_4|sdma_v7|vcn_v5|'
-    r'amd_pstate|amd-pstate|epp_boost|bbr3|bfq|mq-deadline|zstd|marie|cgroup.*dmem',
-    re.IGNORECASE
-)
+r'gfx12|navi48|dcn4|dcn42b|smu14|psp14|mmhub_4|sdma_v7|vcn_v5|'
+r'amd_pstate|amd-pstate|epp_boost|bbr3|bfq|mq-deadline|zstd|marie|cgroup.*dmem',
+re.IGNORECASE )
 
-for mbox_file in ['/tmp/amd-gfx-2026-August.txt', '/tmp/dri-devel-2026-August.txt']:
-    mbox = mailbox.mbox(mbox_file)
-    for msg in mbox:
-        subj = decode(msg.get("Subject", ""))
-        from_a = decode(msg.get("From", ""))
-        mid = msg.get("Message-ID", "").strip().strip("<>")
-        if KEYWORDS.search(subj):
-            print(f"  [{mid}]")
-            print(f"    From: {from_a}")
-            print(f"    Subject: {subj}")
+for mbox_file in ['/tmp/amd-gfx-2026-August.txt',
+'/tmp/dri-devel-2026-August.txt']: mbox = mailbox.mbox(mbox_file) for msg in
+mbox: subj = decode(msg.get("Subject", "")) from_a = decode(msg.get("From", ""))
+mid = msg.get("Message-ID", "").strip().strip("<>") if KEYWORDS.search(subj):
+print(f" [{mid}]") print(f" From: {from_a}") print(f" Subject: {subj}")
 ```
 
 ## Step 4 — GitLab drm/amd issue scan
@@ -189,8 +183,11 @@ tracker and the REST API (the issue *notes* API is 401-gated, but the issues and
 events feeds return real JSON):
 
 ```bash
-curl -s "https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/issues?state=opened&per_page=100&sort=updated_desc" -o issues.json
-curl -s "https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/events?per_page=100" -o events.json
+curl -s
+"https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/issues?state=opened&per_page=100&sort=updated_desc"
+-o issues.json curl -s
+"https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/events?per_page=100"
+-o events.json
 ```
 
 **CAVEAT (learned 2026-08-26):** `sort=updated_desc&order_by=updated_at` can
@@ -213,8 +210,9 @@ projects with no auth. This is how to check issue comments for in-progress fixes
 commit SHAs / workarounds:
 
 ```bash
-curl -s "https://gitlab.freedesktop.org/api/graphql" -H "Content-Type: application/json" \
-  --data '{"query":"query { project(fullPath: \"drm/amd\") { issue(iid: \"5538\") { title notes { nodes { body system } } } } }"}'
+curl -s "https://gitlab.freedesktop.org/api/graphql" -H "Content-Type:
+application/json" \ --data '{"query":"query { project(fullPath: \"drm/amd\") {
+issue(iid: \"5538\") { title notes { nodes { body system } } } } }"}'
 ```
 
 Sweep flow: (1) search issues by hardware keyword —
@@ -271,7 +269,7 @@ Every candidate must pass all four checks. Copy the commands exactly.
 Two failure modes that cost a full debug cycle each:
 - **Reverts**: rg the ML/repo for `Revert "..."` of a patch we already carry.
   If AMD is reverting it (*"Because it causes some regression"*), drop ours —
-  e.g. the DCN4 flip-schedule pair `9051`/`9052` (in `dml2_core_dcn4_calcs.c`).
+  for example, the DCN4 flip-schedule pair `9051`/`9052` (in `dml2_core_dcn4_calcs.c`).
   ```bash
   zcat /tmp/amd-gfx-*.txt.gz 2>/dev/null | rg '^Subject:.*Revert' | sort -u
   ```
@@ -303,8 +301,8 @@ If `grep` returns nothing for any referenced symbol, DROP the candidate.
 **Check 3 — Applies cleanly.** Use `git apply --check` (NOT `patch --dry-run`)
 against the clean reference tree:
 ```bash
-git -C repos/linux-next apply --check <candidate>.patch       # forward check
-git -C repos/linux-next apply --check -R <candidate>.patch    # already-applied check
+git -C repos/linux-next apply --check <candidate>.patch # forward check git -C
+repos/linux-next apply --check -R <candidate>.patch # already-applied check
 ```
 - Forward check passes → CLEAN, proceed to Check 4.
 - Reverse check passes (forward fails) → already applied upstream, DROP it.
@@ -313,7 +311,7 @@ git -C repos/linux-next apply --check -R <candidate>.patch    # already-applied 
 **Check 4 — Author/source trustworthiness.** The patch must have a real
 author (a named kernel developer with a traceable commit hash or message-ID).
 `Signed-off-by` must be present. **AI-assistance is allowed (rule change
-2026-08-03):** an `Assisted-by: <tool>` trailer (e.g. `Assisted-by:
+2026-08-03):** an `Assisted-by: <tool>` trailer (for example, `Assisted-by:
 Claude:claude-opus-5`) does NOT disqualify a patch as long as the author is a
 named human developer, the patch is not fabricated/hand-written, and its
 provenance (commit hash or mailing-list Message-ID) is traceable. What is
@@ -383,12 +381,12 @@ def extract_patch(mbox_file, target_mid, output_file):
 mbox parsers may truncate IDs. Verify extracted patch content before using.
 
 **Outlook-mangled mbox diffs (learned 2026-08-10, patch `1026`):** patches sent
-from Microsoft-hosted addresses (e.g. `...@amd.com` via `namprd12.prod.outlook.com`)
+from Microsoft-hosted addresses (for example, `...@amd.com` via `namprd12.prod.outlook.com`)
 arrive at lists.freedesktop.org with the leading space stripped from every
 context line AND tabs converted to spaces. `git apply --check` reports "corrupt
 patch" and GNU `patch` reports "malformed patch" — both unwritable as-is. If a
 patch's `+`/`-` lines are intact but its context is mangled, verify the added
-content against the rc7 tree (e.g. against an older-IP sibling file the commit
+content against the rc7 tree (for example, against an older-IP sibling file the commit
 message says it's "modeled after" — the GFX12 CRIU fix was modeled after the
 rc7 `kfd_mqd_manager_v11.c` functions), rebuild the diff body from rc7 ground
 truth with proper tabs, and confirm content-identical modulo whitespace. Then

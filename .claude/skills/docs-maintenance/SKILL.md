@@ -15,7 +15,7 @@ description: >
 Run this AFTER the patch work (version bump, sweep, or audit) is done and the
 build is verified — not before.
 
-## Google developer style — apply to every doc edit
+## Google developer style: apply to every doc edit
 
 Consult the local Google documentation style guides before editing:
 `.claude/style-guides/google-docguide/` (index in
@@ -48,7 +48,7 @@ series" range tables) or the PROFILE_PEAK behavior section changes.
 ## 2. Record provenance in PATCH_SOURCES.md
 
 Every changed patch gets a ledger entry BEFORE committing: file name, author,
-subject, source URL or commit hash; note revisions (e.g. `0004` ... **v4**
+subject, source URL or commit hash; note revisions (for example, `0004` ... **v4**
 (2026-08-02): ...). Sweep results: list "already in rc5", "duplicate of
 existing", and "deferred" candidates.
 
@@ -99,9 +99,9 @@ python3 .claude/skills/docs-maintenance/scripts/validate_skills.py
 It checks the rules that actually break discovery or loading: `name` length,
 character set, hyphen rules and **whether it matches the directory name**;
 `description` length and third-person voice; unrecognised frontmatter keys; body
-length under 500 lines; and whether reference files stay one level deep and carry
-a table of contents past 100 lines. Exit status: `0` clean, `1` violations,
-`2` no skills directory found.
+length under 500 lines; and whether reference files stay one level deep and
+carry a table of contents past 100 lines. Exit status: `0` clean, `1`
+violations, `2` no skills directory found.
 
 The specification is the authority, not this script — it is at
 <https://agentskills.io/specification>. The authoring guidance, including the

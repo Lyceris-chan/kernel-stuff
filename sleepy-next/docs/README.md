@@ -6,7 +6,8 @@ built from **mainline Linux 7.3-rc2** plus a sanitized
 [CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 176 targeted
 upstream/local patches. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0_rc2-11` · **Artifact:** `linux-sleepy-next-7.3.0_rc2-11-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0_rc2-11` · **Artifact:**
+`linux-sleepy-next-7.3.0_rc2-11-x86_64.pkg.tar.zst`
 
 ## Target hardware
 
@@ -21,7 +22,8 @@ upstream/local patches. It is not a general-purpose kernel.
 
 ## Highlights
 
-- **Clang ThinLTO `-O3 -march=znver4`** via the kernel.org pre-built LLVM 23.1.0.
+- **Clang ThinLTO `-O3 -march=znver4`** via the kernel.org pre-built LLVM
+  23.1.0.
 - **LRU-MARIE 0.11.0** page eviction — the author's `mm/lru_marie/` subsystem
   carried byte-identical, rebased to this base.
 - **`mm/gup` folio batching** (Rik van Riel's series) for mTHP throughput.

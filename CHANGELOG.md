@@ -5,70 +5,72 @@ Ryzen 7 7700 (Zen 4) + Radeon RX 9070 XT (RDNA 4 / gfx1201) desktop.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/) and the
 [Google developer style guide](https://developers.google.com/style). Versioned
-by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
+by the running kernel (base + `pkgrel`), for example, `7.2.0-rc7-1-sleepy`.
 
 ---
 
-## [7.3.0-rc2-11-sleepy-next] — 2026-09-13
+## [7.3.0-rc2-11-sleepy-next]: 2026-09-13
 
 ### Changed
 - **`amdgpu.dcdebugmask=0x800` removed from the baked cmdline.** It was carried
   from August to mask the display "box" by disabling DCN4 idle power states, on
-  the theory that IPS/DPG pipe-gating made `dc_get_flip_pending_on_otg()` misread
-  a pending flip. That theory is disproved — the box is a COSMIC overlay-plane
-  bug (fixed with `COSMIC_DISABLE_OVERLAY_SCANOUT=1`), and it returned in
-  September with `0x800` still in effect. The mask cost idle power and hid
-  IPS-related problems. Re-add the flag if `flip_done` or vblank timeouts appear:
-  the gap Leo Li documents in `f64a9be56536` is real, just not this machine's
-  failure mode. The `pcie_aspm=off` / `amdgpu.aspm=0` / `amdgpu.runpm=0` stopgaps
-  stay — the !5538 SMU bus-drop is still unfixed upstream.
+  the theory that IPS/DPG pipe-gating made `dc_get_flip_pending_on_otg()`
+  misread a pending flip. That theory is disproved — the box is a COSMIC
+  overlay-plane bug (fixed with `COSMIC_DISABLE_OVERLAY_SCANOUT=1`), and it
+  returned in September with `0x800` still in effect. The mask cost idle power
+  and hid IPS-related problems. Re-add the flag if `flip_done` or vblank
+  timeouts appear: the gap Leo Li documents in `f64a9be56536` is real, just not
+  this machine's failure mode. The `pcie_aspm=off` / `amdgpu.aspm=0` /
+  `amdgpu.runpm=0` stopgaps stay — the !5538 SMU bus-drop is still unfixed
+  upstream.
 - **The dead `--set-str DEFAULT_IOSCHED "kyber"` line is gone.** The symbol no
   longer exists (removed with the blk-mq rework), so `olddefconfig` silently
   discarded it. The NVMe scheduler is set by udev's `60-ioschedulers.rules`.
 
 ### Added
 - **`2143` — zstd DDict probe index wrap-around.** An extracted subset of
-  sirlucjan's `7.3-rc/zstd-dev-patches` merge: `ZSTD_DDictHashSet_emplaceDDict()`
-  and `ZSTD_DDictHashSet_getDDict()` advance the probe index with
-  `idx &= idxRangeMask; idx++;`, which leaves `idx == ddictPtrTableSize` when the
-  probe starts on the last slot — the loop then re-reads out of range and
-  `emplaceDDict()` writes one element past the end. Folding the wrap into the
-  increment fixes it. Reachability here is low (the DDict hash set needs
-  multi-dictionary streaming decompression; zram/zswap use dictionary-less
-  contexts); taken because it is a latent out-of-bounds write in vendored code.
-  The rest of sirlucjan's 7.3 merge was **not** taken: it refactors the `bmi2`
-  field into `ZSTD_*Ctx_get_bmi2()` accessors, which our `2128`–`2130` BMI2
-  series depends on and would have to be rebased onto, and its companion patch is
-  a GCC-only segfault workaround that cannot affect a Clang build.
+  sirlucjan's `7.3-rc/zstd-dev-patches` merge:
+  `ZSTD_DDictHashSet_emplaceDDict()` and `ZSTD_DDictHashSet_getDDict()` advance
+  the probe index with `idx &= idxRangeMask; idx++;`, which leaves `idx ==
+  ddictPtrTableSize` when the probe starts on the last slot — the loop then
+  re-reads out of range and `emplaceDDict()` writes one element past the end.
+  Folding the wrap into the increment fixes it. Reachability here is low (the
+  DDict hash set needs multi-dictionary streaming decompression; zram/zswap use
+  dictionary-less contexts); taken because it is a latent out-of-bounds write in
+  vendored code. The rest of sirlucjan's 7.3 merge was **not** taken: it
+  refactors the `bmi2` field into `ZSTD_*Ctx_get_bmi2()` accessors, which our
+  `2128`–`2130` BMI2 series depends on and would have to be rebased onto, and
+  its companion patch is a GCC-only segfault workaround that cannot affect a
+  Clang build.
 
-### Added — verification tooling
-- **`kernel-verify` skill** with a tiered, portable verification suite:
-  patch hygiene, checksums, provenance, documented claims, skill-spec compliance
-  and dangling symlinks (fast); the cumulative apply (series); `checkpatch`,
-  `sparse`, `coccinelle` and `W=1` (deep). Missing tools are reported as SKIP with
-  the reason, never as a silent pass.
+### Added: verification tooling
+- **`kernel-verify` skill** with a tiered, portable verification suite: patch
+  hygiene, checksums, provenance, documented claims, skill-spec compliance and
+  dangling symlinks (fast); the cumulative apply (series); `checkpatch`,
+  `sparse`, `coccinelle` and `W=1` (deep). Missing tools are reported as SKIP
+  with the reason, never as a silent pass.
 - **Two patches cleaned**: `2138` and `2400` carried 64 and 43 lines of raw
   mail-transport headers (`Return-Path`, `X-Spam-Checker-Version`, `Received`,
   `ARC-Seal`). Diff bodies verified byte-identical, `Message-ID` preserved.
 
-## [7.3.0-rc2-10-sleepy-next] — 2026-09-13
+## [7.3.0-rc2-10-sleepy-next]: 2026-09-13
 
 ### Added
 - **Ten upstream fixes (`1061`–`1063`, `2006`–`2008`, `2141`, `2142`, `2501`,
   `2600`)** from the distro-patchset and stable sweep. Eight are `Cc: stable`
   bug fixes; two are `mm-new` material. Highlights:
-  - `1061` `drm/ttm` bulk_move — a **use-after-free**: `ttm_tt_swapout()` returns
-    a page count but `ttm_bo_swapout_cb()` gates its bookkeeping on `if (!ret)`,
-    so swapped-out resources never leave their bulk_move range and a range
-    endpoint is left dangling (`Closes` drm/amd#5387). Carried as the one-hunk
-    original, *not* the botched merge `3db7d7d58341`.
+  - `1061` `drm/ttm` bulk_move — a **use-after-free**: `ttm_tt_swapout()`
+    returns a page count but `ttm_bo_swapout_cb()` gates its bookkeeping on `if
+    (!ret)`, so swapped-out resources never leave their bulk_move range and a
+    range endpoint is left dangling (`Closes` drm/amd#5387). Carried as the
+    one-hunk original, *not* the botched merge `3db7d7d58341`.
   - `1062`/`1063` `dma-fence` — a **use-after-free** where most amdgpu/drm_sched
     fences lose RCU protection after signalling; plus its doc companion.
   - `2141` `mm/filemap` — retain mapped dropbehind folios (`Cc: stable`; also
     fixes a sleeping-in-atomic warning on the `fadvise(DONTNEED)` path).
-  - `2142` `mm/vmscan` — stop splitting mTHPs pointlessly when swap is exhausted,
-    i.e. for us **when zram is full**; splitting cannot make progress and only
-    destroys the huge page.
+  - `2142` `mm/vmscan` — stop splitting mTHPs pointlessly when swap is
+    exhausted, that is, for us **when zram is full**; splitting cannot make
+    progress and only destroys the huge page.
   - `2501` `x86/MCE/AMD` — threshold IRQs were enabled when a storm *starts* and
     disabled when it ends; the culprit commit is in rc2.
   - `2600` `hrtimer` — rearming a queued timer with slack left the timerqueue
@@ -82,7 +84,7 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 - The full **175-patch series applies to a pristine `v7.3-rc2` worktree with 0
   failures** (cumulative `patch -Np1 --forward`).
 
-### Fixed outside the kernel — the display artifact ("the box")
+### Fixed outside the kernel: the display artifact ("the box")
 A rectangular artifact over application windows had been misattributed to the
 kernel since August. Its decisive traits — absent from screenshots, dismissed by
 moving the cursor over it, and appearing on whichever monitor last had VRR
@@ -99,7 +101,7 @@ No kernel change is involved. `dcdebugmask=0x800` (IPS off) fixed this in August
 and had stopped working, which was the signal that the cause had changed. Full
 evidence chain in `LESSONS.md`.
 
-### Note — the EEVDF fixes are largely inert here
+### Note: the EEVDF fixes are largely inert here
 `scx_loader` is active with `default_sched = "scx_cake"` (live `state=enabled`,
 `ops=cake_1.2.1`), and rc2 gates the CFS balance path behind
 `if (!scx_switched_all())` in `scheduler_tick()`. So the **CFS load-balancing
@@ -113,7 +115,7 @@ Also recorded: `0110-cachy-config-hooks.patch` applies only **with fuzz** on
 rc2 (`CONFIG_PROC_SYSCTL` context vs rc2's `CONFIG_SYSCTL`) — harmless, but it
 is exactly the "0 `.rej` does not prove application" trap in `LESSONS.md`.
 
-## [7.3.0-rc2-9-sleepy-next] — 2026-09-13
+## [7.3.0-rc2-9-sleepy-next]: 2026-09-13
 
 ### Added
 - **`1158` — DMCUB busy-wait fix** (Sultan Alsawaf / kerneltoast, commit
@@ -121,13 +123,13 @@ is exactly the "0 `.rej` does not prove application" trap in `LESSONS.md`.
   `udelay(1)` in a loop bounded by `timeout_us`, and callers pass up to
   **100000** — as much as 100 ms of pure CPU spinning per call, in the DMCUB
   path DCN401 uses (`dc_dmub_srv.c:165,283`). Replaced with progressive backoff
-  (1 µs ×3, then 10 µs, then 100 µs) using `usleep_range()` when `preemptible()`,
-  so the CPU can reach idle. Verified live: `CONFIG_PREEMPT=y` and
-  `PREEMPT_COUNT=y`, so the sleeping path is taken. Out-of-tree, so it will not
-  arrive on a version bump; a self-contained function, so the carry cost is low.
-  Applies clean (offset 178 = stale hunk header from his 6.16 base).
+  (1 µs ×3, then 10 µs, then 100 µs) using `usleep_range()` when
+  `preemptible()`, so the CPU can reach idle. Verified live: `CONFIG_PREEMPT=y`
+  and `PREEMPT_COUNT=y`, so the sleeping path is taken. Out-of-tree, so it will
+  not arrive on a version bump; a self-contained function, so the carry cost is
+  low. Applies clean (offset 178 = stale hunk header from his 6.16 base).
 
-## [7.3.0-rc2-8-sleepy-next] — 2026-09-13
+## [7.3.0-rc2-8-sleepy-next]: 2026-09-13
 
 ### Added
 - **HDMI RGB quantization fix (`1155`–`1157`).** Satyajit Roy's
@@ -181,7 +183,7 @@ is exactly the "0 `.rej` does not prove application" trap in `LESSONS.md`.
   the VUPDATE_NO_LOCK rework `f64a9be56536` in rc2 — though the underlying bug
   class survives and would need a rebase onto `dm_arm_vblank_event()`.
 
-## [7.3.0-rc2-7-sleepy-next] — 2026-09-12
+## [7.3.0-rc2-7-sleepy-next]: 2026-09-12
 
 ### Changed
 - **The repository is now single-package.** The root 7.2 `linux-sleepy`
@@ -246,7 +248,7 @@ is exactly the "0 `.rej` does not prove application" trap in `LESSONS.md`.
   block/IO schedulers (`2000`), memory (`2100`), CPU idle (`2200`) and kbuild
   (`2300`), but not sched core / EEVDF.
 
-## [7.3.0-rc2-6-sleepy-next] — 2026-09-12
+## [7.3.0-rc2-6-sleepy-next]: 2026-09-12
 
 ### Changed
 - **LRU-MARIE updated to the author's official 0.11.1 7.3 port.** firelzrd now
@@ -266,7 +268,7 @@ is exactly the "0 `.rej` does not prove application" trap in `LESSONS.md`.
 
 ---
 
-## [7.3.0-rc2-5-sleepy-next] — 2026-09-10
+## [7.3.0-rc2-5-sleepy-next]: 2026-09-10
 
 ### Added
 - **HDMI 2.1 VRR series — the final pieces of AMD's Linux 7.4 pull.** The
@@ -283,7 +285,7 @@ Series is now **147 patches**, all applying cleanly to pristine v7.3-rc2.
 
 ---
 
-## [7.3.0-rc2-4-sleepy-next] — 2026-09-09
+## [7.3.0-rc2-4-sleepy-next]: 2026-09-09
 
 ### Added
 - **Passive VRR** (`1150`, `1151`) — Tomasz Pakuła's *"[PATCH v1 0/3]
@@ -297,7 +299,7 @@ Series is now **144 patches**.
 
 ---
 
-## [7.3.0-rc2-3-sleepy-next] — 2026-09-09
+## [7.3.0-rc2-3-sleepy-next]: 2026-09-09
 
 ### Fixed
 - **Dropped the two DCN4 flip-schedule patches (`9051`, `9052`) — AMD is
@@ -311,11 +313,12 @@ Series is now **144 patches**.
   candidate yet for the scanout "box"/flicker on the RX 9070 XT.
 
 ### Added
-- **kbuild build-speedup series (23 patches, `2300`–`2322`)** — Lorenzo
-  Stoakes' *"[PATCH 00/23] kbuild: significantly speed up kernel builds"*
-  (rust-for-linux, 2026-09-08, `20260908-build-speedup-v1-0-5dc1ac01672d@kernel.org`).
-  Up to 36% faster full builds, ~70% incremental, ~90% no-op — significant for
-  this project's build loop. All 23 apply cleanly on top of the series.
+- **kbuild build-speedup series (23 patches, `2300`–`2322`)** — Lorenzo Stoakes'
+  *"[PATCH 00/23] kbuild: significantly speed up kernel builds"*
+  (rust-for-linux, 2026-09-08,
+  `20260908-build-speedup-v1-0-5dc1ac01672d@kernel.org`). Up to 36% faster full
+  builds, ~70% incremental, ~90% no-op — significant for this project's build
+  loop. All 23 apply cleanly on top of the series.
 - New patch range `2300–2399` = build system / kbuild.
 
 ### Changed
@@ -323,13 +326,13 @@ Series is now **144 patches**.
 
 ---
 
-## [7.3.0-rc2-2-sleepy-next] — 2026-09-07
+## [7.3.0-rc2-2-sleepy-next]: 2026-09-07
 
-Moved off the linux-next snapshot line onto **Linux 7.3-rc2 (mainline)**, because
-the post-rc1 linux-next bases (0902/0904) carry unfixed upstream RDNA4 display
-bugs (open drm/amd work items #5722 duplicate_state panic, #5684 optc REG_WAIT
-hang, #5759/#5763 MES/wedge) that froze and panicked this RX 9070 XT. rc2
-sidesteps the linux-next mm churn and is the actual release-candidate line.
+Moved off the linux-next snapshot line onto **Linux 7.3-rc2 (mainline)**,
+because the post-rc1 linux-next bases (0902/0904) carry unfixed upstream RDNA4
+display bugs (open drm/amd work items #5722 duplicate_state panic, #5684 optc
+REG_WAIT hang, #5759/#5763 MES/wedge) that froze and panicked this RX 9070 XT.
+rc2 sidesteps the linux-next mm churn and is the actual release-candidate line.
 
 ### Changed
 - Base: linux-next `next-2026090N` snapshots → torvalds **`linux-7.3-rc2`**
@@ -363,7 +366,7 @@ sidesteps the linux-next mm churn and is the actual release-candidate line.
 
 ---
 
-## [repo maintenance] — 2026-09-02
+## [repo maintenance]: 2026-09-02
 
 - **Wannabe 7.3 preview removed.** The `wannabe-7.3-rc1/` preview tree (1.8 GB,
   gitignored), its tracked `wannabe-7.3-patches/` series (16 patches) and
@@ -387,20 +390,31 @@ sidesteps the linux-next mm churn and is the actual release-candidate line.
 
 ---
 
-## [7.3.0-rc1-13-sleepy-next-20260902] — 2026-09-02
+## [7.3.0-rc1-13-sleepy-next-20260902]: 2026-09-02
 
-Bumped to today's linux-next (`next-20260902`) with **LRU-MARIE 0.11.0 rebuilt as a strict 1-to-1 rebase** of the original author's code.
+Bumped to today's linux-next (`next-20260902`) with **LRU-MARIE 0.11.0 rebuilt
+as a strict 1-to-1 rebase** of the original author's code.
 
 ### Added
-- **LRU-MARIE 0.11.0 now carried verbatim** (byte-identical to firelzrd's patch; the earlier adaptation was rewritten to keep every MARIE line unchanged). Only additions: two minimal compile-fix lines (a `vma_flags_t` and an `atomic_long_t` API change the 7.3 base forced) and a clearly-separated "legacy writeout" shim that re-provides the per-folio swap helpers linux-next deleted (MARIE's code calls them as the author wrote it). Compiles clean.
+- **LRU-MARIE 0.11.0 now carried verbatim** (byte-identical to firelzrd's patch;
+  the earlier adaptation was rewritten to keep every MARIE line unchanged). Only
+  additions: two minimal compile-fix lines (a `vma_flags_t` and an
+  `atomic_long_t` API change the 7.3 base forced) and a clearly-separated
+  "legacy writeout" shim that re-provides the per-folio swap helpers linux-next
+  deleted (MARIE's code calls them as the author wrote it). Compiles clean.
 
 ### Changed
-- Base bumped `next-20260901` -> `next-20260902`; the series drops 11 patches now merged upstream (CLIFF: FRL cap/restore, HPD filter, FRL LT-timeout, overlay-cursor, dw-estimate, no-retry PTE, flip-schedule fixes, clamp-dcfclk, sched-ext DSQ, unify-flip-schedule), and 3 were rebased for the new base. Series is now a clean 112 patches.
-- **The flip-schedule changes (which we had carried) are being reverted upstream for causing a regression** — confirming the drop.
+- Base bumped `next-20260901` -> `next-20260902`; the series drops 11 patches
+  now merged upstream (CLIFF: FRL cap/restore, HPD filter, FRL LT-timeout,
+  overlay-cursor, dw-estimate, no-retry PTE, flip-schedule fixes, clamp-dcfclk,
+  sched-ext DSQ, unify-flip-schedule), and 3 were rebased for the new base.
+  Series is now a clean 112 patches.
+- **The flip-schedule changes (which we had carried) are being reverted upstream
+  for causing a regression** — confirming the drop.
 
 ---
 
-## [7.3.0-rc1-12-sleepy-next-20260901] — 2026-09-02
+## [7.3.0-rc1-12-sleepy-next-20260901]: 2026-09-02
 
 Updated to the latest linux-next base (`next-20260901`, now carrying 7.3-rc1
 content — the kernel version string advances to 7.3.0-rc1) and completed a
@@ -431,7 +445,7 @@ to the linux-next (7.3-merge) base**, replacing the version that never applied.
   carrying beyond the base. The passive-VRR series (dri-devel) is a new v1
   feature, not a fix — assessed and deferred.
 
-## [7.2.0-10-sleepy-next-20260828] — 2026-08-28
+## [7.2.0-10-sleepy-next-20260828]: 2026-08-28
 
 Patch-series cleanup and rebuild. Fixed six of the second-sweep patches that
 were accidentally empty (no-ops) in -9 — they are now applied for real (the
@@ -447,7 +461,7 @@ upstreams, so the series is back to a clean 143 patches with no redundancy.
 - Removed 76 redundant/superseded patches the base now provides; series is 143
   patches, `source=()` matches on-disk exactly.
 
-## [7.2.0-9-sleepy-next-20260828] — 2026-08-28
+## [7.2.0-9-sleepy-next-20260828]: 2026-08-28
 
 A second thorough sweep (amd-staging branch + mailing lists, 08-28 window)
 surfaced 8 more patches worth carrying, all built into this release:
@@ -473,7 +487,7 @@ surfaced 8 more patches worth carrying, all built into this release:
 - The base (`next-20260828`) already upstreams ~18 of the AMD fixes we had
   backported, so those no longer need local patches.
 
-## [7.2.0-8-sleepy-next-20260828] — 2026-08-28
+## [7.2.0-8-sleepy-next-20260828]: 2026-08-28
 
 Updated to linux-next `next-20260828`. This snapshot upstreams a large batch of
 the AMD driver fixes we had been carrying as patches — the base now includes
@@ -497,7 +511,7 @@ drm-next / amd-staging trees) for this release window.
   display lock leak, a user-queue fence lock, SVM migration hole/error-path
   fixes, a KFD CRIU NULL-guard, and a ring-isolation bounds check.
 
-## [7.2.0-7-sleepy-next-20260827] — 2026-08-27
+## [7.2.0-7-sleepy-next-20260827]: 2026-08-27
 
 Updated the sleepy-next preview kernel to linux-next `next-20260827` and ran a
 thorough sweep across every source we track — the lkml archives, the AMD
@@ -527,7 +541,7 @@ patches** relevant to this hardware, all merged into this release:
 - Bumped the linux-next base from `next-20260826` to `next-20260827` (a
   one-day refresh; no AMD display changes in that delta).
 
-## [7.2.0-6-sleepy-next-20260826] — 2026-08-26
+## [7.2.0-6-sleepy-next-20260826]: 2026-08-26
 
 ### Fixed
 - **The "box/square" artifact is now permanently fixed.** We baked the
@@ -542,7 +556,7 @@ patches** relevant to this hardware, all merged into this release:
 ### Changed
 - Bumped the linux-next base to `next-20260826` (a routine one-day refresh).
 
-## [7.2.0-5-sleepy-next-20260825] — 2026-08-26
+## [7.2.0-5-sleepy-next-20260825]: 2026-08-26
 
 ### Added
 - DCN4 cursor/plane fixes carried from upstream (color-management state on
@@ -559,7 +573,7 @@ patches** relevant to this hardware, all merged into this release:
 
 ---
 
-## [wannabe-7.3-rc1] — 2026-08-26 (preview tree; superseded 2026-09-02)
+## [wannabe-7.3-rc1]: 2026-08-26 (preview tree; superseded 2026-09-02)
 
 > The wannabe preview tree, its `wannabe-7.3-patches/` series and
 > `WANNABE-7.3.md` were removed 2026-09-02, superseded by the `sleepy-next`
@@ -639,7 +653,7 @@ this hardware.
   DRM fair-policy fix (FIFO default), k10temp per-CCD (EPYC-only), reflex
   governor (needs cpufreq API port), work-items #5616/#4753 (no provenance).
 
-### Fixed (2026-08-26) — DCN401 "box/square" scanout artifact
+### Fixed (2026-08-26): DCN401 "box/square" scanout artifact
 
 The fixed small square over app windows (absent from screenshots, color tracks
 the content behind it) on this base was caused by DCN4 Idle Power States
@@ -653,7 +667,7 @@ not help; `0x800` (IPS off) fixed it. Same class as AMD drm/amd work item
 #5570 (Navi 21, closed 2026-08-25). Re-evaluate when a proper DCN401
 flip-pending fix lands upstream.
 
-### Updated (2026-08-27) — sleepy-next bumped to next-20260827 + sweep patches
+### Updated (2026-08-27): sleepy-next bumped to next-20260827 + sweep patches
 
 - **Bump**: linux-next `next-20260827` (pkgrel 7). No drm/amd changes in the
   one-day delta; the 188-patch series applies/skips identically.
@@ -671,7 +685,7 @@ flip-pending fix lands upstream.
 
 ---
 
-## [7.2.0-2-sleepy] — 2026-08-19 (sweep candidates merged)
+## [7.2.0-2-sleepy]: 2026-08-19 (sweep candidates merged)
 
 Merged the 17 verified candidates from the 08-19 ultracode sweep onto the 7.2
 base. The series grew from 157 to 174 patches.
@@ -703,7 +717,7 @@ base. The series grew from 157 to 174 patches.
 
 ---
 
-## [7.2.0-1-sleepy] — 2026-08-19 (Linux 7.2 stable bump)
+## [7.2.0-1-sleepy]: 2026-08-19 (Linux 7.2 stable bump)
 
 Bumped the base from 7.2-rc7 to the **7.2 stable release**. Version is now
 `7.2.0-1-sleepy`. The series dropped from 184 to 157 patches.
@@ -730,15 +744,16 @@ Bumped the base from 7.2-rc7 to the **7.2 stable release**. Version is now
 
 ---
 
-## [7.2.0-rc7-8-sleepy] — 2026-08-15 (zstd 1.6.0 + work-items recheck)
+## [7.2.0-rc7-8-sleepy]: 2026-08-15 (zstd 1.6.0 + work-items recheck)
 
 ### Changed
 
 - **zstd upgraded to 1.6.0** (`2100`): swapped the carried "dev tree" merge for
   the newer sirlucjan `zstd-7.2: merge v1.6.0 into kernel tree` revision — the
-  same 1.6.0 code plus the Nick Terrell **gcc-BMI2 segfault guard** (DYNAMIC_BMI2
-  gated on gcc ≥ 11.4; avoids a `HUF_compress1X_usingCTable_internal_body` crash
-  on older gcc). Same 18 files, applies cleanly to rc7.
+  same 1.6.0 code plus the Nick Terrell **gcc-BMI2 segfault guard**
+  (DYNAMIC_BMI2 gated on gcc ≥ 11.4; avoids a
+  `HUF_compress1X_usingCTable_internal_body` crash on older gcc). Same 18 files,
+  applies cleanly to rc7.
 
 ### Unchanged (evaluated)
 
@@ -754,7 +769,7 @@ Bumped the base from 7.2-rc7 to the **7.2 stable release**. Version is now
 
 ---
 
-## [7.2.0-rc7-7-sleepy] — 2026-08-15 (six-source sweep)
+## [7.2.0-rc7-7-sleepy]: 2026-08-15 (six-source sweep)
 
 Six-source sweep (drm-next, drm-misc, linux-next `next-20260814`, linux-pm,
 agd5f, amd-gfx + dri-devel ML, sirlucjan, GitLab drm/amd work-items,
@@ -792,7 +807,7 @@ x86/security, akpm-mm). The series grew from 179 to 184 patches.
 
 ---
 
-## [7.2.0-rc7-6-sleepy] — 2026-08-14 (AI-proposed DRM scheduler min_vruntime fix)
+## [7.2.0-rc7-6-sleepy]: 2026-08-14 (AI-proposed DRM scheduler min_vruntime fix)
 
 Adds `1053` — the **AI-proposed DRM scheduler fix** from the 9070XT fair-policy
 regression thread (Luke Wildhardt's AI suggestion, refined by Tvrtko Ursulin):
@@ -803,12 +818,12 @@ target the 7.3 fair-policy codebase and are not backportable here).
 
 ---
 
-## [7.2.0-rc7-5-sleepy] — 2026-08-14 (drm-next 08-12 backports)
+## [7.2.0-rc7-5-sleepy]: 2026-08-14 (drm-next 08-12 backports)
 
-Seven new clean backports from the `amd-drm-next-7.3-2026-08-12` tag, surfaced by
-the 2026-08-14 six-source sweep (linux-next has no new amdgpu/drm-sched commits
-as of `next-20260814`; the GitLab SMU-IF #5538 / RDNA4 MES #5274/#5294 / display
-#5343 items remain OPEN with no driver-side fix):
+Seven new clean backports from the `amd-drm-next-7.3-2026-08-12` tag, surfaced
+by the 2026-08-14 six-source sweep (linux-next has no new amdgpu/drm-sched
+commits as of `next-20260814`; the GitLab SMU-IF #5538 / RDNA4 MES #5274/#5294 /
+display #5343 items remain OPEN with no driver-side fix):
 
 - `1047` drm/amdgpu: don't disable ttm buffer funcs on reset (Pelloux-Prayer).
 - `1048` drm/amdgpu: fix missing check in vm_flush() (gfx12 SPM, Deucher).
@@ -830,7 +845,7 @@ watching the maintainer direction (fixups vs revert v3).
 
 ---
 
-## [7.2.0-rc7-4-sleepy] — 2026-08-12 (conservative SMU/ASPM stopgaps)
+## [7.2.0-rc7-4-sleepy]: 2026-08-12 (conservative SMU/ASPM stopgaps)
 
 Same patch set as `7.2.0-rc7-3`; the built-in CMDLINE gains two conservative
 amdgpu-side stopgaps for the silent gaming freeze (SMU IF mismatch 0x2e vs
@@ -842,7 +857,7 @@ at fixed high clocks.
 
 ---
 
-## [7.2.0-rc7-3-sleepy] — 2026-08-12 (DRM scheduler revert)
+## [7.2.0-rc7-3-sleepy]: 2026-08-12 (DRM scheduler revert)
 
 Full revert of the 7.2 DRM scheduler **FAIR** series (Tvrtko Ursulin,
 `[PATCH v2 00/20] Revert switching default DRM scheduler policy to fair`,
@@ -866,7 +881,7 @@ multi-run-queue FIFO/RR scheduler and makes **FIFO the default** again.
 
 ---
 
-## [7.2.0-rc7-2-sleepy] — 2026-08-12 (maintenance)
+## [7.2.0-rc7-2-sleepy]: 2026-08-12 (maintenance)
 
 Six-source sweep (drm-next, drm-misc, agd5f, amd-staging, linux-next, linux-pm,
 amd-gfx + dri-devel ML, sirlucjan, firelzrd, GitLab drm/amd work-items,
@@ -903,7 +918,7 @@ the freedesktop mbox archives). The series grew from 151 to 154 patches.
 
 ---
 
-## [7.2.0-rc7-1-sleepy] — 2026-08-11 (maintenance)
+## [7.2.0-rc7-1-sleepy]: 2026-08-11 (maintenance)
 
 Full six-source sweep (drm-next, drm-misc, linux-next — incl. the
 next-20260811 snapshot —, linux-pm, agd5f, amd-gfx + dri-devel ML, sirlucjan,
@@ -958,7 +973,7 @@ patches.
 
 ---
 
-## [7.2.0-rc7-1-sleepy] — 2026-08-10
+## [7.2.0-rc7-1-sleepy]: 2026-08-10
 
 Bump to **Linux 7.2-rc7** (tag `linux-7.2-rc7`). The series grew from 127 to
 140 patches. Build verified: BTF present for `vmlinux` + modules, `bbr3`
@@ -1003,7 +1018,7 @@ built-in with the old `bbr` disabled, CAKE SQM ingress enabled.
 - Valve dmemcg aggressive-protect stack (conflicts with `0104` cgroup-vram).
 - gfx12 priv-fault recovery set (needs gfx11 `userq_priv_fault_work` fields).
 
-## [7.2.0-rc6-7-sleepy] — 2026-08-04
+## [7.2.0-rc6-7-sleepy]: 2026-08-04
 
 Bump to **Linux 7.2-rc6** (tag `linux-7.2-rc6`). Final `pkgrel` of the rc6
 line (`rc6-1` … `rc6-7`); `pkgrel` 6 was skipped in git history.
@@ -1041,7 +1056,7 @@ line (`rc6-1` … `rc6-7`); `pkgrel` 6 was skipped in git history.
 - Dropped `1204`/`1210`/`1211`/`1212`/`1213`/`9000`/`9004`/`9005` (merged
   upstream in rc6).
 
-## [7.2.0-rc5-1-sleepy] — 2026-08-02
+## [7.2.0-rc5-1-sleepy]: 2026-08-02
 
 Initial release of sleepy-kernel as a maintained package. Series renumbered
 into coherent ranges (`0001`–`9007`), CachyOS squashed to one patch per branch

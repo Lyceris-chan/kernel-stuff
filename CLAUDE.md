@@ -5,8 +5,8 @@ sanitized CachyOS patchset plus upstream and local patches filtered to this
 hardware.
 
 One package: `sleepy-next/PKGBUILD` (`linux-sleepy-next`, currently **Linux
-7.3-rc2**). Track mainline RCs; linux-next snapshots are a preview base only when
-the RC line is unusable.
+7.3-rc2**). Track mainline RCs; linux-next snapshots are a preview base only
+when the RC line is unusable.
 
 ## Target hardware
 
@@ -39,8 +39,8 @@ the RC line is unusable.
 `README.md` is the entry point; `sleepy-next/docs/` holds the package overview
 and the end-user guide; `CHANGELOG.md` is per-release. Two are load-bearing:
 `sleepy-next/PATCH_SOURCES.md` is the per-patch provenance ledger, and
-**`LESSONS.md` is the incident log and the full durable findings — read it before
-repeating a past mistake.**
+**`LESSONS.md` is the incident log and the full durable findings — read it
+before repeating a past mistake.**
 
 ## Skills
 
@@ -63,8 +63,8 @@ rg -n 'xx` *\|' .claude/skills/patch-audit/SKILL.md
 CachyOS squashes are generated **against the actual series state**, not a clean
 rc — the pre-CachyOS patches touch shared files like `drm_edid.c`. Two known
 conflicts are handled inside the squashes: `0151` duplicates `0055`, and `0053`
-must be dropped when the hdmi branch is present. sirlucjan directories live under
-`repos/sirlucjan-kernel-patches/7.3-rc/`.
+must be dropped when the hdmi branch is present. sirlucjan directories live
+under `repos/sirlucjan-kernel-patches/7.3-rc/`.
 
 ## Full maintenance cycle
 
@@ -75,7 +75,8 @@ alone; a "build it" request is phase 3 alone.
    patch; regenerate only the CachyOS squashes that fail. Report every drop and
    regeneration with its reason. → `kernel-version-bump`
 2. **Patch audit** — check all six sources plus the drm/amd work-items tracker;
-   list candidates with source and priority before adding anything. → `patch-sweep`
+   list candidates with source and priority before adding anything. →
+   `patch-sweep`
 3. **Build and fix** — `rm -rf src pkg && makepkg -f -s -c`; iterate until it
    succeeds or a MUST NOT rule blocks you. → `kernel-build`
 
@@ -94,7 +95,8 @@ alone; a "build it" request is phase 3 alone.
 6. Resolve conflicts yourself — fix offsets, regenerate from source, or drop the
    patch. Do not stall waiting on the user.
 7. Clone with `--shallow-since="YYYY-MM-DD"` — never `--depth=1`.
-8. Document every new patch in `PATCH_SOURCES.md` before adding it to `PKGBUILD`.
+8. Document every new patch in `PATCH_SOURCES.md` before adding it to
+   `PKGBUILD`.
 9. Verify BTF after every build. `CONFIG_TCP_CONG_BBR` (old) and
    `CONFIG_TCP_CONG_BBR3` define the same BTF kfunc symbol, so only one can be
    built-in — the old BBR must stay disabled.
@@ -105,8 +107,8 @@ alone; a "build it" request is phase 3 alone.
 
 1. Never use `ld.mold` — it cannot link the kernel.
 2. Never access `lore.kernel.org` with a browser-like client; the web UI is
-   anti-bot gated. Use lore **git mirrors**, `lists.freedesktop.org` archives, or
-   the **drm/amd work-items tracker** (plain `curl` with **no User-Agent**).
+   anti-bot gated. Use lore **git mirrors**, `lists.freedesktop.org` archives,
+   or the **drm/amd work-items tracker** (plain `curl` with **no User-Agent**).
 3. Never hand-write or fabricate a patch diff. No traceable commit or
    mailing-list submission → tell the user, do not invent one. AI-assisted
    patches **are** allowed with a named human author, `Signed-off-by`, an
@@ -145,10 +147,11 @@ The short version:
 
 - **GC 12.0 ≠ GC 12.1.** Navi 48 is GC IP **(12,0,1)** → `gfx_v12_0.c`.
   `gfx_v12_1.c` is a different chip. Check `IP_VERSION` before any gfx12 patch.
-- **Never carry `9051`/`9052`** (DCN4 flip-schedule) — AMD reverted both upstream.
+- **Never carry `9051`/`9052`** (DCN4 flip-schedule) — AMD reverted both
+  upstream.
 - **Audit with a cumulative apply** — run
   `python3 .claude/skills/kernel-build/scripts/audit_series.py`. It applies the
-  whole series in order to a throwaway worktree at the base tag and flags
+  whole series to a throwaway worktree at the base tag and flags
   `FAILED` **and** `Skipping patch`/`Reversed` (a skipped patch is an inert
   no-op, not a success). Single-patch dry-runs and `git apply --check` give
   false negatives. Exit 0 = clean, 1 = failures, 2 = environment problem.
@@ -156,8 +159,8 @@ The short version:
   `--set-str` on a symbol that no longer exists, MGLRU under LRU-MARIE, and
   `fair.c` under scx full-switch mode are all inert. Confirm the subsystem is
   actually owned by the code you are patching.
-- **Verify clones are fresh before trusting a sweep**, and **never
-  `git format-patch` a lore mirror** (it diffs email headers, not code). Each has
+- **Verify clones are fresh before trusting a sweep**, and **never `git
+  format-patch` a lore mirror** (it diffs email headers, not code). Each has
   produced a confidently wrong "nothing to do" conclusion.
 - **Build time is ~8 min** — prefer rebuilding over guessing.
 

@@ -39,11 +39,10 @@ substitute these (see `reference.md` for why `ld.mold` specifically breaks).
 
 ALL patches — including the `90xx` series (`9001`–`9003`, `9006`–`9024`;
 `9000`/`9004`/`9005` merged upstream into rc6 and were dropped; the 14-patch
-retry-fault v3 series lives at `9011`–`9024`) — apply through the normal
-`patch -Np1 --forward` loop in `prepare()` (PKGBUILD lines ~533–542).
-There is **no** special `git apply` case for `90xx` patches. If you see a `90xx`
-patch fail, diagnose it exactly like any other patch — do not invent a `git apply`
-bypass.
+retry-fault v3 series lives at `9011`–`9024`) — apply through the normal `patch
+-Np1 --forward` loop in `prepare()` (PKGBUILD lines ~533–542). There is **no**
+special `git apply` case for `90xx` patches. If you see a `90xx` patch fail,
+diagnose it exactly like any other patch — do not invent a `git apply` bypass.
 
 **Patch layout (2026-08-11):** patches live in `patches/<range>/NNNN-*.patch`
 folders. makepkg 7.1.0 cannot resolve subdirectory local sources (it strips the
@@ -56,7 +55,8 @@ root-level `*.patch` files; they are always symlinks.
 
 The only special-case reverse-apply in `prepare()` is for `1101`
 (`drm-amd-display-enable-pstate-for-dcn4-non-emulation-builds.patch`), which is
-reverse-applied with `patch -Np1 --forward -R` to keep `.pstate_enabled = false`.
+reverse-applied with `patch -Np1 --forward -R` to keep `.pstate_enabled =
+false`.
 
 ## Audit the full series before building
 
@@ -97,13 +97,12 @@ no-op rather than a pass.
   patch -p1 --forward --dry-run < <patch>                     # THE authoritative check — matches prepare()'s tool
   ```
   **Lesson (2026-08-03):** `git apply --check` can PASS where GNU `patch -p1
-  --forward` (the tool `prepare()` actually runs) REJECTS the same patch —
-  e.g. a hunk whose leading `if (r)` context is ambiguous, or a patch touching
-  a file absent from rc7 (like DCN6 `dcn60_resource.c`). Always confirm with
-  `patch -p1 --forward --dry-run` against the series tree. If a patch passes
-  `git apply` but `patch` still rejects it, DROP it and document why (9025 did
-  this) rather than hand-forcing the hunk. For `git apply --check`, capture the
-  real exit code (`git apply ... > log 2>&1; echo $?`) — never `| head && echo OK`.
+  --forward` (the tool `prepare()` actually runs) REJECTS the same patch — for example, a hunk whose leading `if (r)` context is ambiguous, or a patch touching a file
+  absent from rc7 (like DCN6 `dcn60_resource.c`). Always confirm with `patch -p1
+  --forward --dry-run` against the series tree. If a patch passes `git apply`
+  but `patch` still rejects it, DROP it and document why (9025 did this) rather
+  than hand-forcing the hunk. For `git apply --check`, capture the real exit
+  code (`git apply ... > log 2>&1; echo $?`) — never `| head && echo OK`.
 
 ### 2. BTF failures (`Failed to generate BTF for vmlinux`)
 Check in this order:
