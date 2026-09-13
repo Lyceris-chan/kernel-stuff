@@ -36,29 +36,18 @@ the RC line is unusable.
 
 ## Documentation
 
-| File | Purpose |
-|---|---|
-| `README.md` | Repo entry point |
-| `sleepy-next/docs/README.md` | Package overview, target hardware, build and install |
-| `sleepy-next/docs/GUIDE.md` | End-user guide: toolchain, differences from vanilla, troubleshooting |
-| `CHANGELOG.md` | Per-release summary, by kernel version + pkgrel |
-| `sleepy-next/PATCH_SOURCES.md` | Per-patch provenance ledger |
-| `LESSONS.md` | Incident log and the full durable findings — **read this before repeating a past mistake** |
+`README.md` is the entry point; `sleepy-next/docs/` holds the package overview
+and the end-user guide; `CHANGELOG.md` is per-release. Two are load-bearing:
+`sleepy-next/PATCH_SOURCES.md` is the per-patch provenance ledger, and
+**`LESSONS.md` is the incident log and the full durable findings — read it before
+repeating a past mistake.**
 
 ## Skills
 
-Task-specific procedures live in `.claude/skills/`. Invoke the matching skill
-instead of re-deriving the steps; this file records only the durable rules.
-
-| Skill | Use when |
-|---|---|
-| `kernel-build` | building with makepkg, triaging a build failure, verifying BTF |
-| `kernel-version-bump` | bumping to a new RC or release, refreshing the CachyOS `01xx` squashes |
-| `patch-audit` | ingesting one named patch or commit, swapping a revision, verifying provenance |
-| `patch-sweep` | the periodic six-source sweep for new hardware-relevant patches |
-| `patch-cachy-branches` | refreshing the `0101`–`0109` CachyOS squashes from sirlucjan |
-| `patch-cleanup` | reconciling on-disk patches with `source=()`, removing orphans |
-| `docs-maintenance` | updating docs and committing a maintenance result |
+Task-specific procedures live in `.claude/skills/`, one workflow per skill.
+Invoke the matching skill instead of re-deriving the steps; this file records
+only the durable rules that apply across them. Each skill's own description
+already states what it does and when it fires, so it is not repeated here.
 
 ## Patch numbering
 

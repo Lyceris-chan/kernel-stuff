@@ -15,5 +15,20 @@
       "Bash(git -C repos/* apply --check *)",
       "Bash(git -C repos/* merge-base *)"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/skills/kernel-verify/scripts/commit-gate.sh\"",
+            "timeout": 180,
+            "statusMessage": "Verifying series and packaging before commit"
+          }
+        ]
+      }
+    ]
   }
 }
