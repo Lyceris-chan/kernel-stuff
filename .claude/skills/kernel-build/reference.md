@@ -56,8 +56,10 @@ scripts/config -e CACHY
 scripts/config -d PCIEASPM_PERFORMANCE -d PCIEASPM_POWERSAVE -d PCIEASPM_POWER_SUPERSAVE
 
 # Built-in cmdline (appended to bootloader params; CMDLINE_OVERRIDE stays off)
+# amdgpu.dcdebugmask=0x800 was dropped in pkgrel 11: it was masking the display
+# "box", which is a COSMIC overlay-plane bug, not an IPS one.
 scripts/config -e CMDLINE_BOOL \
-  --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0 amdgpu.dcdebugmask=0x800" \
+  --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0" \
   -d CMDLINE_OVERRIDE
 
 # BTF and debug. Clang 23 requires DWARF5 explicitly; the toolchain default

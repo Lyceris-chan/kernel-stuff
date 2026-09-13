@@ -3,10 +3,10 @@
 `linux-sleepy-next` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
 built from **mainline Linux 7.3-rc2** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 175 targeted
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 176 targeted
 upstream/local patches. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0_rc2-10` · **Artifact:** `linux-sleepy-next-7.3.0_rc2-10-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0_rc2-11` · **Artifact:** `linux-sleepy-next-7.3.0_rc2-11-x86_64.pkg.tar.zst`
 
 ## Target hardware
 
@@ -48,16 +48,21 @@ builds install the shipped config.
 ## Kernel command line (baked in)
 
 ```
-cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0 amdgpu.dcdebugmask=0x800
+cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0
 ```
 
 `pcie_aspm=off` + `amdgpu.aspm=0/runpm=0` are the drm/amd !5538 SMU bus-drop
-stopgaps (DPM stays on). `amdgpu.dcdebugmask=0x800` disables DCN4 Idle Power
-States.
+stopgaps (DPM stays on). `cpuidle.governor=nap` activates the NAP governor, and
+`amd_pstate.epp_boost=1` enables the per-core EPP boost.
+
+`amdgpu.dcdebugmask=0x800` (disable DCN4 idle power states) was removed in
+`pkgrel 11` — it was carried to mask the display "box", which turned out to be a
+COSMIC compositor bug rather than an IPS one. Re-add it if `flip_done` or vblank
+timeouts appear.
 
 ## Patch series
 
-175 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+176 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 
 | Range | Category |
 |---|---|

@@ -9,6 +9,48 @@ by the running kernel (base + `pkgrel`), e.g. `7.2.0-rc7-1-sleepy`.
 
 ---
 
+## [7.3.0-rc2-11-sleepy-next] — 2026-09-13
+
+### Changed
+- **`amdgpu.dcdebugmask=0x800` removed from the baked cmdline.** It was carried
+  from August to mask the display "box" by disabling DCN4 idle power states, on
+  the theory that IPS/DPG pipe-gating made `dc_get_flip_pending_on_otg()` misread
+  a pending flip. That theory is disproved — the box is a COSMIC overlay-plane
+  bug (fixed with `COSMIC_DISABLE_OVERLAY_SCANOUT=1`), and it returned in
+  September with `0x800` still in effect. The mask cost idle power and hid
+  IPS-related problems. Re-add the flag if `flip_done` or vblank timeouts appear:
+  the gap Leo Li documents in `f64a9be56536` is real, just not this machine's
+  failure mode. The `pcie_aspm=off` / `amdgpu.aspm=0` / `amdgpu.runpm=0` stopgaps
+  stay — the !5538 SMU bus-drop is still unfixed upstream.
+- **The dead `--set-str DEFAULT_IOSCHED "kyber"` line is gone.** The symbol no
+  longer exists (removed with the blk-mq rework), so `olddefconfig` silently
+  discarded it. The NVMe scheduler is set by udev's `60-ioschedulers.rules`.
+
+### Added
+- **`2143` — zstd DDict probe index wrap-around.** An extracted subset of
+  sirlucjan's `7.3-rc/zstd-dev-patches` merge: `ZSTD_DDictHashSet_emplaceDDict()`
+  and `ZSTD_DDictHashSet_getDDict()` advance the probe index with
+  `idx &= idxRangeMask; idx++;`, which leaves `idx == ddictPtrTableSize` when the
+  probe starts on the last slot — the loop then re-reads out of range and
+  `emplaceDDict()` writes one element past the end. Folding the wrap into the
+  increment fixes it. Reachability here is low (the DDict hash set needs
+  multi-dictionary streaming decompression; zram/zswap use dictionary-less
+  contexts); taken because it is a latent out-of-bounds write in vendored code.
+  The rest of sirlucjan's 7.3 merge was **not** taken: it refactors the `bmi2`
+  field into `ZSTD_*Ctx_get_bmi2()` accessors, which our `2128`–`2130` BMI2
+  series depends on and would have to be rebased onto, and its companion patch is
+  a GCC-only segfault workaround that cannot affect a Clang build.
+
+### Added — verification tooling
+- **`kernel-verify` skill** with a tiered, portable verification suite:
+  patch hygiene, checksums, provenance, documented claims, skill-spec compliance
+  and dangling symlinks (fast); the cumulative apply (series); `checkpatch`,
+  `sparse`, `coccinelle` and `W=1` (deep). Missing tools are reported as SKIP with
+  the reason, never as a silent pass.
+- **Two patches cleaned**: `2138` and `2400` carried 64 and 43 lines of raw
+  mail-transport headers (`Return-Path`, `X-Spam-Checker-Version`, `Received`,
+  `ARC-Seal`). Diff bodies verified byte-identical, `Message-ID` preserved.
+
 ## [7.3.0-rc2-10-sleepy-next] — 2026-09-13
 
 ### Added
