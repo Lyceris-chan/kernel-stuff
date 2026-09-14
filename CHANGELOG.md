@@ -110,12 +110,14 @@ full entries remain in git history.
   during the `acknowledgments` phase), so drm-misc is the one source this sweep
   could not cover.
 
-### Raised for a decision — `1144`
+### Decision recorded — `1144` is kept
 The MAG251RX is **HDMI 2.0 and DP 1.2a**, so `1144` ("Enable HDMI FRL by
 default") is inert on the hardware: FRL is an HDMI 2.1 feature. It is
 bit-identical to the change CachyOS reverted with no stated reason, and it is
-implicated in open upstream work item #5649 (HDMI FRL blanking). Removing a
-patch needs explicit approval, so it is left in place and flagged here.
+implicated in open upstream work item #5649 (HDMI FRL blanking). Removing it
+was considered and **declined on 2026-09-14**: being inert, removing it buys
+nothing measurable today, and the 7.4 bump replaces this area with drm-next's
+reworked VSDB/FRL handling anyway. Revisit then rather than re-arguing it.
 
 ### Open question (not acted on)
 - The sweep flagged that `CLAUDE.md` lists `DCN42B` as a Navi 48 identifier and
