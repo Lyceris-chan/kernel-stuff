@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-next/PKGBUILD`.
 
 - **Base:** Linux `v7.3-rc3`
-- **Series:** 171 patches
+- **Series:** 172 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -29,7 +29,7 @@ are supplied by the generator instead, so every row below has a source.
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 21 |
 | `2400–2499` | Core scheduler | 1 |
-| `2500–2599` | x86 and arch core | 1 |
+| `2500–2599` | x86 and arch core | 2 |
 | `2600–2699` | Time and timers | 0 |
 | `9000–9099` | agd5f staging backports | 25 |
 
@@ -188,6 +188,7 @@ change rather than a documentation pass.
 | `2322` | kbuild: use pigz for gzip compression if available | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-23-5dc1ac01672d@kernel.org` |
 | `2400` | sched: Set need-resched flags before tracing | Andrea Righi | 2026-09-11 | `20260911213300.1305763-1-arighi@nvidia.com` |
 | `2500` | x86/mm: Fix user-space data loss with MADV_FREE and THP | Vernon Yang | 2026-09-03 | `f7491d7c81db` |
+| `2502` | x86/amd_node: Fix PCI device reference counting in amd_smn_init() | Yazen Ghannam | 2026-09-03 | `27600805e62f` |
 | `9007` | drm/gfx12: Program DB_RING_CONTROL | Alex Deucher | 2026-06-26 | `402ebe22b267` |
 | `9011` | drm/amdgpu: Respect noretry flag for retry faults on GFX12.1 | Timur Kristóf | 2026-07-01 | `20260701161721.85681-2-timur.kristof@gmail.com` |
 | `9012` | drm/amdgpu/gfxhub: Enable retry fault interrupts when needed | Timur Kristóf | 2026-07-01 | `20260701161721.85681-3-timur.kristof@gmail.com` |
@@ -251,6 +252,7 @@ adds are already there, not merely that `patch` reported it applied.
 | `2147` | akpm-mm `f245cf82e158d` | mm/memcg: clear folio memcg after changing per memcg stats |
 | `2148` | crypto ML `<20260825220616.3842633-1-usama.arif@linux.dev>` | crypto: zstd — avoid redundant cstream initialization |
 | `2149` | crypto ML, same series | crypto: zstd — avoid redundant dstream initialization |
+| `2502` | torvalds `27600805e62f` | x86/amd_node: fix PCI device reference counting in `amd_smn_init()` |
 
 `2148` and `2149` were applied by Herbert Xu on 2026-09-11 for 7.4; they touch
 `crypto/zstd.c` and do not conflict with `2128`–`2130`, which are `lib/zstd`.

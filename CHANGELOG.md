@@ -15,6 +15,35 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc3-2-sleepy-next]: 2026-09-14
+
+### Fixed
+- **The MSI MAG251RX flicker.** That panel, running 1920x1080 at 240 Hz over
+  HDMI, flickered continuously and became close to blank under cursor movement.
+
+  The cause was **passive VRR**. It is the feature that keeps a sink in its
+  variable-refresh state during fixed-refresh desktop use, and it is **opt-out**:
+  patch `1150` defaults it on for every connector that advertises
+  `passive_vrr_capable`, and patch `1151` drives `stream->freesync_on_desktop`
+  from the inverse of that flag, so the driver keeps the FreeSync-Active bit set
+  on the desktop even when VRR is switched off. The panel was therefore never in
+  fixed-refresh mode. Cursor movement makes the compositor repaint, the frame
+  interval swings, and the panel follows — which is why idle flicker was mild and
+  cursor use was severe.
+
+  It also explains why toggling VRR in COSMIC never helped: that control moves
+  `VRR_ENABLED`, which is a different property from `PASSIVE_VRR_DISABLED`.
+  Both outputs read `VRR_ENABLED=0  PASSIVE_VRR_DISABLED=0`.
+
+  Fixed by inverting the default: the pristine CRTC state in
+  `drm_atomic_helper_crtc_state_init()` now sets `passive_vrr_disabled = true`,
+  so passive VRR is opt-in on this machine. The property stays exposed and
+  writable, so a userspace that does want desktop passive VRR can still set
+  `PASSIVE_VRR_DISABLED=0` on the CRTC.
+
+  This is a deliberate local deviation from the upstream series, recorded in a
+  `[sleepy]` block in patch `1150`'s commit message.
+
 ## [7.3.0-rc3-1-sleepy-next]: 2026-09-13
 
 ### Changed

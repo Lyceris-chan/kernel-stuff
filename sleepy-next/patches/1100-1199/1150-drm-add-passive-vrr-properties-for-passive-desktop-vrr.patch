@@ -23,6 +23,19 @@ DP/eDP where seamless VRR transitions are enforced by the standard.
 
 Signed-off-by: Tomasz Pakuła <tomasz.pakula.oficjalny@gmail.com>
 Signed-off-by: Fangzhi Zuo <Jerry.Zuo@amd.com>
+
+[sleepy] Local deviation from the upstream series: the pristine CRTC state
+defaults `passive_vrr_disabled` to true, inverting the opt-out into opt-in.
+
+Upstream enables passive VRR by default for every sink that advertises
+passive_vrr_capable, which leaves that sink in its variable-refresh state
+during fixed-refresh desktop use. On this machine's MSI MAG251RX, running at
+1920x1080@240Hz over HDMI, that produces continuous flicker that becomes severe
+under cursor movement -- the compositor repaints, the frame interval swings, and
+the panel follows, to the point of nearly blanking.
+
+The property is still exposed and writable, so a userspace that does want
+desktop passive VRR can set PASSIVE_VRR_DISABLED=0 on the CRTC.
 ---
  drivers/gpu/drm/drm_atomic_uapi.c |  4 ++
  drivers/gpu/drm/drm_connector.c   | 73 +++++++++++++++++++++++++++++++
@@ -267,6 +280,29 @@ index d8f5b7e9673e..c3dbde4ed8c7 100644
  
  	/**
  	 * @dvi_i_subconnector_property: Optional DVI-I property to
+diff --git a/drivers/gpu/drm/drm_atomic_state_helper.c b/drivers/gpu/drm/drm_atomic_state_helper.c
+--- a/drivers/gpu/drm/drm_atomic_state_helper.c
++++ b/drivers/gpu/drm/drm_atomic_state_helper.c
+@@ -76,6 +76,18 @@
+ {
+ 	crtc_state->crtc = crtc;
+ 	crtc_state->background_color = DRM_ARGB64_PREP(0xffff, 0, 0, 0);
++	/*
++	 * sleepy: passive VRR is opt-in here, not opt-out.
++	 *
++	 * Upstream defaults it on for any sink advertising
++	 * passive_vrr_capable, which leaves an HDMI sink in its
++	 * variable-refresh state on the desktop. The MSI MAG251RX at 240 Hz
++	 * flickers badly in that state, worst under cursor movement, where the
++	 * compositor's repaints swing the refresh rate. Opting in keeps
++	 * fixed-refresh desktop use free of VRR while leaving the property
++	 * settable by userspace.
++	 */
++	crtc_state->passive_vrr_disabled = true;
+ }
+ EXPORT_SYMBOL(__drm_atomic_helper_crtc_state_init);
+ 
+
 -- 
 2.55.0
 
