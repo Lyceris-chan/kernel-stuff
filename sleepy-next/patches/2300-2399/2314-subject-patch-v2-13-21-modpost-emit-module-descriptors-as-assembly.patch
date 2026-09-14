@@ -1,44 +1,10 @@
 From nobody Mon Sep 17 00:00:00 2001
 From: "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
-Date: Tue, 08 Sep 2026 21:55:15 +0100
-Subject: [PATCH 15/23] modpost: emit module descriptors as assembly
-Message-Id: <20260908-build-speedup-v1-15-5dc1ac01672d@kernel.org>
-Cc: Nathan Chancellor <nathan@kernel.org>, Nicolas Schier <nsc@kernel.org>, 
- Nick Desaulniers <ndesaulniers@google.com>, 
- Bill Wendling <morbo@google.com>, Justin Stitt <justinstitt@google.com>, 
- Masahiro Yamada <masahiroy@kernel.org>, Alexey Gladkov <legion@kernel.org>, 
- Thomas Gleixner <tglx@kernel.org>, Ingo Molnar <mingo@redhat.com>, 
- Borislav Petkov <bp@alien8.de>, Dave Hansen <dave.hansen@linux.intel.com>, 
- x86@kernel.org, "H. Peter Anvin" <hpa@zytor.com>, 
- Paul Walmsley <pjw@kernel.org>, Palmer Dabbelt <palmer@dabbelt.com>, 
- Albert Ou <aou@eecs.berkeley.edu>, Alexandre Ghiti <alex@ghiti.fr>, 
- Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>, 
- Will Deacon <will@kernel.org>, Mark Rutland <mark.rutland@arm.com>, 
- Ard Biesheuvel <ardb@kernel.org>, 
- Ilias Apalodimas <ilias.apalodimas@linaro.org>, 
- Josh Poimboeuf <jpoimboe@kernel.org>, Peter Zijlstra <peterz@infradead.org>, 
- Miguel Ojeda <ojeda@kernel.org>, Boqun Feng <boqun@kernel.org>, 
- Gary Guo <gary@garyguo.net>, 
- =?utf-8?q?Bj=C3=B6rn_Roy_Baron?= <bjorn3_gh@protonmail.com>, 
- Benno Lossin <lossin@kernel.org>, Andreas Hindborg <a.hindborg@kernel.org>, 
- Alice Ryhl <aliceryhl@google.com>, Trevor Gross <tmgross@umich.edu>, 
- Danilo Krummrich <dakr@kernel.org>, 
- Daniel Almeida <daniel.almeida@collabora.com>, 
- Tamir Duberstein <tamird@kernel.org>, 
- Alexandre Courbot <acourbot@nvidia.com>, 
- =?utf-8?q?Onur_=C3=96zkan?= <work@onurozkan.dev>, 
- Jonathan Corbet <corbet@lwn.net>, Randy Dunlap <rdunlap@infradead.org>
- llvm@lists.linux.dev, linux-riscv@lists.infradead.org, 
- linux-arch@vger.kernel.org, linux-arm-kernel@lists.infradead.org, 
- linux-efi@vger.kernel.org, rust-for-linux@vger.kernel.org, 
- linux-doc@vger.kernel.org, Jens Axboe <axboe@kernel.dk>, 
- "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
- h=from:subject:message-id; bh=AQu1KF1YNgQosHiZo0J2nPyyOBM3uoXaU4HMAqP1Ht4=;
- b=owGbwMvMwCV2fu7ZrsZH9SKMp9WSGLIWlJlHXLLMTu+KnpeWq1gvuUn7eDFb0cV1G44XNRbP+
- tUoP+l1RykLgxgXg6yYIsvzL+L7g0TC5nVe8HeDmcPKBDKEgYtTACZSsJCRYc6V08vfFFekTdnU
- 08SodeWFyiyrGb+kTllfMFp7rO4Q03eGv5LH8z5eKpu4+qvX0mtcr6vUzPUCAnf8CDphLdWnblW
- oxQ4A
- fpr=E7F417BF5214569E89D04F46CF9DCD8A81E27F14
+Date: Mon, 14 Sep 2026 10:22:12 +0100
+Subject: [PATCH v2 13/21] modpost: emit module descriptors as assembly
+Message-Id: <20260914-build-speedup-v2-13-39817ec5db23@kernel.org>
+To: Linus Torvalds <torvalds@linux-foundation.org>,  Nathan Chancellor <nathan@kernel.org>, Nicolas Schier <nsc@kernel.org>,  Nick Desaulniers <ndesaulniers@google.com>,  Bill Wendling <morbo@google.com>, Justin Stitt <justinstitt@google.com>,  Masahiro Yamada <masahiroy@kernel.org>, Alexey Gladkov <legion@kernel.org>,  Thomas Gleixner <tglx@kernel.org>, Ingo Molnar <mingo@redhat.com>,  Borislav Petkov <bp@alien8.de>, Dave Hansen <dave.hansen@linux.intel.com>,  x86@kernel.org, "H. Peter Anvin" <hpa@zytor.com>,  Paul Walmsley <pjw@kernel.org>, Palmer Dabbelt <palmer@dabbelt.com>,  Albert Ou <aou@eecs.berkeley.edu>, Alexandre Ghiti <alex@ghiti.fr>,  Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,  Will Deacon <will@kernel.org>, Mark Rutland <mark.rutland@arm.com>,  Ard Biesheuvel <ardb@kernel.org>,  Ilias Apalodimas <ilias.apalodimas@linaro.org>,  Josh Poimboeuf <jpoimboe@kernel.org>, Peter Zijlstra <peterz@infradead.org>,  Miguel Ojeda <ojeda@kernel.org>, Boqun Feng <boqun@kernel.org>,  Gary Guo <gary@garyguo.net>,  =?utf-8?q?Bj=C3=B6rn_Roy_Baron?= <bjorn3_gh@protonmail.com>,  Benno Lossin <lossin@kernel.org>, Andreas Hindborg <a.hindborg@kernel.org>,  Alice Ryhl <aliceryhl@google.com>, Trevor Gross <tmgross@umich.edu>,  Danilo Krummrich <dakr@kernel.org>,  Daniel Almeida <daniel.almeida@collabora.com>,  Tamir Duberstein <tamird@kernel.org>,  Alexandre Courbot <acourbot@nvidia.com>,  =?utf-8?q?Onur_=C3=96zkan?= <work@onurozkan.dev>,  Jonathan Corbet <corbet@lwn.net>, Randy Dunlap <rdunlap@infradead.org>,  Kees Cook <kees@kernel.org>, "Gustavo A. R. Silva" <gustavoars@kernel.org>
+Cc: linux-kbuild@vger.kernel.org, linux-kernel@vger.kernel.org,  llvm@lists.linux.dev, linux-riscv@lists.infradead.org,  linux-arch@vger.kernel.org, linux-arm-kernel@lists.infradead.org,  linux-efi@vger.kernel.org, rust-for-linux@vger.kernel.org,  linux-doc@vger.kernel.org, Jens Axboe <axboe@kernel.dk>,  linux-hardening@vger.kernel.org, "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
 
 modpost generates a descriptor for every module in the form of a
 <module>.mod.c file with .modinfo strings, the __this_module descriptor,
@@ -63,6 +29,10 @@ The layout required (size and alignment of struct module, struct
 modversion_info, the module's name offsets, init, and exit fields and
 whether the architecture uses PREL32 ksymtab references) can all be derived
 from scripts/mod/module-offsets.h.
+
+The fields of __this_module are emitted in offset order rather than
+declaration order, as CONFIG_RANDSTRUCT shuffles struct module so the name,
+init and exit fields can land anywhere.
 
 An assembly file avoids all of the issues previously mentioned so this
 conversion results in a very significant performance win on kernel build.
@@ -96,6 +66,10 @@ every module and an external one loaded and unloaded, and the srcversions
 checked against modinfo, i386 and arm64 defconfigs (gcc and clang) and a
 ThinLTO build were also built as part of testing.
 
+An x86_64 CONFIG_RANDSTRUCT_FULL build with clang, which places the name
+field after init and exit, was checked the same way and produces the same
+.gnu.linkonce.this_module sections and relocations as the C version.
+
 On the x86_64 allmodconfig with clang 22, "make modules" with every
 *.mod.o and *.ko deleted goes from 64.5s (6,306 CPU-s) to 28.5s (518
 CPU-s).
@@ -111,10 +85,10 @@ Whole build, 128-thread Threadripper 9980X, best of N runs:
 
                                          before   after     delta
                                          -------------------------------
-  x86 allmodconfig, no-op make, gcc        11.0s     1.9s     -9.1s (-82%)
-  x86 allmodconfig, no-op make, clang      11.6s     2.4s     -9.2s (-79%)
-  x86 allmodconfig, clean, gcc            342.1s   304.5s    -37.6s (-11%)
-  x86 allmodconfig, clean, clang          338.5s   301.7s    -36.8s (-11%)
+  x86 allmodconfig, no-op make, gcc        12.7s     2.3s    -10.4s (-82%)
+  x86 allmodconfig, no-op make, clang      13.9s     2.8s    -11.2s (-80%)
+  x86 allmodconfig, clean, gcc            342.6s   306.6s    -36.0s (-11%)
+  x86 allmodconfig, clean, clang          340.1s   290.2s    -49.8s (-15%)
 
 Assisted-by: LLM
 Signed-off-by: Lorenzo Stoakes (ARM) <ljs@kernel.org>
@@ -126,10 +100,10 @@ Signed-off-by: Lorenzo Stoakes (ARM) <ljs@kernel.org>
  scripts/Makefile.modpost     |   2 +-
  scripts/mod/.gitignore       |   1 +
  scripts/mod/Makefile         |   8 +
- scripts/mod/modpost.c        | 619 +++++++++++++++++++++++++++++++------------
+ scripts/mod/modpost.c        | 637 ++++++++++++++++++++++++++++++++-----------
  scripts/mod/module-offsets.c |  35 +++
  scripts/tags.sh              |   5 +-
- 10 files changed, 512 insertions(+), 175 deletions(-)
+ 10 files changed, 530 insertions(+), 175 deletions(-)
 
 diff --git a/.gitignore b/.gitignore
 index 9875120ea7bd..00fc262b894b 100644
@@ -144,7 +118,7 @@ index 9875120ea7bd..00fc262b894b 100644
  *.o.*
  *.patch
 diff --git a/Makefile b/Makefile
-index 088e901f0a72..997fc7ebe096 100644
+index 68df3446d111..8263fc8a86b3 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -1422,8 +1422,8 @@ archprepare: outputmakefile archheaders archscripts scripts include/config/kerne
@@ -249,7 +223,7 @@ index c729bc936bae..fbd5099e0441 100644
  quiet_cmd_elfconfig = MKELF   $@
        cmd_elfconfig = $(obj)/mk_elfconfig < $< > $@
 diff --git a/scripts/mod/modpost.c b/scripts/mod/modpost.c
-index 0fd43c8a89ea..550ccd753ed8 100644
+index 0fd43c8a89ea..b4550b545330 100644
 --- a/scripts/mod/modpost.c
 +++ b/scripts/mod/modpost.c
 @@ -26,6 +26,7 @@
@@ -424,7 +398,7 @@ index 0fd43c8a89ea..550ccd753ed8 100644
  static void write_buf(struct buffer *b, const char *fname)
  {
  	FILE *file;
-@@ -2191,30 +2042,465 @@ static void write_vmlinux_export_c_file(struct module *mod)
+@@ -2191,30 +2042,483 @@ static void write_vmlinux_export_c_file(struct module *mod)
  	free(buf.p);
  }
  
@@ -452,18 +426,9 @@ index 0fd43c8a89ea..550ccd753ed8 100644
 +
 +/* Append the body of an assembler string literal, escaped as needed. */
 +static void buf_escaped(struct buffer *buf, const char *str)
- {
--	struct buffer buf = { };
--	struct module_alias *alias, *next;
--	char fname[PATH_MAX];
--	int ret;
++{
 +	unsigned char chr;
- 
--	add_header(&buf, mod);
--	add_exported_symbols(&buf, mod);
--	add_versions(&buf, mod);
--	add_extended_versions(&buf, mod);
--	add_depends(&buf, mod);
++
 +	while ((chr = *str++)) {
 +		if (chr == '"' || chr == '\\')
 +			buf_printf(buf, "\\%c", chr);
@@ -473,15 +438,23 @@ index 0fd43c8a89ea..550ccd753ed8 100644
 +			buf_printf(buf, "\\%03o", chr);
 +	}
 +}
- 
--	buf_printf(&buf, "\n");
++
 +static void buf_asciz(struct buffer *buf, const char *str)
-+{
+ {
+-	struct buffer buf = { };
+-	struct module_alias *alias, *next;
+-	char fname[PATH_MAX];
+-	int ret;
 +	buf_printf(buf, "\t.asciz \"");
 +	buf_escaped(buf, str);
 +	buf_printf(buf, "\"\n");
 +}
-+
+ 
+-	add_header(&buf, mod);
+-	add_exported_symbols(&buf, mod);
+-	add_versions(&buf, mod);
+-	add_extended_versions(&buf, mod);
+-	add_depends(&buf, mod);
 +/* The equivalent of MODULE_INFO(tag, info). */
 +static void add_asm_modinfo(struct buffer *buf, const char *tag,
 +			    const char *info)
@@ -491,7 +464,8 @@ index 0fd43c8a89ea..550ccd753ed8 100644
 +	buf_escaped(buf, info);
 +	buf_printf(buf, "\"\n");
 +}
-+
+ 
+-	buf_printf(&buf, "\n");
 +/* See __KSYM_REF() in include/linux/export-internal.h. */
 +static void add_asm_ksym_ref(struct buffer *buf, const char *prefix,
 +			     const char *sym)
@@ -590,19 +564,23 @@ index 0fd43c8a89ea..550ccd753ed8 100644
 +static void asm_skip_to(struct buffer *buf, unsigned int *pos,
 +			unsigned int offset)
 +{
++	if (offset < *pos)
++		fatal("__this_module field at offset %u overlaps the previous one\n",
++		      offset);
 +	if (offset > *pos)
 +		buf_printf(buf, "\t.skip %u\n", offset - *pos);
 +
 +	*pos = offset;
 +}
 +
-+/* A pointer field of __this_module: its offset and an assembler expression. */
++/* A non-zero field of __this_module: its offset and the name or symbol in it. */
 +struct this_module_field {
 +	unsigned int offset;
++	bool is_name;
 +	const char *value;
 +};
 +
-+#define THIS_MODULE_MAX_FIELDS	4
++#define THIS_MODULE_MAX_FIELDS	5
 +
 +static int compare_field_offsets(const void *ptr_a, const void *ptr_b)
 +{
@@ -614,29 +592,48 @@ index 0fd43c8a89ea..550ccd753ed8 100644
 +	return 0;
 +}
 +
-+/* The fields of __this_module which are not zero, in offset order. */
++/*
++ * The fields of __this_module which are not zero, in offset order. The order
++ * is only known from module-offsets.h, CONFIG_RANDSTRUCT shuffles struct module.
++ */
 +static unsigned int get_this_module_fields(const struct module *mod,
++					   const char *modname,
 +					   struct this_module_field *fields)
 +{
 +	unsigned int nr_fields = 0;
 +
++	fields[nr_fields++] = (struct this_module_field)
++		{ MOD_OFF_module_name, true, modname };
 +	if (mod->has_init)
 +		fields[nr_fields++] = (struct this_module_field)
-+			{ MOD_OFF_module_init, MOD_FUNC_PREFIX "init_module" };
++			{ MOD_OFF_module_init, false, MOD_FUNC_PREFIX "init_module" };
 +#ifdef MOD_OFF_module_exit
 +	if (mod->has_cleanup)
 +		fields[nr_fields++] = (struct this_module_field)
-+			{ MOD_OFF_module_exit, MOD_FUNC_PREFIX "cleanup_module" };
++			{ MOD_OFF_module_exit, false, MOD_FUNC_PREFIX "cleanup_module" };
 +#endif
 +#ifdef MOD_OFF_module_arch_fixup_start
 +	fields[nr_fields++] = (struct this_module_field)
-+		{ MOD_OFF_module_arch_fixup_start, "__start_fixup" };
++		{ MOD_OFF_module_arch_fixup_start, false, "__start_fixup" };
 +	fields[nr_fields++] = (struct this_module_field)
-+		{ MOD_OFF_module_arch_fixup_end, "__stop_fixup" };
++		{ MOD_OFF_module_arch_fixup_end, false, "__stop_fixup" };
 +#endif
 +	qsort(fields, nr_fields, sizeof(*fields), compare_field_offsets);
 +
 +	return nr_fields;
++}
++
++/* Emit one field of __this_module, returning its size. */
++static unsigned int add_asm_this_module_field(struct buffer *buf,
++					      const struct this_module_field *field)
++{
++	if (field->is_name) {
++		buf_printf(buf, "\t.ascii \"%s\"\n", field->value);
++		return strlen(field->value);
++	}
++
++	buf_printf(buf, "\t" MOD_PTR_DIRECTIVE " %s\n", field->value);
++	return MOD_SIZEOF_LONG;
 +}
 +
 +/*
@@ -652,7 +649,7 @@ index 0fd43c8a89ea..550ccd753ed8 100644
 +				const char *modname)
 +{
 +	struct this_module_field fields[THIS_MODULE_MAX_FIELDS];
-+	const unsigned int nr_fields = get_this_module_fields(mod, fields);
++	const unsigned int nr_fields = get_this_module_fields(mod, modname, fields);
 +	unsigned int pos = 0, i;
 +
 +	buf_printf(buf, "\n\t.section .gnu.linkonce.this_module,\"aw\",%%progbits\n");
@@ -662,14 +659,9 @@ index 0fd43c8a89ea..550ccd753ed8 100644
 +	buf_printf(buf, "\t.size __this_module, %d\n", MOD_SIZEOF_struct_module);
 +	buf_printf(buf, "__this_module:\n");
 +
-+	asm_skip_to(buf, &pos, MOD_OFF_module_name);
-+	buf_printf(buf, "\t.ascii \"%s\"\n", modname);
-+	pos += strlen(modname);
-+
 +	for (i = 0; i < nr_fields; i++) {
 +		asm_skip_to(buf, &pos, fields[i].offset);
-+		buf_printf(buf, "\t" MOD_PTR_DIRECTIVE " %s\n", fields[i].value);
-+		pos += MOD_SIZEOF_LONG;
++		pos += add_asm_this_module_field(buf, &fields[i]);
 +	}
 +
 +	asm_skip_to(buf, &pos, MOD_SIZEOF_struct_module);
@@ -905,7 +897,7 @@ index 0fd43c8a89ea..550ccd753ed8 100644
  	if (ret >= sizeof(fname)) {
  		error("%s: too long path was truncated\n", fname);
  		goto free;
-@@ -2223,6 +2509,7 @@ static void write_mod_c_file(struct module *mod)
+@@ -2223,6 +2527,7 @@ static void write_mod_c_file(struct module *mod)
  	write_if_changed(&buf, fname);
  
  free:
@@ -913,7 +905,7 @@ index 0fd43c8a89ea..550ccd753ed8 100644
  	free(buf.p);
  }
  
-@@ -2462,7 +2749,7 @@ int main(int argc, char **argv)
+@@ -2462,7 +2767,7 @@ int main(int argc, char **argv)
  		if (mod->is_vmlinux)
  			write_vmlinux_export_c_file(mod);
  		else

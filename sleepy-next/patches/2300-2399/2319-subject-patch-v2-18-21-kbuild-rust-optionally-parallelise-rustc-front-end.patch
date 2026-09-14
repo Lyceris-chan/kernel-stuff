@@ -1,0 +1,95 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
+Date: Mon, 14 Sep 2026 10:22:17 +0100
+Subject: [PATCH v2 18/21] kbuild: rust: optionally parallelise rustc front end
+Message-Id: <20260914-build-speedup-v2-18-39817ec5db23@kernel.org>
+To: Linus Torvalds <torvalds@linux-foundation.org>,  Nathan Chancellor <nathan@kernel.org>, Nicolas Schier <nsc@kernel.org>,  Nick Desaulniers <ndesaulniers@google.com>,  Bill Wendling <morbo@google.com>, Justin Stitt <justinstitt@google.com>,  Masahiro Yamada <masahiroy@kernel.org>, Alexey Gladkov <legion@kernel.org>,  Thomas Gleixner <tglx@kernel.org>, Ingo Molnar <mingo@redhat.com>,  Borislav Petkov <bp@alien8.de>, Dave Hansen <dave.hansen@linux.intel.com>,  x86@kernel.org, "H. Peter Anvin" <hpa@zytor.com>,  Paul Walmsley <pjw@kernel.org>, Palmer Dabbelt <palmer@dabbelt.com>,  Albert Ou <aou@eecs.berkeley.edu>, Alexandre Ghiti <alex@ghiti.fr>,  Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,  Will Deacon <will@kernel.org>, Mark Rutland <mark.rutland@arm.com>,  Ard Biesheuvel <ardb@kernel.org>,  Ilias Apalodimas <ilias.apalodimas@linaro.org>,  Josh Poimboeuf <jpoimboe@kernel.org>, Peter Zijlstra <peterz@infradead.org>,  Miguel Ojeda <ojeda@kernel.org>, Boqun Feng <boqun@kernel.org>,  Gary Guo <gary@garyguo.net>,  =?utf-8?q?Bj=C3=B6rn_Roy_Baron?= <bjorn3_gh@protonmail.com>,  Benno Lossin <lossin@kernel.org>, Andreas Hindborg <a.hindborg@kernel.org>,  Alice Ryhl <aliceryhl@google.com>, Trevor Gross <tmgross@umich.edu>,  Danilo Krummrich <dakr@kernel.org>,  Daniel Almeida <daniel.almeida@collabora.com>,  Tamir Duberstein <tamird@kernel.org>,  Alexandre Courbot <acourbot@nvidia.com>,  =?utf-8?q?Onur_=C3=96zkan?= <work@onurozkan.dev>,  Jonathan Corbet <corbet@lwn.net>, Randy Dunlap <rdunlap@infradead.org>,  Kees Cook <kees@kernel.org>, "Gustavo A. R. Silva" <gustavoars@kernel.org>
+Cc: linux-kbuild@vger.kernel.org, linux-kernel@vger.kernel.org,  llvm@lists.linux.dev, linux-riscv@lists.infradead.org,  linux-arch@vger.kernel.org, linux-arm-kernel@lists.infradead.org,  linux-efi@vger.kernel.org, rust-for-linux@vger.kernel.org,  linux-doc@vger.kernel.org, Jens Axboe <axboe@kernel.dk>,  linux-hardening@vger.kernel.org, "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
+
+Rust crates are compiled in a serial chain on the critical path - core,
+bindings, kernel crates and then the drivers - each a rustc invocation.
+
+With CONFIG_RUST set and every rust driver enabled, the entire chain takes
+around 25 seconds on a 128-thread machine, with the associated C code
+taking 24 seconds.
+
+Each time a change is made to any of the bindings, it triggers a rebuild.
+
+rustc has a parallel front end, enabled with -Zthreads, available since
+rust 1.84 [0] and therefore on every rustc the kernel supports.
+
+It is not yet stable and its output is not reproducible, so it cannot be
+used by default - stabilisation is being worked on [1].
+
+Add optional build parameter KBUILD_RUST_THREADS, which when set passes
+that many threads to rustc.
+
+The threads are taken from make's jobserver, so a parallel build is not
+oversubscribed. It was found that benefits level off at 8 threads (16 was
+found to be around the same, and 32 slower).
+
+Generated output was confirmed byte-for-byte identical.
+
+Observed build time changes with KBUILD_RUST_THREADS=8 (rustc 1.98, clang):
+
+                                        before    after
+  core.o                                   7.7s     4.9s
+  bindings.o                               4.3s     3.1s
+  kernel.o                                 2.0s     1.4s
+  clean build                             39.3s    34.6s
+  touch rust/kernel/lib.rs                12.9s    12.1s
+  touch rust/bindings/bindings_helper.h   19.5s    17.5s
+
+Whole build, 128-thread Threadripper 9980X, KBUILD_RUST_THREADS=8, best of
+N runs:
+
+                                         before   after     delta
+                                         -------------------------------
+  x86 defconfig+RUST, clean               41.0s    36.4s     -4.6s (-11%)
+  x86 defconfig+RUST, touch lib.rs         8.3s     7.7s    -0.56s (-7%)
+
+Link: https://github.com/rust-lang/rust/pull/132282 [0]
+Link: https://github.com/rust-lang/compiler-team/issues/1005 [1]
+Assisted-by: LLM
+Signed-off-by: Lorenzo Stoakes (ARM) <ljs@kernel.org>
+---
+ Documentation/kbuild/kbuild.rst | 7 +++++++
+ Makefile                        | 4 ++++
+ 2 files changed, 11 insertions(+)
+
+diff --git a/Documentation/kbuild/kbuild.rst b/Documentation/kbuild/kbuild.rst
+index 5a9013bacfb7..9b2b127676c3 100644
+--- a/Documentation/kbuild/kbuild.rst
++++ b/Documentation/kbuild/kbuild.rst
+@@ -134,6 +134,13 @@ See make help for the full list.
+ 
+ Setting "V=..." takes precedence over KBUILD_VERBOSE.
+ 
++KBUILD_RUST_THREADS
++-------------------
++The number of threads rustc's parallel front end may use, passed to it as
++``-Zthreads``. Unset by default, as the parallel front end is not yet
++stable and its output is not reproducible. The gain levels off at 8
++threads.
++
+ KBUILD_EXTMOD
+ -------------
+ Set the directory to look for the kernel source when building external
+diff --git a/Makefile b/Makefile
+index 8263fc8a86b3..4ef504c1ace2 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1206,6 +1206,10 @@ KBUILD_RUSTFLAGS += --remap-path-prefix=$(srcroot)/= --remap-path-scope=macro
+ endif
+ endif
+ 
++ifneq ($(KBUILD_RUST_THREADS),)
++KBUILD_RUSTFLAGS += -Zthreads=$(KBUILD_RUST_THREADS)
++endif
++
+ # include additional Makefiles when needed
+ include-y			:= scripts/Makefile.warn
+ include-$(CONFIG_DEBUG_INFO)	+= scripts/Makefile.debug
+
+-- 
+2.55.0

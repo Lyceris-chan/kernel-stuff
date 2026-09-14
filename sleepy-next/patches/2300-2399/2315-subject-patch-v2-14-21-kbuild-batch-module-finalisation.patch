@@ -1,0 +1,98 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
+Date: Mon, 14 Sep 2026 10:22:13 +0100
+Subject: [PATCH v2 14/21] kbuild: batch module finalisation
+Message-Id: <20260914-build-speedup-v2-14-39817ec5db23@kernel.org>
+To: Linus Torvalds <torvalds@linux-foundation.org>,  Nathan Chancellor <nathan@kernel.org>, Nicolas Schier <nsc@kernel.org>,  Nick Desaulniers <ndesaulniers@google.com>,  Bill Wendling <morbo@google.com>, Justin Stitt <justinstitt@google.com>,  Masahiro Yamada <masahiroy@kernel.org>, Alexey Gladkov <legion@kernel.org>,  Thomas Gleixner <tglx@kernel.org>, Ingo Molnar <mingo@redhat.com>,  Borislav Petkov <bp@alien8.de>, Dave Hansen <dave.hansen@linux.intel.com>,  x86@kernel.org, "H. Peter Anvin" <hpa@zytor.com>,  Paul Walmsley <pjw@kernel.org>, Palmer Dabbelt <palmer@dabbelt.com>,  Albert Ou <aou@eecs.berkeley.edu>, Alexandre Ghiti <alex@ghiti.fr>,  Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,  Will Deacon <will@kernel.org>, Mark Rutland <mark.rutland@arm.com>,  Ard Biesheuvel <ardb@kernel.org>,  Ilias Apalodimas <ilias.apalodimas@linaro.org>,  Josh Poimboeuf <jpoimboe@kernel.org>, Peter Zijlstra <peterz@infradead.org>,  Miguel Ojeda <ojeda@kernel.org>, Boqun Feng <boqun@kernel.org>,  Gary Guo <gary@garyguo.net>,  =?utf-8?q?Bj=C3=B6rn_Roy_Baron?= <bjorn3_gh@protonmail.com>,  Benno Lossin <lossin@kernel.org>, Andreas Hindborg <a.hindborg@kernel.org>,  Alice Ryhl <aliceryhl@google.com>, Trevor Gross <tmgross@umich.edu>,  Danilo Krummrich <dakr@kernel.org>,  Daniel Almeida <daniel.almeida@collabora.com>,  Tamir Duberstein <tamird@kernel.org>,  Alexandre Courbot <acourbot@nvidia.com>,  =?utf-8?q?Onur_=C3=96zkan?= <work@onurozkan.dev>,  Jonathan Corbet <corbet@lwn.net>, Randy Dunlap <rdunlap@infradead.org>,  Kees Cook <kees@kernel.org>, "Gustavo A. R. Silva" <gustavoars@kernel.org>
+Cc: linux-kbuild@vger.kernel.org, linux-kernel@vger.kernel.org,  llvm@lists.linux.dev, linux-riscv@lists.infradead.org,  linux-arch@vger.kernel.org, linux-arm-kernel@lists.infradead.org,  linux-efi@vger.kernel.org, rust-for-linux@vger.kernel.org,  linux-doc@vger.kernel.org, Jens Axboe <axboe@kernel.dk>,  linux-hardening@vger.kernel.org, "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
+
+Module finalisation on allmodconfig builds consists of a large number of
+very short-lived jobs, and the make job dispatcher cannot possibly dispatch
+jobs fast enough.
+
+For allmodconfig x86-64 this can be on the order of ~22,000 jobs of a few
+milliseconds in duration each.
+
+However per-job cost grows with the variables the instance holds, here the
+savedcmd_* of every .mod.o and .ko read back from the .cmd files, since it
+walks them all to build each child's environment.
+
+This makes module finalisation very inefficient when large numbers of
+modules are being built.
+
+Fix this by splitting modules.order into chunks of 128 at a time, run in
+parallel.
+
+Each instance holds only its own modules' variables and the top-level one
+reads no per-module .cmd files at all, the same rules serve both levels,
+and an instance is told its chunk with modfinal-first=<index>.
+
+"make modules" with every *.mod.o and *.ko deleted goes from 28.9s to 15.9s
+with clang 22. No-op "make modules" goes from 5.6s to 4.8s, as checking the
+22,000 targets is spread over the chunks too.
+
+Whole build, 128-thread Threadripper 9980X, best of N runs:
+
+                                         before   after     delta
+                                         -------------------------------
+  x86 allmodconfig, no-op make, gcc         2.3s     1.4s    -0.85s (-38%)
+  x86 allmodconfig, no-op make, clang       2.8s     1.8s    -0.94s (-34%)
+  x86 allmodconfig, clean, gcc            306.6s   294.1s     -12.6s (-4%)
+  x86 allmodconfig, clean, clang          290.2s   283.9s     -6.4s (-2%)
+
+Assisted-by: LLM
+Signed-off-by: Lorenzo Stoakes (ARM) <ljs@kernel.org>
+---
+ scripts/Makefile.modfinal | 26 +++++++++++++++++++++++++-
+ 1 file changed, 25 insertions(+), 1 deletion(-)
+
+diff --git a/scripts/Makefile.modfinal b/scripts/Makefile.modfinal
+index 75e9effdf02c..858fa798090b 100644
+--- a/scripts/Makefile.modfinal
++++ b/scripts/Makefile.modfinal
+@@ -13,9 +13,30 @@ include $(srctree)/scripts/Makefile.lib
+ # find all modules listed in modules.order
+ modules := $(call read-file, modules.order)
+ 
++modfinal-chunk-size := 128
++
++ifdef modfinal-first
++
++# this instance handles the chunk of modules.order starting at $(modfinal-first)
++modules := $(wordlist $(modfinal-first), $(words $(modules)), $(modules))
++modules := $(wordlist 1, $(modfinal-chunk-size), $(modules))
++
+ __modfinal: $(modules:%.o=%.ko)
+ 	@:
+ 
++else
++
++modfinal-chunks := $(addprefix chunk-, $(shell seq 1 $(modfinal-chunk-size) $(words $(modules))))
++
++PHONY += $(modfinal-chunks)
++$(modfinal-chunks): .module-common.o
++	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.modfinal modfinal-first=$(@:chunk-%=%)
++
++__modfinal: $(modfinal-chunks)
++	@:
++
++endif
++
+ # modname and part-of-module are set to make c_flags define proper module flags
+ modname = $(notdir $(@:.mod.o=))
+ part-of-module = y
+@@ -58,7 +79,10 @@ ifdef CONFIG_DEBUG_INFO_BTF_MODULES
+ endif
+ 	+$(call cmd,check_tracepoint)
+ 
+-targets += $(modules:%.o=%.ko) $(modules:%.o=%.mod.o) .module-common.o
++targets += .module-common.o
++ifdef modfinal-first
++targets += $(modules:%.o=%.ko) $(modules:%.o=%.mod.o)
++endif
+ 
+ # Add FORCE to the prerequisites of a target to force it to be always rebuilt.
+ # ---------------------------------------------------------------------------
+
+-- 
+2.55.0

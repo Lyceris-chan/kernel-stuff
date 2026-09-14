@@ -1,45 +1,10 @@
 From nobody Mon Sep 17 00:00:00 2001
 From: "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
-Date: Tue, 08 Sep 2026 21:55:19 +0100
-Subject: [PATCH 19/23] objtool: decode instructions and resolve branch
- targets in parallel
-Message-Id: <20260908-build-speedup-v1-19-5dc1ac01672d@kernel.org>
-Cc: Nathan Chancellor <nathan@kernel.org>, Nicolas Schier <nsc@kernel.org>, 
- Nick Desaulniers <ndesaulniers@google.com>, 
- Bill Wendling <morbo@google.com>, Justin Stitt <justinstitt@google.com>, 
- Masahiro Yamada <masahiroy@kernel.org>, Alexey Gladkov <legion@kernel.org>, 
- Thomas Gleixner <tglx@kernel.org>, Ingo Molnar <mingo@redhat.com>, 
- Borislav Petkov <bp@alien8.de>, Dave Hansen <dave.hansen@linux.intel.com>, 
- x86@kernel.org, "H. Peter Anvin" <hpa@zytor.com>, 
- Paul Walmsley <pjw@kernel.org>, Palmer Dabbelt <palmer@dabbelt.com>, 
- Albert Ou <aou@eecs.berkeley.edu>, Alexandre Ghiti <alex@ghiti.fr>, 
- Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>, 
- Will Deacon <will@kernel.org>, Mark Rutland <mark.rutland@arm.com>, 
- Ard Biesheuvel <ardb@kernel.org>, 
- Ilias Apalodimas <ilias.apalodimas@linaro.org>, 
- Josh Poimboeuf <jpoimboe@kernel.org>, Peter Zijlstra <peterz@infradead.org>, 
- Miguel Ojeda <ojeda@kernel.org>, Boqun Feng <boqun@kernel.org>, 
- Gary Guo <gary@garyguo.net>, 
- =?utf-8?q?Bj=C3=B6rn_Roy_Baron?= <bjorn3_gh@protonmail.com>, 
- Benno Lossin <lossin@kernel.org>, Andreas Hindborg <a.hindborg@kernel.org>, 
- Alice Ryhl <aliceryhl@google.com>, Trevor Gross <tmgross@umich.edu>, 
- Danilo Krummrich <dakr@kernel.org>, 
- Daniel Almeida <daniel.almeida@collabora.com>, 
- Tamir Duberstein <tamird@kernel.org>, 
- Alexandre Courbot <acourbot@nvidia.com>, 
- =?utf-8?q?Onur_=C3=96zkan?= <work@onurozkan.dev>, 
- Jonathan Corbet <corbet@lwn.net>, Randy Dunlap <rdunlap@infradead.org>
- llvm@lists.linux.dev, linux-riscv@lists.infradead.org, 
- linux-arch@vger.kernel.org, linux-arm-kernel@lists.infradead.org, 
- linux-efi@vger.kernel.org, rust-for-linux@vger.kernel.org, 
- linux-doc@vger.kernel.org, Jens Axboe <axboe@kernel.dk>, 
- "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
- h=from:subject:message-id; bh=/v8LA4EYYewhFC4I2H+iwnOjDqUe/rJIsTneIDuzqV4=;
- b=owGbwMvMwCV2fu7ZrsZH9SKMp9WSGLIWlFn48j+aukdgy+boC/9U+xv33xSI/7llQlK03ItLR
- 6f4LmI731HKwiDGxSArpsjy/Iv4/iCRsHmdF/zdYOawMoEMYeDiFICJ+HozMrRqL8up7ffs0ria
- dlo5inHhtEsTrDfVfXlQsDxcWfBi/jOGP/ybJ9ZZhgmnh95V437E+yhXOu7/8bLHP2adcz5vnhG
- 8nhUA
- fpr=E7F417BF5214569E89D04F46CF9DCD8A81E27F14
+Date: Mon, 14 Sep 2026 10:22:16 +0100
+Subject: [PATCH v2 17/21] objtool: decode instructions and resolve branch targets in parallel
+Message-Id: <20260914-build-speedup-v2-17-39817ec5db23@kernel.org>
+To: Linus Torvalds <torvalds@linux-foundation.org>,  Nathan Chancellor <nathan@kernel.org>, Nicolas Schier <nsc@kernel.org>,  Nick Desaulniers <ndesaulniers@google.com>,  Bill Wendling <morbo@google.com>, Justin Stitt <justinstitt@google.com>,  Masahiro Yamada <masahiroy@kernel.org>, Alexey Gladkov <legion@kernel.org>,  Thomas Gleixner <tglx@kernel.org>, Ingo Molnar <mingo@redhat.com>,  Borislav Petkov <bp@alien8.de>, Dave Hansen <dave.hansen@linux.intel.com>,  x86@kernel.org, "H. Peter Anvin" <hpa@zytor.com>,  Paul Walmsley <pjw@kernel.org>, Palmer Dabbelt <palmer@dabbelt.com>,  Albert Ou <aou@eecs.berkeley.edu>, Alexandre Ghiti <alex@ghiti.fr>,  Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,  Will Deacon <will@kernel.org>, Mark Rutland <mark.rutland@arm.com>,  Ard Biesheuvel <ardb@kernel.org>,  Ilias Apalodimas <ilias.apalodimas@linaro.org>,  Josh Poimboeuf <jpoimboe@kernel.org>, Peter Zijlstra <peterz@infradead.org>,  Miguel Ojeda <ojeda@kernel.org>, Boqun Feng <boqun@kernel.org>,  Gary Guo <gary@garyguo.net>,  =?utf-8?q?Bj=C3=B6rn_Roy_Baron?= <bjorn3_gh@protonmail.com>,  Benno Lossin <lossin@kernel.org>, Andreas Hindborg <a.hindborg@kernel.org>,  Alice Ryhl <aliceryhl@google.com>, Trevor Gross <tmgross@umich.edu>,  Danilo Krummrich <dakr@kernel.org>,  Daniel Almeida <daniel.almeida@collabora.com>,  Tamir Duberstein <tamird@kernel.org>,  Alexandre Courbot <acourbot@nvidia.com>,  =?utf-8?q?Onur_=C3=96zkan?= <work@onurozkan.dev>,  Jonathan Corbet <corbet@lwn.net>, Randy Dunlap <rdunlap@infradead.org>,  Kees Cook <kees@kernel.org>, "Gustavo A. R. Silva" <gustavoars@kernel.org>
+Cc: linux-kbuild@vger.kernel.org, linux-kernel@vger.kernel.org,  llvm@lists.linux.dev, linux-riscv@lists.infradead.org,  linux-arch@vger.kernel.org, linux-arm-kernel@lists.infradead.org,  linux-efi@vger.kernel.org, rust-for-linux@vger.kernel.org,  linux-doc@vger.kernel.org, Jens Axboe <axboe@kernel.dk>,  linux-hardening@vger.kernel.org, "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
 
 During a kernel build objtool is used to decode vmlinux.o's instructions
 and resolve every jump and call destination.
@@ -52,43 +17,26 @@ Decode these in parallel at a function granularity to speed things up.
 Only the instruction hash is shared between the threads and nothing is ever
 removed from it, so an insertion is a compare-and-swap on the bucket head.
 
-Also update the instruction hash to be more efficient - it was previously
-hardcoded to a size of 2^20 buckets.
-
-This is insufficient for an x86-64 allmodconfig kernel where an x86-64
-build decodes ~16 million instructions and in practice find_insn() was
-observed working chains of four or more entries on lookup.
-
-Instead size it based on the amount of text to be decoded at roughly one
-bucket per instruction, identical to the relocation hash (set to
-OFFSET_STRIDE).
-
-This results in 2^20 buckets (~8 MiB memory usage) for a defconfig
-vmlinux.o and 2^22 (~32 MiB memory usage) for an allmodconfig kernel, so it
-is not an egregious use of memory.
-
 Threads are only created for objects with 8 MiB or more of text, meaning
 that runs involving smaller objects remain unaffected.
 
-Only decoding and the branch passes are threaded, so the gain flattens out
-at 16 threads and more only add overhead - on the clang allmodconfig
-vmlinux.o objtool takes 5.58s on 1 thread, 3.96s on 8, 3.91s on 16 and
-4.03s on 128.  Cap the thread count at 16, or the number of CPUs if fewer.
+Threading is limited to decoding and the jump pass, so the gain flattens
+out at 16 threads and any further threads were found to only add overhead.
 
-The passes which resolve jump and call destinations and annotate call
-sites all run over the same regions.
+When performing an allmodconfig build, the clang invocation of objtool when
+processing vmlinux.o took 5.93s on 1 thread, 4.56s on 8, 4.51s on
+16 and 4.63s on 128.
 
-They only write to lists in struct objtool_file, so have each range work
-with their own copy of this data structure, which are then joined, in range
-order afterwards in a map-reduce fashion.
+Therefore cap the thread count at 16 or the number of CPUs, whichever is
+fewer.
 
 The output of objtool before and after this change was confirmed to be
 byte-for-byte identical for x86_64 defconfig and allmodconfig with gcc and
 clang, and for a loongarch defconfig, where objtool runs on every object.
 
 On a 128-thread machine, objtool on the clang allmodconfig vmlinux.o goes
-from 5.9s to 3.7s (6.5s to 3.7s together with the previous patch), and on
-defconfig from 1.87s to 1.26s.
+from 5.2s to 4.4s (6.5s to 4.4s together with the previous two patches),
+and on defconfig from 1.99s to 1.38s.
 
 objtool on vmlinux.o is on the serial tail of every build that links
 vmlinux, no-op builds are unchanged.
@@ -97,21 +45,20 @@ Whole build, 128-thread Threadripper 9980X, best of N runs:
 
                                          before   after     delta
                                          -------------------------------
-  x86 defconfig, touch mm/vma.c, gcc        8.1s     7.5s    -0.65s (-8%)
-  x86 defconfig, touch mm/vma.c, clang      7.1s     6.6s    -0.51s (-7%)
-  x86 defconfig, clean, gcc                26.8s    26.3s    -0.46s (-2%)
-  x86 defconfig, clean, clang              26.2s    25.8s    -0.45s (-2%)
-  x86 allmodconfig, touch mm/vma.c, gcc    28.4s    23.7s     -4.7s (-17%)
-  x86 allmodconfig, touch mm/vma.c, clang  26.0s    22.1s     -3.9s (-15%)
+  x86 defconfig, touch mm/vma.c, gcc        8.2s     7.7s    -0.55s (-7%)
+  x86 defconfig, touch mm/vma.c, clang      7.3s     6.9s    -0.44s (-6%)
+  x86 defconfig, clean, gcc                28.6s    28.2s    -0.47s (-2%)
+  x86 defconfig, clean, clang              29.1s    28.7s    -0.45s (-2%)
+  x86 allmodconfig, touch mm/vma.c, gcc    25.7s    23.7s     -2.0s (-8%)
+  x86 allmodconfig, touch mm/vma.c, clang  24.1s    22.5s     -1.6s (-7%)
 
 Assisted-by: LLM
 Signed-off-by: Lorenzo Stoakes (ARM) <ljs@kernel.org>
 ---
- tools/objtool/Makefile                  |   2 +-
- tools/objtool/check.c                   | 757 ++++++++++++++++++++++++--------
- tools/objtool/include/objtool/objtool.h |   3 +-
- tools/objtool/objtool.c                 |   1 -
- 4 files changed, 578 insertions(+), 185 deletions(-)
+ tools/objtool/Makefile  |   2 +-
+ tools/objtool/check.c   | 714 ++++++++++++++++++++++++++++++++++++------------
+ tools/objtool/objtool.c |  14 +-
+ 3 files changed, 543 insertions(+), 187 deletions(-)
 
 diff --git a/tools/objtool/Makefile b/tools/objtool/Makefile
 index a4484fd22a96..2de50c3917ba 100644
@@ -127,7 +74,7 @@ index a4484fd22a96..2de50c3917ba 100644
  # Allow old libelf to be used:
  elfshdr := $(shell echo '$(pound)include <libelf.h>' | $(HOSTCC) $(OBJTOOL_CFLAGS) -x c -E - 2>/dev/null | grep elf_getshdr)
 diff --git a/tools/objtool/check.c b/tools/objtool/check.c
-index 2abd41cc3aaf..b092cf8d582f 100644
+index 62a3e1d4e9e5..a7499f247818 100644
 --- a/tools/objtool/check.c
 +++ b/tools/objtool/check.c
 @@ -7,6 +7,9 @@
@@ -148,31 +95,7 @@ index 2abd41cc3aaf..b092cf8d582f 100644
  #include <linux/static_call_types.h>
  #include <linux/string.h>
  
-@@ -38,12 +42,22 @@ struct disas_context *objtool_disas_ctx;
- 
- size_t sym_name_max_len;
- 
-+static struct hlist_head *insn_hash_head(struct objtool_file *file,
-+					 struct section *sec, unsigned long offset)
-+{
-+	/* Determine instruction hash based on section index and offset. */
-+	const u32 sec_hash = sec_offset_hash(sec, offset);
-+	const u32 hash = hash_min(sec_hash, file->insn_hash_bits);
-+
-+	return &file->insn_hash[hash];
-+}
-+
- struct instruction *find_insn(struct objtool_file *file,
- 			      struct section *sec, unsigned long offset)
- {
- 	struct instruction *insn;
- 
--	hash_for_each_possible(file->insn_hash, insn, hash, sec_offset_hash(sec, offset)) {
-+	hlist_for_each_entry(insn, insn_hash_head(file, sec, offset), hash) {
- 		if (insn->sec == sec && insn->offset == offset)
- 			return insn;
- 	}
-@@ -54,14 +68,13 @@ struct instruction *find_insn(struct objtool_file *file,
+@@ -64,14 +68,13 @@ struct instruction *find_insn(struct objtool_file *file,
  struct instruction *next_insn_same_sec(struct objtool_file *file,
  				       struct instruction *insn)
  {
@@ -192,7 +115,7 @@ index 2abd41cc3aaf..b092cf8d582f 100644
  }
  
  struct instruction *next_insn_same_func(struct objtool_file *file,
-@@ -411,21 +424,391 @@ static void *cfi_hash_alloc(unsigned long size)
+@@ -413,6 +416,12 @@ static void *cfi_hash_alloc(unsigned long size)
  static unsigned long nr_insns;
  static unsigned long nr_insns_visited;
  
@@ -202,44 +125,13 @@ index 2abd41cc3aaf..b092cf8d582f 100644
 +#define DECODE_MAX_THREADS		16
 +#define DECODE_RANGES_PER_THREAD	4
 +
-+/*
-+ * sec_offset_hash() keys on OFFSET_STRIDE windows, so the instructions of a
-+ * window share a chain and buckets beyond one per window would sit empty.
-+ */
-+#define INSN_HASH_BYTES_PER_BUCKET	OFFSET_STRIDE
-+#define INSN_HASH_MIN_BITS		10
-+
-+static unsigned long total_text_size(struct objtool_file *file)
-+{
-+	unsigned long size = 0;
-+	struct section *sec;
-+
-+	for_each_sec(file->elf, sec)
-+		if (is_text_sec(sec))
-+			size += sec_size(sec);
-+
-+	return size;
-+}
-+
-+static int alloc_insn_hash(struct objtool_file *file, unsigned long text_size)
-+{
-+	const unsigned long nr_buckets = text_size / INSN_HASH_BYTES_PER_BUCKET;
-+	const int bits = ilog2(nr_buckets);
-+
-+	file->insn_hash_bits = max(INSN_HASH_MIN_BITS, bits);
-+	file->insn_hash = calloc(1UL << file->insn_hash_bits,
-+				 sizeof(*file->insn_hash));
-+	if (!file->insn_hash) {
-+		ERROR_GLIBC("calloc");
-+		return -1;
-+	}
-+
-+	if (opts.stats)
-+		printf("insn_hash_bits: %d\n", file->insn_hash_bits);
-+
-+	return 0;
-+}
-+
+ /*
+  * sec_offset_hash() keys on OFFSET_STRIDE windows, so the instructions of a
+  * window share a chain and buckets beyond one per window would sit empty.
+@@ -451,24 +460,347 @@ static int alloc_insn_hash(struct objtool_file *file, unsigned long text_size)
+ 	return 0;
+ }
+ 
 +/* Per-thread state, only instruction hash is shared. */
 +struct insn_range {
 +	struct section *sec;
@@ -286,7 +178,7 @@ index 2abd41cc3aaf..b092cf8d582f 100644
 +static void insn_hash_add(struct objtool_file *file, struct instruction *insn)
 +{
 +	struct hlist_head *head = insn_hash_head(file, insn->sec, insn->offset);
-+	struct hlist_node *first = head->first;
++	struct hlist_node *first = READ_ONCE(head->first);
 +
 +	insn->hash.pprev = &head->first;
 +	do {
@@ -575,13 +467,14 @@ index 2abd41cc3aaf..b092cf8d582f 100644
 -	unsigned long offset;
 -	struct instruction *insn;
 +	unsigned int i;
-+
+ 
+-	if (alloc_insn_hash(file, total_text_size(file)))
 +	if (alloc_insn_hash(file, text_size))
-+		return -1;
-+
+ 		return -1;
+ 
 +	nr_decode_threads = decode_threads(text_size);
 +	range_size = decode_range_size(text_size, nr_decode_threads);
- 
++
  	for_each_sec(file->elf, sec) {
 -		struct instruction *insns = NULL;
 -		u8 prev_len = 0;
@@ -589,7 +482,7 @@ index 2abd41cc3aaf..b092cf8d582f 100644
  
  		if (!is_text_sec(sec))
  			continue;
-@@ -450,41 +833,20 @@ static int decode_instructions(struct objtool_file *file)
+@@ -493,41 +825,20 @@ static int decode_instructions(struct objtool_file *file)
  		if (!strcmp(sec->name, ".init.text") && !opts.module)
  			sec->init = true;
  
@@ -611,16 +504,19 @@ index 2abd41cc3aaf..b092cf8d582f 100644
 -			insn->sec = sec;
 -			insn->offset = offset;
 -			insn->prev_len = prev_len;
--
--			if (arch_decode_instruction(file, sec, offset, sec_size(sec) - offset, insn))
--				return -1;
 +		if (add_decode_ranges(sec, range_size))
 +			return -1;
 +	}
  
--			prev_len = insn->len;
+-			if (arch_decode_instruction(file, sec, offset, sec_size(sec) - offset, insn))
+-				return -1;
 +	if (run_insn_ranges(file, decode_range))
 +		return -1;
+ 
+-			prev_len = insn->len;
++	for (i = 0; i < nr_decode_ranges; i++)
++		nr_insns += decode_ranges[i].nr_insns;
++	link_decode_ranges();
  
 -			/*
 -			 * By default, "ud2" is a dead end unless otherwise
@@ -629,11 +525,8 @@ index 2abd41cc3aaf..b092cf8d582f 100644
 -			 */
 -			if (insn->type == INSN_BUG)
 -				insn->dead_end = true;
-+	for (i = 0; i < nr_decode_ranges; i++)
-+		nr_insns += decode_ranges[i].nr_insns;
-+	link_decode_ranges();
- 
--			hash_add(file->insn_hash, &insn->hash, sec_offset_hash(sec, insn->offset));
+-
+-			hlist_add_head(&insn->hash, insn_hash_head(file, sec, insn->offset));
 -			nr_insns++;
 -		}
 +	for_each_sec(file->elf, sec) {
@@ -642,7 +535,7 @@ index 2abd41cc3aaf..b092cf8d582f 100644
  
  		sec_for_each_sym(sec, func) {
  			if (!is_notype_sym(func) && !is_func_sym(func))
-@@ -1527,133 +1889,147 @@ static bool is_first_func_insn(struct objtool_file *file,
+@@ -1570,133 +1881,147 @@ static bool is_first_func_insn(struct objtool_file *file,
  /*
   * Find the destination instructions for all jumps.
   */
@@ -744,13 +637,13 @@ index 2abd41cc3aaf..b092cf8d582f 100644
 +		dest_sec = dest_sym->sec;
 +		dest_off = dest_sym->offset + arch_insn_adjusted_addend(insn, reloc);
 +	}
-+
-+	dest_insn = find_insn(file, dest_sec, dest_off);
-+	if (!dest_insn) {
-+		struct symbol *sym = find_symbol_by_offset(dest_sec, dest_off);
  
 -			dest_sec = dest_sym->sec;
 -			dest_off = dest_sym->offset + arch_insn_adjusted_addend(insn, reloc);
++	dest_insn = find_insn(file, dest_sec, dest_off);
++	if (!dest_insn) {
++		struct symbol *sym = find_symbol_by_offset(dest_sec, dest_off);
++
 +		/*
 +		 * retbleed_untrain_ret() jumps to
 +		 * __x86_return_thunk(), but objtool can't find
@@ -889,7 +782,7 @@ index 2abd41cc3aaf..b092cf8d582f 100644
  static struct symbol *find_call_destination(struct section *sec, unsigned long offset)
  {
  	struct symbol *call_dest;
-@@ -1668,64 +2044,79 @@ static struct symbol *find_call_destination(struct section *sec, unsigned long o
+@@ -1711,59 +2036,82 @@ static struct symbol *find_call_destination(struct section *sec, unsigned long o
  /*
   * Find the destination instructions for all calls.
   */
@@ -982,11 +875,11 @@ index 2abd41cc3aaf..b092cf8d582f 100644
 +	} else {
 +		if (add_call_dest(file, insn, reloc->sym, false))
 +			return -1;
- 	}
- 
- 	return 0;
- }
- 
++	}
++
++	return 0;
++}
++
 +static int add_call_destinations_range(struct objtool_file *file,
 +				       struct insn_range *range)
 +{
@@ -1000,15 +893,18 @@ index 2abd41cc3aaf..b092cf8d582f 100644
 +	return 0;
 +}
 +
++/* Serial: annotating a call site rewrites instructions the dead end walks read. */
 +static int add_call_destinations(struct objtool_file *file)
 +{
-+	return run_insn_ranges(file, add_call_destinations_range);
-+}
++	unsigned int i;
 +
- /*
-  * The .alternatives section requires some extra special care over and above
-  * other special sections because alternatives are patched in place.
-@@ -2689,6 +3080,8 @@ int decode_file(struct objtool_file *file)
++	for (i = 0; i < nr_decode_ranges; i++) {
++		if (add_call_destinations_range(file, &decode_ranges[i]))
++			return -1;
+ 	}
+ 
+ 	return 0;
+@@ -2732,6 +3080,8 @@ int decode_file(struct objtool_file *file)
  	if (read_annotate(file, __annotate_late))
  		return -1;
  
@@ -1017,32 +913,47 @@ index 2abd41cc3aaf..b092cf8d582f 100644
  	return 0;
  }
  
-diff --git a/tools/objtool/include/objtool/objtool.h b/tools/objtool/include/objtool/objtool.h
-index 6dc12a59ad00..79fe82b7397e 100644
---- a/tools/objtool/include/objtool/objtool.h
-+++ b/tools/objtool/include/objtool/objtool.h
-@@ -21,7 +21,8 @@ struct pv_state {
- 
- struct objtool_file {
- 	struct elf *elf;
--	DECLARE_HASHTABLE(insn_hash, 20);
-+	struct hlist_head *insn_hash;
-+	int insn_hash_bits;
- 	struct list_head retpoline_call_list;
- 	struct list_head return_thunk_list;
- 	struct list_head static_call_list;
 diff --git a/tools/objtool/objtool.c b/tools/objtool/objtool.c
-index a4e139dee7e9..71e048f8582a 100644
+index 71e048f8582a..f472dfe7a773 100644
 --- a/tools/objtool/objtool.c
 +++ b/tools/objtool/objtool.c
-@@ -29,7 +29,6 @@ struct objtool_file *objtool_open_read(const char *filename)
- 	if (!file.elf)
- 		return NULL;
+@@ -8,6 +8,7 @@
+ #include <string.h>
+ #include <stdlib.h>
+ #include <unistd.h>
++#include <pthread.h>
+ #include <subcmd/exec-cmd.h>
+ #include <subcmd/pager.h>
+ #include <linux/kernel.h>
+@@ -41,6 +42,8 @@ struct objtool_file *objtool_open_read(const char *filename)
+ 	return &file;
+ }
  
--	hash_init(file.insn_hash);
- 	INIT_LIST_HEAD(&file.retpoline_call_list);
- 	INIT_LIST_HEAD(&file.return_thunk_list);
- 	INIT_LIST_HEAD(&file.static_call_list);
++static pthread_mutex_t pv_ops_lock = PTHREAD_MUTEX_INITIALIZER;
++
+ int objtool_pv_add(struct objtool_file *f, int idx, struct symbol *func)
+ {
+ 	if (!opts.noinstr)
+@@ -59,12 +62,15 @@ int objtool_pv_add(struct objtool_file *f, int idx, struct symbol *func)
+ 	    !strcmp(func->name, "_paravirt_ident_64"))
+ 		return 0;
+ 
++	pthread_mutex_lock(&pv_ops_lock);
++
+ 	/* already added this function */
+-	if (!list_empty(&func->pv_target))
+-		return 0;
++	if (list_empty(&func->pv_target)) {
++		list_add(&func->pv_target, &f->pv_ops[idx].targets);
++		f->pv_ops[idx].clean = false;
++	}
+ 
+-	list_add(&func->pv_target, &f->pv_ops[idx].targets);
+-	f->pv_ops[idx].clean = false;
++	pthread_mutex_unlock(&pv_ops_lock);
+ 	return 0;
+ }
+ 
 
 -- 
 2.55.0

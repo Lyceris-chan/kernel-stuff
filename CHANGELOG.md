@@ -15,6 +15,51 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc3-6-sleepy-next]: 2026-09-14
+
+### Removed
+- **`0030`** (handmade: proactively shrink DET for pipes losing space). The
+  second bisect step for the 240 Hz flicker, dropped in the same build as
+  `1144`. `0030` patches `dcn401_prepare_bandwidth()` — the DCN401
+  bandwidth-transition function that programs watermarks, the arbiter, compbuf
+  and DET before a clock update — and immediately programs a smaller DET size
+  for pipes that are losing space, *before* the pipe stops scanning at its old
+  requirements. That transient can underflow the pipe's DET buffer and the
+  shared CRB: visible at 240 Hz timing margins, invisible at 144 Hz, and
+  triggered exactly by cursor-driven surface updates, which set the
+  `det_size` update flag on pipes. CachyOS does not carry it.
+
+  The identification came from the kernel-to-kernel diff the bisect demanded:
+  our applied display tree against CachyOS `7.3/base` shows 32 differing
+  files, and the DCN401 hardware-sequencer difference is this patch alone —
+  everything else in `dcn401_hwseq.c` is identical between the two trees.
+
+  Two variables are changed in this build (`1144` and `0030`). If the flicker
+  is gone, a follow-up build can re-add one of them to isolate; if it
+  persists, both are exonerated and the next suspect is the baked command line
+  (`cpuidle.governor=nap`).
+
+### Changed
+- **The kbuild build-speedup series is upgraded from v1 to v2**
+  (`20260914-build-speedup-v2-0-39817ec5db23@kernel.org`, 21 patches,
+  replacing the v1 content on the same numbers `2302`–`2322`). v2 drops two v1
+  patches (the modpost srcversion hashing and its source-per-file companion),
+  adds two (the toolchain checks moved into `init/Kconfig.toolchain`, and
+  objtool sizing its instruction hash to the text), and refreshes the rest with
+  the review feedback from the v1 thread. Renumbered in v2 order. The whole
+  189-patch series still applies cleanly, and this is build-time only, so the
+  runtime behaviour is unchanged from `pkgrel 5`.
+
+### Noted, nothing to add
+- **The Vernon Yang link** (`20260903031608.1194238-1-vernon2gm`) is a reply on
+  the thread of our `2500` (x86/mm `pmd_modify()` dropping the dirty bit) — it
+  just accepts the `Reported-by:` trailer Andrew Morton added. No new patch.
+- **linux-next `next-20260914` is out**, and it is the 7.4 merge-window preview
+  (455 display files changed, 33k insertions; mm +5.4k lines). Per this
+  project's policy linux-next is a preview base, not a patch source mid-RC.
+  The only delta in `crypto/zstd.c` is the workspace series already carried as
+  `2148`/`2149`. Nothing worth backporting onto 7.3-rc3.
+
 ## [7.3.0-rc3-5-sleepy-next]: 2026-09-14
 
 ### Removed

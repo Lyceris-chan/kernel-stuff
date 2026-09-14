@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-next/PKGBUILD`.
 
 - **Base:** Linux `v7.3-rc3`
-- **Series:** 190 patches
+- **Series:** 189 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -18,7 +18,7 @@ are supplied by the generator instead, so every row below has a source.
 
 | Range | Category | Patches |
 |---|---|---|
-| `0001–0049` | Handmade local | 13 |
+| `0001–0049` | Handmade local | 12 |
 | `0050–0099` | EDID and display mailing-list patches | 6 |
 | `0101–0113` | CachyOS branch squashes | 6 |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 25 |
@@ -50,7 +50,6 @@ change rather than a documentation pass.
 | `0006` | drm/amd/pm: Add bounds checking for SMU14 I2C commands | Sleepy | 2026-07-01 | `882e8148ae7e` |
 | `0007` | drm/amd/pm: Remove redundant mutex lock in SMU14 I2C update | Sleepy | 2026-07-01 | `7ceb7ab7c86f` |
 | `0010` | drm/amdkfd: Fix named barrier restore in gfx12.1 trap handler | Jay Cornwall | 2026-07-06 | `20260706220043.612554-1-jay.cornwall@amd.com` |
-| `0030` | drm/amd/display: Proactively shrink DET for pipes losing space | Sleepy | 2026-07-01 | `dd35d8c82202` |
 | `0031` | drm/amd/display: Fix memory leak in DCN20 link encoder creation | Sleepy | 2026-07-01 | `42f8da1167d8` |
 | `0032` | drm/amd/display: Fix OOB array access for HPO FRL link encoder | Sleepy | 2026-07-01 | `d8aa0fbd0493` |
 | `0033` | drm/amd/display: Fix missing HPO FRL link encoder register init | Sleepy | 2026-07-01 | `a4d4d2c0a220` |
@@ -175,27 +174,47 @@ change rather than a documentation pass.
 | `2153` | writeback: report a Tasks-RCU quiescent state per cgwb drain pass | Josef Bacik | 2026-09-09 | `6495bf0e43d6` |
 | `2154` | mm/page_alloc: apply per-task GFP context in bulk allocator | Qiqi Liu | 2026-09-14 | `afd44a6aa48e` |
 | `2200` | 7.2-nap-v0.5.0 | Masahito S | 2026-06-05 | `04aef34448bb` |
-| `2302` | kallsyms: index symbols by token to speed up table compression | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-3-5dc1ac01672d@kernel.org` |
-| `2303` | kallsyms: output binary data to speed output and kallsyms assembly | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-4-5dc1ac01672d@kernel.org` |
-| `2304` | kbuild: do not sort nm output where the order is irrelevant | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-5-5dc1ac01672d@kernel.org` |
-| `2305` | kbuild: only emit vmlinux relocations when required | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-6-5dc1ac01672d@kernel.org` |
-| `2306` | elf-parse: add section flags, symbol binding and a read-only mapping | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-7-5dc1ac01672d@kernel.org` |
-| `2307` | kallsyms: reimplement mksysmap in C | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-8-5dc1ac01672d@kernel.org` |
-| `2308` | kbuild: do not allocate .modinfo in vmlinux | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-9-5dc1ac01672d@kernel.org` |
-| `2309` | kbuild: cache list, composite object state per object | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-10-5dc1ac01672d@kernel.org` |
-| `2310` | kbuild: implement and use depcheck to check dependency timestamps | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-11-5dc1ac01672d@kernel.org` |
-| `2311` | kbuild: avoid re-running compiler and linker probes | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-12-5dc1ac01672d@kernel.org` |
-| `2312` | modpost: hash module source per-file, not per-byte | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-13-5dc1ac01672d@kernel.org` |
-| `2313` | modpost: cache section relocation mismatch state | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-14-5dc1ac01672d@kernel.org` |
-| `2314` | modpost: emit module descriptors as assembly | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-15-5dc1ac01672d@kernel.org` |
-| `2315` | kbuild: batch module finalisation | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-16-5dc1ac01672d@kernel.org` |
-| `2316` | modpost: perform srcversion hashing in parallel | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-17-5dc1ac01672d@kernel.org` |
-| `2317` | objtool: cache relocations and function dead end state, do less work | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-18-5dc1ac01672d@kernel.org` |
-| `2318` | objtool: decode instructions and resolve branch targets in parallel | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-19-5dc1ac01672d@kernel.org` |
-| `2319` | kbuild: rust: parallelise rustc front end | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-20-5dc1ac01672d@kernel.org` |
-| `2320` | rust: make exports.o depend on the headers generated for it | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-21-5dc1ac01672d@kernel.org` |
-| `2321` | kbuild: build rust crates in parallel with the rest of the build | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-22-5dc1ac01672d@kernel.org` |
-| `2322` | kbuild: use pigz for gzip compression if available | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-23-5dc1ac01672d@kernel.org` |
+| `2303.patch` | kallsyms: index symbols by token to speed up table compression | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-2-39817ec5db23@kernel.org` |
+| `2304.patch` | kallsyms: output binary data to speed output and kallsyms assembly | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-3-39817ec5db23@kernel.org` |
+| `2305.patch` | kbuild: do not sort nm output where the order is irrelevant | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-4-39817ec5db23@kernel.org` |
+| `2306.patch` | kbuild: only emit vmlinux relocations when required | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-5-39817ec5db23@kernel.org` |
+| `2307.patch` | elf-parse: add section flags, symbol binding and a read-only mapping | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-6-39817ec5db23@kernel.org` |
+| `2308.patch` | kallsyms: reimplement mksysmap in C | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-7-39817ec5db23@kernel.org` |
+| `2309.patch` | kbuild: cache list, composite object state per object | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-8-39817ec5db23@kernel.org` |
+| `2310.patch` | kbuild: implement and use depcheck to check dependency timestamps | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-9-39817ec5db23@kernel.org` |
+| `2311.patch` | kbuild: move the toolchain checks into init/Kconfig.toolchain | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-10-39817ec5db23@kernel.org` |
+| `2312.patch` | kbuild: avoid re-running compiler and linker probes | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-11-39817ec5db23@kernel.org` |
+| `2313.patch` | modpost: cache section relocation mismatch state | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-12-39817ec5db23@kernel.org` |
+| `2314.patch` | modpost: emit module descriptors as assembly | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-13-39817ec5db23@kernel.org` |
+| `2315.patch` | kbuild: batch module finalisation | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-14-39817ec5db23@kernel.org` |
+| `2316.patch` | objtool: cache relocations, do less work | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-15-39817ec5db23@kernel.org` |
+| `2317.patch` | objtool: size the instruction hash to the text | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-16-39817ec5db23@kernel.org` |
+| `2318.patch` | objtool: decode instructions and resolve branch targets in parallel | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-17-39817ec5db23@kernel.org` |
+| `2319.patch` | kbuild: rust: optionally parallelise rustc front end | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-18-39817ec5db23@kernel.org` |
+| `2320.patch` | rust: make exports.o depend on the headers generated for it | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-19-39817ec5db23@kernel.org` |
+| `2321.patch` | kbuild: build rust crates in parallel with the rest of the build | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-20-39817ec5db23@kernel.org` |
+| `2322.patch` | kbuild: use pigz for gzip compression if available | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-21-39817ec5db23@kernel.org` |
+| `2302` | kbuild: do not allocate .modinfo in vmlinux | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-1-39817ec5db23@kernel.org` |
+| `2303` | kallsyms: index symbols by token to speed up table compression | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-2-39817ec5db23@kernel.org` |
+| `2304` | kallsyms: output binary data to speed output and kallsyms assembly | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-3-39817ec5db23@kernel.org` |
+| `2305` | kbuild: do not sort nm output where the order is irrelevant | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-4-39817ec5db23@kernel.org` |
+| `2306` | kbuild: only emit vmlinux relocations when required | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-5-39817ec5db23@kernel.org` |
+| `2307` | elf-parse: add section flags, symbol binding and a read-only mapping | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-6-39817ec5db23@kernel.org` |
+| `2308` | kallsyms: reimplement mksysmap in C | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-7-39817ec5db23@kernel.org` |
+| `2309` | kbuild: cache list, composite object state per object | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-8-39817ec5db23@kernel.org` |
+| `2310` | kbuild: implement and use depcheck to check dependency timestamps | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-9-39817ec5db23@kernel.org` |
+| `2311` | kbuild: move the toolchain checks into init/Kconfig.toolchain | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-10-39817ec5db23@kernel.org` |
+| `2312` | kbuild: avoid re-running compiler and linker probes | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-11-39817ec5db23@kernel.org` |
+| `2313` | modpost: cache section relocation mismatch state | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-12-39817ec5db23@kernel.org` |
+| `2314` | modpost: emit module descriptors as assembly | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-13-39817ec5db23@kernel.org` |
+| `2315` | kbuild: batch module finalisation | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-14-39817ec5db23@kernel.org` |
+| `2316` | objtool: cache relocations, do less work | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-15-39817ec5db23@kernel.org` |
+| `2317` | objtool: size the instruction hash to the text | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-16-39817ec5db23@kernel.org` |
+| `2318` | objtool: decode instructions and resolve branch targets in parallel | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-17-39817ec5db23@kernel.org` |
+| `2319` | kbuild: rust: optionally parallelise rustc front end | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-18-39817ec5db23@kernel.org` |
+| `2320` | rust: make exports.o depend on the headers generated for it | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-19-39817ec5db23@kernel.org` |
+| `2321` | kbuild: build rust crates in parallel with the rest of the build | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-20-39817ec5db23@kernel.org` |
+| `2322` | kbuild: use pigz for gzip compression if available | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-21-39817ec5db23@kernel.org` |
 | `2400` | sched: Set need-resched flags before tracing | Andrea Righi | 2026-09-11 | `20260911213300.1305763-1-arighi@nvidia.com` |
 | `2403` | drm/sched: Do not restore unsaved virtual runtime | Tvrtko Ursulin | 2026-09-07 | `20260907130527.52530-1-tvrtko.ursulin@igalia.com` |
 | `2404` | sched_ext: Close the pre-enable ops error claim window | Qiurong Fang | 2026-09-12 | `20260912131518.3428032-1-fangqiurong@kylinos.cn` |
@@ -350,7 +369,6 @@ reviewed against the rc2 source on 2026-09-09:
 | `0006` | bounds-check `SwI2cCmds[c]` against `MAX_SW_I2C_COMMANDS` | correct |
 | `0007` | drop a redundant `adev->pm.mutex` around `smu_cmn_update_table`, a self-deadlock hazard | correct |
 | `0010` | named barrier restore in the gfx12.1 trap handler | reviewed for rc2 |
-| `0030` | proactively shrink DET for pipes losing space | correct |
 | `0031` | free `enc20` before the `hpd_source` bounds return; leak | correct |
 | `0032`, `0033` | `hpo_frl_link_enc_regs[1]` into `[2]` and a second `reg_list(1)`; out-of-bounds | correct |
 | `0034` | move `dal_irq_service_destroy` out of the per-pipe loop; double-destroy | correct |
@@ -491,10 +509,13 @@ unaffected.
 
 ### kbuild (2300–2399)
 
-`2300`–`2322` are Lorenzo Stoakes' `[PATCH 00/23] kbuild: significantly speed up
-kernel builds`, from rust-for-linux on 2026-09-08
-(`20260908-build-speedup-v1-0-5dc1ac01672d@kernel.org`). Up to 36% faster full
-builds. This is why a full rebuild here takes about 8 minutes.
+`2302`–`2322` are Lorenzo Stoakes' kbuild build-speedup series, now the
+**v2** posting (`20260914-build-speedup-v2-0-39817ec5db23@kernel.org`,
+21 patches, 2026-09-14), which supersedes the v1 carried previously. v2 drops
+the modpost srcversion hashing pair and adds the toolchain-checks move into
+`init/Kconfig.toolchain` and an objtool instruction-hash sizing patch, with
+the review feedback from v1 folded in. This is why a full rebuild here takes
+about 8 minutes. Build-time only — nothing here changes runtime behaviour.
 
 ### Scheduler (2400–2499)
 

@@ -1,44 +1,10 @@
 From nobody Mon Sep 17 00:00:00 2001
 From: "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
-Date: Tue, 08 Sep 2026 21:55:12 +0100
-Subject: [PATCH 12/23] kbuild: avoid re-running compiler and linker probes
-Message-Id: <20260908-build-speedup-v1-12-5dc1ac01672d@kernel.org>
-Cc: Nathan Chancellor <nathan@kernel.org>, Nicolas Schier <nsc@kernel.org>, 
- Nick Desaulniers <ndesaulniers@google.com>, 
- Bill Wendling <morbo@google.com>, Justin Stitt <justinstitt@google.com>, 
- Masahiro Yamada <masahiroy@kernel.org>, Alexey Gladkov <legion@kernel.org>, 
- Thomas Gleixner <tglx@kernel.org>, Ingo Molnar <mingo@redhat.com>, 
- Borislav Petkov <bp@alien8.de>, Dave Hansen <dave.hansen@linux.intel.com>, 
- x86@kernel.org, "H. Peter Anvin" <hpa@zytor.com>, 
- Paul Walmsley <pjw@kernel.org>, Palmer Dabbelt <palmer@dabbelt.com>, 
- Albert Ou <aou@eecs.berkeley.edu>, Alexandre Ghiti <alex@ghiti.fr>, 
- Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>, 
- Will Deacon <will@kernel.org>, Mark Rutland <mark.rutland@arm.com>, 
- Ard Biesheuvel <ardb@kernel.org>, 
- Ilias Apalodimas <ilias.apalodimas@linaro.org>, 
- Josh Poimboeuf <jpoimboe@kernel.org>, Peter Zijlstra <peterz@infradead.org>, 
- Miguel Ojeda <ojeda@kernel.org>, Boqun Feng <boqun@kernel.org>, 
- Gary Guo <gary@garyguo.net>, 
- =?utf-8?q?Bj=C3=B6rn_Roy_Baron?= <bjorn3_gh@protonmail.com>, 
- Benno Lossin <lossin@kernel.org>, Andreas Hindborg <a.hindborg@kernel.org>, 
- Alice Ryhl <aliceryhl@google.com>, Trevor Gross <tmgross@umich.edu>, 
- Danilo Krummrich <dakr@kernel.org>, 
- Daniel Almeida <daniel.almeida@collabora.com>, 
- Tamir Duberstein <tamird@kernel.org>, 
- Alexandre Courbot <acourbot@nvidia.com>, 
- =?utf-8?q?Onur_=C3=96zkan?= <work@onurozkan.dev>, 
- Jonathan Corbet <corbet@lwn.net>, Randy Dunlap <rdunlap@infradead.org>
- llvm@lists.linux.dev, linux-riscv@lists.infradead.org, 
- linux-arch@vger.kernel.org, linux-arm-kernel@lists.infradead.org, 
- linux-efi@vger.kernel.org, rust-for-linux@vger.kernel.org, 
- linux-doc@vger.kernel.org, Jens Axboe <axboe@kernel.dk>, 
- "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
- h=from:subject:message-id; bh=r7VENpndNaAt1k1zEv1dPwhpRhgGzMHgAB3PtXYAN2s=;
- b=owGbwMvMwCV2fu7ZrsZH9SKMp9WSGLIWlJmziVj8j03lLI4t7iplPbZzM6/Em+bzwSfqODqyH
- 5+xlWHqKGVhEONikBVTZHn+RXx/kEjYvM4L/m4wc1iZQIYwcHEKwETEPzP8sw0Tdn17z9g6UOzA
- kTVai7YofZUwnMfgOOPCk2MWAi9cYxgZbgSF+1jG35G4/zfOaHXx2W+SMRHHRYMWP7wgXXV+cX0
- IKwA=
- fpr=E7F417BF5214569E89D04F46CF9DCD8A81E27F14
+Date: Mon, 14 Sep 2026 10:22:10 +0100
+Subject: [PATCH v2 11/21] kbuild: avoid re-running compiler and linker probes
+Message-Id: <20260914-build-speedup-v2-11-39817ec5db23@kernel.org>
+To: Linus Torvalds <torvalds@linux-foundation.org>,  Nathan Chancellor <nathan@kernel.org>, Nicolas Schier <nsc@kernel.org>,  Nick Desaulniers <ndesaulniers@google.com>,  Bill Wendling <morbo@google.com>, Justin Stitt <justinstitt@google.com>,  Masahiro Yamada <masahiroy@kernel.org>, Alexey Gladkov <legion@kernel.org>,  Thomas Gleixner <tglx@kernel.org>, Ingo Molnar <mingo@redhat.com>,  Borislav Petkov <bp@alien8.de>, Dave Hansen <dave.hansen@linux.intel.com>,  x86@kernel.org, "H. Peter Anvin" <hpa@zytor.com>,  Paul Walmsley <pjw@kernel.org>, Palmer Dabbelt <palmer@dabbelt.com>,  Albert Ou <aou@eecs.berkeley.edu>, Alexandre Ghiti <alex@ghiti.fr>,  Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,  Will Deacon <will@kernel.org>, Mark Rutland <mark.rutland@arm.com>,  Ard Biesheuvel <ardb@kernel.org>,  Ilias Apalodimas <ilias.apalodimas@linaro.org>,  Josh Poimboeuf <jpoimboe@kernel.org>, Peter Zijlstra <peterz@infradead.org>,  Miguel Ojeda <ojeda@kernel.org>, Boqun Feng <boqun@kernel.org>,  Gary Guo <gary@garyguo.net>,  =?utf-8?q?Bj=C3=B6rn_Roy_Baron?= <bjorn3_gh@protonmail.com>,  Benno Lossin <lossin@kernel.org>, Andreas Hindborg <a.hindborg@kernel.org>,  Alice Ryhl <aliceryhl@google.com>, Trevor Gross <tmgross@umich.edu>,  Danilo Krummrich <dakr@kernel.org>,  Daniel Almeida <daniel.almeida@collabora.com>,  Tamir Duberstein <tamird@kernel.org>,  Alexandre Courbot <acourbot@nvidia.com>,  =?utf-8?q?Onur_=C3=96zkan?= <work@onurozkan.dev>,  Jonathan Corbet <corbet@lwn.net>, Randy Dunlap <rdunlap@infradead.org>,  Kees Cook <kees@kernel.org>, "Gustavo A. R. Silva" <gustavoars@kernel.org>
+Cc: linux-kbuild@vger.kernel.org, linux-kernel@vger.kernel.org,  llvm@lists.linux.dev, linux-riscv@lists.infradead.org,  linux-arch@vger.kernel.org, linux-arm-kernel@lists.infradead.org,  linux-efi@vger.kernel.org, rust-for-linux@vger.kernel.org,  linux-doc@vger.kernel.org, Jens Axboe <axboe@kernel.dk>,  linux-hardening@vger.kernel.org, "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
 
 Each kernel make invocation begins with ~30 compiler and linker runs each
 of which performs duplicate probe for a number of compiler and linker
@@ -51,6 +17,10 @@ A convention already exists for this - CC_HAS_xxx, LD_HAS_xxx in Kconfig
 files (for example, CC_HAS_COUNTED_BY), so convert these probes to Kconfig
 options where appropriate.
 
+This change avoids a sublte issue with ppc32 (big endian) - clang doesn't
+accept -fno-stack-clash-protection on this sub-target, so keep this option
+in the Makefile.
+
 With gcc and clang, defconfig and allmodconfig, the recorded command
 lines are unchanged, a build with nothing to do rebuilds nothing and W=1
 continues to function correctly.
@@ -62,14 +32,14 @@ Whole build, 128-thread Threadripper 9980X, best of N runs:
 
                                          before   after     delta
                                          -------------------------------
-  x86 defconfig, no-op make, gcc           0.62s    0.46s    -0.17s (-27%)
-  x86 defconfig, no-op make, clang         0.78s    0.53s    -0.25s (-32%)
-  x86 defconfig, touch mm/vma.c, gcc        8.7s     8.5s    -0.17s (-2%)
-  x86 defconfig, touch mm/vma.c, clang      7.9s     7.6s    -0.25s (-3%)
-  x86 defconfig, clean, clang              27.0s    26.8s    -0.26s (-1%)
-  x86 allmodconfig, no-op make, gcc        11.2s    11.0s    -0.18s (-2%)
-  x86 allmodconfig, no-op make, clang      11.9s    11.6s    -0.28s (-2%)
-  x86 allmodconfig, touch mm/vma.c, clang  36.5s    36.2s    -0.31s (-1%)
+  x86 defconfig, no-op make, gcc           0.78s    0.60s    -0.18s (-23%)
+  x86 defconfig, no-op make, clang         0.94s    0.66s    -0.28s (-30%)
+  x86 defconfig, touch mm/vma.c, gcc        8.6s     8.5s    -0.16s (-2%)
+  x86 defconfig, touch mm/vma.c, clang      8.0s     7.7s    -0.24s (-3%)
+  x86 defconfig, clean, clang              29.8s    29.4s    -0.37s (-1%)
+  x86 allmodconfig, no-op make, gcc        12.9s    12.7s    -0.23s (-2%)
+  x86 allmodconfig, no-op make, clang      14.2s    13.9s    -0.29s (-2%)
+  x86 allmodconfig, touch mm/vma.c, clang  32.2s    31.9s    -0.30s (-1%)
 
 Assisted-by: LLM
 Signed-off-by: Lorenzo Stoakes (ARM) <ljs@kernel.org>
@@ -80,12 +50,12 @@ Signed-off-by: Lorenzo Stoakes (ARM) <ljs@kernel.org>
  arch/x86/Kconfig                      | 17 ++++++++
  arch/x86/Makefile                     | 12 +++---
  drivers/firmware/efi/libstub/Makefile |  2 +-
- init/Kconfig                          | 77 +++++++++++++++++++++++++++++++++++
+ init/Kconfig.toolchain                | 74 +++++++++++++++++++++++++++++++++++
  scripts/Makefile.warn                 | 28 ++++++-------
- 8 files changed, 128 insertions(+), 35 deletions(-)
+ 8 files changed, 126 insertions(+), 34 deletions(-)
 
 diff --git a/Makefile b/Makefile
-index 56e56bea53c3..088e901f0a72 100644
+index 8105123bcf4d..68df3446d111 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -946,8 +946,8 @@ KBUILD_RUSTFLAGS += -Coverflow-checks=$(if $(CONFIG_RUST_OVERFLOW_CHECKS),y,n)
@@ -99,7 +69,7 @@ index 56e56bea53c3..088e901f0a72 100644
  endif
  
  ifdef CONFIG_READABLE_ASM
-@@ -1011,18 +1011,18 @@ endif
+@@ -1011,18 +1011,20 @@ endif
  endif
  
  # Explicitly clear padding bits during variable initialization
@@ -108,8 +78,9 @@ index 56e56bea53c3..088e901f0a72 100644
  
  # While VLAs have been removed, GCC produces unreachable stack probes
  # for the randomize_kstack_offset feature. Disable it for all compilers.
--KBUILD_CFLAGS	+= $(call cc-option, -fno-stack-clash-protection)
-+KBUILD_CFLAGS	+= $(if $(CONFIG_CC_HAS_NO_STACK_CLASH_PROTECTION),-fno-stack-clash-protection)
++# Probed here rather than in Kconfig as clang only accepts it for some
++# sub-targets, so the architecture's flags matter.
+ KBUILD_CFLAGS	+= $(call cc-option, -fno-stack-clash-protection)
  
  # Get details on warnings generated due to GCC value tracking.
 -KBUILD_CFLAGS	+= $(call cc-option, -fdiagnostics-show-context=2)
@@ -122,7 +93,7 @@ index 56e56bea53c3..088e901f0a72 100644
  
  # Clear used registers at func exit (to reduce data lifetime and ROP gadgets).
  ifdef CONFIG_ZERO_CALL_USED_REGS
-@@ -1033,7 +1033,7 @@ ifdef CONFIG_FUNCTION_TRACER
+@@ -1033,7 +1035,7 @@ ifdef CONFIG_FUNCTION_TRACER
  ifdef CONFIG_FTRACE_MCOUNT_USE_CC
    CC_FLAGS_FTRACE	+= -mrecord-mcount
    ifdef CONFIG_HAVE_NOP_MCOUNT
@@ -131,7 +102,7 @@ index 56e56bea53c3..088e901f0a72 100644
        CC_FLAGS_FTRACE	+= -mnop-mcount
        CC_FLAGS_USING	+= -DCC_USING_NOP_MCOUNT
      endif
-@@ -1051,8 +1051,7 @@ ifdef CONFIG_FTRACE_MCOUNT_USE_RECORDMCOUNT
+@@ -1051,8 +1053,7 @@ ifdef CONFIG_FTRACE_MCOUNT_USE_RECORDMCOUNT
    endif
  endif
  ifdef CONFIG_HAVE_FENTRY
@@ -141,7 +112,7 @@ index 56e56bea53c3..088e901f0a72 100644
      CC_FLAGS_FTRACE	+= -mfentry
      CC_FLAGS_USING	+= -DCC_USING_FENTRY
    endif
-@@ -1160,7 +1159,7 @@ NOSTDINC_FLAGS += -nostdinc
+@@ -1160,7 +1161,7 @@ NOSTDINC_FLAGS += -nostdinc
  # the kernel uses only C99 flexible arrays for dynamically sized trailing
  # arrays. Enforce this for everything that may examine structure sizes and
  # perform bounds checking.
@@ -150,7 +121,7 @@ index 56e56bea53c3..088e901f0a72 100644
  
  # disable invalid "can't wrap" optimizations for signed / pointers
  KBUILD_CFLAGS	+= -fno-strict-overflow
-@@ -1240,11 +1239,11 @@ LDFLAGS_vmlinux += --build-id=sha1
+@@ -1240,11 +1241,11 @@ LDFLAGS_vmlinux += --build-id=sha1
  # COMDAT-deduplicated sections. Use --force-group-allocation to resolve these
  # groups when linking modules. The option is available from ld.bfd 2.29 and
  # ld.lld 19.1.0.
@@ -279,19 +250,16 @@ index 77a2b2d74f3f..80058bbddaf5 100644
  				   -D__DISABLE_EXPORTS
  
  #
-diff --git a/init/Kconfig b/init/Kconfig
-index 8583d9f06c52..3c92c87254a3 100644
---- a/init/Kconfig
-+++ b/init/Kconfig
-@@ -144,6 +144,44 @@ config CC_HAS_ASSUME
+diff --git a/init/Kconfig.toolchain b/init/Kconfig.toolchain
+index fac36246451f..7a0438f0eb86 100644
+--- a/init/Kconfig.toolchain
++++ b/init/Kconfig.toolchain
+@@ -144,6 +144,80 @@ config CC_HAS_ASSUME
  config CC_HAS_NO_PROFILE_FN_ATTR
  	def_bool $(success,echo '__attribute__((no_profile_instrument_function)) int x();' | $(CC) -x c - -c -o /dev/null -Werror)
  
 +config CC_HAS_ZERO_INIT_PADDING_BITS
 +	def_bool $(cc-option,-fzero-init-padding-bits=all)
-+
-+config CC_HAS_NO_STACK_CLASH_PROTECTION
-+	def_bool $(cc-option,-fno-stack-clash-protection)
 +
 +config CC_HAS_NO_ADDRSIG
 +	def_bool $(cc-option,-fno-addrsig)
@@ -325,13 +293,6 @@ index 8583d9f06c52..3c92c87254a3 100644
 +config LD_HAS_NO_WARN_RWX_SEGMENTS
 +	def_bool $(ld-option,--no-warn-rwx-segments)
 +
- config CC_HAS_COUNTED_BY
- 	bool
- 	# clang needs to be at least 20.1.0 to avoid potential crashes
-@@ -1006,6 +1044,45 @@ config CC_STRINGOP_OVERFLOW
- 	bool
- 	default y if CC_IS_GCC && !CC_NO_STRINGOP_OVERFLOW
- 
 +config CC_HAS_WNO_ADDRESS_OF_PACKED_MEMBER
 +	def_bool $(cc-option,-Wno-address-of-packed-member)
 +
@@ -371,9 +332,9 @@ index 8583d9f06c52..3c92c87254a3 100644
 +config CC_HAS_WNO_STRINGOP_TRUNCATION
 +	def_bool $(cc-option,-Wno-stringop-truncation)
 +
- #
- # For architectures that know their GCC __int128 support is sound
- #
+ config CC_HAS_COUNTED_BY
+ 	bool
+ 	# clang needs to be at least 20.1.0 to avoid potential crashes
 diff --git a/scripts/Makefile.warn b/scripts/Makefile.warn
 index 35af7d6c6d18..83d274fcbfaf 100644
 --- a/scripts/Makefile.warn
