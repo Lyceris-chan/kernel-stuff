@@ -333,3 +333,46 @@ file before acting on any of them.**
   block of failures, check *which* tree you applied before concluding anything.
 - **Build time is ~8 min** with the kbuild speedup series (`2300`–`2322`). A
   full rebuild is cheap — prefer rebuilding over guessing.
+
+### The 240Hz flicker bisect (2026-09-14)
+
+The MSI MAG251RX flickered at 1920x1080@240Hz on this kernel, worst under
+cursor movement. The whole saga is a methodology lesson:
+
+- **Two mechanistically compelling hypotheses were wrong.** First passive VRR
+  (`PASSIVE_VRR_DISABLED=0` was read as "VRR holding the panel in
+  variable-refresh mode"). The fix was verified in the live state — both CRTCs
+  read `PASSIVE_VRR_DISABLED=1` — and the flicker persisted. Then
+  `dcdebugmask=0x800`, which the user reported only reduced frequency ("less
+  often"). **A mechanism that fits the observations is not a diagnosis; only an
+  A/B result is.** State it that way in the changelog and the webhook: ship
+  hypotheses labelled as such, and record the disproof rather than quietly
+  moving on.
+- **The decisive data was the user's A/B:** the stock cachyos-rc kernel
+  (rc2-based) is clean at 240Hz; 144Hz also works on our kernel. With a known
+  GOOD kernel and a known BAD kernel, bisect by *diffing the good kernel's
+  state*, not by reasoning about the bad one. Capture from the good kernel:
+  `/proc/cmdline`, all `/sys/module/amdgpu/parameters/*`,
+  `modetest -M amdgpu -p/-c` CRTC + connector state, `pp_dpm_*` clock tables,
+  and the embedded config via `scripts/extract-ikconfig /boot/vmlinuz-*`.
+- **Configs can be diffed from vmlinuz on disk** even when the other kernel is
+  booted: `repos/torvalds/scripts/extract-ikconfig /boot/vmlinuz-linux-sleepy-next`
+  works on the stored image. Diffing our final config against the good kernel's
+  showed the display driver config is identical apart from the cmdline and the
+  NAP governor — which eliminated a whole class without a rebuild.
+- **The first variable tested was `dcfeaturemask`:** the good kernel ran
+  `amdgpu.dcfeaturemask=2`, ours `0x402` — the extra bit is `DC_FRL_MASK`,
+  added by patch `1144` (Enable HDMI FRL by default). CachyOS reverted the same
+  change twice in their 7.3 branches (`cc29db585c84`, `143e44f57bf8`, no reason
+  recorded), and it is implicated in work item #5649. Three independent
+  external signals outweighed the local argument that FRL enablement "should
+  be inert" on an HDMI 2.0 sink. **Empirical alignment beats mechanism
+  reasoning — this session proved it twice.**
+- **If the flicker persists on the FRL-drop build, the next variable is the
+  baked cmdline** (`cpuidle.governor=nap`). The NAP governor (patch 2200) is a
+  1756-line neural-network idle predictor — the largest single behavioural
+  difference from the good kernel's menu governor.
+- **This machine cannot synthesise cursor movement** for reproduction:
+  `CONFIG_INPUT_UINPUT` is unset and no cursor tool is installed. Consider
+  enabling `CONFIG_INPUT_UINPUT=m` so a future display bug can be reproduced
+  and bisected without the user at the desk.
