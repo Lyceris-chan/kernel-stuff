@@ -182,7 +182,7 @@ _rcver=rc3
 
 pkgver=7.3.0_rc3
 _tagrel=1
-pkgrel=3
+pkgrel=4
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -635,18 +635,25 @@ EOF
     # amdgpu.aspm=0 / amdgpu.runpm=0: conservative amdgpu-side stopgaps for the
     # silent gaming freeze (SMU IF mismatch 0x2e vs 0x33, !5538) — no GPU ASPM or
     # BACO/runtime-PM power transitions. DPM stays on so clocks still downclock.
-    # amdgpu.dcdebugmask=0x800 (DC_DISABLE_IPS) was carried from 2026-08 to mask the
-    # display "box", on the theory that IPS/DPG pipe-gating made
-    # dc_get_flip_pending_on_otg() read hubp2_is_flip_pending() as false while a flip
-    # was pending. That theory is now disproved: the box is a COSMIC (cosmic-comp)
-    # overlay-plane bug, fixed with COSMIC_DISABLE_OVERLAY_SCANOUT=1, and the box
-    # returned in September with 0x800 still in effect. The mask is therefore removed
-    # — it costs idle power and hides IPS-related problems. Revert by appending
-    # amdgpu.dcdebugmask=0x800 if flip_done/vblank timeouts appear; the IPS gap Leo Li
-    # documents in f64a9be56536 is real, just not this machine's failure mode.
+    # amdgpu.dcdebugmask=0x800 (DC_DISABLE_IPS): re-added 2026-09-14. It was removed
+    # in pkgrel 11 on the grounds that the display "box" was a COSMIC overlay-plane
+    # bug rather than an IPS one. That is true of the box — but the IPS gap is real
+    # and separately observable. dc_get_flip_pending_on_otg() reads
+    # hubp2_is_flip_pending(), which returns false while the HUBP is clock-gated, so
+    # flip completion can be delivered before the hardware latches and the compositor
+    # repaints a buffer still being scanned. Leo Li's own comment in f64a9be56536
+    # concedes it: "DCN HUBP may be clock-gated, so the flip-pending status may be
+    # undefined".
+    # The MSI MAG251RX at 1920x1080@240Hz flickers exactly where that bites: cursor
+    # movement is the most frequent source of flips, so the artifact is severe under
+    # the cursor and mild when idle, and independent of VRR — which is why toggling
+    # VRR, and disabling passive VRR, changed nothing. 1159 fixed the software half
+    # of the race (the non-atomic RMW that clears VUPDATE_NO_LOCK_EN); this mask
+    # covers the clock-gating half, which is hardware.
+    # It costs idle power. Drop it again if a proper DCN4 flip-pending fix lands.
     # Appended to the bootloader params (CMDLINE_OVERRIDE is off); boots this kernel
     # with ASPM off regardless of the platform/BIOS default.
-    scripts/config -e CMDLINE_BOOL --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0" -d CMDLINE_OVERRIDE
+    scripts/config -e CMDLINE_BOOL --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0 amdgpu.dcdebugmask=0x800" -d CMDLINE_OVERRIDE
     scripts/config -e DEBUG_KERNEL -d DEBUG_INFO_NONE -d DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT -e DEBUG_INFO_DWARF5 -e DEBUG_INFO_BTF
     scripts/config -d SECURITY_APPARMOR -d SECURITY_APPARMOR_DEBUG -d SECURITY_APPARMOR_INTROSPECT_POLICY
     scripts/config -d AUDIT -d AUDITSYSCALL -d AUDIT_ARCH -d SLUB_DEBUG

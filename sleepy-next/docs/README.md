@@ -6,8 +6,8 @@ built from **mainline Linux 7.3-rc3** plus a sanitized
 [CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 191 targeted
 upstream/local patches. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0_rc3-3` · **Artifact:**
-`linux-sleepy-next-7.3.0_rc3-3-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0_rc3-4` · **Artifact:**
+`linux-sleepy-next-7.3.0_rc3-4-x86_64.pkg.tar.zst`
 
 ## Target hardware
 
@@ -65,17 +65,22 @@ builds install the shipped config.
 ## Kernel command line (baked in)
 
 ```
-cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0
+cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0 amdgpu.dcdebugmask=0x800
 ```
 
 `pcie_aspm=off` + `amdgpu.aspm=0/runpm=0` are the drm/amd !5538 SMU bus-drop
 stopgaps (DPM stays on). `cpuidle.governor=nap` activates the NAP governor, and
 `amd_pstate.epp_boost=1` enables the per-core EPP boost.
 
-`amdgpu.dcdebugmask=0x800` (disable DCN4 idle power states) was removed in
-`pkgrel 11` — it was carried to mask the display "box", which turned out to be a
-COSMIC compositor bug rather than an IPS one. Re-add it if `flip_done` or vblank
-timeouts appear.
+`amdgpu.dcdebugmask=0x800` disables the DCN4 idle power states. It was removed
+in `pkgrel 11` because the display "box" turned out to be a COSMIC compositor
+bug, and **re-added in `pkgrel 4` of the rc3 line** for a different artifact: the
+MSI MAG251RX flickering at 1920x1080@240Hz, worst under cursor movement. When
+the HUBP is clock-gated, `hubp2_is_flip_pending()` reports no pending flip, so
+flip completion can arrive before the hardware latches — AMD's `f64a9be56536`
+concedes the gap. Cursor movement is the most frequent flip source, which is why
+that artifact tracks the cursor and is independent of VRR. It costs idle power;
+drop it again if a proper DCN4 flip-pending fix lands.
 
 ## Patch series
 

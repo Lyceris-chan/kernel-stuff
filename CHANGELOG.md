@@ -15,6 +15,39 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc3-4-sleepy-next]: 2026-09-14
+
+### Changed
+- **`amdgpu.dcdebugmask=0x800` (DC_DISABLE_IPS) is back in the baked command
+  line.** It was removed in `pkgrel 11` because the display "box" turned out to
+  be a COSMIC overlay-plane bug rather than an IPS one. That is still true of the
+  box — but the IPS gap is a separate, real artifact, and this machine shows it.
+
+  `dc_get_flip_pending_on_otg()` reads `hubp2_is_flip_pending()`, which returns
+  false while the HUBP is clock-gated, so flip completion can be delivered
+  before the hardware latches and the compositor repaints a buffer that is still
+  being scanned. Leo Li's own comment in `f64a9be56536` concedes it: *"DCN HUBP
+  may be clock-gated, so the flip-pending status may be undefined"*.
+
+  The MSI MAG251RX flickers exactly where that bites. Cursor movement is the
+  most frequent source of flips, which is why the artifact is severe under the
+  cursor and mild when idle, and why it is **independent of VRR** — every VRR
+  knob, including disabling passive VRR, changed nothing. `1159` fixed the
+  software half of the race (the non-atomic read-modify-write that clears
+  `VUPDATE_NO_LOCK_EN`); this mask covers the clock-gating half, which is
+  hardware. It costs idle power, and should be dropped again if a proper DCN4
+  flip-pending fix lands.
+
+  **This is a hypothesis under test, not a proven fix.** The passive-VRR
+  diagnosis in `pkgrel 2` was wrong: the fix applied cleanly — both CRTCs read
+  `PASSIVE_VRR_DISABLED=1` — and the flicker persisted. Two related things were
+  established while re-diagnosing: the MSI runs 1920x1080@239.96Hz at a 571 MHz
+  pixel clock on HDMI-A-2 (legal against HDMI 2.0's 600 MHz TMDS ceiling, but
+  near the top of it), and the kernel logs **no runtime display errors at all**.
+  The only complaints are at boot: a `REG_WAIT` timeout in
+  `optc401_disable_crtc`, and an InfoFrame failure on HDMI-A-1 — the *other*
+  monitor, not the MSI.
+
 ## [7.3.0-rc3-3-sleepy-next]: 2026-09-14
 
 ### Added
