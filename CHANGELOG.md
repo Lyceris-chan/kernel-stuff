@@ -15,6 +15,37 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc3-8-sleepy-next]: 2026-09-14
+
+### Added
+- **`2011`** r8169: don't enable chip LTR when the platform has not enabled
+  LTR (Yogesh Gaur, `[PATCH net v4]`,
+  `<20260914130050.304-1-yogeshgaur.83@gmail.com>`). This machine's NIC.
+  rc3's `rtl_hw_aspm_clkreq_enable()` calls `rtl_enable_ltr()` on every ASPM
+  enable, gated only on `tp->aspm_manageable`, which says nothing about LTR;
+  the PCI core's `pci_dev->ltr_path` verdict is never consulted. On platforms
+  where LTR is not end-to-end the chip still programmes ALDPS_LTR_EN and can
+  trigger L1.2 — the reported symptom class is link flaps and downshifts.
+  Applies clean.
+
+### From the sweep, deferred with reasons
+- sched_ext lazy preemption v3 (Righi, for-7.4): a feature for the next
+  window, not a fix for this base.
+- MGLRU rejected-folios v3 (Baolin Wang): inert here — LRU-MARIE owns
+  reclaim — and it needs a rebase past our eight `mm/vmscan.c` patches.
+- Seven post-rc3 mm fixes (`12e9ac7bc5b2` SWAP_USAGE_OFFLIST_BIT,
+  `6e673d0879ef` root-memcg charging, `397432cab17b` mremap locked_vm,
+  `e384abeb559d` THP tuneables, `932cfb25e7ce` shrinker nokmem, plus two
+  inert): all apply-tested clean upstream but arrive with the rc4 bump — no
+  point carrying them for a day.
+- amd-pstate 7.4 pull: a no-op for this machine — the `epp_soc_ids[]` table
+  is empty and non-hybrid Zen 4 keeps the legacy defaults.
+
+### Drop-list data for the next bump
+- `2141`, `2145`, `2146` are now upstream in rc4.
+- `2140`, `2144`, `2150`–`2154` are still akpm-only.
+- `2500` is upstream in rc4 (`f7491d7c81db` via `x86_urgent_for_7.3-rc4`).
+
 ## [7.3.0-rc3-7-sleepy-next]: 2026-09-14
 
 ### Removed

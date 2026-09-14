@@ -182,7 +182,7 @@ _rcver=rc3
 
 pkgver=7.3.0_rc3
 _tagrel=1
-pkgrel=7
+pkgrel=8
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -320,6 +320,7 @@ source=(
   "patches/2000-2099/2008-io_uring-io-wq-stop-a-single-cancel-after-one-running-match.patch"
   "patches/2000-2099/2009-fs-buffer-check-for-NULL-pointer-before-folio_test_dropbehind.patch"
   "patches/2000-2099/2010-blk-cgroup-save-IRQ-state-in-blkg_tryget_closest.patch"
+  "patches/2000-2099/2011-r8169-dont-enable-chip-LTR-when-the-platform-has-not-enabled-LTR.patch"
   "patches/2100-2199/2100-zstd-7.2-merge-v1.6.0-into-kernel-tree.patch"
   "patches/2100-2199/2101-mm-7.3-introduce-LRU-MARIE-0.11.1.patch"
   "patches/2100-2199/2120-mm-gup-mm-gup-break-out-gup-fill-pages-helper.patch"
@@ -1109,6 +1110,7 @@ b2sums=('d400c07b3f76f262c51e88bfc34e419883f13ea12dc76975b624acd6712bef193c4bb88
         'acbee18a4d7bd71fd1dcb91d59b774bb523d0cde519c7fe7dcbf634b3f5c3e1585200d7b365fa89273d8eba0cc59db2e2b634beee8a08cc9499686c7f2af4fde'
         '4225cf30f9fc409bc9cff2398e68ca8623f61d9b082bc47b5b594265a8b4d59e90b69bf3490b4bc2b46850e0ca2190971b3cda780799f4217de9532e2de62e56'
         '448a251a84d7d02a7095cae31fc95f77cb06fa2d8e0a52d8a140ee36028807a14ac04b304260bc121ac8b8e80dae10e25a9a480a97f2152266d52d95a338c7db'
+        '0eb42c67084faaf6390258842b0cdf37c7440b24a9956209b20674991f520606f98ba3dda12f4912a23d7a17c9eaa74fb84518561ed46e00139afe6a71ae6950'
         '1d8d63086f1d7ee562047c5e126276b98452daf4cf5146d9a80030abd4832d6fab97c91c01678c301ec9d830a210952715b852c1c9a6783001633ca2f313fa1d'
         '37e409a2b039ec33dcc82eb8f0957e6d6ce4744eb4f68f8634ff13d796b46d5efe85a3a57af3bfb2126ac0bf88e90d0ea2c624dd45643e90d5d98beff7ae826d'
         'a745db752d2586475d373cb29e64b4f42f6e305b4b3e588efbce955491429c73b3d16c426e76118b1499bbfb4a2159192f3950ed06d309064eb28750a1d6e6aa'

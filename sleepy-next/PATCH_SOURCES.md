@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-next/PKGBUILD`.
 
 - **Base:** Linux `v7.3-rc3`
-- **Series:** 189 patches
+- **Series:** 190 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -24,7 +24,7 @@ are supplied by the generator instead, so every row below has a source.
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 25 |
 | `1100–1199` | AMD display (DCN4, colorops) | 21 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 18 |
-| `2000–2099` | Block, I/O and buffers (bfq, mq-deadline, zram, io_uring) | 11 |
+| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 12 |
 | `2100–2199` | Memory management and compression (zstd, LRU-MARIE, MGLRU, gup) | 33 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 21 |
@@ -135,6 +135,7 @@ change rather than a documentation pass.
 | `2008` | io_uring/io-wq: stop a single cancel after one running match | Mark Amirkan via B4 Relay | 2026-09-13 | `20260913-b4-send-io-wq-cancel-v1-1-dcfe47275c6e@gmail.com` |
 | `2009` | fs/buffer: check for NULL pointer before folio_test_dropbehind() | Zhaoyu Liu | 2026-09-13 | `pfk6l6lsgecie4xwy5njrgtzpave4uayxbl4lkz3iekcdds7fg@bpihjzlnz7m2` |
 | `2010` | blk-cgroup: save IRQ state in blkg_tryget_closest() | Hao Zhang | 2026-09-12 | `aqQmqb1k57PXj8Ef@192.168.1.215` |
+| `2011` | r8169: don't enable chip LTR when the platform has not enabled LTR | Yogesh Gaur | 2026-09-14 | `20260914130050.304-1-yogeshgaur.83@gmail.com` |
 | `2100` | zstd-7.2: merge v1.6.0 into kernel tree | Piotr Gorski | 2026-06-29 | `4d96a5c62121` |
 | `2101` | linux7.3-rc1-lru_marie-0.11.1 | Masahito S | 2026-09-08 | `5a4bbbb3854c` |
 | `2120` | mm/gup: break out gup_fill_pages() helper | Rik van Riel | 2026-08-10 | `7afdec79e9f0` |
