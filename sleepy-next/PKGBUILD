@@ -182,7 +182,7 @@ _rcver=rc3
 
 pkgver=7.3.0_rc3
 _tagrel=1
-pkgrel=6
+pkgrel=7
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -238,10 +238,9 @@ source=(
   "patches/0001-0049/0033-drm-amd-display-Fix-missing-HPO-FRL-link-encoder-reg.patch"
   "patches/0001-0049/0034-drm-amd-display-Prevent-memory-leak-during-IRQ-servi.patch"
   "patches/0050-0099/0050-drm-edid-Parse-AMD-VSDB-for-FreeSync-refresh-range.patch"
-  "patches/0050-0099/0055-drm-edid-parse-HDMI-2.1-gaming-ALLM-VRR-caps-from-HF-VSDB.patch"
+  "patches/0050-0099/0055-drm-edid-add-HDMI-VRR-capability-struct-without-the-parse.patch"
   "patches/0050-0099/0058-drm-amd-display-restore-FRL-cap-on-non-destructive-HDMI-link.patch"
   "patches/0050-0099/0059-drm-amd-display-add-2.1-freesync-support-for-amd-vsdb-edid-block.patch"
-  "patches/0050-0099/0060-drm-amd-display-add-hdmi-2.1-vrr-support-from-hf-vsdb.patch"
   "patches/0050-0099/0061-drm-amd-display-enable-hdmi-allm-for-gaming-vrr.patch"
   "patches/0101-0113/0101-cachy-bbr3.patch"
   "patches/0101-0113/0102-cachy-kbuild.patch"
@@ -290,6 +289,7 @@ source=(
   "patches/1100-1199/1159-drm-amd-display-Atomize-IRQ-register-read-modify-write-ops.patch"
   "patches/1100-1199/1161-drm-amd-display-Guard-NULL-DDC-pins-in-dal_ddc_open.patch"
   "patches/1100-1199/1162-drm-amd-display-check-dc_state_create_copy-for-NULL-in-dm_suspend.patch"
+  "patches/1100-1199/1163-drm-amd-display-keep-freesync_capable-for-HF-VSDB-VRR-sinks-in-MCCS-fallback.patch"
   "patches/1200-1299/1201-cpufreq-amd-pstate-Update-cppc_req_cached-before-w.patch"
   "patches/1200-1299/1202-cpufreq-amd-pstate-Add-per-core-EPP-boost-for-rec.patch"
   "patches/1200-1299/1203-Documentation-amd-pstate-Document-the-epp_boost-pa.patch"
@@ -1028,10 +1028,9 @@ b2sums=('d400c07b3f76f262c51e88bfc34e419883f13ea12dc76975b624acd6712bef193c4bb88
         'f75b523e6c7c4f873eaf4ba1a8a560d8abfbdef614ee55034cc6e44e3e21d4af74288da03153ba968cf062fed329600ed30ce26b1d702679164eeb547926e796'
         '00e5b994e7839f3374dcafdcfa215f3e616ddbc0d5a17405653c17c85451d091fe160b66aaf4365aecfe569d37a9b4aab47ebdc7df40085fdefaa5123a921340'
         'b866c2e213614bff04f852e67c2762e6ca28b402dd43142df61192d516bedb7b6d8a7a647870e1121461375735a5e84acae96dc03059347fbf405dddbefd1212'
-        'f61685cae107b07fd76a108f80cb0452378c672180a98dd49cf0707a7a6013162f20c1f893f080add632d8ad3fe1e0667db1a4d494f16bd2bd980eee506bbf91'
+        '37f10360081e03abfc7db6356e6f535011f8952d7b865ea14a520ade7c392a6f241a6433cfd9e6be059e59e96d5dbf1063552abab25a4d0d7b55baa680174cdb'
         'bb8068b44b22abd2316e41425cc250e517bcd76b52885a6ab81de8129f1a82bb93e6f048d521325666cbddb23f32cf74038abc577d1fbe6a20e655dc3f852137'
         'dbae23fc923db3fa3bd04e2d4dcba2774919d2133c031ce728f71f152cd3f4e0b0415054eb98a8768d56f49ac39aef7be13ce62af37785fdea1173d7c8477662'
-        'a973cf2388f1a229626656883e741f7a35be2a5d33385e7e694e4c66d9dfa96974f26dca5d74fe6ae1ec093bc0421ca779a1ba68cb920e5d18bed8c37cfc5692'
         '212368b3fce77d1a0704a7a477ca71cee62c5cadd0ed85edfa29fadb8d012f7ea045f1f5be3b985cf559b7451eb54d94f3c872756494871a3527d767aa9b2094'
         '1cb6e0ae6f57e9eca2067594ce83c005c6bc49e6a3d7fb11aa1aeee12204691304da0483e5be3c20b233c132a54831ffa587765599634a5ad123489e99982a58'
         'ee5f2c4aead1f2fc8d8096ae2a953d4c45d4c79de29e0578da543767a2d96664f903f043af36cf481adc13f203e2eca8fb616c26257e6cce5b3cae26b1d46ddf'
@@ -1080,6 +1079,7 @@ b2sums=('d400c07b3f76f262c51e88bfc34e419883f13ea12dc76975b624acd6712bef193c4bb88
         'b09eb42ea38e33a3226eaf44b697b37fe978975bea7f9bfb8cf123b8a92b82b7e59bd1d3372f0b8cb07ac1f1c61c7e67ec3ea53eebd4bd48ccd2633d87b1eb21'
         'f1d8ce8b0c82f168a6fb57eaa4a17bbc85b1b7131f9f180439e652193532e71bea75be122d9fe11143e4ef9726868c12b953094a18268a4ae63b5f85e5a8caaf'
         '57fbafa58742a4ad8bc4cf414bbc694f772579a8fd3a5336aded8df3bd1d9389b62a9a650a8c8acbb12cb2afae6a7801c8e5a1523f99bb926616679ddb5498f2'
+        'cb2120f7a57999c68cdb95cc0da74d800b510fbbd0c4834a1fbc0043f164a2f2f9d6bc8b80d49315849f2d52385d9c8e42b248b0985679206a09e113067a857d'
         'e9d464ebf525cd8d93d48f1cbedea0197bd9d0142085da7d83ec3dfda0174483a0fea4077055fd7d1ad9180563dc6dfb77e4f52f9bcb023b7c7d7c9fb5c39ece'
         '9d3e36dbc5c9c5342d2991c4665278ed075073196251e59280bd12f1d6812a37d31db58f5cb978b926e2dcd0a32365960a414b69d10f463bd8f68cedbb4bb6ae'
         '52fe01328f544e023666eab1fd378ae0a0eb47385d495403a55a933f71beedcf295300767c1e43feb46366915fae8bea3b9137f11d16ed194a1fcf71d95aec0d'

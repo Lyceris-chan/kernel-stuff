@@ -15,6 +15,59 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc3-7-sleepy-next]: 2026-09-14
+
+### Removed
+- **`0055` and `0060`** — `0055` (drm/edid: parse HDMI 2.1 gaming ALLM/VRR capabilities from
+  HF-VSDB). The decisive bisect step for the 240 Hz flicker, and the first one
+  grounded in a value difference, not a guess.
+
+  Captured from the flicker-free cachyos-rc kernel at runtime: `vrr_capable=0`
+  and `passive_vrr_capable=0` on **every** connector, so cosmic-settings offers
+  no VRR option at all. Ours advertised `vrr_capable=1` on both HDMI outputs.
+  `0055` is the patch that creates that advertisement: its
+  `drm_parse_hdmi_gaming_info()` sets `vrr_cap.supported=true` from the
+  HF-VSDB VRR range in the MAG251RX's EDID. CachyOS's tree carries the
+  `drm_hdmi_vrr_cap` struct but never sets the flag.
+
+  The chain that follows from the advertisement: our `0060` (dropped in the same build) had a fallback that set
+  `freesync_capable=true`, the driver sends FreeSync signalling to a G-Sync
+  Compatible panel whose scalar then sits in a half-negotiated VRR state —
+  flicker at 240 Hz where content changes (cursor movement), and the box, whose
+  old symptom was that it moved to whichever monitor last had VRR toggled.
+
+  Without `0055`, the advertisement is gone, `0060`'s fallback becomes inert,
+  and the whole chain matches the known-good kernel. VRR over HDMI disappears
+  as a feature; that is the accepted trade for this machine, and it matches
+  the stock kernel's behaviour exactly.
+
+### Added
+- **`1163`** drm/amd/display: keep `freesync_capable` for HF-VSDB VRR sinks in
+  the MCCS fallback. A rebase of Fangzhi Zuo's upstream submission
+  `<20260901191251.2653684-4-jerry.zuo@amd.com>`, which this series carried as
+  patch `1145` until the rc3 rebase dropped it on the assumption that rc3's
+  rewrite of `amdgpu_dm_update_freesync_caps()` superseded its purpose.
+
+  The rewrite restructured the function but kept the MCCS clear without the
+  `vrr_cap.supported` term — and the kernel-to-kernel diff against the
+  flicker-free CachyOS `7.3/base` tree shows they carry exactly that guarded
+  version. The user's test on `pkgrel 6` exonerated both `1144` and `0030`, and
+  this is the next bisect step with the strongest evidence yet:
+
+  - The MAG251RX is a G-Sync Compatible panel: its EDID carries a FreeSync VCP
+    code and an HF-VSDB VRR range. Its MCCS does not answer the AMD VCP read.
+  - Without the guard, the rc3 code clears `freesync_capable` for exactly this
+    sink, so the driver stops FreeSync signalling while the monitor's
+    Adaptive-Sync OSD stays on — the panel sits in a half-negotiated state that
+    flickers, worst where content changes (cursor movement) and worst at
+    240 Hz timing.
+  - The guard skips the clear for `vrr_cap.supported` sinks, keeping the
+    HF-VSDB fallback alive.
+
+### The bisect record
+- `pkgrel 6` was tested: **`1144` and `0030` are exonerated** — the flicker
+  persists with both dropped. Recorded rather than quietly extended.
+
 ## [7.3.0-rc3-6-sleepy-next]: 2026-09-14
 
 ### Removed

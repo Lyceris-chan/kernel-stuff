@@ -19,10 +19,10 @@ are supplied by the generator instead, so every row below has a source.
 | Range | Category | Patches |
 |---|---|---|
 | `0001–0049` | Handmade local | 12 |
-| `0050–0099` | EDID and display mailing-list patches | 6 |
+| `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 25 |
-| `1100–1199` | AMD display (DCN4, colorops) | 20 |
+| `1100–1199` | AMD display (DCN4, colorops) | 21 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 18 |
 | `2000–2099` | Block, I/O and buffers (bfq, mq-deadline, zram, io_uring) | 11 |
 | `2100–2199` | Memory management and compression (zstd, LRU-MARIE, MGLRU, gup) | 33 |
@@ -55,10 +55,8 @@ change rather than a documentation pass.
 | `0033` | drm/amd/display: Fix missing HPO FRL link encoder register init | Sleepy | 2026-07-01 | `a4d4d2c0a220` |
 | `0034` | drm/amd/display: Prevent memory leak during IRQ service destroy | Sleepy | 2026-07-01 | `33a065acb38a` |
 | `0050` | drm/edid: Parse AMD VSDB for FreeSync refresh range | Alex Huang | 2026-08-04 | `20260804143339.714548-2-Alex.Huang2@amd.com` |
-| `0055` | drm/edid: parse HDMI 2.1 gaming (ALLM/VRR) capabilities from HF-VSDB | Fangzhi Zuo | 2026-07-30 | `20260730171754.704049-2-jerry.zuo@amd.com` |
 | `0058` | drm/amd/display: restore FRL cap on non-destructive HDMI link verify | Fangzhi Zuo | 2026-07-30 | `20260730205047.1016922-1-jerry.zuo@amd.com` |
 | `0059` | drm/amd/display: Add 2.1 FreeSync support for AMD VSDB EDID Block | Fangzhi Zuo | 2026-08-26 | `150622@lists.freedesktop.org` |
-| `0060` | drm/amd/display: Add HDMI 2.1 VRR support from HF-VSDB | Fangzhi Zuo | 2026-08-26 | `150623@lists.freedesktop.org` |
 | `0061` | drm/amd/display: Enable HDMI ALLM for Gaming-VRR | Fangzhi Zuo | 2026-08-26 | `150621@lists.freedesktop.org` |
 | `0101` | cachyos-bbr3: BBRv3 TCP congestion control (2 patches) | squash | 2026-08-02 | `55d248b79ea1` |
 | `0102` | cachyos-kbuild: Allow -O3 (kbuild branch) | squash | 2026-08-02 | `35f22c56b3f3` |
@@ -107,6 +105,7 @@ change rather than a documentation pass.
 | `1159` | drm/amd/display: Atomize IRQ register read/modify/write ops | Chenyu Chen | 2026-09-08 | `20260908113338.2433445-59-chen-yu.chen@amd.com` |
 | `1161` | drm/amd/display: Guard NULL DDC pins in dal_ddc_open | Dennis Thomsen | 2026-08-31 | `20260831194926.274044-1-dennis.fich.thomsen@gmail.com` |
 | `1162` | drm/amd/display: check dc_state_create_copy() for NULL in dm_suspend | Jiangshan Yi | 2026-09-04 | `20260904091817.578894-1-yijiangshan@kylinos.cn` |
+| `1163` | drm/amd/display: keep freesync_capable for HF-VSDB VRR sinks in MCCS fallback | Fangzhi Zuo | 2026-09-01 | `20260901191251.2653684-4-jerry.zuo@amd.com` |
 | `1201` | cpufreq/amd-pstate: Update cppc_req_cached before writing the MSR | David Vernet | 2026-07-28 | `20260728073150.54964-3-void@manifault.com` |
 | `1202` | cpufreq/amd-pstate: Add per-core EPP boost for recently-busy CPUs | David Vernet | 2026-07-28 | `20260728073150.54964-4-void@manifault.com` |
 | `1203` | Documentation: amd-pstate: Document the epp_boost parameter | David Vernet | 2026-07-28 | `20260728073150.54964-5-void@manifault.com` |
