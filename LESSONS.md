@@ -336,6 +336,26 @@ file before acting on any of them.**
 
 ### The 240Hz flicker bisect (2026-09-14)
 
+**Resolution (2026-09-15):** the flicker tracked the VRR advertisement after
+all — not because VRR ran, but because of *which pass* set `freesync_capable`.
+The MAG251RX EDID (dumped live from `/sys/class/drm/*/edid`, decoded with
+`edid-decode`) has an **AMD VSDB v1** (48–240 Hz, MCCS flag 0xe6) and **no
+HF-VSDB VRR** (`hdmi.vrr_cap.supported=0`). On rc3, upstream `cfdcf5571c31`
+moved the MCCS clear inside `if (do_mccs)`; the later `do_mccs=false` pass
+from `amdgpu_dm_connector_ddc_get_modes()` re-advertises
+`freesync_capable=true` for HDMI sinks whose MCCS VCP does not answer. rc2 —
+and therefore the clean cachyos-rc kernel — cleared unconditionally and stayed
+at `vrr_capable=0`. Fix: patch `1164` reverts `cfdcf5571c31` (keeping 1163's
+HF-VSDB exemption), matching cachy exactly. **The two-pass structure of
+`amdgpu_dm_update_freesync_caps()` (hotplug `do_mccs=true`, then
+`ddc_get_modes()` `do_mccs=false`) is itself the trap: the last writer wins,
+and the second pass carries stale MCCS state.** When auditing this function,
+always check what the *final* call in the sequence computes, not what the
+first one computes. rc2→rc3 had zero DCN401/HUBP/clock-manager changes
+(verified by log), and cachy's `7.3/fixes` branch is just series reverts +
+`kzalloc_obj`→`kzalloc` style — so the MCCS two-pass was the only behavioural
+display delta between the clean and broken kernels.
+
 The MSI MAG251RX flickered at 1920x1080@240Hz on this kernel, worst under
 cursor movement. The whole saga is a methodology lesson:
 

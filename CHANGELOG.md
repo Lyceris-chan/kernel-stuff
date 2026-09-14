@@ -15,6 +15,34 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc3-9-sleepy-next]: 2026-09-15
+
+### Fixed
+- **VRR advertisement regression — the MAG251RX flicker bisect ends here.**
+  The clean CachyOS 7.3 rc kernel (rc2-based) reports `vrr_capable=0` and
+  `passive_vrr_capable=0` on both HDMI ports and does not flicker; our rc3
+  line reported 1/1 and flickered at 240 Hz. Bisecting the diff between the
+  two trees: the MSI MAG251RX EDID has an AMD VSDB **v1** (48–240 Hz, MCCS
+  flag) and no HF-VSDB VRR block (`hdmi.vrr_cap.supported=0`), so the only
+  path to `freesync_capable=true` is the AMD-VSDB parse plus the MCCS gate.
+  Upstream `cfdcf5571c31` ("Consult MCCS FreeSync cap only if requested &
+  supported", merged for rc3) moved the MCCS clear inside `if (do_mccs)`; the
+  later `do_mccs=false` pass from `amdgpu_dm_connector_ddc_get_modes()` then
+  re-advertises VRR on HDMI sinks whose MCCS VCP does not answer. rc2 (and
+  cachy) cleared unconditionally and stayed at 0.
+- **`1164`** reverts `cfdcf5571c31` (adapted to the 1163 form in the series),
+  restoring the unconditional clear with the HF-VSDB VRR exemption kept.
+  Result: `vrr_capable=0` + `passive_vrr_capable=0` on both HDMI ports, the
+  VRR option disappears from cosmic-settings, and the runtime state matches
+  the cachy kernel verified clean on this monitor.
+- Box bug: the rc2→rc3 window carried zero DCN401/HUBP/clock-manager changes
+  (verified by log), and CachyOS carries no extra DCN401 fix — the baked
+  `amdgpu.dcdebugmask=0x800` (IPS power states off) remains the documented
+  mitigation for the HUBP flip-pending artifact, unchanged in this release.
+
+### Changed
+- `pkgrel` 8 → 9. Series is now 191 patches.
+
 ## [7.3.0-rc3-8-sleepy-next]: 2026-09-14
 
 ### Added

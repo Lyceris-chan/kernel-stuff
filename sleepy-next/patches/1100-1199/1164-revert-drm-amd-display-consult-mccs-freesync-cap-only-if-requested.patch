@@ -1,0 +1,71 @@
+From: Sleepy <sleepy@localhost>
+Subject: Revert "drm/amd/display: Consult MCCS FreeSync cap only if requested & supported"
+Date: Mon, 15 Sep 2026 00:30:00 +0000
+
+This reverts commit cfdcf5571c3107bf636002fc0c16ce93c19bd671
+("drm/amd/display: Consult MCCS FreeSync cap only if requested &
+supported"), adapted to the 1163 form already in the series.
+
+Upstream moved the MCCS clear inside the do_mccs gate. The later
+do_mccs=false pass from amdgpu_dm_connector_ddc_get_modes() then
+re-advertises VRR (freesync_capable = true -> vrr_capable = 1) on
+HDMI sinks whose MCCS VCP does not answer. The MSI MAG251RX
+(AMD VSDB v1, 48-240 Hz, MCCS flag, no HF-VSDB VRR) is such a sink:
+on rc3 it shows vrr_capable=1 / passive_vrr_capable=1 while CachyOS
+7.3 (rc2-based, which still has the unconditional clear) shows 0 for
+the same EDID. Restore the unconditional clear, keeping the HF-VSDB
+VRR exemption from 1163, so the advertisement matches the cachy
+kernel that was verified clean on this monitor.
+
+Signed-off-by: Sleepy <sleepy@localhost>
+Assisted-by: Claude <noreply@anthropic.com>
+
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
+@@ -3948,17 +3948,26 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
+-	if (do_mccs) {
+-		dm_helpers_read_mccs_caps(adev->dm.dc->ctx, amdgpu_dm_connector->dc_link, sink);
+-
+-		/*
+-		 * HF-VSDB VRR sinks keep freesync_capable even when the MCCS
+-		 * read does not answer: the panel negotiates VRR through the
+-		 * HDMI Forum VSDB, not the AMD MCCS VCP. Clearing the flag here
+-		 * stops FreeSync signalling and leaves such panels (G-Sync
+-		 * Compatible included) in a half-negotiated state that flickers.
+-		 */
+-		if (sink->edid_caps.freesync_vcp_code && !sink->mccs_caps.freesync_supported &&
+-		    !connector->display_info.hdmi.vrr_cap.supported)
+-			freesync_capable = false;
+-
+-		if (sink->mccs_caps.freesync_supported && freesync_capable)
+-			dm_helpers_mccs_vcp_set(adev->dm.dc->ctx, amdgpu_dm_connector->dc_link, sink);
+-	}
++	if (do_mccs)
++		dm_helpers_read_mccs_caps(adev->dm.dc->ctx, amdgpu_dm_connector->dc_link, sink);
++
++	/*
++	 * HF-VSDB VRR sinks keep freesync_capable even when the MCCS
++	 * read does not answer: the panel negotiates VRR through the
++	 * HDMI Forum VSDB, not the AMD MCCS VCP. Clearing the flag here
++	 * stops FreeSync signalling and leaves such panels (G-Sync
++	 * Compatible included) in a half-negotiated state that flickers.
++	 *
++	 * The clear stays outside the do_mccs gate on purpose. Upstream
++	 * cfdcf5571c31 moved it inside; the later do_mccs=false pass from
++	 * amdgpu_dm_connector_ddc_get_modes() then re-advertises VRR on
++	 * HDMI sinks whose MCCS VCP does not answer (MSI MAG251RX).
++	 * CachyOS 7.3 (rc2-based) still carries the unconditional form and
++	 * reports vrr_capable=0 for these sinks; match that behaviour.
++	 */
++	if ((sink->sink_signal == SIGNAL_TYPE_HDMI_TYPE_A ||
++	     as_type == FREESYNC_TYPE_PCON_IN_WHITELIST) &&
++	    !connector->display_info.hdmi.vrr_cap.supported &&
++	    (!sink->edid_caps.freesync_vcp_code ||
++	     (sink->edid_caps.freesync_vcp_code && !sink->mccs_caps.freesync_supported)))
++		freesync_capable = false;
++
++	if (do_mccs && sink->mccs_caps.freesync_supported && freesync_capable)
++		dm_helpers_mccs_vcp_set(adev->dm.dc->ctx, amdgpu_dm_connector->dc_link, sink);
+
+ update:

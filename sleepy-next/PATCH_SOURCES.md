@@ -33,11 +33,10 @@ are supplied by the generator instead, so every row below has a source.
 | `2600–2699` | Time and timers | 0 |
 | `9000–9099` | agd5f staging backports | 31 |
 
-**A known numbering collision:** two different patches are both numbered
-`1140` — one clamps `force_min_dcfclk` to the dcn42b range, the other falls back
-to an overlay cursor on dcn4x. Refer to them by subject until one is renumbered.
-Renumbering changes `source=()`, so it is deliberately left for a build-tested
-change rather than a documentation pass.
+**A resolved numbering collision:** two patches used to share the number
+`1140` — Tom Chung's clamp of `force_min_dcfclk` to the dcn42b range (still
+`1140`) and James Lin's fallback to an overlay cursor on dcn4x, which was
+renumbered to `1165` in the rc3-9 cycle (2026-09-15).
 
 ## Patch index
 | Patch | Subject | Author | Date | Upstream id |
@@ -93,7 +92,7 @@ change rather than a documentation pass.
 | `1136` | drm/amd/display: Update and revert FRL LT Timeout | Relja Vojvodic | 2026-08-05 | `20260805063937.2145774-21-chiahsuan.chung@amd.com` |
 | `1138` | drm/amd/display: pull colorops into state when recreating a plane | Harry Wentland | — | `20260825153539.213495-1-harry.wentland@amd.com` |
 | `1140` | drm/amd/display: clamp force_min_dcfclk to dcn42b range | Tom Chung | 2026-08-05 | `20260805063937.2145774-11-chiahsuan.chung@amd.com` |
-| `1140` | drm/amd/display: fall back to overlay cursor on dcn4x when top plane doesn't fill CRTC | James Lin | — | `20260818202139.4172592-2-IVAN.LIPSKI@amd.com` |
+| `1165` | drm/amd/display: fall back to overlay cursor on dcn4x when top plane doesn't fill CRTC | James Lin | — | `20260818202139.4172592-2-IVAN.LIPSKI@amd.com` |
 | `1141` | drm/amd/display: skip receiver power control without AUX | "NepNep7601" | 2026-08-27 | `20260826204457.4666-1-neptune@imm0nv1nhtv.is-a.dev` |
 | `1142` | drm/amd/display: close DDC on I2C engine setup failure | "NepNep7601" | 2026-08-27 | `20260826204457.4666-2-neptune@imm0nv1nhtv.is-a.dev` |
 | `1143` | drm/amd/display: fall back to software I2C on hardware engine failure | "NepNep7601" | 2026-08-27 | `20260826170549.21985-1-neptune@imm0nv1nhtv.is-a.dev` |
@@ -106,6 +105,7 @@ change rather than a documentation pass.
 | `1161` | drm/amd/display: Guard NULL DDC pins in dal_ddc_open | Dennis Thomsen | 2026-08-31 | `20260831194926.274044-1-dennis.fich.thomsen@gmail.com` |
 | `1162` | drm/amd/display: check dc_state_create_copy() for NULL in dm_suspend | Jiangshan Yi | 2026-09-04 | `20260904091817.578894-1-yijiangshan@kylinos.cn` |
 | `1163` | drm/amd/display: keep freesync_capable for HF-VSDB VRR sinks in MCCS fallback | Fangzhi Zuo | 2026-09-01 | `20260901191251.2653684-4-jerry.zuo@amd.com` |
+| `1164` | Revert "drm/amd/display: Consult MCCS FreeSync cap only if requested & supported" | Sleepy (revert of upstream cfdcf5571c31, orig. Michel Dänzer) | 2026-09-15 | upstream commit `cfdcf5571c3107bf636002fc0c16ce93c19bd671` |
 | `1201` | cpufreq/amd-pstate: Update cppc_req_cached before writing the MSR | David Vernet | 2026-07-28 | `20260728073150.54964-3-void@manifault.com` |
 | `1202` | cpufreq/amd-pstate: Add per-core EPP boost for recently-busy CPUs | David Vernet | 2026-07-28 | `20260728073150.54964-4-void@manifault.com` |
 | `1203` | Documentation: amd-pstate: Document the epp_boost parameter | David Vernet | 2026-07-28 | `20260728073150.54964-5-void@manifault.com` |
@@ -429,10 +429,10 @@ real hash, or removed, the next time these two are touched.
 
 `1138` pulls colorops into the plane state when recreating a plane.
 
-`1140` is **used twice**. The first is Tom Chung's clamp of `force_min_dcfclk`
-into the dcn42b range, from the series above; the second is James Lin's fallback
-to an overlay cursor on dcn4x when the top plane does not fill the CRTC. See the
-collision note above the index.
+`1140` is Tom Chung's clamp of `force_min_dcfclk`
+into the dcn42b range, from the series above. It used to share its number with
+James Lin's fallback to an overlay cursor on dcn4x when the top plane does not
+fill the CRTC — that one is now `1165` (renumbered in the rc3-9 cycle).
 
 `1141`–`1143` are display robustness fixes: skip receiver power control when
 there is no AUX, close DDC when I2C engine setup fails, and fall back to
