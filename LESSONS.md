@@ -376,3 +376,27 @@ cursor movement. The whole saga is a methodology lesson:
   `CONFIG_INPUT_UINPUT` is unset and no cursor tool is installed. Consider
   enabling `CONFIG_INPUT_UINPUT=m` so a future display bug can be reproduced
   and bisected without the user at the desk.
+
+### The "assumed superseded" trap (2026-09-14)
+
+The 240Hz flicker's actual cause was a patch the rebase **dropped as
+"superseded"**: `1145` (the `vrr_cap.supported` guard in
+`amdgpu_dm_update_freesync_caps()`). rc3 rewrote that function, so the rebase
+concluded the rewrite superseded the patch's purpose and dropped it. The
+rewrite had restructured the code but kept the unguarded MCCS clear — and the
+flicker-free CachyOS tree demonstrably carries the guarded version. The flicker
+appeared exactly when the patch disappeared.
+
+**Rule: "the base rewrote the function" is not evidence of supersession.** A
+rewrite can preserve the bug a patch fixes while relocating it. Before dropping
+a patch because its target moved, diff the NEW function against the version the
+patch produces — or, faster, diff the new function against the same function in
+a maintained distro tree (CachyOS here) and look for the patch's signature.
+Only drop when the fix's behaviour is actually present, not when the hunk no
+longer applies.
+
+Also recorded from the same bisect: two mechanistically-plausible candidates
+(1144 FRL-default, 0030 DET shrink) were each dropped and each **exonerated** by
+user testing. Hypotheses are cheap; A/B tests are the only currency. And the
+decisive data came from diffing the applied tree against a known-good kernel —
+not from reasoning about the broken one.
