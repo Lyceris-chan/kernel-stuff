@@ -3,11 +3,11 @@
 `linux-sleepy-next` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
 built from **mainline Linux 7.3-rc3** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 191 targeted
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 190 targeted
 upstream/local patches. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0_rc3-4` · **Artifact:**
-`linux-sleepy-next-7.3.0_rc3-4-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0_rc3-5` · **Artifact:**
+`linux-sleepy-next-7.3.0_rc3-5-x86_64.pkg.tar.zst`
 
 ## Target hardware
 
@@ -29,8 +29,8 @@ upstream/local patches. It is not a general-purpose kernel.
 - **`mm/gup` folio batching** (Rik van Riel's series) for mTHP throughput.
 - **BBR3** default + CAKE SQM via `net-tune`; ACPI CPPC hardening + per-core EPP
   boost for `amd-pstate`.
-- **DCN4 display work**: HDMI FreeSync/VRR/ALLM, FRL, colorops, and the
-  upstream HF-VSDB MCCS fix.
+- **DCN4 display work**: HDMI FreeSync/VRR/ALLM, colorops, and the upstream
+  HF-VSDB MCCS fix.
 - **kbuild build-speedup series** — full kernel builds in ~8 minutes.
 
 ## Build and install
@@ -74,7 +74,8 @@ stopgaps (DPM stays on). `cpuidle.governor=nap` activates the NAP governor, and
 
 `amdgpu.dcdebugmask=0x800` disables the DCN4 idle power states. It was removed
 in `pkgrel 11` because the display "box" turned out to be a COSMIC compositor
-bug, and **re-added in `pkgrel 4` of the rc3 line** for a different artifact: the
+bug, and **re-added in `pkgrel 4` of the rc3 line** for a different artifact:
+the
 MSI MAG251RX flickering at 1920x1080@240Hz, worst under cursor movement. When
 the HUBP is clock-gated, `hubp2_is_flip_pending()` reports no pending flip, so
 flip completion can arrive before the hardware latches — AMD's `f64a9be56536`
@@ -84,7 +85,7 @@ drop it again if a proper DCN4 flip-pending fix lands.
 
 ## Patch series
 
-191 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+190 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 
 | Range | Category |
 |---|---|
@@ -92,7 +93,7 @@ drop it again if a proper DCN4 flip-pending fix lands.
 | `0050–0099` | Upstream EDID/display ML patches |
 | `0101–0113` | CachyOS squashes |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) |
-| `1100–1199` | AMD Display (DCN4/42B, FRL, colorops) |
+| `1100–1199` | AMD Display (DCN4, colorops) |
 | `1200–1299` | AMD PM (amd-pstate, ACPI CPPC) |
 | `2000–2099` | Block / I/O (bfq, mq-deadline, zram, io_uring) |
 | `2100–2199` | Memory (zstd, LRU-MARIE, MGLRU, gup batching) |

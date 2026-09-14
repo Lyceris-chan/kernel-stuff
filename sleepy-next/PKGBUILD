@@ -182,7 +182,7 @@ _rcver=rc3
 
 pkgver=7.3.0_rc3
 _tagrel=1
-pkgrel=4
+pkgrel=5
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -283,7 +283,6 @@ source=(
   "patches/1100-1199/1141-drm-amd-display-skip-receiver-power-control-without-AUX.patch"
   "patches/1100-1199/1142-drm-amd-display-close-DDC-on-I2C-engine-setup-failure.patch"
   "patches/1100-1199/1143-drm-amd-display-fall-back-to-software-I2C-on-hardware-engine-failure.patch"
-  "patches/1100-1199/1144-drm-amd-display-enable-HDMI-FRL-by-default.patch"
   "patches/1100-1199/1150-drm-add-passive-vrr-properties-for-passive-desktop-vrr.patch"
   "patches/1100-1199/1151-drm-amd-display-use-passive-vrr-properties-in-amdgpu.patch"
   "patches/1100-1199/1152-drm-amd-display-emit-VTEM-for-HF-VSDB-VRR-on-TMDS-links.patch"
@@ -1075,7 +1074,6 @@ b2sums=('d400c07b3f76f262c51e88bfc34e419883f13ea12dc76975b624acd6712bef193c4bb88
         '0fb08f727791630b6101b8263b23ce433a8b65f895ff757a4d79b282815be449e7b1932a752635e848b3b3ba8235a775a3bf618cfb933bb80d69f3a38f5e5ead'
         '8b3a99b10483d883adcf7d8b2f9daacedd5be8e5cd6a9064a659c73cff5c657c47c4a21d5eaedc139baf906036326a06833ff22a055fe707cac33bac3bfb57a2'
         '05f7335d35933033edcdbdd436dcf8c9fb1f6326cf4cefc34bbc48a1a91d7030536b0e69e48d8ffd4b0a20592f22b5a96895fbd277b776ad860bb2853025d532'
-        'fe7fbf83a8f834b103dbfa6f8209d32b62ad4df23683017e0347c03f23372180b331c226baa0ef563dcdc5ad7125f10ef69a072204eb6bf6cdd69f31ffc156b8'
         '5893df1814631d9ec88b9452991a7614ea0c6bcb717301a57bc77de5d90f81a609d180871f5edb5df10f06dfb0b7ef23bd8e9fdc8cdf10d367441e1555cd76e1'
         '1001d04235eec9ebd39930a76ac2074c1b7bbd70e8d075fdc2c73a7b1949306229e5d76025fc95343fb66a5975f6476132454cee5fb325c391f0885714c2f6b0'
         'ad647ad8480f67a4040d1a4fbaab47ebba1445a45499ee5cb4ee09fe4c0c880da4bfa7ca4c502be262b58f6a3758edd4e016f79d2314b354eec76d053dc3ddf4'

@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-next/PKGBUILD`.
 
 - **Base:** Linux `v7.3-rc3`
-- **Series:** 191 patches
+- **Series:** 190 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -22,7 +22,7 @@ are supplied by the generator instead, so every row below has a source.
 | `0050–0099` | EDID and display mailing-list patches | 6 |
 | `0101–0113` | CachyOS branch squashes | 6 |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 25 |
-| `1100–1199` | AMD display (DCN4, FRL, colorops) | 21 |
+| `1100–1199` | AMD display (DCN4, colorops) | 20 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 18 |
 | `2000–2099` | Block, I/O and buffers (bfq, mq-deadline, zram, io_uring) | 11 |
 | `2100–2199` | Memory management and compression (zstd, LRU-MARIE, MGLRU, gup) | 33 |
@@ -100,7 +100,6 @@ change rather than a documentation pass.
 | `1141` | drm/amd/display: skip receiver power control without AUX | "NepNep7601" | 2026-08-27 | `20260826204457.4666-1-neptune@imm0nv1nhtv.is-a.dev` |
 | `1142` | drm/amd/display: close DDC on I2C engine setup failure | "NepNep7601" | 2026-08-27 | `20260826204457.4666-2-neptune@imm0nv1nhtv.is-a.dev` |
 | `1143` | drm/amd/display: fall back to software I2C on hardware engine failure | "NepNep7601" | 2026-08-27 | `20260826170549.21985-1-neptune@imm0nv1nhtv.is-a.dev` |
-| `1144` | drm/amd/display: Enable HDMI FRL by default | Fangzhi Zuo | 2026-08-27 | `20260827155409.1426730-1-jerry.zuo@amd.com` |
 | `1150` | drm: Add passive_vrr properties for passive/desktop VRR | Tomasz Pakuła | 2026-09-01 | `21311d5b6fd4` |
 | `1151` | drm/amd/display: Use passive_vrr properties in amdgpu | Tomasz Pakuła | 2026-09-01 | `1508cfd62df5` |
 | `1152` | drm/amd/display: Emit VTEM for HF-VSDB VRR on TMDS links | Fangzhi Zuo | 2026-08-20 | `fabf2169cb45` |
@@ -319,10 +318,13 @@ rather than submissions, so a single DCO line on them would not mean anything.
 
 ### Watch items
 
-- **CachyOS reverted `Enable HDMI FRL by default`** (`cc29db585c84`, live on
-  their `7.3/base` and `7.3/fixes` branches) — the same change this series
-  carries as `1144`. No reason was recorded. Worth understanding before the next
-  bump decides whether to keep it.
+- **CachyOS reverted `Enable HDMI FRL by default`** (`cc29db585c84` on
+  `7.3/base`, `143e44f57bf8` on `7.3/fixes`, both by their maintainer with no
+  reason recorded). This series carried the same change as `1144` until
+  2026-09-14, when it was dropped as the first bisect step for the 240 Hz
+  flicker: the flicker-free cachyos-rc kernel runs `dcfeaturemask=2` while ours
+  ran `0x402`, and the extra `DC_FRL_MASK` bit is exactly what this patch adds.
+  See the rc3-5 changelog entry for the full evidence chain.
 - **drm/amd work item !5663** (RX 9070 XT, 2026-09-13) reports post-resume
   artifacts caused by the ttm/all-SDMA-schedulers change, which **is** in the rc3
   base. No upstream fix is named yet.
@@ -416,8 +418,8 @@ collision note above the index.
 
 `1141`–`1143` are display robustness fixes: skip receiver power control when
 there is no AUX, close DDC when I2C engine setup fails, and fall back to
-software I2C when the hardware engine fails. `1144` enables HDMI FRL by default
-by adding `DC_FRL_MASK` to the default `amdgpu_dc_feature_mask`. `1145` is
+software I2C when the hardware engine fails. (`1144`, which enabled HDMI FRL by
+default, was dropped 2026-09-14 — see the rc3-5 changelog entry.) `1145` is
 Fangzhi Zuo's HF-VSDB MCCS fix, which skips the MCCS `freesync_capable` clear
 when the sink advertises HF-VSDB VRR; it replaced the local `1137`.
 

@@ -15,6 +15,35 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc3-5-sleepy-next]: 2026-09-14
+
+### Removed
+- **`1144`** (drm/amd/display: Enable HDMI FRL by default). This is a bisect
+  step aimed at the MSI MAG251RX 240 Hz flicker, not a value judgement on the
+  patch itself.
+
+  The evidence chain that made it the first variable to test:
+
+  - The user A/B-tested: the cachyos-rc kernel (rc2-based) is flicker-free at
+    240 Hz, this kernel flickers, and 144 Hz works. Something in this kernel's
+    delta is the cause.
+  - Captured from the good kernel: `amdgpu.dcfeaturemask=2`. Ours was `0x402`.
+    The extra bit is `DC_FRL_MASK`, added by this patch.
+  - CachyOS reverted the same change twice in their 7.3 branches
+    (`cc29db585c84`, `143e44f57bf8`), both by their maintainer with no reason
+    stated, and the change is implicated in open upstream work item #5649
+    (HDMI FRL blanking).
+
+  Ruled out before this move: rc3's display commits versus rc2 (all benign), the
+  FRL status-polling workqueue (inert without a trained FRL link), FBC (off on
+  both kernels), the display driver configuration (identical between the two
+  kernels apart from the command line and the NAP governor), and passive VRR
+  (the good kernel has it *on* and is fine, so it cannot be the cause).
+
+  Dropping the patch restores the upstream default mask of exactly 2, the
+  known-good value. If the flicker persists on this build, the next suspect is
+  the baked command line (`cpuidle.governor=nap`).
+
 ## [7.3.0-rc3-4-sleepy-next]: 2026-09-14
 
 ### Changed
