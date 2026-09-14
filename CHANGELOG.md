@@ -15,6 +15,115 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc3-3-sleepy-next]: 2026-09-14
+
+### Added
+- **Nineteen fixes from the multi-source sweep**, every one apply-tested against
+  the full series before being added. Series: 172 -> 191 patches. Twelve are
+  display and GPU core (below), eight are subsystem fixes (further down).
+  - **`1159`** drm/amd/display: atomize IRQ register read/modify/write ops. The
+    upstream fix for a non-atomic read-modify-write on `OTG_GLOBAL_SYNC_STATUS`
+    that can clear `VUPDATE_NO_LOCK_EN`. That is the same mechanism as this
+    machine's `flip_done` timeouts and the display artifacts recorded in
+    `LESSONS.md`, and it matters most on high-refresh panels.
+  - **`1161`** drm/amd/display: guard NULL DDC pins in `dal_ddc_open`, a hard
+    wedge when a NULL pin meets `+0x28` (upstream issue #5716).
+  - **`1162`** drm/amd/display: check `dc_state_create_copy()` for NULL in
+    `dm_suspend`.
+  - **`1064`** drm/amdgpu: don't release the fence reference the scheduler
+    consumed — a cross-thread use-after-free in `amdgpu_vm_sdma_update()`.
+  - **`2403`** drm/sched: do not restore unsaved virtual runtime (Tvrtko
+    Ursulin, `Cc: stable`).
+  - **`9055`**, **`9056`** drm/amdgpu/userq: a `userq_signal_ioctl` hang inside
+    `drm_exec_until_all_locked()`, and filtering idle userqs out of the pending
+    signal list.
+  - **`9057`** drm/amdgpu: keep freed VM mappings on clear failure (`Cc:
+    stable`).
+  - **`9058`** drm/amdgpu: hold a runtime PM reference for P2P dma-buf
+    attachments (`Cc: stable`).
+  - **`9059`**, **`9060`** drm/amdkfd: don't gate userptr cleanup on the owning
+    mm, and skip migration when the fault window is already in VRAM.
+
+### Also added — eight subsystem fixes
+- **`2009`** fs/buffer: check for a NULL pointer before
+  `folio_test_dropbehind()`. The most severe find of the sweep: `bh->b_folio`
+  is dereferenced unguarded, and jbd2 submits buffer heads with no folio — a
+  NULL-dereference panic on the ext4 journal commit path, which is this
+  machine's root filesystem. Crash reported on 7.3.0-rc2-next; the culprit
+  commit is in rc3.
+- **`2152`** khugepaged: hold `invalidate_lock` across `collapse_file()`
+  readahead. A syzbot-reported deadlock between collapse and truncate,
+  reachable in about 20 seconds under a collapse/truncate race.
+- **`2150`** mm/huge_memory: fix pgtable withdrawal for huge zero PMDs, a NULL
+  dereference on `munmap()` (`Cc: stable`).
+- **`2154`** mm/page_alloc: apply the per-task GFP context in the bulk
+  allocator, so `PF_MEMALLOC_NOIO`/`NOFS`/`PIN` are honoured (`Cc: stable`).
+- **`2153`** writeback: report a Tasks-RCU quiescent state per cgwb drain pass.
+  Without it any `synchronize_rcu_tasks()` under `PREEMPT_LAZY` can stall for
+  minutes and trip the hung-task detector (`Cc: stable`).
+- **`2151`** mm/shmem: ignore sysfs configs for forced collapse, restoring the
+  documented `MADV_COLLAPSE` behaviour (`Cc: stable`).
+- **`2010`** blk-cgroup: save IRQ state in `blkg_tryget_closest()`, where an
+  unconditional `spin_unlock_irq()` could re-enable interrupts under a caller
+  holding the lock with `spin_lock_irq()`.
+- **`2404`** sched_ext: close the pre-enable ops error claim window — a
+  use-after-free in `kernel/sched/ext/ext.c` (`Cc: stable`). Worth having
+  because this machine actually runs sched-ext (`scx_cake`), and unlike the
+  `fair.c` patches this one is **not** inert under full-switch mode.
+
+### Not carried
+- **`1160`** drm/amd/display: only allow freesync on a `VRR_ENABLED` crtc. The
+  most conceptually interesting find: it addresses the same condition as the
+  passive-VRR fix in `pkgrel 2` from the other side, by refusing to let
+  VRR-capable sinks set `allow_freesync` while `VRR_ENABLED=0` — the path that
+  lets FPO stretch frames during UCLK switches. Three hunks apply; the fourth
+  fails because the author's tree has `dc/dml2_wrapper/dml21_wrapper/` while
+  rc3 has `dc/dml2_0/dml21/`, and that file's content differs around the hunk
+  too. Deferred rather than hand-rebased.
+- **`9061`** drm/amdkfd: fix a TCP XNACK scoreboard reset race. It applied
+  cleanly but **failed to compile**: its new `gfx_v9_4_2_run_shader()` call
+  passes 11 arguments while rc3's definition takes 10, so the patch depends on
+  a signature-changing prerequisite that is not in v7.3-rc3. Dropped for that
+  reason, not for irrelevance. This is the "applies but does not belong" case
+  the cumulative-apply check cannot catch — only a build can.
+- **`2155`** mm/zswap: return `-ENOENT` when the swap device is gone. Two hunks
+  fail against the current series.
+- **sirlucjan's full zstd dev update.** Asked for explicitly, and the answer is
+  no: it is a 1.5.7 → 1.6.0 vendored sync whose only x86-relevant deltas are
+  already our `2128` and `2143` — and it **conflicts with both**, so carrying it
+  would mean dropping them. Its bulk is ARM SVE2 and RISC-V RVV code that
+  cannot execute on Zen 4, and its gcc workaround is inert under Clang.
+- **CachyOS `sched/fair: do not scan twice in detach_tasks()`.** `fair.c` is
+  inert here: sched-ext full-switch mode gates the CFS balance path.
+- **CachyOS `finish_task_switch()` always-inline.** Evaluated before and
+  rejected: the quoted 34.8% figure is for spectre_v2 retpolines, while this
+  machine reports Enhanced/Automatic IBRS, leaving under 0.3% end to end.
+- **`mm, swap: extendable swap devices (xswap)`, v2 12-patch series.** Applies
+  cleanly, but it is a feature, not a fix, on a subsystem this machine does not
+  need extended (zram swap).
+- **`nvme: bump genctr when cancelling a request`.** Directly on the Phison E16
+  reset path, but v1 with no `Fixes:`, no `Cc: stable` and no acks.
+- **maple_tree range64 RCU pointer corruption.** Genuine memory corruption, but
+  v1, unreviewed, with no `Fixes:` or `Cc: stable`. Worth re-checking after
+  maintainer review.
+- `repos/drm-misc` could not be refreshed (every fetch fails with HTTP 503
+  during the `acknowledgments` phase), so drm-misc is the one source this sweep
+  could not cover.
+
+### Raised for a decision — `1144`
+The MAG251RX is **HDMI 2.0 and DP 1.2a**, so `1144` ("Enable HDMI FRL by
+default") is inert on the hardware: FRL is an HDMI 2.1 feature. It is
+bit-identical to the change CachyOS reverted with no stated reason, and it is
+implicated in open upstream work item #5649 (HDMI FRL blanking). Removing a
+patch needs explicit approval, so it is left in place and flagged here.
+
+### Open question (not acted on)
+- The sweep flagged that `CLAUDE.md` lists `DCN42B` as a Navi 48 identifier and
+  claimed it is really GC 11.5.0 with the DCN4A SoC variant B. `DCN_VERSION_4_2B`
+  does exist as its own variant in `dal_types.h`, but that mapping could not be
+  confirmed from the source here, so the hardware table is left alone and the
+  question is recorded rather than resolved.
+
 ## [7.3.0-rc3-2-sleepy-next]: 2026-09-14
 
 ### Fixed

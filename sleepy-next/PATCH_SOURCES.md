@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-next/PKGBUILD`.
 
 - **Base:** Linux `v7.3-rc3`
-- **Series:** 172 patches
+- **Series:** 191 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -21,17 +21,17 @@ are supplied by the generator instead, so every row below has a source.
 | `0001–0049` | Handmade local | 13 |
 | `0050–0099` | EDID and display mailing-list patches | 6 |
 | `0101–0113` | CachyOS branch squashes | 6 |
-| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 24 |
-| `1100–1199` | AMD display (DCN4, DCN42B, FRL, colorops) | 18 |
+| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 25 |
+| `1100–1199` | AMD display (DCN4, FRL, colorops) | 21 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 18 |
-| `2000–2099` | Block and I/O (bfq, mq-deadline, zram, io_uring) | 9 |
-| `2100–2199` | Memory management and compression (zstd, LRU-MARIE, MGLRU, gup) | 28 |
+| `2000–2099` | Block, I/O and buffers (bfq, mq-deadline, zram, io_uring) | 11 |
+| `2100–2199` | Memory management and compression (zstd, LRU-MARIE, MGLRU, gup) | 33 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 21 |
-| `2400–2499` | Core scheduler | 1 |
+| `2400–2499` | Core scheduler and sched-ext | 3 |
 | `2500–2599` | x86 and arch core | 2 |
 | `2600–2699` | Time and timers | 0 |
-| `9000–9099` | agd5f staging backports | 25 |
+| `9000–9099` | agd5f staging backports | 31 |
 
 **A known numbering collision:** two different patches are both numbered
 `1140` — one clamps `force_min_dcfclk` to the dcn42b range, the other falls back
@@ -91,6 +91,7 @@ change rather than a documentation pass.
 | `1061` | drm/ttm: fix swapped-out resources never leaving their bulk_move range | Vadim Nikitushkin | 2026-09-09 | `20260909205028.13799-1-bub4z0r@gmail.com` |
 | `1062` | dma-buf/dma-fence: fix checking signaling bit for timeline and driver name | Christian König | 2026-09-09 | `20260909131808.2201-2-christian.koenig@amd.com` |
 | `1063` | drm/sched: document the RCU dependency | Christian König | 2026-09-09 | `20260909131808.2201-3-christian.koenig@amd.com` |
+| `1064` | drm/amdgpu: don't release the fence reference consumed by the scheduler | Donggeun Yoo | 2026-09-10 | `20260910054551.634054-1-donggeunyoo.kernel@gmail.com` |
 | `1135` | drm/amd/display: fix HPD program filter programming | Charlene Liu | 2026-08-05 | `20260805063937.2145774-13-chiahsuan.chung@amd.com` |
 | `1136` | drm/amd/display: Update and revert FRL LT Timeout | Relja Vojvodic | 2026-08-05 | `20260805063937.2145774-21-chiahsuan.chung@amd.com` |
 | `1138` | drm/amd/display: pull colorops into state when recreating a plane | Harry Wentland | — | `20260825153539.213495-1-harry.wentland@amd.com` |
@@ -105,6 +106,9 @@ change rather than a documentation pass.
 | `1152` | drm/amd/display: Emit VTEM for HF-VSDB VRR on TMDS links | Fangzhi Zuo | 2026-08-20 | `fabf2169cb45` |
 | `1154` | drm/amd/display: Fix NULL deref of new_stream->sink in VTEM guard | Fangzhi Zuo | 2026-08-31 | `a69d7c8a99b4` |
 | `1158` | drm/amd/display: Fix high busy wait load in dmub_srv_wait_for_idle() | Sultan Alsawaf | 2025-08-25 | `dfd0e5aa6aad` |
+| `1159` | drm/amd/display: Atomize IRQ register read/modify/write ops | Chenyu Chen | 2026-09-08 | `20260908113338.2433445-59-chen-yu.chen@amd.com` |
+| `1161` | drm/amd/display: Guard NULL DDC pins in dal_ddc_open | Dennis Thomsen | 2026-08-31 | `20260831194926.274044-1-dennis.fich.thomsen@gmail.com` |
+| `1162` | drm/amd/display: check dc_state_create_copy() for NULL in dm_suspend | Jiangshan Yi | 2026-09-04 | `20260904091817.578894-1-yijiangshan@kylinos.cn` |
 | `1201` | cpufreq/amd-pstate: Update cppc_req_cached before writing the MSR | David Vernet | 2026-07-28 | `20260728073150.54964-3-void@manifault.com` |
 | `1202` | cpufreq/amd-pstate: Add per-core EPP boost for recently-busy CPUs | David Vernet | 2026-07-28 | `20260728073150.54964-4-void@manifault.com` |
 | `1203` | Documentation: amd-pstate: Document the epp_boost parameter | David Vernet | 2026-07-28 | `20260728073150.54964-5-void@manifault.com` |
@@ -132,6 +136,8 @@ change rather than a documentation pass.
 | `2006` | zram: convert to SG-list zsmalloc object read API | Sergey Senozhatsky | 2026-09-07 | `abaa6b12ca8a` |
 | `2007` | zsmalloc: remove old object read API | Sergey Senozhatsky | 2026-09-07 | `f2ae543ebcc5` |
 | `2008` | io_uring/io-wq: stop a single cancel after one running match | Mark Amirkan via B4 Relay | 2026-09-13 | `20260913-b4-send-io-wq-cancel-v1-1-dcfe47275c6e@gmail.com` |
+| `2009` | fs/buffer: check for NULL pointer before folio_test_dropbehind() | Zhaoyu Liu | 2026-09-13 | `pfk6l6lsgecie4xwy5njrgtzpave4uayxbl4lkz3iekcdds7fg@bpihjzlnz7m2` |
+| `2010` | blk-cgroup: save IRQ state in blkg_tryget_closest() | Hao Zhang | 2026-09-12 | `aqQmqb1k57PXj8Ef@192.168.1.215` |
 | `2100` | zstd-7.2: merge v1.6.0 into kernel tree | Piotr Gorski | 2026-06-29 | `4d96a5c62121` |
 | `2101` | linux7.3-rc1-lru_marie-0.11.1 | Masahito S | 2026-09-08 | `5a4bbbb3854c` |
 | `2120` | mm/gup: break out gup_fill_pages() helper | Rik van Riel | 2026-08-10 | `7afdec79e9f0` |
@@ -164,6 +170,11 @@ change rather than a documentation pass.
 | `2147` | mm/memcg: clear folio memcg after changing per memcg stats | Bingfang Guo | 2026-09-10 | `f245cf82e158` |
 | `2148` | crypto: zstd - Avoid redundant cstream initialization | Usama Arif | 2026-08-25 | `20260825220616.3842633-2-usama.arif@linux.dev` |
 | `2149` | crypto: zstd - Avoid redundant dstream initialization | Usama Arif | 2026-08-25 | `20260825220616.3842633-3-usama.arif@linux.dev` |
+| `2150` | mm/huge_memory: fix pgtable withdrawal for huge zero PMDs | Lance Yang | 2026-09-13 | `ac63e1b4d2a2` |
+| `2151` | mm: shmem: ignore sysfs configs for shmem forced collapse | Baolin Wang | 2026-09-14 | `1538a25f38cf` |
+| `2152` | khugepaged: hold invalidate_lock across collapse_file() readahead | Nguyen Ngoc Thang | 2026-09-13 | `1be399d378b7` |
+| `2153` | writeback: report a Tasks-RCU quiescent state per cgwb drain pass | Josef Bacik | 2026-09-09 | `6495bf0e43d6` |
+| `2154` | mm/page_alloc: apply per-task GFP context in bulk allocator | Qiqi Liu | 2026-09-14 | `afd44a6aa48e` |
 | `2200` | 7.2-nap-v0.5.0 | Masahito S | 2026-06-05 | `04aef34448bb` |
 | `2302` | kallsyms: index symbols by token to speed up table compression | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-3-5dc1ac01672d@kernel.org` |
 | `2303` | kallsyms: output binary data to speed output and kallsyms assembly | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-4-5dc1ac01672d@kernel.org` |
@@ -187,6 +198,8 @@ change rather than a documentation pass.
 | `2321` | kbuild: build rust crates in parallel with the rest of the build | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-22-5dc1ac01672d@kernel.org` |
 | `2322` | kbuild: use pigz for gzip compression if available | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-08 | `20260908-build-speedup-v1-23-5dc1ac01672d@kernel.org` |
 | `2400` | sched: Set need-resched flags before tracing | Andrea Righi | 2026-09-11 | `20260911213300.1305763-1-arighi@nvidia.com` |
+| `2403` | drm/sched: Do not restore unsaved virtual runtime | Tvrtko Ursulin | 2026-09-07 | `20260907130527.52530-1-tvrtko.ursulin@igalia.com` |
+| `2404` | sched_ext: Close the pre-enable ops error claim window | Qiurong Fang | 2026-09-12 | `20260912131518.3428032-1-fangqiurong@kylinos.cn` |
 | `2500` | x86/mm: Fix user-space data loss with MADV_FREE and THP | Vernon Yang | 2026-09-03 | `f7491d7c81db` |
 | `2502` | x86/amd_node: Fix PCI device reference counting in amd_smn_init() | Yazen Ghannam | 2026-09-03 | `27600805e62f` |
 | `9007` | drm/gfx12: Program DB_RING_CONTROL | Alex Deucher | 2026-06-26 | `402ebe22b267` |
@@ -214,6 +227,13 @@ change rather than a documentation pass.
 | `9049` | drm/amdgpu: recompute the dw estimate after allocating a new VM update job | YuBiao Wang | 2026-07-29 | `39e5b1e4f4b3` |
 | `9050` | drm/amdgpu: Update no-retry PTE flags for GFX12 | Mukul Joshi | 2025-12-04 | `9b7ce74b7867` |
 | `9054` | drm/amd/display: Guard amdgpu_dm_irq_schedule_work against NULL irq_wq | Ivan Lipski | 2026-08-18 | `0372d4c817bc` |
+| `9055` | drm/amdgpu/userq: fix userq_signal_ioctl stuck in drm_exec_until_all_locked() | Yogesh Mohan Marimuthu | 2026-09-07 | `20260907084719.3972-1-yogesh.mohanmarimuthu@amd.com` |
+| `9056` | drm/amdgpu/userq: filter out idle userqs from pending signal list | Prike Liang | 2026-09-07 | `20260907125343.647133-1-Prike.Liang@amd.com` |
+| `9057` | drm/amdgpu: keep freed VM mappings on clear failure | oushinnyo | 2026-09-05 | `20260905023151.90699-1-oushinnyo@163.com` |
+| `9058` | drm/amdgpu: hold a runtime PM reference for P2P dma-buf attachments | Mike Lothian | 2026-09-12 | `20260911232908.1056738-1-mike@fireburn.co.uk` |
+| `9059` | drm/amdkfd: don't gate userptr cleanup on the owning mm | Perry Yuan | 2026-09-02 | `20260902024715.696381-1-perry.yuan@amd.com` |
+| `9060` | drm/amdkfd: skip migration when the fault window is already in VRAM | William Palacek | 2026-09-01 | `20260901165400.16262-1-William.Palacek@amd.com` |
+| `9061` | drm/amdkfd: Fix TCP XNACK scoreboard reset race | Gang Ba | 2026-09-09 | `20260909201536.942624-1-Gang.Ba@amd.com` |
 
 ## The v7.3-rc3 bump (2026-09-13)
 

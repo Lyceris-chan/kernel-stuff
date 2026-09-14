@@ -1,0 +1,38 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Perry Yuan <perry.yuan@amd.com>
+To: <Alexander.Deucher@amd.com>, <amd-gfx@lists.freedesktop.org>
+CC: <Christian.Koenig@amd.com>, <Yifan1.Zhang@amd.com>, <perry.yuan@amd.com>
+Subject: [PATCH] drm/amdkfd: don't gate userptr cleanup on the owning mm
+Date: Wed, 2 Sep 2026 10:47:15 +0800
+Message-ID: <20260902024715.696381-1-perry.yuan@amd.com>
+
+amdgpu_ttm_tt_get_usermm() returns gtt->usertask->mm. By the time KFD
+frees its BOs from kfd_process_wq_release(), the process has long since
+run exit_mm() and that pointer is NULL, so the cleanup below is simply
+skipped on process teardown. mem->user_pages then leaks along with the
+page references it still holds, or mem->range on HMM builds.
+
+Check the USERPTR alloc flag instead. It is set when the BO is created
+and stays valid no matter what the process does.
+
+Signed-off-by: Perry Yuan <perry.yuan@amd.com>
+Reviewed-by: Philip Yang <philip.yang@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gpuvm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gpuvm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gpuvm.c
+index 7882f1385248..a5d1d83ee5d3 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gpuvm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gpuvm.c
+@@ -1954,7 +1954,7 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
+ 		return ret;
+ 
+ 	/* Cleanup user pages and MMU notifiers */
+-	if (amdgpu_ttm_tt_get_usermm(mem->bo->tbo.ttm)) {
++	if (mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_USERPTR) {
+ 		amdgpu_hmm_unregister(mem->bo);
+ 		amdgpu_hmm_range_free(mem->range);
+ 		mem->range = NULL;
+-- 
+2.34.1

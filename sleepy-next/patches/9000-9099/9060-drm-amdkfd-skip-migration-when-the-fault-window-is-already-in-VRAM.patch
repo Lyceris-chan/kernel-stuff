@@ -1,0 +1,128 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: William Palacek <William.Palacek@amd.com>
+To: <amd-gfx@lists.freedesktop.org>
+CC: <felix.kuehling@amd.com>, <Harish.Kasiviswanathan@amd.com>, <kent.russell@amd.com>, <William.Palacek@amd.com>
+Subject: [PATCH v2] drm/amdkfd: skip migration when the fault window is already in VRAM
+Date: Tue, 1 Sep 2026 12:54:00 -0400
+Message-ID: <20260901165400.16262-1-William.Palacek@amd.com>
+
+svm_migrate_vma_to_vram() is called for windows that are already fully
+resident in the target GPU's VRAM. migrate_vma_setup() raises an MMU
+notifier invalidate before it can discover there is nothing to collect,
+and with retry faults enabled svm_range_cpu_invalidate_pagetables()
+special cases only MMU_NOTIFY_UNMAP, so MMU_NOTIFY_MIGRATE is handled by
+its default arm, reaching svm_range_evict() and then
+svm_range_unmap_from_gpus().
+
+The attempt therefore drops the window's GPU mapping and then returns
+having migrated nothing, so the next fault on that window is escalated
+into another migration instead of being satisfied by mapping alone.
+
+Measured on MI300X (gfx942, SPX/NPS1, xnack+) under an HMM
+oversubscription workload, 96 to 97% of to-VRAM migration attempts
+collected zero pages, and the driver unmapped a window roughly 35 times
+for every migration that moved data.
+
+Test whether every page of the faulting window is already resident in
+this node's VRAM and return early if it is. prange->actual_loc alone is
+not sufficient: since commit a546a2768440 ("drm/amdkfd: Use partial
+migrations/mapping for GPU/CPU page faults in SVM") migration is per
+window, so a range can report actual_loc == best_loc while part of it has
+been evicted back to system memory. 3.3% of attempts were in exactly that
+state and did have pages to move, so the per-page test is required rather
+than the scalar alone. Instrumented over 100000 attempts on an earlier
+run against a different driver build, the per-page test never skipped one
+that had pages to move.
+
+The actual_loc comparison is kept alongside the per-page test because
+SVM_RANGE_VRAM_DOMAIN records only that a page is in some device's VRAM,
+not which device's.
+
+With this applied the fault driven phase of that workload falls from 270
+to 348 s down to 45 to 48 s, across 9 patched and 7 unpatched runs with
+no overlap at either oversubscription factor tested. page_in at the end
+of that phase does not fall with it: 44.5 to 48.3M pages patched against
+44.1 to 49.7M unpatched at factor 1.10, and 46.2 to 48.0M against 44.1 to
+45.7M at factor 1.02. Those ranges overlap at 1.10, so the claim is that
+no data is stranded, not that more moves. Unmaps per productive migration
+fall from about 35 to about 2. Retry fault counts do not fall in any arm,
+so this is not a refault loop; what changes is how often a fault
+escalates into a migration.
+
+The scan is bounded by the migration window, one granule on the fault
+path and the whole range on the prefetch path. That is the same order as
+the migrate_vma_setup() walk it avoids, and it returns at the first page
+that is not resident, so the worst case is one extra pass over a range
+that then migrates normally.
+
+Signed-off-by: William Palacek <William.Palacek@amd.com>
+---
+ drivers/gpu/drm/amd/amdkfd/kfd_migrate.c | 46 ++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_migrate.c b/drivers/gpu/drm/amd/amdkfd/kfd_migrate.c
+index c3411dacdf55..e91d0115cbba 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_migrate.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_migrate.c
+@@ -384,6 +384,46 @@ svm_migrate_copy_to_vram(struct kfd_node *node, struct svm_range *prange,
+ 	return r;
+ }
+ 
++/* Check if a range of addresses is already resident in VRAM to avoid
++ * unnecessary migrations that would trigger MMU notifiers causing the range
++ * to be unmapped and faulted again unnecessarily.
++ *
++ * Called with prange->migrate_mutex held.
++ */
++static bool
++svm_range_window_resident(struct kfd_node *node, struct svm_range *prange,
++			  u64 start, u64 end)
++{
++	struct kfd_process *p = container_of(prange->svms, struct kfd_process, svms);
++	unsigned long i, offset, npages;
++	dma_addr_t *addr;
++	uint32_t gpuid;
++	int32_t gpuidx;
++
++	if (kfd_process_gpuid_from_node(p, node, &gpuid, &gpuidx))
++		return false;
++	if (prange->actual_loc != gpuid)
++		return false;
++
++	addr = prange->dma_addr[gpuidx];
++	if (!addr)
++		return false;
++
++	start = max(start >> PAGE_SHIFT, prange->start);
++	end = min(end >> PAGE_SHIFT, prange->last + 1);
++	if (end <= start)
++		return false;
++
++	offset = start - prange->start;
++	npages = end - start;
++
++	for (i = offset; i < offset + npages; i++)
++		if (!(addr[i] & SVM_RANGE_VRAM_DOMAIN))
++			return false;
++
++	return true;
++}
++
+ static long
+ svm_migrate_vma_to_vram(struct kfd_node *node, struct svm_range *prange,
+ 			struct vm_area_struct *vma, u64 start,
+@@ -401,6 +441,12 @@ svm_migrate_vma_to_vram(struct kfd_node *node, struct svm_range *prange,
+ 	void *buf;
+ 	int r = -ENOMEM;
+ 
++	/* Avoid unnecessary migrations and MMU notifiers if all the data is
++	 * already resident in VRAM.
++	 */
++	if (svm_range_window_resident(node, prange, start, end))
++		return 0;
++
+ 	memset(&migrate, 0, sizeof(migrate));
+ 	migrate.vma = vma;
+ 	migrate.start = start;
+-- 
+2.34.1

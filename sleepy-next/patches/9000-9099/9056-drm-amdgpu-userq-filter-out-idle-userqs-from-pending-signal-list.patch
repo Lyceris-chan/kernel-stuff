@@ -1,0 +1,43 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Prike Liang <Prike.Liang@amd.com>
+To: <amd-gfx@lists.freedesktop.org>
+CC: <Alexander.Deucher@amd.com>, <christian.koenig@amd.com>, Prike Liang <Prike.Liang@amd.com>
+Subject: [PATCH] drm/amdgpu/userq: filter out idle userqs from pending signal list
+Date: Mon, 7 Sep 2026 20:53:43 +0800
+Message-ID: <20260907125343.647133-1-Prike.Liang@amd.com>
+
+As for the empty pending fence list case: after cutting the userq fence
+driver's fence list, if no pending signaled userq fences remain, this
+should be treated as an idle userq condition and the hang detection worker
+should be cancelled accordingly.
+
+Signed-off-by: Prike Liang <Prike.Liang@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c
+index c270635c907b..2f38872dcef6 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c
+@@ -162,8 +162,16 @@ amdgpu_userq_fence_driver_process(struct amdgpu_userq_fence_driver *fence_drv)
+ 				&userq_fence->link);
+ 	spin_unlock_irqrestore(&fence_drv->fence_list_lock, flags);
+ 
+-	if (list_empty(&to_be_signaled))
+-		return -ENOENT;
++	if (list_empty(&to_be_signaled)) {
++		bool idle;
++
++		/* distinguish: was the fence list already empty? */
++		spin_lock_irqsave(&fence_drv->fence_list_lock, flags);
++		idle = list_empty(&fence_drv->fences);
++		spin_unlock_irqrestore(&fence_drv->fence_list_lock, flags);
++		/* 0 = truly idle, -ENOENT = pending submission*/
++		return idle ? 0 : -ENOENT;
++	}
+ 
+ 	list_for_each_entry_safe(userq_fence, tmp, &to_be_signaled, link) {
+ 		fence = &userq_fence->base;
+-- 
+2.34.1

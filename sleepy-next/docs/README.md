@@ -3,11 +3,11 @@
 `linux-sleepy-next` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
 built from **mainline Linux 7.3-rc3** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 172 targeted
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 191 targeted
 upstream/local patches. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0_rc3-2` · **Artifact:**
-`linux-sleepy-next-7.3.0_rc3-2-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0_rc3-3` · **Artifact:**
+`linux-sleepy-next-7.3.0_rc3-3-x86_64.pkg.tar.zst`
 
 ## Target hardware
 
@@ -79,7 +79,7 @@ timeouts appear.
 
 ## Patch series
 
-172 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+191 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 
 | Range | Category |
 |---|---|
