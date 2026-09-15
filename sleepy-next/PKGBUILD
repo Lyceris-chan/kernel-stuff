@@ -182,7 +182,7 @@ _rcver=rc3
 
 pkgver=7.3.0_rc3
 _tagrel=1
-pkgrel=10
+pkgrel=11
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -323,7 +323,7 @@ source=(
   "patches/2000-2099/2010-blk-cgroup-save-IRQ-state-in-blkg_tryget_closest.patch"
   "patches/2000-2099/2011-r8169-dont-enable-chip-LTR-when-the-platform-has-not-enabled-LTR.patch"
   "patches/2100-2199/2100-zstd-7.2-merge-v1.6.0-into-kernel-tree.patch"
-  "patches/2100-2199/2101-mm-7.3-introduce-LRU-MARIE-0.11.1.patch"
+  "patches/2100-2199/2101-mm-7.3-introduce-LRU-MARIE-0.11.1r2.patch"
   "patches/2100-2199/2120-mm-gup-mm-gup-break-out-gup-fill-pages-helper.patch"
   "patches/2100-2199/2121-mm-gup-mm-gup-convert-follow-page-mask-to-return-a-long.patch"
   "patches/2100-2199/2122-mm-gup-mm-gup-split-follow-page-pte-commit-out-of.patch"
@@ -359,6 +359,18 @@ source=(
   "patches/2100-2199/2152-khugepaged-hold-invalidate_lock-across-collapse_file-readahead.patch"
   "patches/2100-2199/2153-writeback-report-a-Tasks-RCU-quiescent-state-per-cgwb-drain-pass.patch"
   "patches/2100-2199/2154-mm-page_alloc-apply-per-task-GFP-context-in-bulk-allocator.patch"
+  "patches/2100-2199/2155-mm-xswap-support-for-zswap.patch"
+  "patches/2100-2199/2156-mm-swap-add-CONFIG_XSWAP-and-xswap-fields-to-swap_info_struct.patch"
+  "patches/2100-2199/2157-mm-swap-refactor-free_swap_cluster_info-to-take-swap_info_struct.patch"
+  "patches/2100-2199/2158-mm-swap-add-xswap-cluster-grow-via-VM_SPARSE-vmalloc.patch"
+  "patches/2100-2199/2159-mm-swap-add-sysfs-create-interface-for-xswap.patch"
+  "patches/2100-2199/2160-mm-swap-add-xswap-grow-trigger-on-cluster-allocation.patch"
+  "patches/2100-2199/2161-mm-swap-add-xswap_try_shrink-and-shrink-trigger-on-cluster-free.patch"
+  "patches/2100-2199/2162-mm-swap-free-backing-pages-in-xswap_unmap_clusters.patch"
+  "patches/2100-2199/2163-mm-swap-defer-xswap-shrink-to-workqueue-to-avoid-lock-recursion.patch"
+  "patches/2100-2199/2164-mm-swap-refactor-swapoff-and-add-xswap_destroy.patch"
+  "patches/2100-2199/2165-mm-swap-require-zswap-for-xswap-devices.patch"
+  "patches/2100-2199/2166-mm-swap-add-sysfs-per-device-size-limit-for-xswap.patch"
   "patches/2200-2299/2200-7.2-nap-v0.5.0.patch"
   "patches/2300-2399/2302-subject-patch-v2-01-21-kbuild-do-not-allocate-modinfo-in-vmlinux.patch"
   "patches/2300-2399/2303-subject-patch-v2-02-21-kallsyms-index-symbols-by-token-to-speed-up-table-compression.patch"
@@ -1026,7 +1038,7 @@ for _p in "${pkgname[@]}"; do
 done
 
 b2sums=('d400c07b3f76f262c51e88bfc34e419883f13ea12dc76975b624acd6712bef193c4bb88fb5fc8d283e6a074800da23f2219a6be6694a6c65107a88405ea794b2'
-        'bec733001dd0f5ff9993f3bef81aadb7acf98517d3e5056fcfde7bcbb21eaedb64e8d71e534517e8fcbee6f9c86c131fcaef75d8634f169d809f04747dee7ad1'
+        '66701fcfebbf35e2a7a412cdd52ece9a7a45b0c7fee70200d7f11211666df2f33fa4a5602db46f2d7bd8fc6d1b0f6944f49ef34569eb0625828b24e27898cdea'
         'ff25ac7c89880886b454064ba57bd1196fb747cb80c7663d7981006cc603151aee075ebe1b49b1a92866ad2a212d1e599ce622f63bfd140ad64d37b463c17aad'
         '0806d7b3b8e4e9044c14843fc53255ff92b12aaf3b8e0d0490bbf6266aaa6b01872476ce34a65c5b694cda9a1d82e84a38df16dbb9c798ae9aa6d1c9097b32aa'
         '007cf65f43e18e1425239bcd7502ea2b65105858e94bf20810adbd684619d773cf85b2bff98e2dfb4c9f8b3f58477d5f6251ffeaf2dfeba494ef1d98053682f8'
@@ -1124,7 +1136,7 @@ b2sums=('d400c07b3f76f262c51e88bfc34e419883f13ea12dc76975b624acd6712bef193c4bb88
         '448a251a84d7d02a7095cae31fc95f77cb06fa2d8e0a52d8a140ee36028807a14ac04b304260bc121ac8b8e80dae10e25a9a480a97f2152266d52d95a338c7db'
         '0eb42c67084faaf6390258842b0cdf37c7440b24a9956209b20674991f520606f98ba3dda12f4912a23d7a17c9eaa74fb84518561ed46e00139afe6a71ae6950'
         '1d8d63086f1d7ee562047c5e126276b98452daf4cf5146d9a80030abd4832d6fab97c91c01678c301ec9d830a210952715b852c1c9a6783001633ca2f313fa1d'
-        '37e409a2b039ec33dcc82eb8f0957e6d6ce4744eb4f68f8634ff13d796b46d5efe85a3a57af3bfb2126ac0bf88e90d0ea2c624dd45643e90d5d98beff7ae826d'
+        'af27ad207d40b0f0b05512843f5c38b05f841f47e022341d8bf9778a41beaf47d57c784901bd47d558965ed73412e3716ee91d785063d02a8427b540aae4a739'
         'a745db752d2586475d373cb29e64b4f42f6e305b4b3e588efbce955491429c73b3d16c426e76118b1499bbfb4a2159192f3950ed06d309064eb28750a1d6e6aa'
         '8820c684d4f21c9c74729a518f187334b817b8059436aa808e423533a67a6b752a93df4e79c200307b29635f0de393f6749aaa52cfc20e28957f759b4adb6ce0'
         '877dc1eebcaec113969ea45471b63e0339066a270da667b5c1aa1578e26aa01c7ec34e1cb4c436565553388e0ba04add10bf3540fe4ba7e11b24aa8a8d8ccc4f'
@@ -1160,6 +1172,18 @@ b2sums=('d400c07b3f76f262c51e88bfc34e419883f13ea12dc76975b624acd6712bef193c4bb88
         'ca1ef67a17397bde9e5cf092589e43ce140cde08779c58232325501752d737f42a0e7c96f17a68751663cc8393ea013fef39ed400877693db05559a836dc29d5'
         'b6bfa228a20bc031b794a6eea356681825463d7ff3fb6604dce3c2f75288e2ec57e2ab52954d3cbd21aa775253568ea570f773ec5ef230392420b6a010abb301'
         '782aa214a69fdea448c3a497b50751a5af608c200397987fbce052633be1e584227cf5d08c92c6add218743c67a8f26b4723d7535c18c381912085cea2fbc7c1'
+        'e7b1197a05bc5cb6eeb35f6f81ace1a5f0ec5498af256e28dcbe2e0b2715f4c2ccac843d89f4c4398c53ee158d02286f79d4222b1b3c10b52926651b237a8db3'
+        '9a750a56c64420b6774e6e5f02e9a6218d03ca72bf6e643d2c1235f844d46982a496bab6f25f6166f8c8a2e25670039db698a7a80dd0cbb906adfe63efc2db11'
+        'd01647fb44b9fc39d97efb4b43e4d9fc7aa688b59c7ba54e29761e3610fc197cc4f891fc1d0729ccd1d2aff37e21918d5490c71dce54ec4e4c3240bd72c0bccd'
+        '5816140cb3f7e478a99d7b0316704dea0e5ab894d1947ebd7d580169e5cb773138e8c963f007d6310f3bab48a96d5d9c067166e15e0824b35291eefdbfb99b43'
+        '4b0b4ab290a3a43ed9d53bb3ec5cf4c2148ef74323869ded01249ab9086ee79ec65b9ec86ec9a0cf7f6a9f439d0ef1f721e385ea6017d8d7a8ad4038e13d4056'
+        'b37e07c2d95df6344ba84844e2f4aa2bd089075ee122adbd95830019dedf8825a06161bc22313ac26a9a0f2915995e8baa43d39c4f540fa9f04bde42fbadb120'
+        '6dd3cdd40c595ad5c55426637981d92f6801aec665f30895f227f8fac50cd949a8f1cdd59da59954dfcf8910a85c0b8f062440b486a06125d498ccd5622de87b'
+        'ea8a853955e14741081c99e03013f4979786bd96b71a4a9da668b206d16a894d26219d62889bebc3ccc8511700ed86127051ab2904440882e99228be74d93285'
+        'c74320fb5bdd0e2daad5083509e0dae60bd9946b62b0f35860603903103b944e480430571228603eed66072b4f939a2c0274a37370a808ef5655460fe79514c0'
+        '3ef47959689f2a434dc8444442374a9b7fce72277dbb1076c72ad25bb7ef63a8a5b0255e6c1fef651ab25a1dd2c960056d7654726a91c5dff9279e2d2a11c67b'
+        'd873cf9bfb2242bfa4dd90bb60503d113fdb61a1649f0b9f65722dbc6cfbe63850ad01068aed36951987fada6b026b33087ae18b7853594db4f3ac765dbe6cc8'
+        '534e59a73fafd2127ded6d74a5a7cac204d70fa122534fb2269300a4e2b758fc8b2132439fd64263a6ff44e4d8945430bda0c22d5f2eda86e83bb00dd4a3e626'
         'dc4e862e8f9fa7e8ead895908459757afd1027c24b960ae3d289a7212e29575bce3ce4627d5fd73edf211ee162dfa545e1642c5b16e8156f3dce50af8ef3c256'
         'b8aa919c153a0366ebf7237282e2955e5744d190e991b300f5c4f55d3017daa9d8ca84ae85beebeb85baff7b0bed0aec06e70b05042331551eeec956ba7c32e2'
         '0ff8d967ee5e9473da3ca925ae6241c37aa6094a8891b93a37e9b9fb88994a946d63a7ac686e04010e32e3bbcddef704298a8c77170b66f8b559a953b59533e1'

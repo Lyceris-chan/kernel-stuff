@@ -1,6 +1,6 @@
-From 5a4bbbb3854c3282afe4eb6c2e0aa6e71f0fe928 Mon Sep 17 00:00:00 2001
+From 10c0c0872c919a65f28cae377eb051f28600d046 Mon Sep 17 00:00:00 2001
 From: Masahito S <firelzrd@gmail.com>
-Date: Tue, 8 Sep 2026 01:03:26 +0900
+Date: Tue, 15 Sep 2026 16:03:03 +0900
 Subject: [PATCH] linux7.3-rc1-lru_marie-0.11.1
 
 ---
@@ -10,7 +10,6 @@ Subject: [PATCH] linux7.3-rc1-lru_marie-0.11.1
  include/linux/mmzone.h         |   15 +
  include/linux/swap.h           |   18 +
  include/linux/swap_ops.h       |   12 +
- localversion                   |    1 +
  mm/Kconfig                     |   72 ++
  mm/Makefile                    |    1 +
  mm/compaction.c                |   32 +-
@@ -53,9 +52,8 @@ Subject: [PATCH] linux7.3-rc1-lru_marie-0.11.1
  mm/swap.h                      |    4 +
  mm/vmscan.c                    |  526 ++++++++-
  scripts/setlocalversion        |    2 +-
- 49 files changed, 13819 insertions(+), 36 deletions(-)
+ 48 files changed, 13818 insertions(+), 36 deletions(-)
  create mode 100644 include/linux/lru_marie.h
- create mode 100644 localversion
  create mode 100644 mm/lru_marie/Makefile
  create mode 100644 mm/lru_marie/account.h
  create mode 100644 mm/lru_marie/bitmap.c
@@ -14901,3 +14899,19 @@ index f11491ee9e..6932ef9336 100644
  		.extra1		= SYSCTL_ZERO,
  		.extra2		= SYSCTL_TWO_HUNDRED,
  	},
+diff --git a/scripts/setlocalversion b/scripts/setlocalversion
+index 28169d7e14..5cb02894ac 100755
+--- a/scripts/setlocalversion
++++ b/scripts/setlocalversion
+@@ -117,7 +117,7 @@ scm_version()
+ 		# If only the short version is requested, don't bother
+ 		# running further git commands
+ 		if $short; then
+-			echo "+"
++			#echo "+"
+ 			return
+ 		fi
+ 
+-- 
+2.34.1
+

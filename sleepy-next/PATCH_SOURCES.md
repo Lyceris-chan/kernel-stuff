@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-next/PKGBUILD`.
 
 - **Base:** Linux `v7.3-rc3`
-- **Series:** 201 patches
+- **Series:** 213 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -25,7 +25,7 @@ are supplied by the generator instead, so every row below has a source.
 | `1100–1199` | AMD display (DCN4, colorops) | 21 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 18 |
 | `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 12 |
-| `2100–2199` | Memory management and compression (zstd, LRU-MARIE, MGLRU, gup) | 33 |
+| `2100–2199` | Memory management and swap (zstd, LRU-MARIE, MGLRU, gup, xswap) | 45 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 21 |
 | `2400–2499` | Core scheduler and sched-ext | 3 |
@@ -147,7 +147,7 @@ renumbered to `1165` in the rc3-9 cycle (2026-09-15).
 | `2010` | blk-cgroup: save IRQ state in blkg_tryget_closest() | Hao Zhang | 2026-09-12 | `aqQmqb1k57PXj8Ef@192.168.1.215` |
 | `2011` | r8169: don't enable chip LTR when the platform has not enabled LTR | Yogesh Gaur | 2026-09-14 | `20260914130050.304-1-yogeshgaur.83@gmail.com` |
 | `2100` | zstd-7.2: merge v1.6.0 into kernel tree | Piotr Gorski | 2026-06-29 | `4d96a5c62121` |
-| `2101` | linux7.3-rc1-lru_marie-0.11.1 | Masahito S | 2026-09-08 | `5a4bbbb3854c` |
+| `2101` | linux7.3-rc1-lru_marie-0.11.1r2 | Masahito S | 2026-09-15 | `10c0c0872c91` |
 | `2120` | mm/gup: break out gup_fill_pages() helper | Rik van Riel | 2026-08-10 | `7afdec79e9f0` |
 | `2121` | mm/gup: convert follow_page_mask() to return a long | Rik van Riel | 2026-08-10 | `b283884f04a2` |
 | `2122` | mm/gup: split follow_page_pte_commit() out of follow_page_pte() | Rik van Riel | 2026-08-10 | `9fbdbf16c239` |
@@ -183,6 +183,18 @@ renumbered to `1165` in the rc3-9 cycle (2026-09-15).
 | `2152` | khugepaged: hold invalidate_lock across collapse_file() readahead | Nguyen Ngoc Thang | 2026-09-13 | `1be399d378b7` |
 | `2153` | writeback: report a Tasks-RCU quiescent state per cgwb drain pass | Josef Bacik | 2026-09-09 | `6495bf0e43d6` |
 | `2154` | mm/page_alloc: apply per-task GFP context in bulk allocator | Qiqi Liu | 2026-09-14 | `afd44a6aa48e` |
+| `2155` | mm: xswap support for zswap | Baoquan He | 2026-09-13 | `20260913075014.1732524-2-hebaoquan@kylinos.cn` |
+| `2156` | mm, swap: add CONFIG_XSWAP and xswap fields to swap_info_struct | Baoquan He | 2026-09-13 | `20260913075014.1732524-3-hebaoquan@kylinos.cn` |
+| `2157` | mm, swap: refactor free_swap_cluster_info to take swap_info_struct | Baoquan He | 2026-09-13 | `20260913075014.1732524-4-hebaoquan@kylinos.cn` |
+| `2158` | mm, swap: add xswap cluster grow via VM_SPARSE vmalloc | Baoquan He | 2026-09-13 | `20260913075014.1732524-5-hebaoquan@kylinos.cn` |
+| `2159` | mm, swap: add sysfs create interface for xswap | Baoquan He | 2026-09-13 | `20260913075014.1732524-6-hebaoquan@kylinos.cn` |
+| `2160` | mm, swap: add xswap grow trigger on cluster allocation | Baoquan He | 2026-09-13 | `20260913075014.1732524-7-hebaoquan@kylinos.cn` |
+| `2161` | mm, swap: add xswap_try_shrink and shrink trigger on cluster free | Baoquan He | 2026-09-13 | `20260913075014.1732524-8-hebaoquan@kylinos.cn` |
+| `2162` | mm, swap: free backing pages in xswap_unmap_clusters | Baoquan He | 2026-09-13 | `20260913075014.1732524-9-hebaoquan@kylinos.cn` |
+| `2163` | mm, swap: defer xswap shrink to workqueue to avoid lock recursion | Baoquan He | 2026-09-13 | `20260913075014.1732524-10-hebaoquan@kylinos.cn` |
+| `2164` | mm, swap: refactor swapoff + add xswap_destroy | Baoquan He | 2026-09-13 | `20260913075014.1732524-11-hebaoquan@kylinos.cn` |
+| `2165` | mm, swap: require zswap for xswap devices | Baoquan He | 2026-09-13 | `20260913075014.1732524-12-hebaoquan@kylinos.cn` |
+| `2166` | mm, swap: add sysfs per-device size limit for xswap | Baoquan He | 2026-09-13 | `20260913075014.1732524-13-hebaoquan@kylinos.cn` |
 | `2200` | 7.2-nap-v0.5.0 | Masahito S | 2026-06-05 | `04aef34448bb` |
 | `2303.patch` | kallsyms: index symbols by token to speed up table compression | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-2-39817ec5db23@kernel.org` |
 | `2304.patch` | kallsyms: output binary data to speed output and kallsyms assembly | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-3-39817ec5db23@kernel.org` |
@@ -689,3 +701,18 @@ sweep does not re-derive the same conclusion.
 - Palazzi's cursor-vblank patch (!5799) no longer applies: its target was
   rewritten by the VUPDATE_NO_LOCK rework `f64a9be56536` in rc2. The underlying
   bug class survives and would need a rebase onto `dm_arm_vblank_event()`.
+
+## 2026-09-15 note: LRU-MARIE r2 and xswap
+
+`2101` now carries the author's **0.11.1r2** packet from
+<https://github.com/firelzrd/lru_marie> (`patches/testing/`). The r2 revision is
+0.11.1 minus the `localversion` file creation (the `-marie` version suffix) with
+the diffstat corrected; the author's packet subject still reads `0.11.1` while
+the file is named `r2`. Everything else is byte-identical, including the
+`scripts/setlocalversion` hunk.
+
+`2155`–`2166` carry Baoquan He's **v2 xswap series** ("extendable swap
+devices"), posted to linux-mm on 2026-09-13 and also shipped by CachyOS in its
+`7.3/xswap` branch. It is upstream work in review: drop it when it lands in
+mainline, and re-check for a v3 before rebasing. `CONFIG_XSWAP=y` is set in
+`config`.

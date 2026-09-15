@@ -447,3 +447,33 @@ Also recorded: when a new series touches code our backports already modified,
 check every hunk against BOTH the clean base and the series-applied tree, and
 read the callee's locking contract (`amdgpu_userq_ensure_ev_fence` releases
 `userq_mutex` on failure) before writing the adaptation.
+
+## Verification traps, 2026-09-15 (ThinLTO, `| head`, /tmp)
+
+Three checks in one session produced **false negatives** — each looked like a
+clean result and none was. All three are the same mistake in different clothes:
+treating an empty result as a finding.
+
+- **ThinLTO objects are bitcode, not machine code.** `objdump -d mm/vmscan.o`
+  and `llvm-objdump -d kernel/sched/fair.o` print nothing because the files are
+  LLVM IR (`file` says "LLVM IR bitcode"). Disassembling them cannot answer any
+  question about generated instructions — only the linked `vmlinux` can, and it
+  must be disassembled *after* the LTO backend has run.
+- **`cmd | head -3 && echo OK` always prints OK.** GNU `head` exits 0, so the
+  `&&` branch runs regardless. It reported "APPLIES" for a patch whose path was
+  wrong. Capture the exit status of the real command (`cmd > log 2>&1; echo $?`),
+  never of a pipeline that ends in `head`.
+- **`/tmp` is cleaned between sessions.** A vmlinux extracted an hour earlier was
+  gone, so `objdump -d /tmp/vmlinux-rc3-10 | rg ...` returned zero matches and
+  looked like "no AVX in the kernel". Re-extract and confirm the file exists
+  (`ls -la`) before drawing a conclusion from a disassembly or a scan.
+
+The corrected finding, for the record: this kernel contains 3,089 `ymm`/`zmm`
+instructions, **all** of them in 27 deliberate vector functions — the x86 crypto
+assembly (poly1305, chacha, sha1/sha256/sha512, crc32/crc64 AVX2 and AVX-512)
+and the NAP governor's AVX2 neural-network predictor. None are compiler
+spillover into generic code. To map instructions to functions, disassemble the
+**running** kernel's image (`/boot/vmlinuz-*` → `extract-vmlinux` →
+`objdump -d`) and map addresses through `/proc/kallsyms`, which needs
+`kernel.kptr_restrict=0` for the duration of one `cat` (restore it immediately —
+and note the extracted file must be `chmod 644` after a `sudo cp`).

@@ -1,0 +1,14 @@
+[Unit]
+Description=Create an xswap device (extendable compressed swap backed by zswap)
+ConditionPathExists=/sys/kernel/mm/xswap/create
+Before=swap.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Writing a priority to the sysfs file creates a new device; the guard keeps
+# repeated starts from stacking up extra xswap devices.
+ExecStart=/bin/sh -c "grep -q ^xswap /proc/swaps || echo 100 > /sys/kernel/mm/xswap/create"
+
+[Install]
+WantedBy=swap.target

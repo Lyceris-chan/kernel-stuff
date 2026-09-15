@@ -15,6 +15,79 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc3-11-sleepy-next]: 2026-09-15
+
+### Added
+- **`2155`–`2166`** — Baoquan He's **v2 xswap series**, "mm, swap: extendable
+  swap devices" (linux-mm, 2026-09-13,
+  `<20260913075014.1732524-2..13-hebaoquan@kylinos.cn>`), 12 patches: the
+  `XSWAP` Kconfig option, a sparse-vmalloc `cluster_info[]`, grow and shrink
+  triggers driven by allocation and free, the `sysfs create` interface, a
+  workqueue-deferred shrink, `xswap_destroy`, the zswap requirement, and a
+  per-device size limit. An xswap device has no backing store — swapped pages
+  live in zswap — and its metadata is mapped lazily, so it starts at 1xRAM and
+  costs nothing until used. CachyOS carries the same series in its `7.3/xswap`
+  branch. `CONFIG_XSWAP=y` is set. Upstream work in review: drop it when it
+  lands, and check for a v3 before rebasing.
+- **Swap stack switched from zram to zswap + xswap** on this machine. zram
+  allocated a fixed 30.9 GB compressed block device and never gave the memory
+  back; xswap grows and shrinks with use. The kernel side is the series above;
+  the userspace side is `/etc/systemd/system/xswap-create.service` (creates one
+  device at priority 100), `/etc/systemd/zram-generator.conf` and
+  `/etc/udev/rules.d/30-zram.rules` symlinked to `/dev/null`, and
+  `zswap.enabled=0` removed from `LINUX_OPTIONS` in `/etc/sdboot-manage.conf`
+  so the built-in `CONFIG_ZSWAP_DEFAULT_ON=y` takes effect. Masking the udev
+  rule matters: it forces `zswap/parameters/enabled` to `N` whenever a zram
+  device appears, which would make `xswap/create` return `-EOPNOTSUPP`.
+  `vm.swappiness=150` moves to `/etc/sysctl.d/99-xswap-swappiness.conf`; the
+  masked udev rule used to set it.
+
+### Changed
+- **`2101`** now carries LRU-MARIE **0.11.1r2** from the author's repository
+  (<https://github.com/firelzrd/lru_marie>). The r2 revision is 0.11.1 minus
+  the `localversion` file creation — the content is otherwise byte-identical,
+  and this repository already stripped that hunk, so the code in the built
+  kernel does not change.
+- `pkgrel` 10 → 11. Series is now 213 patches.
+
+### Reviewed and not included: cachymod
+[cachymod](https://github.com/marioroy/cachymod) is a CachyOS kernel
+customization toolkit (TUI, build configs, and a patch set). Reviewed on
+2026-09-15; nothing was adopted:
+- `0280-prefer-idle-core` was **reverted by CachyOS itself**
+  (`a4808133047d`), and its author calls it trial-and-error EEVDF tuning
+  measured on a Threadripper 3970X (many CCDs) — this machine has one CCD.
+- `0000-revert-prop-newidle-bal` reverts mainline `9fe89f022c05` ("More
+  complex proportional newidle balance"), which is present in rc3, and it
+  applies cleanly. Not adopted: the supporting measurement is a 6.18.5-era
+  easyWave regression ("persists with 7.1-rc, though not as bad"), and
+  upstream has since reworked that area (`b3a2dfa8b42e`, `c095741713d1`).
+  Reverting it would be a permanent divergence from the scheduler mainline.
+- `0300-x86-prevent-avx2-vector` adds `-mno-avx2 -fno-tree-vectorize
+  -mpopcnt`. Not adopted: `CONFIG_MZEN4` selects `-march=znver4` and the
+  kernel appends `-mno-sse -mno-avx` after it, and an audit of the linked
+  vmlinux (disassembled, mapped through `/proc/kallsyms`) found all 3,089
+  `ymm`/`zmm` instructions confined to 27 deliberate vector functions — the
+  x86 crypto assembly (poly1305, chacha, sha1/sha256/sha512, crc32/crc64
+  AVX2 and AVX-512) and the NAP governor's AVX2 neural-network predictor.
+  None appear in compiler-generated generic code. cachymod's own configs
+  leave the option off by default too (`_prevent_avx2:=no`).
+- `0200-clearlinux-extras` is the Clear Linux patch set. Several entries are
+  Intel-only (`itmt_epb`, `itmt2` ADL fixes, `epp-retune`); the rest are
+  generic micro-optimizations with no target here. Modern CachyOS does not
+  carry them either (its `clearlinux-5.18` branch was reverted).
+- The remaining patches revert CachyOS scheduler modifications that this
+  series never carried (`gaming-sched`, POC, `sched/fair` tunings), or belong
+  to cachymod's own build framework (gnu17 switch, DKMS clang, 800 Hz tick
+  option — this kernel runs `CONFIG_HZ=1000`).
+- Config comparison: this kernel already matches or exceeds cachymod's
+  defaults — THP `always`, `CONFIG_PREEMPT=y`, `CONFIG_HZ=1000`, plus BBR3.
+
+### Sweep 2026-09-15 (evening)
+- Nothing new in agd5f, drm-next, linux-pm, or the CachyOS branches today;
+  linux-next's newest snapshot remains `next-20260914`.
+- xswap had no v3 and no review replies at the time of the check.
+
 ## [7.3.0-rc3-10-sleepy-next]: 2026-09-15
 
 ### Added

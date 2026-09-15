@@ -3,11 +3,11 @@
 `linux-sleepy-next` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
 built from **mainline Linux 7.3-rc3** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 201 targeted
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 213 targeted
 upstream/local patches. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0_rc3-10` · **Artifact:**
-`linux-sleepy-next-7.3.0_rc3-10-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0_rc3-11` · **Artifact:**
+`linux-sleepy-next-7.3.0_rc3-11-x86_64.pkg.tar.zst`
 
 ## Target hardware
 
@@ -24,7 +24,7 @@ upstream/local patches. It is not a general-purpose kernel.
 
 - **Clang ThinLTO `-O3 -march=znver4`** via the kernel.org pre-built LLVM
   23.1.0.
-- **LRU-MARIE 0.11.0** page eviction — the author's `mm/lru_marie/` subsystem
+- **LRU-MARIE 0.11.1r2** page eviction — the author's `mm/lru_marie/` subsystem
   carried byte-identical, rebased to this base.
 - **`mm/gup` folio batching** (Rik van Riel's series) for mTHP throughput.
 - **BBR3** default + CAKE SQM via `net-tune`; ACPI CPPC hardening + per-core EPP
@@ -34,6 +34,8 @@ upstream/local patches. It is not a general-purpose kernel.
 - **kbuild build-speedup series** — full kernel builds in ~8 minutes.
 - **userq hardening** — Zhu Lingshan's kref lifecycle series closes use-after-free
   races in the user-queue submission path (`9062`–`9071`).
+- **xswap** — extendable compressed swap backed by zswap (`2155`–`2166`); it
+  replaces the fixed-size zram device on this machine.
 
 ## Build and install
 
@@ -89,7 +91,7 @@ fix lands.
 
 ## Patch series
 
-201 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+213 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 
 | Range | Category |
 |---|---|
@@ -100,13 +102,13 @@ fix lands.
 | `1100–1199` | AMD Display (DCN4, colorops) |
 | `1200–1299` | AMD PM (amd-pstate, ACPI CPPC) |
 | `2000–2099` | Block / I/O (bfq, mq-deadline, zram, io_uring) |
-| `2100–2199` | Memory (zstd, LRU-MARIE, MGLRU, gup batching) |
+| `2100–2199` | Memory and swap (zstd, LRU-MARIE, MGLRU, gup, xswap) |
 | `2200–2299` | CPU idle (NAP) |
 | `2300–2399` | Build system / kbuild |
 | `2400–2499` | Core scheduler (non-CachyOS) |
 | `2500–2599` | x86 / arch core |
 | `2600–2699` | Time / timers |
-| `9000–9099` | agd5f staging backports |
+| `9000–9099` | agd5f staging + userq lifecycle backports |
 
 ## Documentation
 
