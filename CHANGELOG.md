@@ -136,6 +136,53 @@ fix. #5720's fix (`c4a5160e3be0`) is absent from rc3 but concerns YCbCr-4:2:0
 sinks, which this monitor is not. #5663 (TTM/SDMA artifacts after resume) is
 acknowledged by Christian König as known and being investigated.
 
+### Deep sweep 2026-09-15 (second pass): GPU/display, core, work items
+
+**A patch we carry does nothing on this hardware — `1140`.** It modifies only
+`dc/clk_mgr/dcn42b/dcn42b_clk_mgr.c`. That clk_mgr is instantiated exclusively
+under `AMDGPU_FAMILY_GC_11_5_0` with `DCN_VERSION_4_2B`
+(`dc/clk_mgr/clk_mgr.c`). Our GPU is GC IP (12,0,1), which
+`amdgpu_discovery.c` maps to `AMDGPU_FAMILY_GC_12_0_0` → `dcn401_clk_mgr_construct`,
+and the kernel reports "Display Core v3.2.392 initialized on DCN 4.0.1". The
+DCN42B file is dead code here, so the patch is inert — the "a patch that applies
+can still do nothing" trap again. A scan of every carried patch against the
+display blocks we do not instantiate (dcn42, dcn42b, dcn60) found this as the
+only case. Removal needs the user's approval; it is harmless where it sits.
+
+**DC 3.2.398 (66 patches) triage — nothing adopted.** The reviewer-recommended
+patch 58 is already ours (`1159`). The rest of the fix-shaped subset is
+off-target or inert:
+- patches 42, 43, 56, 57, 60 touch `pg/dcn42/`, `resource/dcn42b/` and the
+  DCN42B MALL/HPO paths — the same dead blocks as `1140`; patch 61 touches
+  `hpo/dcn42/` and `hpo/dcn60/`; patch 04 targets DCN31/35/42.
+- `35c21515dbe1` ("fix MALL hysteresis timer underflow at high refresh rates")
+  looked ideal — a 240 Hz-relevant underflow in the hysteresis timer — but it
+  patches `dcn30_apply_idle_power_optimizations()`, and DCN 4.0.1 has its own
+  `dcn401_apply_idle_power_optimizations()` (DMUB CAB based, no such timer).
+  It is the DCN 3.x implementation that underflows, not ours.
+- `37531443a4f3` ("mes12: clear event log on resume to avoid MES page fault",
+  Jesse Zhang, AMD, 2026-09-15) is on-target but **inert at defaults**: its
+  guard checks `amdgpu_mes_log_enable`, and
+  `amdgpu_mes_event_log_init()` returns before allocating the buffer unless
+  that parameter is set — it defaults to 0.
+- DC 59 and DC 52 are behaviour changes inside a 66-patch drop that lands with
+  the next drm merge; taking them piecemeal invites conflicts with the rest.
+
+**Deferred for breadth, not doubt.** `2d606b35a24c` ("drm/sched: fix
+use-after-free of the fence timeline name", v3 0/2) is a real UAF fix but a
+121-line rewrite of fence lifetime across `sched_fence.c`, `sched_main.c` and
+`gpu_scheduler.h` — and this series already carries four drm/sched patches.
+`1528781b16c7` ("drm/vblank: Don't arm vblank timer with invalid frame
+duration", v4) changes `drm_calc_timestamping_constants()` from `void` to `int`
+across DRM. Both land upstream; revisit at the bump.
+
+**Core sweep:** nothing includable. The only real candidate, a hrtick repick
+fix (Shubhang Kaushik), is measured on ARM64 and the author partially withdrew
+v2 ("please disregard the DL portion of v2") — and `CONFIG_SCHED_HRTICK` plus
+HRTICK_DL are on here, so the withdrawn half is not inert. Wait for v3.
+Everything else was already carried (`2012`/`2013`, `2148`/`2149`, `2302`–`2322`),
+queued for 7.4, or inert.
+
 ### Changed
 - `pkgrel` 11 → 12.
 
