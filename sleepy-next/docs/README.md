@@ -6,8 +6,8 @@ built from **mainline Linux 7.3-rc3** plus a sanitized
 [CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 213 targeted
 upstream/local patches. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0_rc3-11` · **Artifact:**
-`linux-sleepy-next-7.3.0_rc3-11-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0_rc3-12` · **Artifact:**
+`linux-sleepy-next-7.3.0_rc3-12-x86_64.pkg.tar.zst`
 
 ## Target hardware
 
@@ -113,5 +113,6 @@ fix lands.
 ## Documentation
 
 `GUIDE.md` (this directory) covers toolchain, PROFILE_PEAK, troubleshooting, and
-net-tune. `../net-tune/README.md` documents the SQM service.
+net-tune. `../net-tune/README.md` documents the SQM service, and
+`../swap-stack/README.md` the zswap + xswap swap setup.
 `../../CLAUDE.md` holds the maintenance rules; `../PATCH_SOURCES.md` the ledger.

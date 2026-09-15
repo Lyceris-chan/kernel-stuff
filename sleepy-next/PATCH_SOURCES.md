@@ -22,10 +22,10 @@ are supplied by the generator instead, so every row below has a source.
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 25 |
-| `1100–1199` | AMD display (DCN4, colorops) | 21 |
+| `1100–1199` | AMD display (DCN4, colorops) | 18 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 18 |
-| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 12 |
-| `2100–2199` | Memory management and swap (zstd, LRU-MARIE, MGLRU, gup, xswap) | 45 |
+| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 14 |
+| `2100–2199` | Memory management and swap (zstd, LRU-MARIE, MGLRU, gup, xswap) | 47 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 21 |
 | `2400–2499` | Core scheduler and sched-ext | 3 |
@@ -146,7 +146,9 @@ renumbered to `1165` in the rc3-9 cycle (2026-09-15).
 | `2009` | fs/buffer: check for NULL pointer before folio_test_dropbehind() | Zhaoyu Liu | 2026-09-13 | `pfk6l6lsgecie4xwy5njrgtzpave4uayxbl4lkz3iekcdds7fg@bpihjzlnz7m2` |
 | `2010` | blk-cgroup: save IRQ state in blkg_tryget_closest() | Hao Zhang | 2026-09-12 | `aqQmqb1k57PXj8Ef@192.168.1.215` |
 | `2011` | r8169: don't enable chip LTR when the platform has not enabled LTR | Yogesh Gaur | 2026-09-14 | `20260914130050.304-1-yogeshgaur.83@gmail.com` |
-| `2100` | zstd-7.2: merge v1.6.0 into kernel tree | Piotr Gorski | 2026-06-29 | `4d96a5c62121` |
+| `2012` | block: skip redundant flush for O_DSYNC direct writes | Zhenxian Ma | 2026-08-15 | `bec7d36a6514` |
+| `2013` | block: only use REQ_FUA for direct writes if the device supports it | Zhenxian Ma | 2026-08-15 | `0d492f40c4ad` |
+| `2100` | zstd-7.3: merge v1.6.0 into kernel tree | Piotr Gorski | 2026-09-14 | `e0f9795534f4` |
 | `2101` | linux7.3-rc1-lru_marie-0.11.1r2 | Masahito S | 2026-09-15 | `10c0c0872c91` |
 | `2120` | mm/gup: break out gup_fill_pages() helper | Rik van Riel | 2026-08-10 | `7afdec79e9f0` |
 | `2121` | mm/gup: convert follow_page_mask() to return a long | Rik van Riel | 2026-08-10 | `b283884f04a2` |
@@ -156,7 +158,6 @@ renumbered to `1165` in the rc3-9 cycle (2026-09-15).
 | `2125` | mm/gup: return a huge page's full count from follow_page_mask() | Rik van Riel | 2026-08-10 | `ef7d0a878a6e` |
 | `2126` | mm/gup: walk multiple PTEs per follow_page_pte() call | Rik van Riel | 2026-08-10 | `053ce5bc0ed8` |
 | `2127` | mm/gup: batch contiguous same-folio PTEs into one refcount grab | Rik van Riel | 2026-08-10 | `6c2092bc8448` |
-| `2128` | zstd: use ZSTD_cpuSupportsBmi2() in ZSTD_initStaticCCtx() | Usama Arif | 2026-08-26 | `20260826122558.2662013-2-usama.arif@linux.dev` |
 | `2129` | zstd: skip the BMI2 probe when dynamic BMI2 dispatch is disabled | Usama Arif | 2026-08-26 | `20260826122558.2662013-3-usama.arif@linux.dev` |
 | `2130` | zstd: probe the CPU for BMI2 support only once | Usama Arif | 2026-08-26 | `20260826122558.2662013-4-usama.arif@linux.dev` |
 | `2131` | mm/mglru: separate folio generation update from LRU accounting | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-09-02 | `54e9345e4563` |
@@ -171,7 +172,6 @@ renumbered to `1165` in the rc3-9 cycle (2026-09-15).
 | `2140` | mm/page_alloc: avoid direct compaction for costly __GFP_NORETRY allocations | Salvatore Dipietro | 2026-09-11 | `60adb47f4fa3` |
 | `2141` | mm: filemap: retain mapped dropbehind folios | Wenjie Qi | 2026-08-30 | `848d2ce2fce1` |
 | `2142` | mm/vmscan: avoid pointless large folio splits without swap | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-08-30 | `bd7fcb0dea86` |
-| `2143` | zstd: fix DDict hash-set probe index wrap-around | Piotr Gorski | 2026-09-02 | `sirlucjan 7.3-rc/zstd-dev-patches-sep/0001 (commit 9e0330ca)` |
 | `2144` | xarray: fix index jumping backwards in xas_find() | Krystian Kaniewski | 2026-09-04 | `5fe684a7cd8e` |
 | `2145` | mm/vma: correctly unaccount on mmap_prepare() failure | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-02 | `6cc27d821963` |
 | `2146` | mm/mlock: use the IRQ-safe accessor for NR_MLOCK in __munlock_folio() | Shakeel Butt | 2026-09-01 | `e14a34548064` |
@@ -296,6 +296,12 @@ adds are already there, not merely that `patch` reported it applied.
 | `2600` | hrtimer: Use hard expiry when updating timers on the same base |
 
 ### Dropped — superseded
+- **`2128`** (zstd: use `ZSTD_cpuSupportsBmi2()` in `ZSTD_initStaticCCtx()`) and
+  **`2143`** (zstd: fix DDict hash-set probe index wrap-around). The
+  `2100` merge was updated on 2026-09-15 to sirlucjan's 2026-09-14
+  `zstd-7.3` cut, which already contains both changes: `2128`'s hunk reports
+  "already applied" and `2143` is skipped as present. Removed with the user's
+  approval; nothing is lost, the code is in the tree via `2100`.
 
 - **`1145`** (drm/amd/display: Keep FreeSync for HF-VSDB VRR sinks in MCCS
   fallback). rc3 rewrites `amdgpu_dm_update_freesync_caps()`; the block the patch

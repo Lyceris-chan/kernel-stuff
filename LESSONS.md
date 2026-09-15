@@ -477,3 +477,29 @@ spillover into generic code. To map instructions to functions, disassemble the
 `objdump -d`) and map addresses through `/proc/kallsyms`, which needs
 `kernel.kptr_restrict=0` for the duration of one `cat` (restore it immediately —
 and note the extracted file must be `chmod 644` after a `sudo cp`).
+
+## Two unmerged series in one hot path (2026-09-15)
+
+The sweep surfaced Kefeng Wang's "zswap: optimize zswap invalidate and store"
+v3, which applies cleanly to this tree and is squarely on-target now that zswap
+backs the swap stack. It was **not** adopted, and the reason is worth keeping:
+it rewrites `swap_range_free()` in `mm/swapfile.c`, which is the same function
+Baoquan He's xswap series (`2155`–`2166`) rewrites. Both are review-stage series
+that will change again before they land.
+
+Two unmerged series composing in the swap hot path is precisely the shape of the
+240 Hz flicker: several plausible patches interacting in one subsystem, with the
+interaction invisible to `git apply`. **Rule: adopt one unmerged series per
+subsystem per cycle.** Wait for the bump, by which time at least one of them is
+usually merged and the other rebases onto it.
+
+## The 7.4 bump will re-enable HDMI FRL by default (2026-09-15)
+
+`af6139855b55` ("Enable HDMI FRL by default", in amd-staging, targeted 7.4) sets
+`DC_FRL_MASK` in `amdgpu_dc_feature_mask`. That is the exact variable the
+flicker bisect turned on twice and off once: `1144` set the same mask, was
+dropped as the first bisect step, and the clean comparison kernel ran
+`dcfeaturemask=2` while ours ran `0x402`. When the 7.4 bump happens, re-test the
+MAG251RX at 1920x1080@240 Hz **before** installing, and expect to either drop
+the FRL default again or re-bisect. Fangzhi Zuo's FRL patches 61/66 and 65/66
+in Chenyu Chen's DC 3.2.398 series sit on the same code.

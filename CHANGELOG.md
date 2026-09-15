@@ -15,6 +15,94 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc3-12-sleepy-next]: 2026-09-15
+
+### Added (from the 2026-09-15 sweep)
+- **`2012`–`2013`** — Zhenxian Ma's "block: avoid redundant flushes for O_DSYNC
+  direct writes" pair (linux-next `bec7d36a6514`, `0d492f40c4ad`, `Reviewed-by:
+  Christoph Hellwig`, merged by Jens for 7.4). `blkdev_write_iter()` called
+  `generic_write_sync()` unconditionally, so an `O_DIRECT|O_DSYNC` write paid a
+  `REQ_PREFLUSH` on top of the `REQ_FUA` the direct path had already set. The
+  author measured 4 KiB `O_DIRECT|O_DSYNC` writes on a Seagate ST20000NM007D
+  going from 119.7 to 7497 IOPS. This machine's Phison E16 reports `fua=1`, so
+  `2013` (use FUA only when the device supports it) is inert here; `2012` is the
+  one that removes the redundant flush.
+- **`2100`** regenerated from sirlucjan's 2026-09-14 `zstd-7.3` cut
+  (`e0f9795534f4`, 2741 lines, 25 files vs 20). The newer cut carries more
+  upstream zstd work, including a BMI2 dispatch refactor
+  (`lib/zstd/common/bmi2.h`). zstd is now load-bearing for the swap stack, not
+  just for btrfs.
+
+### Removed (superseded by `2100`)
+- **`2128`** (use `ZSTD_cpuSupportsBmi2()` in `ZSTD_initStaticCCtx()`) and
+  **`2143`** (DDict hash-set probe wrap-around) are inside the new `2100`; its
+  hunk reports already-applied and `2143` is skipped as present. Removed with
+  the user's approval — the code stays in the tree through `2100`.
+
+### Sweep 2026-09-15: three parallel sweeps (MM, crypto/block/net, PM/x86/sched + work items)
+
+**Hazard for the 7.4 bump — re-test the flicker fix.** Upstream has merged
+"Enable HDMI FRL by default" (`af6139855b55`, in amd-staging only for now,
+targeted 7.4), which sets `DC_FRL_MASK` in `amdgpu_dc_feature_mask`. That is
+exactly the variable this project bisected for the 240 Hz flicker and dropped
+as `1144` (`PATCH_SOURCES.md`). When the bump lands, re-check the MAG251RX at
+1920x1080@240 Hz before shipping. Related: Fangzhi Zuo's FRL patches 61/66 and
+65/66 in Chenyu Chen's DC 3.2.398 series sit on the same surface as our `0058`
+and `1136`.
+
+**Already carried — the sweeps re-found our own patches.**
+- `2500` is `f7491d7c81db` (the Phoronix "silent user-space data loss since
+  2023" item); `2502` is `27600805e62f` (x86/amd_node PCI refcount);
+  `2404` is `c7a1c6e8004a` (sched_ext). All three are now upstream post-rc3
+  and go on the drop-list for the next bump.
+- `1159` is patch 58/66 of Chenyu Chen's DC 3.2.398 series — the patch AMD
+  developers recommend in work items #5829, #5834 and #5839 for `update_config`
+  NULL dereferences. Carrying it already.
+- The kbuild series Phoronix covered on 2026-09-15 ("~36% faster builds") is
+  the `[PATCH v2 00/21]` series we already carry as `2302`–`2322`.
+- `2140` (direct compaction for costly `__GFP_NORETRY`) is in mm-unstable —
+  ours already. `2011` is byte-identical to the r8169 LTR ML v4.
+
+**Deferred, with reasons.**
+- zswap "optimize zswap invalidate and store" v3 (Kefeng Wang, 3 patches)
+  applies cleanly and is on-target now that zswap backs the swap stack. Held
+  back deliberately: it rewrites `swap_range_free()`, the same function the
+  xswap series (`2155`–`2166`) rewrites, and both are unmerged review-stage
+  series. Composing two of those in the swap hot path is how this project got
+  the flicker. Re-evaluate at the 7.4 bump, when at least one of them lands.
+- Usama Arif's PMD-level swap entries for anonymous THPs v7 (29 patches) is
+  the most on-target MM series found (THP swap + zswap + xswap all in play),
+  but it is a large review-stage rewrite of the same paths. Watch.
+- Hugh Dickins' `mm/fbatch` drain v2 (26 patches): the author states he is
+  taking three weeks off, expects "some disappointments" on performance, and
+  asks someone else to shepherd it.
+- Lorenzo Stoakes' VMA-flag semantics v2 (40 patches) is the same churn that
+  already broke LRU-MARIE once (`vm_flags` → `vma_flags`).
+- CPPC: our `1210`–`1224` are Christian Loehle's **v5**; a **v6** exists
+  (2026-08-30, same 15-patch shape, still under review with an outstanding
+  request from Rafael Wysocki). Refresh at the bump rather than mid-cycle.
+- amd-pstate 7.4 pull: Zen 6 EPP tunings do not apply to Zen 4, but the pull
+  restructures `amd-pstate.c`/`.h` where our `1201`/`1202` live — expect a
+  rebase surface.
+- **BBR3 rebase surface**: linux-next `cb145191e9d3` renames `min_tso_segs()`
+  to `tso_segs()` with a new signature; `0101-cachy-bbr3.patch` references the
+  old name 13 times.
+- io_uring cancel-at-ring-close (15 patches) and the rsrc node-cache RFC are
+  7.4 material. `net/sched` qdisc handle scan needs 32767 HTB classes to
+  matter (ours has one). Rejected as off-target: r8169 RSS v13 (RTL8127),
+  realtek PHY firmware writes (RTL8261x), `xor_gen` AVX-512 (`CONFIG_BLK_DEV_MD`
+  is off), `tcp_poll()` `smp_rmb()` (an ARM64 win), zonelist/NUMA and
+  cache-aware-scheduling work (single-CCD desktop), ESMTP (SEV-SNP guests).
+
+**Work items.** The five tracked issues (#5821 hang, #5820 SMU bus loss, #5800
+vblank timeout, #5812 VRR black level, #5780 HDMI FRL) still have no referenced
+fix. #5720's fix (`c4a5160e3be0`) is absent from rc3 but concerns YCbCr-4:2:0
+sinks, which this monitor is not. #5663 (TTM/SDMA artifacts after resume) is
+acknowledged by Christian König as known and being investigated.
+
+### Changed
+- `pkgrel` 11 → 12.
+
 ## [7.3.0-rc3-11-sleepy-next]: 2026-09-15
 
 ### Added
@@ -41,6 +129,9 @@ full entries remain in git history.
   device appears, which would make `xswap/create` return `-EOPNOTSUPP`.
   `vm.swappiness=150` moves to `/etc/sysctl.d/99-xswap-swappiness.conf`; the
   masked udev rule used to set it.
+
+
+
 
 ### Changed
 - **`2101`** now carries LRU-MARIE **0.11.1r2** from the author's repository

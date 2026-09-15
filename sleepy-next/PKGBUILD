@@ -182,7 +182,7 @@ _rcver=rc3
 
 pkgver=7.3.0_rc3
 _tagrel=1
-pkgrel=11
+pkgrel=12
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -322,7 +322,9 @@ source=(
   "patches/2000-2099/2009-fs-buffer-check-for-NULL-pointer-before-folio_test_dropbehind.patch"
   "patches/2000-2099/2010-blk-cgroup-save-IRQ-state-in-blkg_tryget_closest.patch"
   "patches/2000-2099/2011-r8169-dont-enable-chip-LTR-when-the-platform-has-not-enabled-LTR.patch"
-  "patches/2100-2199/2100-zstd-7.2-merge-v1.6.0-into-kernel-tree.patch"
+  "patches/2000-2099/2012-block-skip-redundant-flush-for-O_DSYNC-direct-writes.patch"
+  "patches/2000-2099/2013-block-only-use-REQ_FUA-for-direct-writes-if-the-device-supports-it.patch"
+  "patches/2100-2199/2100-zstd-7.3-merge-v1.6.0-into-kernel-tree.patch"
   "patches/2100-2199/2101-mm-7.3-introduce-LRU-MARIE-0.11.1r2.patch"
   "patches/2100-2199/2120-mm-gup-mm-gup-break-out-gup-fill-pages-helper.patch"
   "patches/2100-2199/2121-mm-gup-mm-gup-convert-follow-page-mask-to-return-a-long.patch"
@@ -332,7 +334,6 @@ source=(
   "patches/2100-2199/2125-mm-gup-mm-gup-return-a-huge-page-s-full-count-from.patch"
   "patches/2100-2199/2126-mm-gup-mm-gup-walk-multiple-PTEs-per-follow-page-pte-call.patch"
   "patches/2100-2199/2127-mm-gup-mm-gup-batch-contiguous-same-folio-PTEs-into-one.patch"
-  "patches/2100-2199/2128-zstd-use-ZSTD_cpuSupportsBmi2-in-ZSTD_initStaticCCtx.patch"
   "patches/2100-2199/2129-zstd-skip-BMI2-probe-when-dynamic-BMI2-dispatch-disabled.patch"
   "patches/2100-2199/2130-zstd-probe-CPU-for-BMI2-support-only-once.patch"
   "patches/2100-2199/2131-mm-mglru-separate-folio-generation-update-from-LRU-accounting.patch"
@@ -347,7 +348,6 @@ source=(
   "patches/2100-2199/2140-mm-page_alloc-avoid-direct-compaction-for-costly-NORETRY-allocations.patch"
   "patches/2100-2199/2141-mm-filemap-retain-mapped-dropbehind-folios.patch"
   "patches/2100-2199/2142-mm-vmscan-avoid-pointless-large-folio-splits-without-swap.patch"
-  "patches/2100-2199/2143-zstd-fix-DDict-hash-set-probe-index-wrap-around.patch"
   "patches/2100-2199/2144-xarray-fix-index-jumping-backwards-in-xas_find.patch"
   "patches/2100-2199/2145-mm-vma-correctly-unaccount-on-mmap_prepare-failure.patch"
   "patches/2100-2199/2146-mm-mlock-use-the-IRQ-safe-accessor-for-NR_MLOCK.patch"
@@ -1135,7 +1135,9 @@ b2sums=('d400c07b3f76f262c51e88bfc34e419883f13ea12dc76975b624acd6712bef193c4bb88
         '4225cf30f9fc409bc9cff2398e68ca8623f61d9b082bc47b5b594265a8b4d59e90b69bf3490b4bc2b46850e0ca2190971b3cda780799f4217de9532e2de62e56'
         '448a251a84d7d02a7095cae31fc95f77cb06fa2d8e0a52d8a140ee36028807a14ac04b304260bc121ac8b8e80dae10e25a9a480a97f2152266d52d95a338c7db'
         '0eb42c67084faaf6390258842b0cdf37c7440b24a9956209b20674991f520606f98ba3dda12f4912a23d7a17c9eaa74fb84518561ed46e00139afe6a71ae6950'
-        '1d8d63086f1d7ee562047c5e126276b98452daf4cf5146d9a80030abd4832d6fab97c91c01678c301ec9d830a210952715b852c1c9a6783001633ca2f313fa1d'
+        '6ae674fbe987a1fdb27e5956b4330d1ef9e51290205104ea85325f1c6826e55e9378ab45545cbefea298ffd9daa17c74eb9f64ea8a66ce625eb055fb8a35b9a8'
+        '5a6d1572133692dbae8e9ea4e5f703376b6c516c1ee06f40ee0c79f8596504cafb26919aa538c57b67bac3d0a8a2d28e8ad993b40cd8c88c2536347df15294a9'
+        '07c483cb4406a48a811c3893ccf33b379004a706777d60dc5d81726fcd3c87b4bced6aab8331c247aa96eb31772ea715c0135de502604c58561e1f67917a1e70'
         'af27ad207d40b0f0b05512843f5c38b05f841f47e022341d8bf9778a41beaf47d57c784901bd47d558965ed73412e3716ee91d785063d02a8427b540aae4a739'
         'a745db752d2586475d373cb29e64b4f42f6e305b4b3e588efbce955491429c73b3d16c426e76118b1499bbfb4a2159192f3950ed06d309064eb28750a1d6e6aa'
         '8820c684d4f21c9c74729a518f187334b817b8059436aa808e423533a67a6b752a93df4e79c200307b29635f0de393f6749aaa52cfc20e28957f759b4adb6ce0'
@@ -1145,7 +1147,6 @@ b2sums=('d400c07b3f76f262c51e88bfc34e419883f13ea12dc76975b624acd6712bef193c4bb88
         'e5330139599a17003bdc3508190e71b3875e354ea6f345d24104ff3449724fab9638f2e431ed0e86c0d987733431da0594bec323271c135e8c6daacf5c7eeb69'
         'a590f6140a02f5cbee18f8ea91ec079e965b5d06a9bdf09c85940f6380fbd6d8a29cb87f846fe05985bb8a256177dd27d3d2a6a1cca9c296cd1c0b3e7ce01985'
         'c91351632390e03d5b874ce5180e07c54c892592180c7d9bf14175e3874762cad385e60f5f77aae24a58bcd1c1a380e40598a52d0dc085fe04f5c63805c68048'
-        'c096823c41fb07bd9974ae2189ffeb1f98c31730eb9f8e3ccafe4e3d30b9b9c207b592672698e3f7b5369cdc3baf5375c15f15fc87551fdb27dfbe97e318a66e'
         'eb5b6994b1341e7c05c49ba79336febc87dffe40e5008a81a9afdf931c8d2c00fb69fcf4d70923ba999993dd2e8e9ebf768d5809ee219a22e94f632944553539'
         '5626968774bad1795494928621f43e19945a1ecbd26c4dccd432a329277c26f04fc4ae02fde5560c503aed0fcd9bfda219de5c47e29a226149723fa5a7dbb721'
         'cba1e7420661569cef5f2f60191c4d81be9b8c990ed848f789f389622878ab8dbe8c36c0c490bfdfe7b9c812f12f8c8c4158ec71337cddd821fddf770f84d69b'
@@ -1160,7 +1161,6 @@ b2sums=('d400c07b3f76f262c51e88bfc34e419883f13ea12dc76975b624acd6712bef193c4bb88
         '0e78ba14e22246ea53e7db445233ab50783dba533cf3bb90b3f387a44147c282d6e856aee34e8f43dd854e8a5a6a792bcda56a70cbc5589451bf91627efffab1'
         'f4cfd25e020cd0b6292bd70465a55d46b7aa9b89e803f95d300ee69f7f430dc3e01c73a320f792af88bbda29842eb55fdc21bbb97f54a4f94ab9ce143a6f79c6'
         '67a726146b9ecc8403fb0c70650c0c6354a48171684a198eb8ca46b4cd5c71e0592b583a015fba8bb4d83e0b90f157baf36ed86e0c43250250e723670fd8440c'
-        'd5bc5e94aeb3f32306888b622407aca66545ece43a1ab3d767f83c4f70ef21e5e646d986e0550558db94a18987094a251bcbb04d97de3f29f2be784ed46cbce2'
         '46f2b6e3bfbef36211ac98d3ce20e41cca25a22aec14f1e5fb3c1b7b507b14d9d464c56696a37fe7dca8351619a9c7dcd1346f616b4883b65814096f0a6c4a45'
         '0033b6e49dfc73e34ff5d5d3272d6b90144d081ea0c801dec47e7fbeee080d3823519984b460ae4de2d1869118195a44b5b74fdcf71a8aaca2409fc30edde584'
         '95ec3bfd4c26aee45f1229b2ec4fc67051d4796820776cf2699ac7fc713fee88ae1ce2f1eb59eb73b8e247e787b0e7dfcecf72d104ce2e05b5a51617b1f68bd2'

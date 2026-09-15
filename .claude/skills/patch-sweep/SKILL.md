@@ -18,8 +18,7 @@ description: >
 - **Read the whole skill before starting.** The steps build on each other
   (fetch → scan → triage → number). Skipping ahead produces a wrong report.
 - **Never access `lore.kernel.org`.** Its anti-bot protection blocks automated
-  agents. Use only the git repos and the `lists.freedesktop.org` archives
-  described in this skill.
+  agents. Use only the git repos and the `lists.freedesktop.org` archives.
 - **Use the `git -C repos/<repo> ...` form everywhere** (this form is already
   covered by project permissions). Never `cd` into a repo and run git there.
 - **Confirm each command's output before proceeding.** An empty `curl`
@@ -49,7 +48,6 @@ description: >
 
 The steps below query every source listed here. Phoronix is a signal, not a
 patch source (Step 2c).
-
 | Source | Where |
 |---|---|
 | Mainline torvalds | `repos/torvalds`, `repos/linux-next` |
@@ -70,18 +68,9 @@ patch source (Step 2c).
 ## Step 1: fetch all repos in parallel
 
 ```bash
-# Linux-next is huge and slow to fetch. If the newest next-YYYYMMDD tag
-# equals what we already have locally, SKIP the linux-next fetch.
-#   git ls-remote --tags repos/linux-next 'next-*' | awk -F/ '{print $NF}' | rg -v "\^{}" | sort -V | tail -1
-#   git -C repos/linux-next describe --tags master   # what we already have
-# Tags are published on working days only — weekends have no new snapshot.
-# CAVEAT (learned 2026-08-04): ls-remote --tags on kernel.org's linux-next may
-# NOT advertise the newest snapshot (stale/truncated ref advertisement on this
-# huge repo). next-20260803 existed but ls-remote only showed next-20260731.
-# If the calendar says a newer working-day snapshot should exist but ls-remote
-# disagrees, try a DIRECT tag fetch before concluding nothing is new:
+# Linux-next is huge; skip the fetch when we already have the newest tag.
+# ls-remote may not advertise it (2026-08-04) — fetch the tag directly:
 #   git -C repos/linux-next fetch origin tag next-YYYYMMDD
-# That bypasses the advertisement and either fetches the tag or errors cleanly.
 
 # Git repos (use background processes). drm-misc is the TTM/dmemcg/dmabuf line
 # (Valve dmemcg-aggressive-protect series) — clone on first sweep.
@@ -308,6 +297,17 @@ check_commit() {
     echo "  $(echo "$fwd" | head -1)"
   fi
 }
+```
+
+**One fix, two hashes (learned 2026-09-15).** The same patch often sits in
+linux-next under a different hash and subject than in torvalds:
+`aa55d949bf9f` ("fix pmd_modify() dropping the dirty bit") and `f7491d7c81db`
+("Fix user-space data loss with MADV_FREE and THP") are one commit — same
+author, date, and diff. Check by content, not subject:
+
+```bash
+git -C repos/torvalds show <sha> --format='' | md5sum   # compare diff bodies
+rg -l "<the changed line>" sleepy-next/patches/         # already carried?
 ```
 
 **Clean-base FAIL is not a series FAIL (learned 2026-09-15).** A candidate
