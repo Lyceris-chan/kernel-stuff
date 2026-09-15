@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-next/PKGBUILD`.
 
 - **Base:** Linux `v7.3-rc3`
-- **Series:** 215 patches
+- **Series:** 216 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -25,7 +25,7 @@ are supplied by the generator instead, so every row below has a source.
 | `1100–1199` | AMD display (DCN4, colorops) | 18 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 18 |
 | `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 14 |
-| `2100–2199` | Memory management and swap (zstd, LRU-MARIE, MGLRU, gup, xswap) | 49 |
+| `2100–2199` | Memory management and swap (zstd, LRU-MARIE, MGLRU, gup, xswap) | 50 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 21 |
 | `2400–2499` | Core scheduler and sched-ext | 3 |
@@ -54,6 +54,7 @@ renumbered to `1165` in the rc3-9 cycle (2026-09-15).
 | `0033` | drm/amd/display: Fix missing HPO FRL link encoder register init | Sleepy | 2026-07-01 | `a4d4d2c0a220` |
 | `0034` | drm/amd/display: Prevent memory leak during IRQ service destroy | Sleepy | 2026-07-01 | `33a065acb38a` |
 | `0050` | drm/edid: Parse AMD VSDB for FreeSync refresh range | Alex Huang | 2026-08-04 | `20260804143339.714548-2-Alex.Huang2@amd.com` |
+| `0055` | drm/edid: add the HDMI VRR capability struct without enabling the parse | Fangzhi Zuo (struct-only strip by Sleepy) | 2026-07-30 | `20260730171754.704049-2-jerry.zuo@amd.com` |
 | `0058` | drm/amd/display: restore FRL cap on non-destructive HDMI link verify | Fangzhi Zuo | 2026-07-30 | `20260730205047.1016922-1-jerry.zuo@amd.com` |
 | `0059` | drm/amd/display: Add 2.1 FreeSync support for AMD VSDB EDID Block | Fangzhi Zuo | 2026-08-26 | `150622@lists.freedesktop.org` |
 | `0061` | drm/amd/display: Enable HDMI ALLM for Gaming-VRR | Fangzhi Zuo | 2026-08-26 | `150621@lists.freedesktop.org` |
@@ -171,7 +172,8 @@ renumbered to `1165` in the rc3-9 cycle (2026-09-15).
 | `2139` | mm: vmscan: avoid anon scanning for GFP_NOIO with low swapcache | Bo Zhang | 2026-09-08 | `09c1d29a3d1e` |
 | `2140` | mm/page_alloc: avoid direct compaction for costly __GFP_NORETRY allocations | Salvatore Dipietro | 2026-09-11 | `60adb47f4fa3` |
 | `2141` | mm: filemap: retain mapped dropbehind folios | Wenjie Qi | 2026-08-30 | `848d2ce2fce1` |
-| `2142` | mm/vmscan: avoid pointless large folio splits without swap | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-08-30 | `bd7fcb0dea86` |
+| `2169` | mm/vmscan: avoid pointless large folio splits without swap | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-08-30 | `bd7fcb0dea86` |
+| `2170` | mm: vmalloc: fix vmap_purge_lock livelock under memory pressure | Ye Liu | 2026-08-28 | `6c06fec56a63d` |
 | `2144` | xarray: fix index jumping backwards in xas_find() | Krystian Kaniewski | 2026-09-04 | `5fe684a7cd8e` |
 | `2145` | mm/vma: correctly unaccount on mmap_prepare() failure | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-02 | `6cc27d821963` |
 | `2146` | mm/mlock: use the IRQ-safe accessor for NR_MLOCK in __munlock_folio() | Shakeel Butt | 2026-09-01 | `e14a34548064` |
@@ -275,7 +277,6 @@ renumbered to `1165` in the rc3-9 cycle (2026-09-15).
 | `9058` | drm/amdgpu: hold a runtime PM reference for P2P dma-buf attachments | Mike Lothian | 2026-09-12 | `20260911232908.1056738-1-mike@fireburn.co.uk` |
 | `9059` | drm/amdkfd: don't gate userptr cleanup on the owning mm | Perry Yuan | 2026-09-02 | `20260902024715.696381-1-perry.yuan@amd.com` |
 | `9060` | drm/amdkfd: skip migration when the fault window is already in VRAM | William Palacek | 2026-09-01 | `20260901165400.16262-1-William.Palacek@amd.com` |
-| `9061` | drm/amdkfd: Fix TCP XNACK scoreboard reset race | Gang Ba | 2026-09-09 | `20260909201536.942624-1-Gang.Ba@amd.com` |
 
 ## The v7.3-rc3 bump (2026-09-13)
 
@@ -409,9 +410,10 @@ trailer, and no leftover `[PATCH n/N]` series numbering.
 
 ### HDMI and EDID (0050–0061)
 
-`0050` is Alex Huang's v3, which tolerates future VSDB revisions. `0055` is
-Fangzhi Zuo's HF-VSDB gaming-caps patch (`150619` in the
-lists.freedesktop.org amd-gfx 2026-August archive). `0059`, `0060` and `0061`
+`0050` is Alex Huang's v3, which tolerates future VSDB revisions. `0055` is a
+Sleepy [sleepy]-stripped version of Fangzhi Zuo's HF-VSDB gaming-caps patch (the full submission is `20260730171754.704049-2-jerry.zuo@amd.com`, 2026-07-30;
+the series also appeared as `150619` in the lists.freedesktop.org amd-gfx
+2026-August archive). `0059`, `0060` and `0061`
 are the amdgpu side of the same series from that archive, as `150622`, `150623`
 and `150621`. Together these give HDMI 2.1 FreeSync over `SIGNAL_TYPE_HDMI_FRL`,
 the HF-VSDB VRR-range fallback, and ALLM for Gaming-VRR.
@@ -725,9 +727,9 @@ devices"), posted to linux-mm on 2026-09-13 and also shipped by CachyOS in its
 mainline, and re-check for a v3 before rebasing. `CONFIG_XSWAP=y` is set in
 `config`.
 
-## 2026-09-15 note: 2142 needed its series prerequisites
+## 2026-09-15 note: 2169 (formerly 2142) needed its series prerequisites
 
-`2142` is patch **3/4** of Xueyuan Chen's "[PATCH v7 0/4] mm: avoid large folio
+`2169` — carried as `2142` until the 2026-09-15 renumber — is patch **3/4** of Xueyuan Chen's "[PATCH v7 0/4] mm: avoid large folio
 splits when swap is unavailable". Only 3/4 was ever carried. On its own it is
 not just incomplete but wrong: it gates the large-folio split fallback on
 `ret != -E2BIG`, and nothing in the tree returned `-E2BIG` — 2/4 is what

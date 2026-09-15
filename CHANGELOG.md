@@ -15,6 +15,34 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc3-14-sleepy-next]: 2026-09-15
+
+### Added
+- **`2170`** — "mm: vmalloc: fix `vmap_purge_lock` livelock under memory
+  pressure" (Ye Liu, `6c06fec56a63d`, `Fixes: 7679ba6b36db`,
+  `Reviewed-by: Uladzislau Rezki (Sony)`, in akpm's tree). `__purge_vmap_area_lazy()`
+  holds `vmap_purge_lock` across a `flush_work()` while `vmap_node_shrink_scan()`
+  can block on that same lock from direct reclaim — a circular wait that
+  deadlocks the whole system under memory pressure. The fix takes the lock with
+  `mutex_trylock()` in both reclaim-reachable paths and reports
+  `SHRINK_STOP`; skipping a pool decay is harmless. `mm/vmalloc.c` is not
+  touched by any other patch in the series.
+
+### Changed
+- **Renumbered for order.** `1165` now sits after `1164` instead of back at the
+  `1140` slot it kept when it was renamed from `1140`, and `2142` became
+  **`2169`** so the three parts of its series read `2167`, `2168`, `2169`.
+  `source=()` is now sorted ascending end to end. No patch content changed.
+- `pkgrel` 13 → 14. Series is now 216 patches.
+
+### Ledger repair
+- `PATCH_SOURCES.md` had a stale index row for `9061` (evaluated and dropped
+  for a compile failure, never carried) and **no row at all for `0055`**, which
+  is carried. Both fixed; `0055`'s row now names its real provenance (a
+  `[sleepy]`-stripped version of Fangzhi Zuo's submission, not the
+  `150619` archive id the prose implied). Every remaining row without a file is
+  an intentional "Dropped" record.
+
 ## [7.3.0-rc3-13-sleepy-next]: 2026-09-15
 
 ### Fixed

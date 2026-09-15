@@ -27,20 +27,17 @@ description: >
   verify the repo actually fetched — never assume "no candidates" from an
   empty result.
 - **Use absolute patch paths with `git -C`.** `git -C <repo> apply --check`
-  changes the process directory to the repo, so a relative patch path like
-  `patches/<range>/NNNN-....patch` resolves against the repo and errors "can't
-  open patch". Always write
+  changes directory, so a relative patch path resolves against the repo and
+  errors "can't open patch". Always write
   `git -C repos/linux-next apply --check "$PWD/patches/<range>/NNNN-....patch"`.
-  Patches live in `patches/<range>/` folders (2026-08-11); root-level
-  `NNNN-*.patch` entries are gitignored build symlinks, not the source of truth.
+  Root-level `NNNN-*.patch` entries are gitignored build symlinks, not patches.
 - **Capture real exit codes, never `| head && echo OK`.** `git apply --check f
   2>&1 | head -3 && echo CLEAN` always prints CLEAN because `head`'s exit status
   wins. Use `git apply --check f > log 2>&1; echo "exit: $?"` and read `log`.
 - **`git apply --check` passing is NOT enough** (learned 2026-08-03). The patch
   must also survive `patch -p1 --forward -F2 --dry-run` — GNU patch rejects
-  context that git-apply tolerates (extra lines between context lines, a
-  context line that gained an `r = ` prefix). For a file absent from the base,
-  strip that file's hunks + its stats line as a documented adjustment.
+  context git-apply tolerates (a context line that gained an `r = ` prefix).
+  For a file absent from the base, strip its hunks + stats line, and document it.
 
 # Six-Source Patch Sweep
 
@@ -83,9 +80,8 @@ done
 git -C repos/linux-next fetch --shallow-since=2026-08-01 origin 2>&1 | tail -3 &
 git -C repos/sirlucjan-kernel-patches pull 2>&1 | tail -3 &
 git -C repos/firelzrd-bore-scheduler pull 2>&1 | tail -3 &
-# lore git mirrors (never the lore web UI). "shallow-since" fetches on these
-# can die with "error in object: unshallow" — a plain `fetch` works; if it
-# hangs, `timeout 120` and mark the mirror UNREFRESHED rather than stalling.
+# lore mirrors: use a plain `fetch` (shallow-since dies with "unshallow"); if
+# it hangs, `timeout 120` and mark that mirror UNREFRESHED rather than stalling.
 for repo in repos/lore-amdgfx repos/lore-dri-devel repos/lore-linux-mm \
             repos/lore-linux-crypto repos/lore-linux-pm repos/lore-linux-block \
             repos/lore-io-uring repos/lore-linux-nvme repos/lore-fsdevel-new \
@@ -310,12 +306,17 @@ git -C repos/torvalds show <sha> --format='' | md5sum   # compare diff bodies
 rg -l "<the changed line>" sleepy-next/patches/         # already carried?
 ```
 
-**Clean-base FAIL is not a series FAIL (learned 2026-09-15).** A candidate
-can fail against the clean rc tree and still apply to the series-applied
-tree because earlier patches supply the context — the userq kref series
-(1065–1074) had two such patches (05/10, 10/10) that apply only after our
-existing userq backports. When a patch fails the clean-base check, apply-check
-it against the series state (`repos/_audit_rc3/...`) before dropping it.
+**Clean-base FAIL is not a series FAIL (learned 2026-09-15).** A candidate can
+fail against clean rc and still apply to the series-applied tree, because
+earlier patches supply the context. Get that tree with `--keep` and test there:
+
+```bash
+python3 .claude/skills/kernel-build/scripts/audit_series.py --keep
+git -C repos/_audit/<tree> apply --check "$PWD/patches/<range>/<cand>.patch"
+```
+
+Never test against a plain copy of the rc source: with no `.git`, `git -C`
+walks up to the enclosing sleepy-kernel repo and patches the wrong tree.
 
 ## Step 6 — Triage checklist (run in this order for every CLEAN candidate)
 
