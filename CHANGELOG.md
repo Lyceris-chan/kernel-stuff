@@ -87,8 +87,10 @@ and `1136`.
 - **BBR3 rebase surface**: linux-next `cb145191e9d3` renames `min_tso_segs()`
   to `tso_segs()` with a new signature; `0101-cachy-bbr3.patch` references the
   old name 13 times.
-- io_uring cancel-at-ring-close (15 patches) and the rsrc node-cache RFC are
-  7.4 material. `net/sched` qdisc handle scan needs 32767 HTB classes to
+- io_uring: cancel-at-ring-close (merged for 7.4) and Jens Axboe's 15-patch
+  thread-identity handoff RFC are 7.4 material — the RFC's own table shows
+  large queue-depth-1 wins but losses at higher depth (−65% fsync on ext4 at
+  qd32), so it is not obviously a win. `net/sched` qdisc handle scan needs 32767 HTB classes to
   matter (ours has one). Rejected as off-target: r8169 RSS v13 (RTL8127),
   realtek PHY firmware writes (RTL8261x), `xor_gen` AVX-512 (`CONFIG_BLK_DEV_MD`
   is off), `tcp_poll()` `smp_rmb()` (an ARM64 win), zonelist/NUMA and
@@ -205,11 +207,15 @@ customization toolkit (TUI, build configs, and a patch set). Reviewed on
 
 ### Sweep 2026-09-15 (evening)
 - Nothing new in agd5f, drm-next, linux-pm, or the CachyOS branches today.
-- **`next-20260915`** (737 files, +42k/-12k over the previous snapshot)
-  carries nothing to add: `aa55d949bf9f` ("x86/mm: fix pmd_modify() dropping
-  the dirty bit") is byte-identical to `f7491d7c81db`, the fix already carried
-  as `2500` (same author, same date, identical diff), and `eddf1f80667e`
-  (shmem forced collapse) is our `2151`. The hugetlb subpool accounting fix
+- **`next-20260915`**: its tree diff against `next-20260914` is 737 files
+  (+42k/-12k). Nothing in it needs adding. Two commits checked by content:
+  `aa55d949bf9f` is byte-identical to `f7491d7c81db`, the fix we already carry
+  as `2500` (same author, same date, identical diff), and `eddf1f80667e` is our
+  `2151`. *Method note:* `git log A..B` between two linux-next tags returns
+  **1.47 million** commits, because the tags are rebased onto fresh bases daily
+  — the commit list is meaningless. Use `git diff` for content and the tag's own
+  merge commits for attribution; `git log` between tags produces a confident,
+  wrong "delta". The hugetlb subpool accounting fix
   (`1ff1504af83d`) is unreachable here — `HugePages_Total` is 0, so nothing
   allocates from a hugetlbfs subpool. `228200f695c0` fixes Zen 5 TLB size
   reporting (a CPUID bit Zen 4 does not set). The block delta is entirely
