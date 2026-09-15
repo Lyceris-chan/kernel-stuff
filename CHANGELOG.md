@@ -45,9 +45,11 @@ full entries remain in git history.
 ### Changed
 - **`2101`** now carries LRU-MARIE **0.11.1r2** from the author's repository
   (<https://github.com/firelzrd/lru_marie>). The r2 revision is 0.11.1 minus
-  the `localversion` file creation — the content is otherwise byte-identical,
-  and this repository already stripped that hunk, so the code in the built
-  kernel does not change.
+  the `localversion` file creation (the `-marie` version suffix), which this
+  repository had already stripped. It also restores the author's
+  `scripts/setlocalversion` change — an `echo "+"` commented out — which is
+  inert here because the kernel is built from a tarball and that branch only
+  runs inside a git tree. The built version string is unchanged.
 - `pkgrel` 10 → 11. Series is now 213 patches.
 
 ### Reviewed and not included: cachymod
