@@ -182,7 +182,7 @@ _rcver=rc3
 
 pkgver=7.3.0_rc3
 _tagrel=1
-pkgrel=15
+pkgrel=16
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -643,7 +643,13 @@ EOF
     # the blk-mq rework), so olddefconfig silently discarded it. The NVMe device's
     # scheduler is set by udev's /usr/lib/udev/rules.d/60-ioschedulers.rules, which
     # assigns kyber to nvme[0-9]*. MQ_IOSCHED_KYBER must still be built in.
-    scripts/config -e LRU_GEN -e LRU_GEN_ENABLED -e LRU_GEN_WALKS_MMU -e LRU_MARIE -e CPU_IDLE_GOV_NAP -e MQ_IOSCHED_KYBER -m USB_VIDEO_CLASS -m I2C_CHARDEV -m R8169 -d TCP_CONG_BBR -e TCP_CONG_BBR3 -e DEFAULT_BBR3 --set-str DEFAULT_TCP_CONG "bbr3"
+    scripts/config -e LRU_GEN -e LRU_GEN_ENABLED -e LRU_GEN_WALKS_MMU -e LRU_MARIE -e CPU_IDLE_GOV_NAP -e MQ_IOSCHED_KYBER -m USB_VIDEO_CLASS -m I2C_CHARDEV -e R8169 -e REALTEK_PHY -d TCP_CONG_BBR -e TCP_CONG_BBR3 -e DEFAULT_BBR3 --set-str DEFAULT_TCP_CONG "bbr3"
+    # R8169 + REALTEK_PHY built in, not modules. As modules they are loaded
+    # by udev after the root switch (measured: probe at 6.26s, PHY attach
+    # 7.05s, carrier 10.13s), which pushes the link negotiation past most of
+    # the boot; built in, the probe runs during kernel init and the ~3s of
+    # PHY negotiation overlaps with the rest of the boot. The PHY driver must
+    # be built in too, or it loads late and the carrier waits for it anyway.
     # ASPM: OFF (was PERFORMANCE). There is no Kconfig "off" policy for PCIe ASPM —
     # the choice is BIOS-default/powersave/powersupersave/performance. The real
     # "off" is the runtime pcie_aspm=off param (the drm/amd !5538 SMU bus-drop
@@ -832,8 +838,13 @@ _package() {
     else
         install -Dm644 "$startdir/net-tune/net-tune.conf" -t "$pkgdir/etc/"
     fi
-    install -d "$pkgdir/etc/systemd/system/multi-user.target.wants"
-    ln -s /usr/lib/systemd/system/net-tune.service "$pkgdir/etc/systemd/system/multi-user.target.wants/net-tune.service"
+    # Enabled through network-online.target.wants, NOT multi-user.target.wants.
+    # A unit that multi-user pulls in is waited for, so an After=network-online
+    # service enabled there holds the session back until DHCP finishes --
+    # measured at 12.3s, which was this machine's entire avoidable boot time.
+    # The target still starts the shaping as soon as the link is up.
+    install -d "$pkgdir/etc/systemd/system/network-online.target.wants"
+    ln -s /usr/lib/systemd/system/net-tune.service "$pkgdir/etc/systemd/system/network-online.target.wants/net-tune.service"
 
     echo "Installing modules..."
     ZSTD_CLEVEL=19 make "${BUILD_FLAGS[@]}" INSTALL_MOD_PATH="$pkgdir/usr" INSTALL_MOD_STRIP=1 \

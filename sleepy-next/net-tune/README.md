@@ -4,8 +4,15 @@ One systemd service that applies low-latency Ethernet settings and CAKE SQM
 shaping. Each half is independently toggleable in `/etc/net-tune.conf`.
 
 `linux-sleepy-next` owns this service: a build installs it, enables it through
-`multi-user.target.wants`, and marks `/etc/net-tune.conf` as a pacman backup
+`network-online.target.wants`, and marks `/etc/net-tune.conf` as a pacman backup
 file so local edits survive kernel upgrades.
+
+It is enabled through the **network** target, not `multi-user.target`, and that
+is deliberate. A unit `multi-user.target` pulls in is waited for, so enabling an
+`After=network-online.target` service there makes the whole session wait for
+DHCP — 12.3s on this machine, its entire avoidable boot time. Pulled in by
+`network-online.target` instead, the shaping is applied as soon as the link is
+up and the desktop no longer waits for it.
 
 ## Configuration
 

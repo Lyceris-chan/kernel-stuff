@@ -4,6 +4,12 @@ Description=CAKE SQM + low-latency ethernet tuning
 # exists. Deliberately NOT ordered Before=network.target: that put this
 # service in the login critical chain and delayed boot by up to 30s while it
 # waited for the default route (network.target gates the greeter).
+#
+# Likewise WantedBy is network-online.target, NOT multi-user.target: a unit
+# that multi-user pulls in is waited for, so an After=network-online service
+# there holds the session back until DHCP finishes (measured: 12.3s, the whole
+# of this machine's avoidable boot time). Pulled in by the network target, the
+# shaping still applies once the link is up, and the desktop no longer waits.
 After=network-online.target
 Wants=network-online.target
 
@@ -13,4 +19,4 @@ ExecStart=/usr/local/bin/net-tune.sh
 RemainAfterExit=yes
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=network-online.target

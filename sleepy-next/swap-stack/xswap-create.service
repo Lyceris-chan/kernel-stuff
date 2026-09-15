@@ -2,7 +2,11 @@
 Description=Create an xswap device (extendable compressed swap backed by zswap)
 ConditionPathExists=/sys/kernel/mm/xswap/create
 DefaultDependencies=no
-After=local-fs.target
+# No After=local-fs.target: that lands between local-fs.target and swap.target
+# and closes a loop through any fstab mount ordered After=swap.target (fstab
+# mounts are), which systemd resolves by deleting the mount's own job. Root is
+# already mounted by the initramfs and sysfs by the initramfs' sysinit, so the
+# only ordering this needs is "before swap.target".
 Before=swap.target
 
 [Service]

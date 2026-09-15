@@ -15,6 +15,61 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc3-16-sleepy-next]: 2026-09-15
+
+### Boot speed
+
+Measured before touching anything: `9.406s firmware + 485ms loader + 2.099s
+kernel + 2.777s initrd + 14.751s userspace = 29.521s`. The userspace half was
+almost entirely one thing, visible straight from the critical chain:
+
+```
+graphical.target @14.751s
+└─ multi-user.target @14.720s
+   └─ net-tune.service @14.689s
+      └─ network-online.target @14.685s
+         └─ NetworkManager-wait-online.service @2.339s +12.346s
+```
+
+**The session was waiting 12.3s for DHCP.** Two of our own units were pulling
+that wait into the boot: `net-tune.service` was `WantedBy=multi-user.target`
+with `After=network-online.target`, and the same shape had been added to
+`blocky.service` by a drop-in. A unit that `multi-user.target` pulls in **is
+waited for**, so an `After=network-online` service enabled there holds the
+desktop back until the link is up — the earlier note in the unit ("deliberately
+NOT ordered Before=network.target") had fixed one half of this and missed the
+other.
+
+- Both are now pulled in by `network-online.target` instead:
+  `net-tune.service` in the package (its `WantedBy`, the enable symlink, and the
+  `install` step), `blocky.service` by an explicit
+  `network-online.target.wants` symlink — `systemctl enable` reads `[Install]`
+  from the unit file and ignores a drop-in's `WantedBy`, so the symlink is the
+  mechanism and the drop-in keeps only the ordering. Both still start the moment
+  the link is up; the desktop no longer waits for either.
+- **`2170`-adjacent, found by `systemd-analyze verify` while doing this:**
+  `xswap-create.service` had an ordering *cycle*
+  (`tmp.mount → swap.target → xswap-create → local-fs.target → tmp.mount`),
+  which systemd resolved by deleting the `tmp.mount` job at every boot. It
+  happened to mount anyway, but the fix is to drop `After=local-fs.target` —
+  the root is mounted by the initramfs, so `Before=swap.target` is all the unit
+  needs.
+- **`R8169` and `REALTEK_PHY` are built in, not modules.** As modules, udev
+  loaded them after the root switch: probe at 6.26s, PHY attached at 7.05s,
+  carrier at 10.13s — the ~3s of link negotiation ran *after* most of the boot
+  and pushed DHCP to the very end. Built in, the probe happens during kernel
+  init and that negotiation overlaps with the rest of boot. The PHY driver has
+  to be built in too, or the carrier waits for it to be loaded anyway.
+
+Not touched, with reasons: the initramfs (`54.5 MB`, but decompression is
+0.046s — the bulk is the 32.69 MiB AMD microcode CPIO, and trimming it saves
+almost nothing). The `kms` hook could shave the initrd's early module load but
+changes when the display modesets, which is not a trade to make blind on this
+monitor. The 9.4s of firmware time is POST, not the kernel.
+
+### Changed
+- `pkgrel` 15 → 16.
+
 ## [7.3.0-rc3-15-sleepy-next]: 2026-09-15
 
 ### Added
