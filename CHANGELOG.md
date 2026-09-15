@@ -84,9 +84,32 @@ customization toolkit (TUI, build configs, and a patch set). Reviewed on
   defaults — THP `always`, `CONFIG_PREEMPT=y`, `CONFIG_HZ=1000`, plus BBR3.
 
 ### Sweep 2026-09-15 (evening)
-- Nothing new in agd5f, drm-next, linux-pm, or the CachyOS branches today;
-  linux-next's newest snapshot remains `next-20260914`.
+- Nothing new in agd5f, drm-next, linux-pm, or the CachyOS branches today.
+- **`next-20260915`** (737 files, +42k/-12k over the previous snapshot)
+  carries nothing to add: `aa55d949bf9f` ("x86/mm: fix pmd_modify() dropping
+  the dirty bit") is byte-identical to `f7491d7c81db`, the fix already carried
+  as `2500` (same author, same date, identical diff), and `eddf1f80667e`
+  (shmem forced collapse) is our `2151`. The hugetlb subpool accounting fix
+  (`1ff1504af83d`) is unreachable here — `HugePages_Total` is 0, so nothing
+  allocates from a hugetlbfs subpool. `228200f695c0` fixes Zen 5 TLB size
+  reporting (a CPUID bit Zen 4 does not set). The block delta is entirely
+  zoned-storage work, which this NVMe does not use.
 - xswap had no v3 and no review replies at the time of the check.
+
+### Housekeeping
+- Removed the accumulated `*.pacnew` / `*.pacsave` files (13 of them, some
+  from January) after diffing each against its live config; they are archived
+  at `~/etc-pacnew-pacsave-20260915.tar.gz`. The live configs were the
+  deliberate ones in every case (for example `resolved.conf` sets `FallbackDNS=`
+  empty and `MulticastDNS=no`; `system.conf` sets `DefaultTimeoutStartSec=0s`).
+- Removed four dangling systemd-boot entries (`linux-cachyos-cacule`,
+  `linux-cachyos`, `linux-next`, `linux-sleepy`) whose kernels no longer exist
+  on disk, via `sdboot-manage remove`. Three valid entries remain.
+- `xswap-create.service` needed `DefaultDependencies=no` + `After=local-fs.target`:
+  `systemd-analyze verify` found an ordering cycle (swap.target is ordered
+  before sysinit.target, so a default-dependency service that is `Before=swap.target`
+  deadlocks the graph and systemd deletes the swap.target job to break it —
+  which would have silently skipped the unit at boot).
 
 ## [7.3.0-rc3-10-sleepy-next]: 2026-09-15
 

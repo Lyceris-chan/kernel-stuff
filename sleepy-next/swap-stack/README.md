@@ -56,6 +56,17 @@ swapon --show                                # one xswap device, priority 100
 grep -c zram /proc/swaps                     # 0
 ```
 
+## Other kernels on this machine
+
+Only kernels built with `CONFIG_XSWAP` get a swap device from this setup —
+this package, and anything built from the same series. The stock
+`linux-cachyos-rc` and `linux-cachyos-lts` kernels do not have it, and since
+zram is masked system-wide they boot with **no swap at all**. zswap does not
+help there: it is a compressed cache in front of a swap device, not a swap
+device itself. `xswap-create.service` skips cleanly on those kernels
+(`ConditionPathExists`), it just leaves them without swap. Bring zram back for
+a comparison boot by removing the two mask symlinks, or add a disk swap file.
+
 ## Tune
 
 `/sys/kernel/mm/xswap/type<N>/limit` caps a device, in pages. Grow and shrink
