@@ -94,6 +94,17 @@ and `1136`.
   is off), `tcp_poll()` `smp_rmb()` (an ARM64 win), zonelist/NUMA and
   cache-aware-scheduling work (single-CCD desktop), ESMTP (SEV-SNP guests).
 
+**Two branches/dirs we do not adopt from, checked.** CachyOS's `7.3/vesa-dsc-bpp`
+carries VESA DSC EDID parsing and a DSC `max_qp` spec fix; the EDID side is
+already upstream in rc3 and this machine never negotiates DSC (1080p240 fits
+HDMI 2.0's 600 MHz TMDS without it), so nothing to take. sirlucjan ships
+**ADIOS**, a 2,062-line non-upstream "Adaptive Deadline I/O scheduler"
+(`block/adios.c`, Piotr Gorski, 3.3.0) that CachyOS patches to be the default.
+Not adopted: it is unreviewed third-party block-layer code, and this machine's
+scheduler is a deliberate distro choice — `60-ioschedulers.rules` sets **kyber**
+for NVMe, bfq for rotating, mq-deadline for other flash. Worth revisiting only
+if desktop I/O latency ever becomes a complaint.
+
 **Verified drop-list (reverse-apply audit against torvalds master, 2026-09-15).**
 Five carried patches are already in master and disappear at the next bump:
 `2141` (filemap retain mapped dropbehind folios), `2145` (mm/vma unaccount on

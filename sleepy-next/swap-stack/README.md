@@ -72,6 +72,11 @@ a comparison boot by removing the two mask symlinks, or add a disk swap file.
 `/sys/kernel/mm/xswap/type<N>/limit` caps a device, in pages. Grow and shrink
 both work without it, and the default ceiling is 1xRAM.
 
+`/sys/module/zswap/parameters/max_pool_percent` (default 20) is the real memory
+ceiling: with no disk swap behind it, the compressed pool *is* the swap
+capacity, so the pool cap times the compression ratio is how much can be
+swapped. Raise it only if you see swap allocation failures.
+
 ## Revert to zram
 
 ```bash
