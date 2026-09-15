@@ -96,6 +96,13 @@ and `1136`.
   is off), `tcp_poll()` `smp_rmb()` (an ARM64 win), zonelist/NUMA and
   cache-aware-scheduling work (single-CCD desktop), ESMTP (SEV-SNP guests).
 
+**Checked and dismissed: the NAP governor.** A sweep pass reported that the
+NAP cpuidle governor never tests `states_usage[].disable` and could enter a
+C-state disabled via sysfs. It does test it — in `nap_fallback_heuristic()`,
+in `nap_find_min_valid_state()` (behind the cached-minimum path), and in the
+neural-net decision loop inside `nap_fpu_select()` before it accepts a
+candidate. No action.
+
 **Machine profile corrections that shrink the search space.** `CONFIG_NUMA` is
 **not set** in this build, so the NUMA-targeted optimizations that dominate mm
 and net-next (zonelist refactors, per-node reclaim, `skb_defer_free` node
