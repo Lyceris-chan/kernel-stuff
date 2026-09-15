@@ -15,6 +15,28 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc3-15-sleepy-next]: 2026-09-15
+
+### Added
+- **`1166`** — "drm/amd/display: Return success status from check_mode_supported"
+  (Alvin Lee, `Reviewed-by: Wenjing Liu`, DC 3.2.398 patch 59/66,
+  `<20260908113338.2433445-60-chen-yu.chen@amd.com>`). `dml2_top_utm_check_mode_supported()`
+  logged DML2's verdict and then returned a hardcoded `true`, so a mode the
+  display mode library had rejected was still programmed. The fix returns
+  `status == DML2_STATUS_OK`; it is the patch AMD recommends in the reports of
+  **#5834** — a NULL pointer dereference in `update_config` that hits roughly 30%
+  of the time when waking from screen-off (plain DPMS, not suspend) on a 9070 XT,
+  leaving a blank screen and no usable tty. DPMS cycling is daily use here, and
+  the same series' patch 58 is already carried as `1159`.
+  *Watch on the first boot:* this makes mode validation authoritative, so a mode
+  DML2 rejects is now refused instead of programmed. 1920x1080@240 and 1080p are
+  ordinary modes for DCN 4.0.1 and unlikely to be rejected, but if the display
+  comes up at the wrong mode after rebooting, drop `1166` (or boot the
+  cachyos-rc entry) — that is the revert, and the changelog is the record.
+
+### Changed
+- `pkgrel` 14 → 15. Series is now 217 patches.
+
 ## [7.3.0-rc3-14-sleepy-next]: 2026-09-15
 
 ### Added

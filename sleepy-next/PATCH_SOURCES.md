@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-next/PKGBUILD`.
 
 - **Base:** Linux `v7.3-rc3`
-- **Series:** 216 patches
+- **Series:** 217 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -22,7 +22,7 @@ are supplied by the generator instead, so every row below has a source.
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 25 |
-| `1100–1199` | AMD display (DCN4, colorops) | 18 |
+| `1100–1199` | AMD display (DCN4, colorops) | 19 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 18 |
 | `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 14 |
 | `2100–2199` | Memory management and swap (zstd, LRU-MARIE, MGLRU, gup, xswap) | 50 |
@@ -104,6 +104,7 @@ renumbered to `1165` in the rc3-9 cycle (2026-09-15).
 | `1138` | drm/amd/display: pull colorops into state when recreating a plane | Harry Wentland | — | `20260825153539.213495-1-harry.wentland@amd.com` |
 | `1140` | drm/amd/display: clamp force_min_dcfclk to dcn42b range | Tom Chung | 2026-08-05 | `20260805063937.2145774-11-chiahsuan.chung@amd.com` |
 | `1165` | drm/amd/display: fall back to overlay cursor on dcn4x when top plane doesn't fill CRTC | James Lin | — | `20260818202139.4172592-2-IVAN.LIPSKI@amd.com` |
+| `1166` | drm/amd/display: Return success status from check_mode_supported | Alvin Lee (DC 3.2.398, posted by Chenyu Chen) | 2026-09-08 | `20260908113338.2433445-60-chen-yu.chen@amd.com` |
 | `1141` | drm/amd/display: skip receiver power control without AUX | "NepNep7601" | 2026-08-27 | `20260826204457.4666-1-neptune@imm0nv1nhtv.is-a.dev` |
 | `1142` | drm/amd/display: close DDC on I2C engine setup failure | "NepNep7601" | 2026-08-27 | `20260826204457.4666-2-neptune@imm0nv1nhtv.is-a.dev` |
 | `1143` | drm/amd/display: fall back to software I2C on hardware engine failure | "NepNep7601" | 2026-08-27 | `20260826170549.21985-1-neptune@imm0nv1nhtv.is-a.dev` |

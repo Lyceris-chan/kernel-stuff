@@ -1,0 +1,36 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Chenyu Chen <chen-yu.chen@amd.com>
+To: <amd-gfx@lists.freedesktop.org>
+CC: Harry Wentland <harry.wentland@amd.com>, Leo Li <sunpeng.li@amd.com>, Aurabindo Pillai <aurabindo.pillai@amd.com>, Roman Li <roman.li@amd.com>, Wayne Lin <wayne.lin@amd.com>, Tom Chung <chiahsuan.chung@amd.com>, "Fangzhi Zuo" <jerry.zuo@amd.com>, Dan Wheeler <daniel.wheeler@amd.com>, Ray Wu <Ray.Wu@amd.com>, Ivan Lipski <ivan.lipski@amd.com>, Alex Hung <alex.hung@amd.com>, James Lin <PingLei.Lin@amd.com>, Chenyu Chen <Chen-Yu.Chen@amd.com>, Alvin Lee <Alvin.Lee2@amd.com>, Wenjing Liu <wenjing.liu@amd.com>, Chenyu Chen <chen-yu.chen@amd.com>
+Subject: [PATCH 59/66] drm/amd/display: Return success status from check_mode_supported
+Date: Tue, 8 Sep 2026 19:31:52 +0800
+Message-ID: <20260908113338.2433445-60-chen-yu.chen@amd.com>
+
+From: Alvin Lee <Alvin.Lee2@amd.com>
+
+[Description]
+dml21_top_utm_check_mode_supported must return the success status from
+the mode support result otherwise the caller will believe that mode
+support always returns true. This can cause issues where mode support
+returns true, where mode programming returns false.
+
+Reviewed-by: Wenjing Liu <wenjing.liu@amd.com>
+Signed-off-by: Alvin Lee <Alvin.Lee2@amd.com>
+Signed-off-by: Chenyu Chen <chen-yu.chen@amd.com>
+---
+ .../drm/amd/display/dc/dml2_0/dml21/src/dml2_top/dml2_top_utm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_top/dml2_top_utm.c b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_top/dml2_top_utm.c
+index 73e02b10934f..77c9308bb9e6 100644
+--- a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_top/dml2_top_utm.c
++++ b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_top/dml2_top_utm.c
+@@ -290,7 +290,7 @@ static bool dml2_top_utm_check_mode_supported(struct dml2_check_mode_supported_i
+ 	DML_LOG_INFO("%s exit with %s\n", __func__, dml2_status_str(status));
+ 	DML_LOG_TOP_IF_EXIT();
+ 
+-	return true;
++	return status == DML2_STATUS_OK;
+ }
+ 
+ static bool dml2_top_utm_build_mode_programming(struct dml2_build_mode_programming_in_out *in_out)

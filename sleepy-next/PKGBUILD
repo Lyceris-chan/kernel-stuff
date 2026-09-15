@@ -182,7 +182,7 @@ _rcver=rc3
 
 pkgver=7.3.0_rc3
 _tagrel=1
-pkgrel=14
+pkgrel=15
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -291,6 +291,7 @@ source=(
   "patches/1100-1199/1163-drm-amd-display-keep-freesync_capable-for-HF-VSDB-VRR-sinks-in-MCCS-fallback.patch"
   "patches/1100-1199/1164-revert-drm-amd-display-consult-mccs-freesync-cap-only-if-requested.patch"
   "patches/1100-1199/1165-drm-amd-display-fall-back-to-overlay-cursor-on-dcn4x.patch"
+  "patches/1100-1199/1166-drm-amd-display-return-success-status-from-check_mode_supported.patch"
   "patches/1200-1299/1201-cpufreq-amd-pstate-Update-cppc_req_cached-before-w.patch"
   "patches/1200-1299/1202-cpufreq-amd-pstate-Add-per-core-EPP-boost-for-rec.patch"
   "patches/1200-1299/1203-Documentation-amd-pstate-Document-the-epp_boost-pa.patch"
@@ -1108,6 +1109,7 @@ b2sums=('d400c07b3f76f262c51e88bfc34e419883f13ea12dc76975b624acd6712bef193c4bb88
         'cb2120f7a57999c68cdb95cc0da74d800b510fbbd0c4834a1fbc0043f164a2f2f9d6bc8b80d49315849f2d52385d9c8e42b248b0985679206a09e113067a857d'
         '7f6663f02a307a150c99b873158118ea02da6c2579bfef1eb4b08d808c67b836ed62e3d0fc7ac6530a42bfd38ec051923c7b0ff1922d1805c565817ea26b7c80'
         'bdf5097165ed183abddde7b1b63b1001c428bf953187fc169d7b4e77a5b6a77f5a04eac8220f0467fa7d30c0b858e9f6d26a0a477205432ede746f1c03ef8f91'
+        '158a3b2603ddbe02ed09247a914c906693c464ad7202b7384236ce22cd06843d9e8606223a90b3845d53f74b00ae3816b2d1330da87bbff049211c20cc2f5f0f'
         'e9d464ebf525cd8d93d48f1cbedea0197bd9d0142085da7d83ec3dfda0174483a0fea4077055fd7d1ad9180563dc6dfb77e4f52f9bcb023b7c7d7c9fb5c39ece'
         '9d3e36dbc5c9c5342d2991c4665278ed075073196251e59280bd12f1d6812a37d31db58f5cb978b926e2dcd0a32365960a414b69d10f463bd8f68cedbb4bb6ae'
         '52fe01328f544e023666eab1fd378ae0a0eb47385d495403a55a933f71beedcf295300767c1e43feb46366915fae8bea3b9137f11d16ed194a1fcf71d95aec0d'
