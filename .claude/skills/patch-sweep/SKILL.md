@@ -12,11 +12,9 @@ description: >
 
 ## Local model (Qwen) tips: READ THIS FIRST
 
-- **Copy commands exactly.** Do not improvise, rephrase, or "simplify" any
-  command below. A weaker local model that paraphrases produces broken grep
-  patterns, wrong paths, or bad quoting. If a command errors, paste the exact
-  error text into your reply and follow this skill's fix instructions — do not
-  invent a replacement command.
+- **Copy commands exactly.** A weaker local model that paraphrases produces
+  broken grep patterns, wrong paths, or bad quoting. If a command errors,
+  paste the exact error text and follow this skill's fix instructions.
 - **Read the whole skill before starting.** The steps build on each other
   (fetch → scan → triage → number). Skipping ahead produces a wrong report.
 - **Never access `lore.kernel.org`.** Its anti-bot protection blocks automated
@@ -24,13 +22,11 @@ description: >
   described in this skill.
 - **Use the `git -C repos/<repo> ...` form everywhere** (this form is already
   covered by project permissions). Never `cd` into a repo and run git there.
-- **Confirm each command's output before proceeding.** If a `curl` download
-  yields an empty file or a "403 Forbidden" page, stop and re-read the archive
-  access section in Step 1 before moving on. If a `grep`/`git log` returns
-  nothing, re-run it and verify the repo actually fetched before assuming there
-  are no candidates.
-- Do not silently continue past a step that produced no output — re-run the
-  previous step and verify before proceeding.
+- **Confirm each command's output before proceeding.** An empty `curl`
+  download or a "403 Forbidden" page means re-read the archive access section
+  in Step 1. A `grep`/`git log` that returns nothing means re-run it and
+  verify the repo actually fetched — never assume "no candidates" from an
+  empty result.
 - **Use absolute patch paths with `git -C`.** `git -C <repo> apply --check`
   changes the process directory to the repo, so a relative patch path like
   `patches/<range>/NNNN-....patch` resolves against the repo and errors "can't
@@ -42,21 +38,40 @@ description: >
   2>&1 | head -3 && echo CLEAN` always prints CLEAN because `head`'s exit status
   wins. Use `git apply --check f > log 2>&1; echo "exit: $?"` and read `log`.
 - **`git apply --check` passing is NOT enough** (learned 2026-08-03). The patch
-  must also survive `patch -p1 --forward --dry-run`, the exact tool `prepare()`
-  uses. Git-apply tolerates offset/ambiguity that GNU patch rejects (a hunk
-  whose leading `if (r)` context appears many times, or a hunk touching
-  `dcn60_resource.c` — DCN6, absent from rc7). For a file absent from rc7, strip
-  that file's hunks + its stats line + fix the "N files changed" summary as a
-  documented adjustment.
+  must also survive `patch -p1 --forward -F2 --dry-run` — GNU patch rejects
+  context that git-apply tolerates (extra lines between context lines, a
+  context line that gained an `r = ` prefix). For a file absent from the base,
+  strip that file's hunks + its stats line as a documented adjustment.
 
 # Six-Source Patch Sweep
 
+## Sources inventory (all of them)
+
+The steps below query every source listed here. Phoronix is a signal, not a
+patch source (Step 2c).
+
+| Source | Where |
+|---|---|
+| Mainline torvalds | `repos/torvalds`, `repos/linux-next` |
+| linux-next | `repos/linux-next`, `next-YYYYMMDD` tags |
+| drm-next | `repos/drm-next` |
+| amd-staging-drm-next | `repos/agd5f-linux` |
+| amd-staging full | `repos/amd-staging-drm-next` |
+| drm-misc (TTM/dmemcg) | `repos/drm-misc` |
+| linux-pm | `repos/linux-pm` |
+| lore git mirrors | `repos/lore-amdgfx`, `-dri-devel`, `-linux-mm`, `-linux-crypto`, `-linux-pm`, `-linux-block`, `-io-uring`, `-linux-nvme`, `-fsdevel-new`, `-netdev-new`, `-mirror` (lkml) |
+| ML mbox archives | `lists.freedesktop.org` amd-gfx + dri-devel monthly `.txt.gz` |
+| drm/amd work items | `gitlab.freedesktop.org` drm%2Famd issues + events + GraphQL notes |
+| CachyOS | `repos/cachyos-linux`, branches `7.3/base`, `7.3/cachy`, `7.3/fixes`, `7.3/hdmi`, `7.3/xswap` |
+| sirlucjan | `repos/sirlucjan-kernel-patches/7.3-rc/` |
+| firelzrd | `repos/firelzrd-lru-marie`, `-bore-scheduler`, `-le9uo` |
+| linux-tkg / Clear | `repos/linux-tkg`, `repos/clearlinux-linux` |
+| Phoronix | news archive + site search (Step 2c) |
 ## Step 1: fetch all repos in parallel
 
 ```bash
-# Linux-next is huge and slow to fetch. Check first whether a newer daily
-# snapshot (next-YYYYMMDD tag) exists at all; if the latest tag equals what
-# we already have locally, SKIP the linux-next fetch — there is no new content.
+# Linux-next is huge and slow to fetch. If the newest next-YYYYMMDD tag
+# equals what we already have locally, SKIP the linux-next fetch.
 #   git ls-remote --tags repos/linux-next 'next-*' | awk -F/ '{print $NF}' | rg -v "\^{}" | sort -V | tail -1
 #   git -C repos/linux-next describe --tags master   # what we already have
 # Tags are published on working days only — weekends have no new snapshot.
@@ -79,6 +94,18 @@ done
 git -C repos/linux-next fetch --shallow-since=2026-08-01 origin 2>&1 | tail -3 &
 git -C repos/sirlucjan-kernel-patches pull 2>&1 | tail -3 &
 git -C repos/firelzrd-bore-scheduler pull 2>&1 | tail -3 &
+# lore git mirrors (never the lore web UI). "shallow-since" fetches on these
+# can die with "error in object: unshallow" — a plain `fetch` works; if it
+# hangs, `timeout 120` and mark the mirror UNREFRESHED rather than stalling.
+for repo in repos/lore-amdgfx repos/lore-dri-devel repos/lore-linux-mm \
+            repos/lore-linux-crypto repos/lore-linux-pm repos/lore-linux-block \
+            repos/lore-io-uring repos/lore-linux-nvme repos/lore-fsdevel-new \
+            repos/lore-netdev-new repos/lore-mirror; do
+  timeout 120 git -C "$repo" fetch --all 2>&1 | tail -1 &
+done
+# distro trees
+timeout 120 git -C repos/cachyos-linux fetch --all --prune 2>&1 | tail -1 &
+timeout 60 git -C repos/firelzrd-lru-marie pull 2>&1 | tail -3 &
 wait
 
 # Mailing lists: curl with a browser UA (WebFetch 403s). Full detail:
@@ -152,6 +179,29 @@ mitigations, Safe-RET, MCE/RAS on AMD) and is NOT already in the rc base.
 Most land in mainline and arrive with the next version bump — only carry one
 if it is security-relevant, on-target, and absent from the current base.
 
+## Step 2c — Phoronix news scan (signal, not source)
+
+Phoronix reports optimizations days before they hit the trees. Read it to
+know which stones to turn over, then trace every claim to the actual series:
+
+```bash
+# WebFetch https://www.phoronix.com/news/archive — list the last week of
+# kernel/AMD/scheduler/MM/crypto/PM articles.
+# WebSearch: site:phoronix.com <subsystem> <month> <year>
+```
+
+For each article naming a series or commit:
+1. Find it in the matching lore mirror (`git log --grep` the subject
+   keywords) or the named tree (linux-next, linux-pm, agd5f).
+2. Classify: in our series? in the rc base? in linux-next/amd-staging
+   (arrives next bump — drop-list entry)? under review (watch)? rejected?
+3. Record it in the sweep report under a Phoronix heading with the URL.
+
+Known beats: kbuild speedups (`lore-mirror`), zstd merges (sirlucjan +
+`lore-linux-mm`), x86/mm fixes (`repos/linux-next` x86_urgent), io_uring
+(`lore-io-uring`), amd-pstate pulls (`repos/linux-pm`), crypto
+(`lore-linux-crypto`). Phoronix only tells you which sources to check.
+
 ## Step 3 — Mailing list scan
 
 Parse the downloaded mbox with Python:
@@ -215,12 +265,11 @@ application/json" \ --data '{"query":"query { project(fullPath: \"drm/amd\") {
 issue(iid: \"5538\") { title notes { nodes { body system } } } } }"}'
 ```
 
-Sweep flow: (1) search issues by hardware keyword —
-`curl -s "https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/issues?search=<kw>&state=all&per_page=100"` —
-then (2) pull notes for each relevant iid via GraphQL and rg for
-`([0-9a-f]{12,40})|fixed by|patch|commit|in progress|merged`. The HTML issue page
-(`/-/issues/<iid>`) renders the description but comments are Vue-lazy-loaded, so
-GraphQL is the reliable route for comments. (2026-08-10 scan: no SMU-IF driver
+Sweep flow: search issues by hardware keyword
+(`/api/v4/projects/drm%2Famd/issues?search=<kw>&state=all&per_page=100`), then
+pull notes for each relevant iid via GraphQL and rg for
+`([0-9a-f]{12,40})|fixed by|patch|commit|in progress|merged`. Comments are
+Vue-lazy-loaded on the HTML page, so GraphQL is the reliable route. (2026-08-10 scan: no SMU-IF driver
 fix in !5538/!5479/!5038 — firmware-side; AMD devs suggest `pcie.aspm=off` as a
 !5538 stopgap; display-stall class !4753 has an in-progress FAMS2 investigation.)
 
@@ -260,6 +309,13 @@ check_commit() {
   fi
 }
 ```
+
+**Clean-base FAIL is not a series FAIL (learned 2026-09-15).** A candidate
+can fail against the clean rc tree and still apply to the series-applied
+tree because earlier patches supply the context — the userq kref series
+(1065–1074) had two such patches (05/10, 10/10) that apply only after our
+existing userq backports. When a patch fails the clean-base check, apply-check
+it against the series state (`repos/_audit_rc3/...`) before dropping it.
 
 ## Step 6 — Triage checklist (run in this order for every CLEAN candidate)
 

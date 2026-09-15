@@ -1,0 +1,47 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Zhu Lingshan <lingshan.zhu@amd.com>
+To: <Alexander.Deucher@amd.com>, <felix.kuehling@amd.com>
+CC: <Ray.Huang@amd.com>, <amd-gfx@lists.freedesktop.org>, Zhu Lingshan <lingshan.zhu@amd.com>
+Subject: [PATCH RESEND 03/10] drm/amdgpu/gfx11: hold userq refs in private fault worker
+Date: Mon, 14 Sep 2026 21:07:17 +0800
+Message-ID: <20260914130724.130794-4-lingshan.zhu@amd.com>
+
+The GFX11 user queue private fault woker loads
+the relevnt user queue from the userq doorbell xarray.
+However it does not hold the spin_lock of the xarray
+when walking the xarray, and does not increase the
+kref of the user queue, so it races with queue
+destruction path and may run into an use-after-free
+userq problem.
+
+This commit fixes this UAF problem by utilizing
+amdgpu_lookup_queue_by_doorbell helper, which
+properly hoding the xarray spin lock and the kref
+of the user queue.
+
+Signed-off-by: Zhu Lingshan <lingshan.zhu@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c b/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c
+index a447562977ab..a063f86a8847 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c
+@@ -6733,9 +6733,12 @@ static void gfx_v11_0_userq_priv_fault_work(struct work_struct *work)
+ 
+ 		doorbell = (db_ctrl & CP_RB_DOORBELL_CONTROL__DOORBELL_OFFSET_MASK) >>
+ 			   CP_RB_DOORBELL_CONTROL__DOORBELL_OFFSET__SHIFT;
+-		q = xa_load(&adev->userq_doorbell_xa, doorbell);
+-		if (q)
++		q = amdgpu_lookup_queue_by_doorbell(&adev->userq_doorbell_xa,
++						    doorbell);
++		if (q) {
+ 			amdgpu_userq_start_hang_detect_work(q);
++			amdgpu_userq_put(q);
++		}
+ 	}
+ }
+ 
+-- 
+2.53.0

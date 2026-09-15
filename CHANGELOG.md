@@ -15,6 +15,55 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc3-10-sleepy-next]: 2026-09-15
+
+### Added
+- **`9062`–`9071`** — Zhu Lingshan's "secure userq lifecycle by its kref"
+  series (10 patches, amd-gfx, RESEND 2026-09-14,
+  `<20260914130724.130794-2..11-lingshan.zhu@amd.com>`). A doorbell lookup
+  helper that holds the queue kref, userq-manager lifetime tied to its
+  queues, kref held in the gfx11/gfx12 private fault workers (our chip is
+  the gfx12 one), asynchronous userq destruction, kref held across MES
+  reset / isolation scheduling / suspend-resume, and create-path UAF fixes.
+  Hardens the user-queue submission path that the 9000s backports ship.
+  Still under review (the author pinged AMD on 2026-09-14); drop or refresh
+  when the series lands in agd5f. Two of the ten patches apply only against
+  our series-applied tree, not clean rc3 — the context comes from our
+  existing userq backports.
+
+### Sweep 2026-09-15
+- **Upstream now — drop at the next bump**: `2148`/`2149` (crypto zstd
+  init dedup) are in linux-next for 7.4 (`0db478c2e26f`, `57818119c9eb`);
+  `2500` (x86/mm MADV_FREE-THP data loss) is in mainline x86_urgent
+  (`f7491d7c81db`) and arrives with rc4.
+- **Watch for 7.4**: amd-pstate per-SoC EPP tunings (linux-pm pull,
+  2026-09-14) — the override table is empty for non-hybrid platforms, so
+  Zen 4 keeps the legacy defaults; a no-op here, skip. The mqd_prop
+  modify-flag series (v4, amd-gfx) depends on agd5f CU-mask work. Alex
+  Hung's 66-patch DC series (KUnit tests, dcn42b power gating, MALL
+  removal) heads for amd-staging. Jens Axboe's io_uring rsrc prefill and
+  thread-identity RFCs. sirlucjan's zstd-dev-patches v3 (2026-09-14) —
+  regenerate `2100` from it at the next bump instead of churning now.
+- **Work items tracked, no fix referenced yet**: RX 9070 XT hard
+  hang/reset deadlock (#5821), SMU bus loss (#5820), vblank-wait timeout
+  (#5800), VRR black level over DisplayPort (#5812), HDMI FRL after
+  standby (#5780).
+- **Skipped**: ESMTP guest hardening (EPYC/SEV, not this machine), EROFS
+  LZ4 rollback (not our filesystem), jitterentropy hardware mixer (watch
+  only), Zen6 EPP tunings (wrong CPU).
+
+### Changed
+- `pkgrel` 9 → 10. Series is now 201 patches.
+
+### Handmade-patch audit (0001–0049)
+All 12 patches in the handmade range were checked against rc3 upstream code:
+every one is still valid (applies and compiles in rc3-10) and still needed —
+none of the fixes has an upstream equivalent yet. Notably `0001`'s `unsigned
+tyep` typo and `0005`'s `// TODO` mode1-reset stub are both still in rc3
+verbatim, and the `0031`/`0034` resource leaks are still present in rc3's
+dcn401 code. `0055` (the local `drm_hdmi_vrr_cap` struct) stays: rc3 does not
+define the field anywhere, and `1163`'s guard reads it.
+
 ## [7.3.0-rc3-9-sleepy-next]: 2026-09-15
 
 ### Fixed
@@ -99,6 +148,10 @@ full entries remain in git history.
   and the whole chain matches the known-good kernel. VRR over HDMI disappears
   as a feature; that is the accepted trade for this machine, and it matches
   the stock kernel's behaviour exactly.
+
+  *Correction (rc3-9):* this hypothesis was wrong — dropping `0055`/`0060`
+  did not zero the chain (`vrr_capable` stayed 1). The actual cause was
+  upstream `cfdcf5571c31`, fixed by `1164`; see the rc3-9 entry.
 
 ### Added
 - **`1163`** drm/amd/display: keep `freesync_capable` for HF-VSDB VRR sinks in

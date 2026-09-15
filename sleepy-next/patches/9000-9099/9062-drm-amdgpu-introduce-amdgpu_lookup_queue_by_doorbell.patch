@@ -1,0 +1,77 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Zhu Lingshan <lingshan.zhu@amd.com>
+To: <Alexander.Deucher@amd.com>, <felix.kuehling@amd.com>
+CC: <Ray.Huang@amd.com>, <amd-gfx@lists.freedesktop.org>, Zhu Lingshan <lingshan.zhu@amd.com>
+Subject: [PATCH RESEND 01/10] drm/amdgpu: introduce amdgpu_lookup_queue_by_doorbell
+Date: Mon, 14 Sep 2026 21:07:15 +0800
+Message-ID: <20260914130724.130794-2-lingshan.zhu@amd.com>
+
+This commit introduces a new helper
+amdgpu_lookup_queue_by_doorbell which helps
+look up a user queue with the given doorbell id
+in a xarray.
+
+This function takes a kref of the user space queue.
+
+Signed-off-by: Zhu Lingshan <lingshan.zhu@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c | 30 +++++++++++++++++++++++
+ drivers/gpu/drm/amd/amdgpu/amdgpu_userq.h |  2 ++
+ 2 files changed, 32 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+index 0a816b3c5ff9..e0639f844a8e 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+@@ -609,6 +609,36 @@ struct amdgpu_usermode_queue *amdgpu_userq_get(struct amdgpu_userq_mgr *uq_mgr,
+ 	return queue;
+ }
+ 
++/**
++ * amdgpu_lookup_queue_by_doorbell - look up a user queue by doorbell
++ * @xa: user queue XArray indexed by doorbell
++ * @doorbell: doorbell index
++ *
++ * Return: A queue with the doorbell indexed, or NULL if no such a queue found.
++ *
++ * This function increases kref of the queue, the caller
++ * must release the reference with amdgpu_userq_put().
++ */
++struct amdgpu_usermode_queue *
++amdgpu_lookup_queue_by_doorbell(struct xarray *xa, u32 doorbell)
++{
++	struct amdgpu_usermode_queue *queue;
++	unsigned long flags;
++
++	xa_lock_irqsave(xa, flags);
++	queue = xa_load(xa, doorbell);
++	if (!queue)
++		goto out_unlock;
++
++	if (!kref_get_unless_zero(&queue->refcount))
++		queue = NULL;
++
++out_unlock:
++	xa_unlock_irqrestore(xa, flags);
++
++	return queue;
++}
++
+ void amdgpu_userq_put(struct amdgpu_usermode_queue *queue)
+ {
+ 	if (queue)
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.h b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.h
+index 6412a7f7b6ef..8fc73862f64e 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.h
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.h
+@@ -151,6 +151,8 @@ struct amdgpu_db_info {
+ };
+ 
+ struct amdgpu_usermode_queue *amdgpu_userq_get(struct amdgpu_userq_mgr *uq_mgr, u32 qid);
++struct amdgpu_usermode_queue *
++amdgpu_lookup_queue_by_doorbell(struct xarray *xa, u32 doorbell);
+ void amdgpu_userq_put(struct amdgpu_usermode_queue *queue);
+ 
+ int amdgpu_userq_ioctl(struct drm_device *dev, void *data, struct drm_file *filp);
+-- 
+2.53.0

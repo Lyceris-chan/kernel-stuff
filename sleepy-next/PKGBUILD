@@ -182,7 +182,7 @@ _rcver=rc3
 
 pkgver=7.3.0_rc3
 _tagrel=1
-pkgrel=9
+pkgrel=10
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -417,6 +417,16 @@ source=(
   "patches/9000-9099/9058-drm-amdgpu-hold-a-runtime-PM-reference-for-P2P-dma-buf-attachments.patch"
   "patches/9000-9099/9059-drm-amdkfd-dont-gate-userptr-cleanup-on-the-owning-mm.patch"
   "patches/9000-9099/9060-drm-amdkfd-skip-migration-when-the-fault-window-is-already-in-VRAM.patch"
+  "patches/9000-9099/9062-drm-amdgpu-introduce-amdgpu_lookup_queue_by_doorbell.patch"
+  "patches/9000-9099/9063-drm-amdgpu-keep-the-userq-manager-alive-as-long-as-its-queues.patch"
+  "patches/9000-9099/9064-drm-amdgpu-gfx11-hold-userq-refs-in-private-fault-worker.patch"
+  "patches/9000-9099/9065-drm-amdgpu-gfx12-hold-userq-refs-in-private-fault-worker.patch"
+  "patches/9000-9099/9066-drm-amdgpu-implement-asynchronous-userq-destruction-routine.patch"
+  "patches/9000-9099/9067-drm-amdgpu-hold-userq-kref-in-MES-reset.patch"
+  "patches/9000-9099/9068-drm-amdgpu-hold-userq-kref-during-isolation-scheduling.patch"
+  "patches/9000-9099/9069-drm-amdgpu-hold-userq-kref-during-suspend-and-resume.patch"
+  "patches/9000-9099/9070-drm-amdgpu-free-userq-by-kref_put-when-fails-to-create.patch"
+  "patches/9000-9099/9071-drm-amdgpu-take-queue-kref-in-userq_create-to-avoid-UAF.patch"
 )
 
 # makepkg 7.1.0 resolves local sources by basename in the PKGBUILD directory
@@ -1208,6 +1218,16 @@ b2sums=('d400c07b3f76f262c51e88bfc34e419883f13ea12dc76975b624acd6712bef193c4bb88
         '3850fc0a696d7bda44e6923d38c437eaec7da0e23bf811d0235e8680b9f2cd5610456cdf526f2bba35afb874dd230a5919c742870909d4f8c2c85d222b83b49d'
         'e293205f873acf70ef9dd932f810abfc70cebe0417fc4c45aaf995e6e9f981a23f767186cf3d30d9e14c029d82db51af052c478717efa3e5d26721edee239843'
         'd92f82745836dd7521eedfb9a9fad914fa50506ef0e24247370c8dcebcad8cdb55cf06482d9e50a1f5d4d107f8f74e5b44b2a8d529e05f38b7d59769d4bb6bb7'
+        '40d1799b81b53b048d14a02f0a4751f783d34ef58d37f3a32717e8299eb1200937d91dfe931386a95f5373656d5a053df9e9fee2ec555cf2ea1e4f32c58bc9e7'
+        '6673a83f47d4b64452a112a7693c69fce0bbbd23960348e0c340bb593ad3cbc2c8d8b7bad4beb83524cbd964c7d7bdca58a65e4485336ef06e7f86f515c44370'
+        '6ad1ccea3b40c3f0fb1b404845dda9974615e1f415a537cd302de5e591349573c77f8304d5af1a379175acdeb7c117d0f13a98c68d5889577fbffe7daa9c6159'
+        '950d2e68210f785152f9cc79daf8dcf85d590e5d73e47a40394f2e0b0849184f45986a48cf8d9bc7fc2b4fd736c01093d2392024c4fc5431634998e11acbcab4'
+        'c204815d1c5221dfd3e41485affe50865412f320b600d68bf52d6fd53e2fafb282da79e70e201895f6871616fae438f51b0396660f1c88e37ee562f6f8bc5591'
+        '14ffb0fd13e06113d85d25d4d90470b87b812ee84bc5fe6b9fe2e5eda1d412d978323575e59aa911e1ce7cd040efb824189a37097aa81540ff6d43a4d322bbc1'
+        '109dcd6eb0924fef05a3bbeac891ad83c8029fed9f26f83eef20d6a3152d979ade61767c68f4c9abe77e3ea76a2ad9cd1940f35101a1206f2e0d8ff3ad25662c'
+        '21e0ffb034bfcff893aa869347a1a65adcdd8035587f55786ddba78f69eed6e54e152281c419238918f4996428d07dda968b8bde87deb1a70ca5f4a5c4517cd0'
+        'fb90bc03f0cee05a38fcd4ae814b299df85e0defb3fcb8acced14c6882c50c72f0bda0a25d90698c1d8a9f24298fe8ff38757de2768289a79aeefaa08ca3acb9'
+        '6a2c4553f317fa0894100b1675bf8277c87d211f68268e8defe9b3a778fbe6f8053664b8c7e5165d7dc628992ed4c2ae310234f9a66615f48dd51e3acedc906b'
         '2cdec9daf2eb9d4a8e95f33bcc81e603899db1f2e4f55cde68fa29727972238b5bd544e055a06bd0c94569e222666f6d8bf231db9fa8593b6d5f4fe52b26022a'
         '4cf91dd679c25cb8c7a519f5d77fdf29cc345043bd8a71b6c8e54d1a4179cf489f464108464ad2b1bc8ccffd743707e6fdaae1e33300b29a4fc7b9457b90e6be')
 

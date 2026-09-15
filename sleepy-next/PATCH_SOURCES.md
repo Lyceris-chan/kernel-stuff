@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-next/PKGBUILD`.
 
 - **Base:** Linux `v7.3-rc3`
-- **Series:** 190 patches
+- **Series:** 201 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -31,7 +31,7 @@ are supplied by the generator instead, so every row below has a source.
 | `2400–2499` | Core scheduler and sched-ext | 3 |
 | `2500–2599` | x86 and arch core | 2 |
 | `2600–2699` | Time and timers | 0 |
-| `9000–9099` | agd5f staging backports | 31 |
+| `9000–9099` | agd5f staging + userq lifecycle backports | 41 |
 
 **A resolved numbering collision:** two patches used to share the number
 `1140` — Tom Chung's clamp of `force_min_dcfclk` to the dcn42b range (still
@@ -88,6 +88,16 @@ renumbered to `1165` in the rc3-9 cycle (2026-09-15).
 | `1062` | dma-buf/dma-fence: fix checking signaling bit for timeline and driver name | Christian König | 2026-09-09 | `20260909131808.2201-2-christian.koenig@amd.com` |
 | `1063` | drm/sched: document the RCU dependency | Christian König | 2026-09-09 | `20260909131808.2201-3-christian.koenig@amd.com` |
 | `1064` | drm/amdgpu: don't release the fence reference consumed by the scheduler | Donggeun Yoo | 2026-09-10 | `20260910054551.634054-1-donggeunyoo.kernel@gmail.com` |
+| `9062` | drm/amdgpu: introduce amdgpu_lookup_queue_by_doorbell | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-2-lingshan.zhu@amd.com` |
+| `9063` | drm/amdgpu: keep the userq manager alive as long as its queues | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-3-lingshan.zhu@amd.com` |
+| `9064` | drm/amdgpu/gfx11: hold userq refs in private fault worker | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-4-lingshan.zhu@amd.com` |
+| `9065` | drm/amdgpu/gfx12: hold userq refs in private fault worker | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-5-lingshan.zhu@amd.com` |
+| `9066` | drm/amdgpu: implement asynchronous userq destruction routine | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-6-lingshan.zhu@amd.com` |
+| `9067` | drm/amdgpu: hold userq kref in MES reset | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-7-lingshan.zhu@amd.com` |
+| `9068` | drm/amdgpu: hold userq kref during isolation scheduling | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-8-lingshan.zhu@amd.com` |
+| `9069` | drm/amdgpu: hold userq kref during suspend and resume | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-9-lingshan.zhu@amd.com` |
+| `9070` | drm/amdgpu: free userq by kref_put when fails to create | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-10-lingshan.zhu@amd.com` |
+| `9071` | drm/amdgpu: take queue kref in userq_create to avoid UAF | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-11-lingshan.zhu@amd.com` |
 | `1135` | drm/amd/display: fix HPD program filter programming | Charlene Liu | 2026-08-05 | `20260805063937.2145774-13-chiahsuan.chung@amd.com` |
 | `1136` | drm/amd/display: Update and revert FRL LT Timeout | Relja Vojvodic | 2026-08-05 | `20260805063937.2145774-21-chiahsuan.chung@amd.com` |
 | `1138` | drm/amd/display: pull colorops into state when recreating a plane | Harry Wentland | — | `20260825153539.213495-1-harry.wentland@amd.com` |

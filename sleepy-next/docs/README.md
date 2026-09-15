@@ -3,11 +3,11 @@
 `linux-sleepy-next` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
 built from **mainline Linux 7.3-rc3** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 191 targeted
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 201 targeted
 upstream/local patches. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0_rc3-9` · **Artifact:**
-`linux-sleepy-next-7.3.0_rc3-9-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0_rc3-10` · **Artifact:**
+`linux-sleepy-next-7.3.0_rc3-10-x86_64.pkg.tar.zst`
 
 ## Target hardware
 
@@ -32,6 +32,8 @@ upstream/local patches. It is not a general-purpose kernel.
 - **DCN4 display work**: HDMI FreeSync/VRR/ALLM, colorops, and the upstream
   HF-VSDB MCCS fix.
 - **kbuild build-speedup series** — full kernel builds in ~8 minutes.
+- **userq hardening** — Zhu Lingshan's kref lifecycle series closes use-after-free
+  races in the user-queue submission path (`9062`–`9071`).
 
 ## Build and install
 
@@ -72,20 +74,22 @@ cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.r
 stopgaps (DPM stays on). `cpuidle.governor=nap` activates the NAP governor, and
 `amd_pstate.epp_boost=1` enables the per-core EPP boost.
 
-`amdgpu.dcdebugmask=0x800` disables the DCN4 idle power states. It was removed
-in `pkgrel 11` because the display "box" turned out to be a COSMIC compositor
-bug, and **re-added in `pkgrel 4` of the rc3 line** for a different artifact:
-the
-MSI MAG251RX flickering at 1920x1080@240Hz, worst under cursor movement. When
-the HUBP is clock-gated, `hubp2_is_flip_pending()` reports no pending flip, so
-flip completion can arrive before the hardware latches — AMD's `f64a9be56536`
-concedes the gap. Cursor movement is the most frequent flip source, which is why
-that artifact tracks the cursor and is independent of VRR. It costs idle power;
-drop it again if a proper DCN4 flip-pending fix lands.
+`amdgpu.dcdebugmask=0x800` disables the DCN4 idle power states. The 7.2 line
+dropped it after the display "box" turned out to be a COSMIC compositor bug,
+and the rc3 line re-added it while bisecting the MSI MAG251RX flicker at
+1920x1080@240Hz (worst under cursor movement). The flicker itself stopped in
+rc3-9: patch `1164` restores the rc2 MCCS clear so the MAG251RX is no longer
+advertised as VRR-capable, matching the cachyos-rc kernel that was verified
+clean on this monitor. The mask stays because it reduced the flicker frequency
+before that fix and covers the clock-gated HUBP flip-pending misread: when the
+HUBP is clock-gated, `hubp2_is_flip_pending()` reports no pending flip, so flip
+completion can arrive before the hardware latches (AMD's `f64a9be56536`
+concedes the gap). It costs idle power; drop it if a proper DCN4 flip-pending
+fix lands.
 
 ## Patch series
 
-191 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+201 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 
 | Range | Category |
 |---|---|

@@ -1,0 +1,131 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Zhu Lingshan <lingshan.zhu@amd.com>
+To: <Alexander.Deucher@amd.com>, <felix.kuehling@amd.com>
+CC: <Ray.Huang@amd.com>, <amd-gfx@lists.freedesktop.org>, Zhu Lingshan <lingshan.zhu@amd.com>
+Subject: [PATCH RESEND 02/10] drm/amdgpu: keep the userq manager alive as long as its queues
+Date: Mon, 14 Sep 2026 21:07:16 +0800
+Message-ID: <20260914130724.130794-3-lingshan.zhu@amd.com>
+
+The life cycle of a user queue is managed by its
+kref. However when destroy a userq manager,
+the kref_put of its queues in amdgpu_userq_mgr_fini
+may not be the last put, therefore the queues
+could be still alive after the userq manager
+has been destroyed, resulting in
+userq->userq_mgr use-after-free issues.
+
+This commit fixes this problem by introduce a new
+counter refs representing for the number of its queues,
+and only free the userq_manager when refs == 0
+
+Signed-off-by: Zhu Lingshan <lingshan.zhu@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c | 30 +++++++++++++++++++++++
+ drivers/gpu/drm/amd/amdgpu/amdgpu_userq.h |  9 +++++++
+ 2 files changed, 39 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+index e0639f844a8e..f398986a61a5 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+@@ -27,6 +27,7 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/overflow.h>
+ #include <drm/drm_drv.h>
++#include <linux/wait_bit.h>
+ 
+ #include "amdgpu.h"
+ #include "amdgpu_reset.h"
+@@ -533,6 +534,17 @@ amdgpu_userq_get_doorbell_index(struct amdgpu_userq_mgr *uq_mgr,
+ 	return r;
+ }
+ 
++static void amdgpu_userq_mgr_inc_refs(struct amdgpu_userq_mgr *uq_mgr)
++{
++	atomic_inc(&uq_mgr->refs);
++}
++
++static void amdgpu_userq_mgr_dec_refs(struct amdgpu_userq_mgr *uq_mgr)
++{
++	if (atomic_dec_and_test(&uq_mgr->refs))
++		wake_up_var(&uq_mgr->refs);
++}
++
+ static int
+ amdgpu_userq_destroy(struct amdgpu_userq_mgr *uq_mgr, struct amdgpu_usermode_queue *queue)
+ {
+@@ -594,6 +606,8 @@ static void amdgpu_userq_kref_destroy(struct kref *kref)
+ 	r = amdgpu_userq_destroy(uq_mgr, queue);
+ 	if (r)
+ 		drm_file_err(uq_mgr->file, "Failed to destroy usermode queue %d\n", r);
++
++	amdgpu_userq_mgr_dec_refs(uq_mgr);
+ }
+ 
+ struct amdgpu_usermode_queue *amdgpu_userq_get(struct amdgpu_userq_mgr *uq_mgr, u32 qid)
+@@ -707,6 +721,7 @@ amdgpu_userq_create(struct drm_file *filp, union drm_amdgpu_userq *args)
+ 	queue->xcp_id = (fpriv->xcp_id != AMDGPU_XCP_NO_PARTITION) ?
+ 				fpriv->xcp_id : 0;
+ 	queue->userq_mgr = uq_mgr;
++	amdgpu_userq_mgr_inc_refs(uq_mgr);
+ 	INIT_DELAYED_WORK(&queue->hang_detect_work,
+ 			  amdgpu_userq_hang_detect_work);
+ 
+@@ -819,6 +834,7 @@ amdgpu_userq_create(struct drm_file *filp, union drm_amdgpu_userq *args)
+ free_queue:
+ 	trace_amdgpu_userq_create_end(queue, r);
+ 	kfree(queue);
++	amdgpu_userq_mgr_dec_refs(uq_mgr);
+ err_pm_runtime:
+ 	pm_runtime_put_autosuspend(adev_to_drm(adev)->dev);
+ 	return r;
+@@ -1331,6 +1347,7 @@ int amdgpu_userq_mgr_init(struct amdgpu_userq_mgr *userq_mgr, struct drm_file *f
+ {
+ 	mutex_init(&userq_mgr->userq_mutex);
+ 	xa_init_flags(&userq_mgr->userq_xa, XA_FLAGS_ALLOC);
++	atomic_set(&userq_mgr->refs, 0);
+ 	userq_mgr->adev = adev;
+ 	userq_mgr->file = file_priv;
+ 	userq_mgr->proc_ctx_allocated = false;
+@@ -1380,6 +1397,19 @@ void amdgpu_userq_mgr_fini(struct amdgpu_userq_mgr *userq_mgr)
+ 		amdgpu_userq_put(queue);
+ 	}
+ 
++	/*
++	 * The above amdgpu_userq_put() may not be the last put
++	 * of the kref of a user queue, therefore there could
++	 * be some queues still alive even when the userq manager
++	 * has been destroyed. This wait_evet() blocks
++	 * amdgpu_userq_mgr_fini(), so keep userq_mgr alive
++	 * while any queues holding it.
++	 *
++	 * This prevents queue->userq_mgr use-after-free issues.
++	 */
++	wait_var_event(&userq_mgr->refs,
++		       !atomic_read_acquire(&userq_mgr->refs));
++
+ 	xa_destroy(&userq_mgr->userq_xa);
+ 
+ 	/*
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.h b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.h
+index 8fc73862f64e..a13d8d4dd5c7 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.h
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.h
+@@ -126,6 +126,15 @@ struct amdgpu_userq_mgr {
+ 	 */
+ 	struct xarray			userq_xa;
+ 	struct mutex			userq_mutex;
++
++	/**
++	 * @refs:
++	 *
++	 * Each queue increases this counter when join this manager,
++	 * and decreases it when leave this manager.
++	 */
++	atomic_t			refs;
++
+ 	struct amdgpu_device		*adev;
+ 	struct delayed_work		resume_work;
+ 	struct drm_file			*file;
+-- 
+2.53.0

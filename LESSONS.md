@@ -420,3 +420,30 @@ Also recorded from the same bisect: two mechanistically-plausible candidates
 user testing. Hypotheses are cheap; A/B tests are the only currency. And the
 decisive data came from diffing the applied tree against a known-good kernel —
 not from reasoning about the broken one.
+
+## Userq kref series: two traps in one adoption (2026-09-15)
+
+Adopting Zhu Lingshan's 10-patch userq lifecycle series surfaced two traps
+that each cost a build cycle:
+
+- **"Applies with git apply" is not the gate.** All ten patches passed
+  `git apply --check` against our tree; the build then failed with
+  `amdgpu_userq.c:877: use of undeclared label 'erase_doorbell'`. The
+  authoritative check is the cumulative `audit_series.py` (GNU `patch -Np1
+  --forward`), which caught the real problems: hunk context that our base's
+  `r = amdgpu_userq_ensure_ev_fence(...)` assignment line broke (upstream
+  context has no `r =`), and an error path our base has that upstream's does
+  not (the doorbell is published before the eviction-fence setup here, and
+  the mutex is already released on that path — the adaptation must detach +
+  put + return, not unlock again).
+- **Apply order is the numbering.** The series was numbered 1065–1074 and
+  applied cleanly against the series-applied tree — but `source=()` applies
+  the 9000s range *after* the 1000s, and these patches need the userq
+  backports' context. The audit failed until the series moved to 9062–9071.
+  Rule: a patch whose context depends on patches in a later-numbered range
+  must itself live in that range.
+
+Also recorded: when a new series touches code our backports already modified,
+check every hunk against BOTH the clean base and the series-applied tree, and
+read the callee's locking contract (`amdgpu_userq_ensure_ev_fence` releases
+`userq_mutex` on failure) before writing the adaptation.
