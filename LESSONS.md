@@ -556,3 +556,90 @@ Found by a sweep agent reading the patch *and* grepping the tree for its
 contract, then confirmed by hand: `rg -c E2BIG mm/swapfile.c mm/swap.h
 mm/vmscan.c` returned nothing on a tree that had been running the patch for
 days.
+
+## A unit that waits is not the unit that gates (2026-09-15)
+
+Three boot analyses agreed the 14.7s userspace time was a DHCP wait and then
+disagreed about why it reached `multi-user.target`. `systemd-analyze
+critical-chain` caused the disagreement:
+
+```
+$ systemd-analyze critical-chain timers.target
+timers.target @14.686s
+└─cachyos-rate-mirrors.timer @14.686s
+  └─network-online.target @14.685s
+    └─NetworkManager-wait-online.service @2.339s +12.346s
+```
+
+That reads as: the CachyOS rate-mirrors timer holds `basic.target`, which holds
+`multi-user.target`, which holds the desktop — a packaging bug worth reporting
+upstream. It is wrong. `basic.target` is `After=timers.target`, and on the same
+boot:
+
+| unit | `ActiveEnterTimestampMonotonic` |
+|---|---|
+| `basic.target` | 6883384 (6.88s) |
+| `NetworkManager.service` | 7213319 (7.21s) |
+| `timers.target` | 19563507 (19.56s) |
+| `multi-user.target` | 19597845 (19.60s) |
+
+`basic.target` cannot be ordered after `timers.target` and also be active 12.7s
+earlier. The declared ordering exists but was never honoured: systemd found the
+cycle `basic.target → timers.target → cachyos-rate-mirrors.timer →
+network-online.target → NetworkManager-wait-online → NetworkManager →
+basic.target` and **deleted one edge to break it** — silently, with no
+"ordering cycle" journal line (that message appeared only for the separate
+`tmp.mount`/`xswap-create` cycle). `critical-chain` then printed the declared
+chain as if it had been followed.
+
+**Why it matters:** the two candidate causes have opposite fixes. If the timer
+gates, you edit the timer. If `net-tune.service` and `blocky.service` gate —
+both were `WantedBy=multi-user.target` with `After=network-online.target` — you
+move those two and leave the timer alone. Acting on the chain output would have
+produced a wrong upstream bug report and a drop-in that changed nothing.
+
+**Telling a cause from a victim:**
+
+- Compare **raw** `ActiveEnterTimestampMonotonic` (µs since boot) for the
+  suspect against the unit it supposedly holds. If the timestamps contradict the
+  declared edge, systemd broke the edge and the unit is a victim.
+- `critical-chain` prints *declared* edges. Cross-check every conclusion against
+  `systemctl show <unit> -p After` **and** the timestamps.
+- `blame` attributes time to the unit that spent it, not to the unit that waited
+  on it. `NetworkManager-wait-online.service` says `12.346s`; the units that made
+  that matter were the ones in `multi-user.target.wants` ordering after
+  `network-online.target`.
+- The decisive question is not "what does X wait for" but **"does anything on
+  the boot path wait for X"**. Check `systemctl show X -p Before`: if it is empty
+  and X is not `WantedBy` a target the boot waits for, X is off the path however
+  late it starts.
+
+**Corollary: an empty `After=` in a drop-in does not reset the ordering list.**
+The obvious fix — `After=` under `[Unit]` on `cachyos-rate-mirrors.timer` — was
+written, `daemon-reload`ed, and measured: `After=` still reported
+`sysinit.target network-online.target -.mount time-set.target time-sync.target`,
+and `systemctl cat` confirmed the drop-in was read with no parse error. Never
+assume a reset took; query the unit after reloading. The drop-in was reverted
+rather than left in the tree doing nothing.
+
+## `sudo -S` eats the first line of a heredoc (2026-09-15)
+
+```bash
+echo 'pw' | sudo -S tee /etc/foo.conf >/dev/null <<'EOF'
+[Unit]
+After=
+EOF
+```
+
+The heredoc **replaces** the pipe as `sudo`'s stdin, so `sudo -S` reads `[Unit]`
+as the password. Authentication fails, but the redirection still leaves a file
+behind — and with line 1 gone the remainder parses as stray assignments. systemd
+said so plainly (`Assignment outside of section. Ignoring.`) while the drop-in
+silently did nothing, which is how a config file that does not work got
+installed twice.
+
+Write the file with the Write tool and `sudo install -m 644` it, or use `sudo -S`
+only where stdin genuinely is the password. Same family as the `rg -rn` and
+`pkill -f` traps: the convenient-looking shell construct is the one that quietly
+changes what the command means. `pgrep -af <pattern>` self-matches the invoking
+shell exactly like `pkill -f` — `pgrep -x <name>` is the form that does not.

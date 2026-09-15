@@ -16,7 +16,7 @@ upstream/local patches. It is not a general-purpose kernel.
 | CPU | Ryzen 7 7700 (Zen 4) | `MZEN4`, `amd-pstate`, `CPPC`, `k10temp` |
 | GPU | Radeon RX 9070 XT (Navi 48) | `gfx1201` (GC 12.0), `DCN401` (DCN 4.0.1), `SMU14`, `PSP14` |
 | NIC | Realtek RTL8125B | in-kernel `r8169` |
-| NVMe | Phison E16 PCIe 4.0 | `bfq`, `mq-deadline`, `kyber` |
+| NVMe | Phison E16 PCIe 4.0 | `kyber` (`bfq`, `mq-deadline` built) |
 | Scheduler | sched-ext | `CONFIG_SCHED_CLASS_EXT=y` |
 | CPUIdle | NAP governor | `CONFIG_CPU_IDLE_GOV_NAP=y` |
 

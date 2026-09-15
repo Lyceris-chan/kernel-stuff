@@ -61,11 +61,62 @@ other.
   init and that negotiation overlaps with the rest of boot. The PHY driver has
   to be built in too, or the carrier waits for it to be loaded anyway.
 
-Not touched, with reasons: the initramfs (`54.5 MB`, but decompression is
-0.046s — the bulk is the 32.69 MiB AMD microcode CPIO, and trimming it saves
-almost nothing). The `kms` hook could shave the initrd's early module load but
-changes when the display modesets, which is not a trade to make blind on this
-monitor. The 9.4s of firmware time is POST, not the kernel.
+Not touched, with reasons: the initramfs (`54.5 MB`, but it unpacks in 25 ms —
+`Unpacking initramfs...` at 0.311756 to `Freeing initrd memory: 55776K` at
+0.336762 — so trimming it saves almost nothing). The bulk is not microcode: the
+`microcode` hook adds one 128,644-byte file, and the rest is mkinitcpio moving
+already-compressed payloads into the early CPIO so they are not compressed
+twice — here ~29 MiB of `amdgpu` firmware (699 `.bin.zst` files, pulled in
+because the driver declares 638 firmware entries) plus `amdgpu.ko.zst`. The
+`kms` hook could shave the initrd's early module load but changes when the
+display modesets, which is not a trade to make blind on this monitor. The 9.4s
+of firmware time is POST, not the kernel.
+
+### Boot speed, second pass (Arch wiki + CachyOS wiki)
+
+Both wikis were read against this machine's measured boot. Most of what they
+recommend is already in place or does not apply, so the useful output is
+negative results — recorded here so the same ground is not covered twice.
+
+- **The 12.346s is DHCP, not systemd overhead.** NetworkManager starts at
+  22:29:37.69, carrier at 40.90 (+3.2s), lease at 50.19 (+9.3s). Building the
+  NIC in moves the driver probe from 7.2s to kernel init, so the negotiation
+  overlaps boot instead of following it.
+- **`cachyos-rate-mirrors.timer` reads like a second gate and is not one.** It
+  carries `Wants=` *and* `After=network-online.target`, and `timers.target` is
+  `WantedBy=basic.target`, which looks like a CachyOS packaging bug holding the
+  whole session. On this boot `basic.target` entered at `6883384µs` and
+  `timers.target` at `19563507µs`, and `basic.target` is `After=timers.target`:
+  systemd had already broken that edge as part of the cycle `basic.target →
+  timers.target → cachyos-rate-mirrors.timer → network-online.target →
+  NetworkManager-wait-online → NetworkManager → basic.target`. The timer waits
+  on the network-online wave; it does not cause it. A drop-in clearing its
+  `After=` was written, measured to change nothing — an empty `After=` does not
+  reset an ordering list from a drop-in — and reverted. Its `Wants=` is
+  load-bearing and stays: it is one of the units that pulls
+  `network-online.target` in, and `net-tune` and `blocky` are `WantedBy` that
+  target.
+- **Disabled: `system76-power-monitor.service`.** Hand-written, owned by no
+  package, ordered `After=com.system76.PowerDaemon.service` which does not
+  exist, running `/usr/local/bin/s76-profile-monitor` — a
+  `while true; do system76-power profile; sleep 3; done` loop for a binary that
+  is not installed. It forks three processes every three seconds and can never
+  succeed. The unit and the script are left on disk; re-enable with
+  `systemctl enable --now system76-power-monitor.service`.
+- **Rejected, with the reason.** `kexec` reboots would skip the 9.4s POST but
+  re-initialise the GPU from a running kernel, which is not a change to make
+  while the display path is under A/B. Also rejected: dropping the `kms` hook;
+  dropping the `base` hook (it is the recovery shell, and the presets build no
+  fallback image); `MODULES_DECOMPRESS="yes"` with `xz -9e` (trades a ~250 ms
+  ESP read for single-threaded decompression); `libahci.ignore_sss=1`
+  (applicable — `ahci 0000:10:00.0: SSS flag set, parallel bus scan disabled` —
+  but the MX500 is `x-systemd.automount` and nothing on the critical path waits
+  for it); and the silent-boot console flags (the console is the GPU
+  framebuffer, so they touch the display path). Each is worth a few hundred ms
+  at most, against a 12.3s win already taken.
+- **Left open.** A 748 ms gap inside the initrd, between the root fsck
+  finishing (2.730555) and `/sysroot` being mounted (3.478237), with only USB
+  enumeration in the log. Nothing in the initrd accounts for it.
 
 ### Changed
 - `pkgrel` 15 → 16.

@@ -15,7 +15,7 @@ when the RC line is unusable.
 | CPU | AMD Ryzen 7 7700 (Zen 4) | `MZEN4`, `amd-pstate`, `CPPC`, `k10temp` |
 | GPU | AMD Radeon RX 9070 XT (Navi 48, RDNA 4) | `gfx1201`, `DCN401` (DCN 4.0.1), `SMU14`, `PSP14`, `GC 12.0`, `SDMA 7.0`, `VCN 5.0`, `MMHUB 4.1` |
 | NIC | Realtek RTL8125B 2.5 GbE | `r8169` (in-kernel driver, since 7.2) |
-| NVMe | Phison E16 PCIe 4.0 | `bfq`, `mq-deadline` |
+| NVMe | Phison E16 PCIe 4.0 | `kyber` (CachyOS `60-ioschedulers.rules`) |
 | Scheduler | sched-ext BPF schedulers | `CONFIG_SCHED_CLASS_EXT=y` |
 | CPUIdle | NAP governor | `CONFIG_CPU_IDLE_GOV_NAP=y` |
 
