@@ -34,6 +34,25 @@ full entries remain in git history.
   comes up at the wrong mode after rebooting, drop `1166` (or boot the
   cachyos-rc entry) — that is the revert, and the changelog is the record.
 
+### Verified after the reboot (2026-09-15 22:29, running `7.3.0-rc3-15`)
+
+- **xswap is live**: `zswap/enabled=Y`, `compressor=zstd`, `/proc/swaps` shows a
+  single `xswap0` of 30.9G at priority 100 with pages already in it (83 MB
+  compressed holding 268 MB, ~3.2x), `/sys/kernel/mm/xswap/{create,destroy,type0}`
+  present, and `xswap-create.service` exited 0. No zram swap anywhere; the
+  leftover `zram0` node is size 0 and its setup unit is dead. `vm.swappiness`
+  is 150 from the sysctl drop-in, replacing what the masked udev rule used to set.
+- **The flicker fix holds**: `vrr_capable=0` and `passive_vrr_capable=0` on both
+  HDMI connectors, `VRR_ENABLED=0`, `PASSIVE_VRR_DISABLED=1` — the same state the
+  clean cachyos-rc kernel showed.
+- **`1166` did not reject the mode**: CRTC 438 is driving 1920x1080 at
+  **239.96 Hz** as before. This was the one item to watch after making DML2 mode
+  validation authoritative, and it is the outcome that mattered.
+- One `amdgpu` message appears (`Failed to setup vendor infoframe on connector
+  HDMI-A-2: -22`); it is present with the **same count in the previous boot**, so
+  it predates this series and belongs to the second monitor's sink, not to any
+  patch here.
+
 ### Changed
 - `pkgrel` 14 → 15. Series is now 217 patches.
 
