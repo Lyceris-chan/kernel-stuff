@@ -503,3 +503,23 @@ dropped as the first bisect step, and the clean comparison kernel ran
 MAG251RX at 1920x1080@240 Hz **before** installing, and expect to either drop
 the FRL default again or re-bisect. Fangzhi Zuo's FRL patches 61/66 and 65/66
 in Chenyu Chen's DC 3.2.398 series sit on the same code.
+
+## linux-next tags are rebased daily; `git log A..B` between them is a lie (2026-09-15)
+
+`git -C repos/linux-next log --oneline next-20260914..next-20260915` returns
+**1,473,514 commits**. The tags are daily integrations rebased onto fresh bases,
+so the "commits in B but not A" set is essentially every subsystem branch, not
+the day's delta. The adjacent `git diff --stat` is fine (737 files) because it
+compares trees, not history.
+
+The failure mode is nasty because it does not error: piping that log through
+`rg` for keywords yields a plausible-looking list of "new" commits, and they are
+not new — they are the same subsystem work every day. One sweep agent produced a
+confident delta from it; another caught it. **Use `git diff` for content and the
+tag's own merge commits for attribution.** The same applies to any tree that
+rebases (linux-next, amd-staging, distro -next branches): ancestry between
+snapshots is not meaningful, only content is.
+
+Related: `repos/linux-next`'s `master` branch is stale (2026-08-03) while the
+tags are current — check `git -C repos/linux-next describe --tags <ref>` before
+trusting any ref in that clone.

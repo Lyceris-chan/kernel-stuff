@@ -1,0 +1,10 @@
+--- .gitignore
++++ .gitignore
+@@ -38,6 +38,7 @@
+ *.lzo
+ *.mod
+ *.mod.c
++*.mod.S
+ *.o
+ *.o.*
+ *.patch

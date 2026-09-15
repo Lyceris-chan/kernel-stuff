@@ -94,6 +94,13 @@ and `1136`.
   is off), `tcp_poll()` `smp_rmb()` (an ARM64 win), zonelist/NUMA and
   cache-aware-scheduling work (single-CCD desktop), ESMTP (SEV-SNP guests).
 
+**Machine profile corrections that shrink the search space.** `CONFIG_NUMA` is
+**not set** in this build, so the NUMA-targeted optimizations that dominate mm
+and net-next (zonelist refactors, per-node reclaim, `skb_defer_free` node
+iteration, cache-aware scheduling) are inert here, and `for_each_node()` and
+`for_each_online_node()` compile to the same thing. `CONFIG_BLK_DEV_MD` is off,
+so the raid6/xor `vzeroupper` work is inert. `CONFIG_EROFS_FS` is off.
+
 **Two branches/dirs we do not adopt from, checked.** CachyOS's `7.3/vesa-dsc-bpp`
 carries VESA DSC EDID parsing and a DSC `max_qp` spec fix; the EDID side is
 already upstream in rc3 and this machine never negotiates DSC (1080p240 fits
