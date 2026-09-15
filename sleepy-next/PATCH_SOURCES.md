@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-next/PKGBUILD`.
 
 - **Base:** Linux `v7.3-rc3`
-- **Series:** 213 patches
+- **Series:** 215 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -25,7 +25,7 @@ are supplied by the generator instead, so every row below has a source.
 | `1100–1199` | AMD display (DCN4, colorops) | 18 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 18 |
 | `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 14 |
-| `2100–2199` | Memory management and swap (zstd, LRU-MARIE, MGLRU, gup, xswap) | 47 |
+| `2100–2199` | Memory management and swap (zstd, LRU-MARIE, MGLRU, gup, xswap) | 49 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 21 |
 | `2400–2499` | Core scheduler and sched-ext | 3 |
@@ -195,6 +195,8 @@ renumbered to `1165` in the rc3-9 cycle (2026-09-15).
 | `2164` | mm, swap: refactor swapoff + add xswap_destroy | Baoquan He | 2026-09-13 | `20260913075014.1732524-11-hebaoquan@kylinos.cn` |
 | `2165` | mm, swap: require zswap for xswap devices | Baoquan He | 2026-09-13 | `20260913075014.1732524-12-hebaoquan@kylinos.cn` |
 | `2166` | mm, swap: add sysfs per-device size limit for xswap | Baoquan He | 2026-09-13 | `20260913075014.1732524-13-hebaoquan@kylinos.cn` |
+| `2167` | mm: add page_counter_margin() | Xueyuan Chen | 2026-08-30 | `20260830042920.2280454-2-xueyuan.chen21@gmail.com` |
+| `2168` | mm: distinguish large folio swap allocation failures | Xueyuan Chen | 2026-08-30 | `20260830042920.2280454-3-xueyuan.chen21@gmail.com` |
 | `2200` | 7.2-nap-v0.5.0 | Masahito S | 2026-06-05 | `04aef34448bb` |
 | `2303.patch` | kallsyms: index symbols by token to speed up table compression | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-2-39817ec5db23@kernel.org` |
 | `2304.patch` | kallsyms: output binary data to speed output and kallsyms assembly | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-3-39817ec5db23@kernel.org` |
@@ -722,3 +724,16 @@ devices"), posted to linux-mm on 2026-09-13 and also shipped by CachyOS in its
 `7.3/xswap` branch. It is upstream work in review: drop it when it lands in
 mainline, and re-check for a v3 before rebasing. `CONFIG_XSWAP=y` is set in
 `config`.
+
+## 2026-09-15 note: 2142 needed its series prerequisites
+
+`2142` is patch **3/4** of Xueyuan Chen's "[PATCH v7 0/4] mm: avoid large folio
+splits when swap is unavailable". Only 3/4 was ever carried. On its own it is
+not just incomplete but wrong: it gates the large-folio split fallback on
+`ret != -E2BIG`, and nothing in the tree returned `-E2BIG` — 2/4 is what
+introduces that classification — so every `folio_alloc_swap()` failure took the
+"do not split" branch and the split fallback was dead code. `2167` (1/4) and
+`2168` (2/4) complete the series and restore the intended behaviour: split only
+when splitting might actually help (`-E2BIG`), skip the pointless split when
+swap is exhausted (`-ENOSPC`) or would not help (`-ENOMEM`). Patch 4/4 (shmem)
+is not carried and not needed for correctness here.

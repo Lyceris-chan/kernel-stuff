@@ -182,7 +182,7 @@ _rcver=rc3
 
 pkgver=7.3.0_rc3
 _tagrel=1
-pkgrel=12
+pkgrel=13
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -371,6 +371,8 @@ source=(
   "patches/2100-2199/2164-mm-swap-refactor-swapoff-and-add-xswap_destroy.patch"
   "patches/2100-2199/2165-mm-swap-require-zswap-for-xswap-devices.patch"
   "patches/2100-2199/2166-mm-swap-add-sysfs-per-device-size-limit-for-xswap.patch"
+  "patches/2100-2199/2167-mm-add-page_counter_margin.patch"
+  "patches/2100-2199/2168-mm-distinguish-large-folio-swap-allocation-failures.patch"
   "patches/2200-2299/2200-7.2-nap-v0.5.0.patch"
   "patches/2300-2399/2302-subject-patch-v2-01-21-kbuild-do-not-allocate-modinfo-in-vmlinux.patch"
   "patches/2300-2399/2303-subject-patch-v2-02-21-kallsyms-index-symbols-by-token-to-speed-up-table-compression.patch"
@@ -1184,6 +1186,8 @@ b2sums=('d400c07b3f76f262c51e88bfc34e419883f13ea12dc76975b624acd6712bef193c4bb88
         '3ef47959689f2a434dc8444442374a9b7fce72277dbb1076c72ad25bb7ef63a8a5b0255e6c1fef651ab25a1dd2c960056d7654726a91c5dff9279e2d2a11c67b'
         'd873cf9bfb2242bfa4dd90bb60503d113fdb61a1649f0b9f65722dbc6cfbe63850ad01068aed36951987fada6b026b33087ae18b7853594db4f3ac765dbe6cc8'
         '534e59a73fafd2127ded6d74a5a7cac204d70fa122534fb2269300a4e2b758fc8b2132439fd64263a6ff44e4d8945430bda0c22d5f2eda86e83bb00dd4a3e626'
+        '248f421125422b282194ff39ad70a883c76fb76b6f47fdaed98353b25d3cb018ab013be6fab8414b38ea6055388320e073d3704477c508f9f9c3648e74e1533e'
+        'c08072205021ecb00bf2dcf22c83d3df986526317a4dbb99e311d9f6ac077b898afefb31ecdd15f7af9b2b4f42d30b38d60baa42863421cc27c5d954130a2473'
         'dc4e862e8f9fa7e8ead895908459757afd1027c24b960ae3d289a7212e29575bce3ce4627d5fd73edf211ee162dfa545e1642c5b16e8156f3dce50af8ef3c256'
         'b8aa919c153a0366ebf7237282e2955e5744d190e991b300f5c4f55d3017daa9d8ca84ae85beebeb85baff7b0bed0aec06e70b05042331551eeec956ba7c32e2'
         '0ff8d967ee5e9473da3ca925ae6241c37aa6094a8891b93a37e9b9fb88994a946d63a7ac686e04010e32e3bbcddef704298a8c77170b66f8b559a953b59533e1'

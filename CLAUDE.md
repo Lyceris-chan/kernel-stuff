@@ -13,7 +13,7 @@ when the RC line is unusable.
 | Component | Hardware | Kernel identifiers |
 |---|---|---|
 | CPU | AMD Ryzen 7 7700 (Zen 4) | `MZEN4`, `amd-pstate`, `CPPC`, `k10temp` |
-| GPU | AMD Radeon RX 9070 XT (Navi 48, RDNA 4) | `gfx1201`, `DCN401`, `DCN42B`, `SMU14`, `PSP14`, `GC 12.0`, `SDMA 7.0`, `VCN 5.0`, `MMHUB 4.1` |
+| GPU | AMD Radeon RX 9070 XT (Navi 48, RDNA 4) | `gfx1201`, `DCN401` (DCN 4.0.1), `SMU14`, `PSP14`, `GC 12.0`, `SDMA 7.0`, `VCN 5.0`, `MMHUB 4.1` |
 | NIC | Realtek RTL8125B 2.5 GbE | `r8169` (in-kernel driver, since 7.2) |
 | NVMe | Phison E16 PCIe 4.0 | `bfq`, `mq-deadline` |
 | Scheduler | sched-ext BPF schedulers | `CONFIG_SCHED_CLASS_EXT=y` |
@@ -145,6 +145,8 @@ rg -c 'pattern' CLAUDE.md             # match count per file
 Evidence, exact commands, and the source-access mechanics are in `LESSONS.md`.
 The short version:
 
+- **DCN 4.0.1, not DCN42B.** This GPU is GC IP (12,0,1) → `AMDGPU_FAMILY_GC_12_0_0` → `dcn401_clk_mgr_construct`/`dcn401_create_resource_pool`, and the kernel prints "Display Core ... on DCN 4.0.1". `DCN42B` (and `dcn42`/`dcn42b`/`dcn60` files generally) is instantiated only under
+  `AMDGPU_FAMILY_GC_11_5_0` + `DCN_VERSION_4_2B` — Strix-class APUs. A patch touching those files applies and compiles, and does nothing here.
 - **GC 12.0 ≠ GC 12.1.** Navi 48 is GC IP **(12,0,1)** → `gfx_v12_0.c`.
   `gfx_v12_1.c` is a different chip. Check `IP_VERSION` before any gfx12 patch.
 - **Never carry `9051`/`9052`** (DCN4 flip-schedule) — AMD reverted both

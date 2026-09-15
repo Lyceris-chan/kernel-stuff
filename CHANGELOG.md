@@ -15,6 +15,54 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc3-13-sleepy-next]: 2026-09-15
+
+### Fixed
+- **`2142` was an incomplete series, and incomplete made it wrong.** It is
+  patch 3/4 of Xueyuan Chen's "[PATCH v7 0/4] mm: avoid large folio splits when
+  swap is unavailable"; only 3/4 was carried. It gates the large-folio split
+  fallback in `shrink_folio_list()` on `ret != -E2BIG`, and **nothing in the
+  tree returned `-E2BIG`** — 2/4 is what introduces that classification — so
+  every `folio_alloc_swap()` failure took the "do not split" branch. The THP /
+  mTHP swapout fallback was unreachable dead code, the exact opposite of the
+  patch's intent, and it made large anon folios that could not get swap get
+  reactivated instead of split. Added **`2167`** (1/4, `page_counter_margin()`)
+  and **`2168`** (2/4, the `0`/`-E2BIG`/`-ENOSPC`/`-ENOMEM` classification,
+  `Acked-by: David Hildenbrand`), which restores the intended behaviour: split
+  only when splitting might help, skip the pointless split when swap is
+  exhausted. Patch 4/4 (shmem) is not carried and not needed for correctness.
+  This is the failure mode the "a patch that applies can still do nothing" rule
+  warns about, in the opposite direction: the patch did something, and the
+  something was wrong.
+
+### Deep sweep results not adopted
+- **Work items**: `dc66/59` ("Return success status from check_mode_supported",
+  Alvin Lee, AMD) is the one AMD recommends in #5834's NULL-deref reports and
+  it applies cleanly to our series. Not adopted yet **because of what it
+  changes**: it makes DML2 mode validation actually return failure instead of a
+  hardcoded `true`. If DML2 dislikes 1920x1080@240 it would now be rejected, and
+  this display just got fixed. It arrives with the DC 3.2.398 drop in the next
+  drm merge, where AMD tests the set together — re-evaluate then.
+- Wentland's RGBA8888 surface-format enablement (#5339, field-tested on Navi 48)
+  is skipped on evidence: this machine logs **zero** "Unsupported screen format"
+  messages in dmesg and the journal, so it is not hit here.
+- superm1's EDID-override pair (#5779) only matters if an override is in use.
+  Correcting an earlier note: it does **not** collide with our `1143` (different
+  files entirely).
+- MM: Kefeng Wang's zswap invalidate/store v3 has **no measured claim** in its
+  cover letter ("eliminate redundant per-slot lookups"), and it shares
+  `swap_range_free()` with our xswap series — still deferred for that reason.
+  Usama Arif's PMD-level swap v7 does not apply as posted (needs `f078c72e5ca2`
+  + `94edc3c732625` for 12/29 and a hugetlb patch absent from rc3 for 14/29).
+  Hugh Dickins' fbatch v2 collides with LRU-MARIE in `mm/folio.c` (436 changed
+  lines) and its author expects "some disappointments".
+- The Ghiti zswap-writeback fixes fail on our series state at `mm/zswap.c:1001`
+  — exactly where xswap's `2155` rewrites the store/writeback path. They are
+  accounting fixes, and we have no writeback target (no disk swap).
+
+### Changed
+- `pkgrel` 12 → 13. Series is now 215 patches.
+
 ## [7.3.0-rc3-12-sleepy-next]: 2026-09-15
 
 ### Added (from the 2026-09-15 sweep)

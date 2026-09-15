@@ -523,3 +523,36 @@ snapshots is not meaningful, only content is.
 Related: `repos/linux-next`'s `master` branch is stale (2026-08-03) while the
 tags are current — check `git -C repos/linux-next describe --tags <ref>` before
 trusting any ref in that clone.
+
+## Half a series is worse than none (2026-09-15, patch 2142)
+
+`2142` was adopted as a single patch from Xueyuan Chen's 4-part series "avoid
+large folio splits when swap is unavailable". It is part **3/4**. Parts 1/4 and
+2/4 — which introduce `page_counter_margin()` and the `0`/`-E2BIG`/`-ENOSPC`/
+`-ENOMEM` return classification for `folio_alloc_swap()` — were never taken.
+
+3/4 gates the large-folio split fallback in `shrink_folio_list()` on
+`ret != -E2BIG`. With nothing in the tree returning `-E2BIG`, that condition was
+always true, so **every** swap-allocation failure took the "do not split" branch
+and the THP/mTHP swapout fallback became unreachable. The patch did the exact
+opposite of its stated purpose, and it made reclaim worse than stock. It
+applied cleanly, compiled, ran, and appeared in no log.
+
+**Rule: a patch that is *part* of a series must be checked for its siblings
+before adoption, not just for whether it applies.** Concretely:
+
+```bash
+# what does this patch assume already exists?
+rg -n 'E2BIG|page_counter_margin' sleepy-next/patches/<range>/<the patch>
+rg -n 'E2BIG|page_counter_margin' repos/torvalds/mm/ repos/torvalds/include/linux/
+```
+
+If the patch tests for a value, a symbol, or a state that nothing in the tree
+produces, the patch is either inert or — worse — latched into a branch it was
+never meant to take. The cumulative apply cannot catch this: the patch applies
+perfectly.
+
+Found by a sweep agent reading the patch *and* grepping the tree for its
+contract, then confirmed by hand: `rg -c E2BIG mm/swapfile.c mm/swap.h
+mm/vmscan.c` returned nothing on a tree that had been running the patch for
+days.

@@ -3,18 +3,18 @@
 `linux-sleepy-next` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
 built from **mainline Linux 7.3-rc3** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 213 targeted
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 215 targeted
 upstream/local patches. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0_rc3-12` · **Artifact:**
-`linux-sleepy-next-7.3.0_rc3-12-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0_rc3-13` · **Artifact:**
+`linux-sleepy-next-7.3.0_rc3-13-x86_64.pkg.tar.zst`
 
 ## Target hardware
 
 | Component | Hardware | Kernel identifiers |
 |---|---|---|
 | CPU | Ryzen 7 7700 (Zen 4) | `MZEN4`, `amd-pstate`, `CPPC`, `k10temp` |
-| GPU | Radeon RX 9070 XT (Navi 48) | `gfx1201` (GC 12.0), `DCN401`, `DCN42B`, `SMU14`, `PSP14` |
+| GPU | Radeon RX 9070 XT (Navi 48) | `gfx1201` (GC 12.0), `DCN401` (DCN 4.0.1), `SMU14`, `PSP14` |
 | NIC | Realtek RTL8125B | in-kernel `r8169` |
 | NVMe | Phison E16 PCIe 4.0 | `bfq`, `mq-deadline`, `kyber` |
 | Scheduler | sched-ext | `CONFIG_SCHED_CLASS_EXT=y` |
@@ -91,7 +91,7 @@ fix lands.
 
 ## Patch series
 
-213 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+215 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 
 | Range | Category |
 |---|---|
