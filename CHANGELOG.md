@@ -94,6 +94,15 @@ and `1136`.
   is off), `tcp_poll()` `smp_rmb()` (an ARM64 win), zonelist/NUMA and
   cache-aware-scheduling work (single-CCD desktop), ESMTP (SEV-SNP guests).
 
+**Verified drop-list (reverse-apply audit against torvalds master, 2026-09-15).**
+Five carried patches are already in master and disappear at the next bump:
+`2141` (filemap retain mapped dropbehind folios), `2145` (mm/vma unaccount on
+mmap_prepare failure), `2146` (mm/mlock IRQ-safe NR_MLOCK accessor), `2500`
+(MADV_FREE/THP data loss) and `2502` (x86/amd_node PCI refcount). The check is
+`git apply --check -R` per patch against a worktree at `origin/master` — note it
+must run against a master checkout, not the repo's working tree, which sits at
+rc3 and makes every patch look un-applied.
+
 **Work items.** The five tracked issues (#5821 hang, #5820 SMU bus loss, #5800
 vblank timeout, #5812 VRR black level, #5780 HDMI FRL) still have no referenced
 fix. #5720's fix (`c4a5160e3be0`) is absent from rc3 but concerns YCbCr-4:2:0
