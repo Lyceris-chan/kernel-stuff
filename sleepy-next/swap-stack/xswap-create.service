@@ -12,9 +12,17 @@ Before=swap.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-# Writing a priority to the sysfs file creates a new device; the guard keeps
-# repeated starts from stacking up extra xswap devices.
-ExecStart=/bin/sh -c "grep -q ^xswap /proc/swaps || echo 100 > /sys/kernel/mm/xswap/create"
+# Writing a priority to the sysfs file creates a new device, and the kernel does
+# NOT deduplicate: two writes of the same priority give two devices at that
+# priority. The guard is therefore required for idempotency across restarts.
+#
+# It matches a device at priority 100 specifically, not merely "some xswap
+# device". The coarse `grep -q ^xswap` was wrong in a way that is easy to hit:
+# a stray device at any other priority satisfies it, so the configured device is
+# never created and the machine boots without it. Verified by hand — creating a
+# second device at priority 50 and restarting the unit left the machine with
+# only the priority-50 device.
+ExecStart=/bin/sh -c "grep -qE '^xswap[0-9]+[[:space:]]+xswap[[:space:]]+[0-9]+[[:space:]]+[0-9]+[[:space:]]+100$' /proc/swaps || echo 100 > /sys/kernel/mm/xswap/create"
 
 [Install]
 WantedBy=swap.target

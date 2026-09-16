@@ -44,8 +44,22 @@ sudo sdboot-manage gen
 ```
 
 The action of record is `xswap-create.service`: it writes `100` to
-`/sys/kernel/mm/xswap/create` once per boot, guarded so a second start does not
-create a second device.
+`/sys/kernel/mm/xswap/create` once per boot.
+
+**The guard is load-bearing, because the kernel does not deduplicate.** Writing
+a priority to `create` always makes a new device — two writes of `100` give two
+devices at priority 100 (verified on the live kernel: it produced `xswap0` and
+`xswap1`, both at priority 100). The unit's guard therefore matches a device at
+priority 100 *specifically*, not "any xswap device": the coarse `grep -q ^xswap`
+form is satisfied by a stray device at any other priority, so the configured one
+would never be created and the machine would boot without the swap it expects.
+Both directions were tested — no duplicate when a priority-100 device exists,
+and a priority-100 device is created when only a stray one is present.
+
+Multiple devices are supported. Each `create` takes the next free type and
+appears as `xswap<N>` in `/proc/swaps`; `destroy` takes the type to remove; an
+out-of-range or non-numeric type is rejected with `EINVAL`. A destroy/recreate
+cycle reuses the lowest free type, so it gives `xswap0` back.
 
 ## Verify after a reboot
 
@@ -120,6 +134,34 @@ no backing store, and therefore no device node.
   the kernel command line), so adding it would need a disk swap file or
   partition alongside this stack. Suspend-to-RAM
   (`mem_sleep_default=deep`) is what this setup is for.
+
+## Verified on the live kernel (2026-09-16, 7.3.0-rc3-16)
+
+Beyond "it shows up in `swapon --show`", the stack was driven under real load:
+
+- **A forced swap cycle.** 1.25 GiB of touched anonymous memory inside a cgroup
+  capped at 384 MiB pushed `stored_pages` from 3,578 to 443,398 and the pool to
+  501 MB holding 2.15 GiB logical — 4.4x — with `pool_limit_hit` still 0.
+- **Round-trip integrity.** 262,144 pages (1 GiB) written with a per-page
+  pattern, forced out to swap, then read back: **zero mismatches**, and
+  `decompress_fail` stayed 0 throughout.
+- **The pool shrinks again.** 15 s after the pressure ended the pool was already
+  draining (443k → 384k pages) and it kept draining. It does this via
+  `zswap_invalidate` as swap slots are freed, not via writeback —
+  `written_back_pages` is 0, correctly, since there is no backing store.
+- **No leak in the grow/shrink path.** Five full create → allocate → free →
+  destroy cycles left `MemAvailable` flat (27.76, 27.96, 27.87, 28.07, 28.04 GB
+  across the five). A leaking `cluster_info[]` would have shown a steady
+  per-cycle decline.
+- **Every error counter stayed at zero**: `reject_alloc_fail`,
+  `reject_compress_fail`, `reject_compress_poor`, `reject_kmemcache_fail`,
+  `reject_reclaim_fail`, `decompress_fail`, `pool_limit_hit`,
+  `written_back_pages`, `stored_incompressible_pages`.
+
+`/sys/kernel/mm/xswap/{create,destroy}` are root-write-only (`--w-------`) and
+`type<N>/limit` is `0644`. The device is created at its ceiling (`si->pages`,
+1xRAM = 8,107,519 pages here) and memory is allocated lazily per cluster, so a
+nominally 30 GiB device costs nothing while idle.
 
 ## Tune
 
