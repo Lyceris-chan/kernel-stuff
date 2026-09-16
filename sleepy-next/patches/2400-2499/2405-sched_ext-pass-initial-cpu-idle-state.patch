@@ -1,0 +1,94 @@
+From 93d88ac4a448f200d18d1d71de0074b8e716bbee Mon Sep 17 00:00:00 2001
+From: Tao Cui <cuitao@kylinos.cn>
+Date: Tue, 25 Aug 2026 10:35:56 +0800
+Subject: [PATCH] sched_ext: Pass the initial cpu.idle state in
+ scx_cgroup_init_args
+
+scx_cgroup_init_args carries the initial weight and bandwidth control
+parameters of a cgroup to ops.cgroup_init(), but not its cpu.idle
+state. A cgroup that was already configured idle before the scheduler
+was loaded (or before it was onlined under it) is presented as
+non-idle, and the BPF scheduler only learns about it if cpu.idle is
+written again later.
+
+Add the sched_idle state to scx_cgroup_init_args and fill it in all
+four places that build the args: scx_tg_online() for cgroups onlined
+under the scheduler, scx_cgroup_init() for cgroups that already exist
+when the scheduler is loaded, and the sub-scheduler handover paths
+scx_cgroup_claim_subtree() and scx_cgroup_return_subtree().
+
+Verified in a VM with a probe scheduler printing the init args: a
+cgroup configured cpu.idle=1 before loading shows sched_idle=1 in
+ops.cgroup_init(), the default shows 0, and later cpu.idle writes
+still come through ops.cgroup_set_idle(). The sub-scheduler paths
+are compile-tested only.
+
+Fixes: 347ed2d566da ("sched/ext: Implement cgroup_set_idle() callback")
+Signed-off-by: Tao Cui <cuitao@kylinos.cn>
+Reviewed-by: Andrea Righi <arighi@nvidia.com>
+Signed-off-by: Tejun Heo <tj@kernel.org>
+---
+ kernel/sched/ext/ext.c      | 4 +++-
+ kernel/sched/ext/internal.h | 3 +++
+ kernel/sched/ext/sub.c      | 2 ++
+ 3 files changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/kernel/sched/ext/ext.c b/kernel/sched/ext/ext.c
+index 713aa26b2828..901fb0f8b976 100644
+--- a/kernel/sched/ext/ext.c
++++ b/kernel/sched/ext/ext.c
+@@ -4766,7 +4766,8 @@ int scx_tg_online(struct task_group *tg)
+ 				{ .weight = tg->scx.weight,
+ 				  .bw_period_us = tg->scx.bw_period_us,
+ 				  .bw_quota_us = tg->scx.bw_quota_us,
+-				  .bw_burst_us = tg->scx.bw_burst_us };
++				  .bw_burst_us = tg->scx.bw_burst_us,
++				  .sched_idle = tg->scx.idle };
+ 
+ 			ret = SCX_CALL_OP_RET(sch, cgroup_init,
+ 					      NULL, tg->css.cgroup, &args);
+@@ -5187,6 +5188,7 @@ static int scx_cgroup_init(struct scx_sched *sch)
+ 				.bw_period_us = tg->scx.bw_period_us,
+ 				.bw_quota_us = tg->scx.bw_quota_us,
+ 				.bw_burst_us = tg->scx.bw_burst_us,
++				.sched_idle = tg->scx.idle,
+ 			};
+ 
+ 			ret = SCX_CALL_OP_RET(sch, cgroup_init, NULL, css->cgroup, &args);
+diff --git a/kernel/sched/ext/internal.h b/kernel/sched/ext/internal.h
+index 0967b99a4948..076a351bb3f2 100644
+--- a/kernel/sched/ext/internal.h
++++ b/kernel/sched/ext/internal.h
+@@ -259,6 +259,9 @@ struct scx_cgroup_init_args {
+ 	u64			bw_period_us;
+ 	u64			bw_quota_us;
+ 	u64			bw_burst_us;
++
++	/* whether the cgroup is configured SCHED_IDLE via cpu.idle */
++	bool			sched_idle;
+ };
+ 
+ enum scx_cpu_preempt_reason {
+diff --git a/kernel/sched/ext/sub.c b/kernel/sched/ext/sub.c
+index 0554448835bd..385302d19914 100644
+--- a/kernel/sched/ext/sub.c
++++ b/kernel/sched/ext/sub.c
+@@ -1361,6 +1361,7 @@ static s32 scx_cgroup_claim_subtree(struct scx_sched *sch)
+ 			.bw_period_us = tg->scx.bw_period_us,
+ 			.bw_quota_us = tg->scx.bw_quota_us,
+ 			.bw_burst_us = tg->scx.bw_burst_us,
++			.sched_idle = tg->scx.idle,
+ 		};
+ 
+ 		if (tg->scx.sched != parent ||
+@@ -1464,6 +1465,7 @@ static void scx_cgroup_return_subtree(struct scx_sched *sch)
+ 			.bw_period_us = tg->scx.bw_period_us,
+ 			.bw_quota_us = tg->scx.bw_quota_us,
+ 			.bw_burst_us = tg->scx.bw_burst_us,
++			.sched_idle = tg->scx.idle,
+ 		};
+ 
+ 		/* the first pass must have transferred everything */
+-- 
+2.55.0
+

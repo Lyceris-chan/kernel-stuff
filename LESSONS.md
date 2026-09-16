@@ -849,3 +849,126 @@ TSC-instability detection, which this project's A/B methodology depends on.
 Same shape as *"A unit that waits is not the unit that gates"* above: the thing
 that *mentions* a problem is rarely the thing that *is* the problem. Ask what had
 to be true for the message to be printed, not merely what printed it.
+
+## "Is it in the base?" is not a duplicate test (2026-09-16)
+
+A sweep surfaced `848d2ce2fce1` (`mm: filemap: retain mapped dropbehind folios`).
+The check that mattered — `git merge-base --is-ancestor <sha> v7.3-rc3` — said
+**no**, correctly. The patch is a real fix. It was staged as `2176`, documented,
+given a checksum, and queued for the build.
+
+It was **already in the series as `2141`**, byte-identical, and had been for
+days. The build caught it and nothing else did:
+
+```
+Applying patch 2176-mm-filemap-retain-mapped-dropbehind-folios.patch...
+  SKIPPED: does not apply cleanly
+```
+
+GNU `patch` explains itself in the dry-run log — `Reversed (or previously
+applied) patch detected!` — but `prepare()` prints only `SKIPPED`, and a skipped
+patch is not a failed build. It is a **silent no-op**: the tree still compiles,
+the package still installs, and the only trace is one line in a log nobody
+re-reads.
+
+**Why every pre-adoption check passed.** `git apply --check` and
+`patch --dry-run` are only meaningful against a tree that already contains the
+whole series. The audit worktree at `repos/_audit` was created from an *earlier*
+series state, so it did not contain `2141` — the patch applied beautifully to a
+tree that was missing the thing it duplicated. **A stale reference tree turns a
+duplicate into a clean apply.**
+
+Three rules follow:
+
+1. **Compare against the series, not the base.** Duplicate detection is a hash
+   scan over the diff bodies of every patch in `source=()`, with `index` and
+   `similarity index` lines stripped (the blob hashes differ between
+   regenerations even when the code is identical). One `python3` loop over
+   `sleepy-next/patches/*/*.patch` finds this class in a second.
+2. **The authoritative check is the build's own dry-run, in series order.** It
+   is the only thing that runs against the real tree in the real order. Read the
+   `SKIPPED` count out of every build log; do not assume a clean build means
+   every patch landed.
+3. **Rebuild the audit worktree after the series changes.** `rm -rf repos/_audit`
+   before `audit_series.py --keep`. A worktree kept from a previous cycle is
+   worse than no worktree, because it answers questions confidently and wrongly.
+
+The vacated number stays vacated — `2176` is a gap, like `2401`, `2402` and
+`2501`. Renumbering would erase the evidence that something was tried and
+rejected.
+
+Related: *"Half a series is worse than none"* above is the same failure seen from
+the other side — a tree that is missing a prerequisite makes an inert patch look
+effective. Both are the cost of testing against a tree that is not the real one.
+
+## Every clone here is shallow, so `merge-base --is-ancestor` lies (2026-09-16)
+
+The standard "is this patch already in our base?" test was written into the
+sweep instructions as:
+
+```bash
+git merge-base --is-ancestor <sha> v7.3-rc3   # WRONG in this repo
+```
+
+**It is wrong, and it fails silently in the direction that looks like a finding.**
+Every clone under `repos/` except `pixelcluster-kernel` is shallow — `torvalds`
+has 162 graft points, `linux-next` 560, `drm-misc` 471, `zen-kernel` 481. In a
+shallow clone git cannot walk past the grafts, so ancestry queries return
+"not an ancestor" for commits it simply cannot see.
+
+The sanity check that exposes it — and the reason to always run one:
+
+```
+c84bf6dd2b83  2025-05-09  -> "not an ancestor of v7.3-rc3"
+2fbb0c10d1e8  2022-02-14  -> "not an ancestor of v7.3-rc3"
+```
+
+Two commits from 2025 and 2022, reported as not ancestors of a 2026 tag. They
+obviously are. **Before trusting any ancestry answer, test it against a commit
+whose answer you already know.** A primitive that cannot be wrong in your favour
+is worth ten minutes of calibration.
+
+The failure mode is nasty because it inflates the candidate list rather than
+emptying it: ancient, long-merged code is reported as novel, and each false
+positive costs a manual rejection. It also almost hid a real one — `mmap_prepare`
+was reported absent from the base, but `v7.3-rc3:mm/vma.c` contains 14 references
+to it, which is how we know `2145` and `2146` are live fixes and not inert.
+
+**The two tests that do work** are content-based, and neither needs ancestry:
+
+- **Already carried?** Search `sleepy-next/patches/*/*.patch` for the sha in a
+  `From <sha>` line *and* for a matching `Subject:` line; grep `PATCH_SOURCES.md`.
+- **Bug present in the base?** Read the file at the tag:
+  `git -C repos/torvalds show v7.3-rc3:<path> | rg '<symbol>'`. If the code the
+  patch repairs is there, the bug is live.
+
+Applicability is settled the same way it always was: `patch -p1 --forward
+--dry-run -F2` against a worktree carrying the full series. Neither a bare
+`v7.3-rc3` tree nor a stale worktree will do — see the entry above.
+
+## A crashed command and an empty result look identical (2026-09-16)
+
+Mid-sweep, `dmesg` showed 23 `zsh` coredumps in three minutes. This looked like
+a kernel regression and was not one. The crashing processes had been spawned by
+an automated sweep command, and the backtrace was entirely *inside zsh* —
+`getoutput -> execode -> execlist -> prefork`, with `sp` equal to the faulting
+address (`SEGV_MAPERR`). The captured command line was a `for` loop built with
+pathological nested escaping (`\'"\'"\'%H\'"\'"\'`), and the escapes are what
+blew zsh's stack. `zsh -c 'echo ok'` worked every time.
+
+Two things worth keeping:
+
+**Diagnose a segfault by the backtrace, not the count.** `sp == fault address`
+with symbol-free frames *inside the interpreter* says userspace, and says the
+interpreter is recursing too deep. A kernel-side stack fault would have taken
+out more than one program, and simple invocations would fail too.
+
+**The real hazard is the silence afterwards.** `git log ... | wc -l` in a shell
+that segfaults prints `0`. A crashed sweep and a clean "nothing to report" are
+the same three characters. Any sweep step that returns a *negative* result — no
+candidates, no new commits, zero matches — has to be re-run cleanly before it is
+believed, because the failure mode of the tool and the failure mode of the
+question are indistinguishable.
+
+The fix is to stop generating deeply-escaped one-liners: write the loop to a file
+and run it with `bash <file>`, so there is no quoting layer at all.

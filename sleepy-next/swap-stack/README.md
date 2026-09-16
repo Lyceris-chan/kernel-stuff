@@ -1,7 +1,7 @@
 # swap stack: zswap + xswap
 
 This machine swaps into compressed RAM instead of a zram block device. The
-kernel side is `CONFIG_XSWAP` plus patches `2155`–`2166`; the userspace side is
+kernel side is `CONFIG_XSWAP` plus patches `2155`–`2168`; the userspace side is
 the two files in this directory.
 
 ## Why not zram
@@ -135,7 +135,28 @@ no backing store, and therefore no device node.
   partition alongside this stack. Suspend-to-RAM
   (`mem_sleep_default=deep`) is what this setup is for.
 
-## Verified on the live kernel (2026-09-16, 7.3.0-rc3-16)
+## NOT YET RE-VERIFIED: the series was replaced with v2 on 2026-09-16
+
+Everything below this line was measured against the **previous revision** of the
+series (`2155`–`2166`, the 12-patch `v2/12` posting). On 2026-09-16 that block
+was replaced by sirlucjan's **14-patch `xswap-patches-v2-sep`**, now carried as
+`2155`–`2168`. The revisions are not cosmetic: `2158` swaps `READ_ONCE()` for
+`smp_load_acquire()`/`smp_store_release()` in the cluster grow/unmap protocol,
+`2166`/`2167` make `si->pages` mutable at runtime and add kobject add/del
+helpers, and two patches are new — `2166` (cap growth at `nr_clusters`) and
+`2168` (shrink to the ceiling when it drops). Those two turn `type<N>/limit`
+from the soft bound described under **Tune** below into a real cap, which is the
+wart that section documents.
+
+**So: the numbers, the round-trip test, the leak check and the code audit below
+describe code that is no longer in the tree.** They are kept as the record of
+what was verified and how, not as a claim about the current series. Re-run the
+same procedure after the next boot on a kernel carrying v2 before trusting any
+of it. The "Known cosmetic artifacts" and "Install"/"Revert" sections are
+unaffected — they describe userspace and the sysfs ABI, neither of which
+changed.
+
+## Verified on the live kernel (2026-09-16, 7.3.0-rc3-16) — previous revision
 
 Beyond "it shows up in `swapon --show`", the stack was driven under real load:
 
@@ -163,7 +184,7 @@ Beyond "it shows up in `swapon --show`", the stack was driven under real load:
 1xRAM = 8,107,519 pages here) and memory is allocated lazily per cluster, so a
 nominally 30 GiB device costs nothing while idle.
 
-## Code audit of the series (2026-09-16)
+## Code audit of the series (2026-09-16) — previous revision, superseded
 
 Patches `2155`–`2166` were read end to end against a reconstructed post-series
 tree. **No reachable lifetime, locking, use-after-free, double-free, or

@@ -21,17 +21,17 @@ are supplied by the generator instead, so every row below has a source.
 | `0001–0049` | Handmade local | 12 |
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
-| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 25 |
-| `1100–1199` | AMD display (DCN4, colorops) | 19 |
+| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 30 |
+| `1100–1199` | AMD display (DCN4, colorops) | 20 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 18 |
-| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 14 |
-| `2100–2199` | Memory management and swap (zstd, LRU-MARIE, MGLRU, gup, xswap) | 50 |
+| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 45 |
+| `2100–2199` | Memory management and swap (zstd, LRU-MARIE, MGLRU, gup, xswap) | 76 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 21 |
-| `2400–2499` | Core scheduler and sched-ext | 3 |
-| `2500–2599` | x86 and arch core | 2 |
-| `2600–2699` | Time and timers | 0 |
-| `9000–9099` | agd5f staging + userq lifecycle backports | 41 |
+| `2400–2499` | Core scheduler and sched-ext | 14 |
+| `2500–2599` | x86 and arch core | 7 |
+| `2600–2699` | Time and timers | 3 |
+| `9000–9099` | agd5f staging + userq lifecycle backports | 45 |
 
 **A resolved numbering collision:** two patches used to share the number
 `1140` — Tom Chung's clamp of `force_min_dcfclk` to the dcn42b range (still
@@ -99,6 +99,10 @@ renumbered to `1165` in the rc3-9 cycle (2026-09-15).
 | `9069` | drm/amdgpu: hold userq kref during suspend and resume | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-9-lingshan.zhu@amd.com` |
 | `9070` | drm/amdgpu: free userq by kref_put when fails to create | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-10-lingshan.zhu@amd.com` |
 | `9071` | drm/amdgpu: take queue kref in userq_create to avoid UAF | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-11-lingshan.zhu@amd.com` |
+| `9072` | drm/amdgpu/sdma: add detect_hung_queue callback | Jesse Zhang | 2026-09-03 | `972a8cd8fba1` |
+| `9073` | drm/amdgpu/sdma6: implement detect_hung_queue | Jesse Zhang | 2026-09-03 | `994dea375802` |
+| `9074` | drm/amdgpu/sdma7: implement detect_hung_queue | Jesse Zhang | 2026-09-03 | `ba07df579939` |
+| `9075` | drm/amdgpu/userq: reset a hung SDMA user queue over MMIO | Jesse Zhang | 2026-09-03 | `10a6760a1a64` |
 | `1135` | drm/amd/display: fix HPD program filter programming | Charlene Liu | 2026-08-05 | `20260805063937.2145774-13-chiahsuan.chung@amd.com` |
 | `1136` | drm/amd/display: Update and revert FRL LT Timeout | Relja Vojvodic | 2026-08-05 | `20260805063937.2145774-21-chiahsuan.chung@amd.com` |
 | `1138` | drm/amd/display: pull colorops into state when recreating a plane | Harry Wentland | — | `20260825153539.213495-1-harry.wentland@amd.com` |
@@ -173,8 +177,8 @@ renumbered to `1165` in the rc3-9 cycle (2026-09-15).
 | `2139` | mm: vmscan: avoid anon scanning for GFP_NOIO with low swapcache | Bo Zhang | 2026-09-08 | `09c1d29a3d1e` |
 | `2140` | mm/page_alloc: avoid direct compaction for costly __GFP_NORETRY allocations | Salvatore Dipietro | 2026-09-11 | `60adb47f4fa3` |
 | `2141` | mm: filemap: retain mapped dropbehind folios | Wenjie Qi | 2026-08-30 | `848d2ce2fce1` |
-| `2169` | mm/vmscan: avoid pointless large folio splits without swap | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-08-30 | `bd7fcb0dea86` |
-| `2170` | mm: vmalloc: fix vmap_purge_lock livelock under memory pressure | Ye Liu | 2026-08-28 | `6c06fec56a63d` |
+| `2171` | mm/vmscan: avoid pointless large folio splits without swap | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-08-30 | `bd7fcb0dea86` |
+| `2172` | mm: vmalloc: fix vmap_purge_lock livelock under memory pressure | Ye Liu | 2026-08-28 | `6c06fec56a63d` |
 | `2144` | xarray: fix index jumping backwards in xas_find() | Krystian Kaniewski | 2026-09-04 | `5fe684a7cd8e` |
 | `2145` | mm/vma: correctly unaccount on mmap_prepare() failure | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-02 | `6cc27d821963` |
 | `2146` | mm/mlock: use the IRQ-safe accessor for NR_MLOCK in __munlock_folio() | Shakeel Butt | 2026-09-01 | `e14a34548064` |
@@ -186,20 +190,21 @@ renumbered to `1165` in the rc3-9 cycle (2026-09-15).
 | `2152` | khugepaged: hold invalidate_lock across collapse_file() readahead | Nguyen Ngoc Thang | 2026-09-13 | `1be399d378b7` |
 | `2153` | writeback: report a Tasks-RCU quiescent state per cgwb drain pass | Josef Bacik | 2026-09-09 | `6495bf0e43d6` |
 | `2154` | mm/page_alloc: apply per-task GFP context in bulk allocator | Qiqi Liu | 2026-09-14 | `afd44a6aa48e` |
-| `2155` | mm: xswap support for zswap | Baoquan He | 2026-09-13 | `20260913075014.1732524-2-hebaoquan@kylinos.cn` |
-| `2156` | mm, swap: add CONFIG_XSWAP and xswap fields to swap_info_struct | Baoquan He | 2026-09-13 | `20260913075014.1732524-3-hebaoquan@kylinos.cn` |
-| `2157` | mm, swap: refactor free_swap_cluster_info to take swap_info_struct | Baoquan He | 2026-09-13 | `20260913075014.1732524-4-hebaoquan@kylinos.cn` |
-| `2158` | mm, swap: add xswap cluster grow via VM_SPARSE vmalloc | Baoquan He | 2026-09-13 | `20260913075014.1732524-5-hebaoquan@kylinos.cn` |
-| `2159` | mm, swap: add sysfs create interface for xswap | Baoquan He | 2026-09-13 | `20260913075014.1732524-6-hebaoquan@kylinos.cn` |
-| `2160` | mm, swap: add xswap grow trigger on cluster allocation | Baoquan He | 2026-09-13 | `20260913075014.1732524-7-hebaoquan@kylinos.cn` |
-| `2161` | mm, swap: add xswap_try_shrink and shrink trigger on cluster free | Baoquan He | 2026-09-13 | `20260913075014.1732524-8-hebaoquan@kylinos.cn` |
-| `2162` | mm, swap: free backing pages in xswap_unmap_clusters | Baoquan He | 2026-09-13 | `20260913075014.1732524-9-hebaoquan@kylinos.cn` |
-| `2163` | mm, swap: defer xswap shrink to workqueue to avoid lock recursion | Baoquan He | 2026-09-13 | `20260913075014.1732524-10-hebaoquan@kylinos.cn` |
-| `2164` | mm, swap: refactor swapoff + add xswap_destroy | Baoquan He | 2026-09-13 | `20260913075014.1732524-11-hebaoquan@kylinos.cn` |
-| `2165` | mm, swap: require zswap for xswap devices | Baoquan He | 2026-09-13 | `20260913075014.1732524-12-hebaoquan@kylinos.cn` |
-| `2166` | mm, swap: add sysfs per-device size limit for xswap | Baoquan He | 2026-09-13 | `20260913075014.1732524-13-hebaoquan@kylinos.cn` |
-| `2167` | mm: add page_counter_margin() | Xueyuan Chen | 2026-08-30 | `20260830042920.2280454-2-xueyuan.chen21@gmail.com` |
-| `2168` | mm: distinguish large folio swap allocation failures | Xueyuan Chen | 2026-08-30 | `20260830042920.2280454-3-xueyuan.chen21@gmail.com` |
+| `2155` | mm: xswap support for zswap | Chris Li | 2026-09-16 | `xswap-patches-v2-sep/0001` |
+| `2156` | mm, swap: add CONFIG_XSWAP and xswap fields to | Baoquan He | 2026-09-16 | `xswap-patches-v2-sep/0002` |
+| `2157` | mm, swap: refactor free_swap_cluster_info to take | Baoquan He | 2026-09-16 | `xswap-patches-v2-sep/0003` |
+| `2158` | mm, swap: add xswap cluster grow via VM_SPARSE vmalloc | Baoquan He | 2026-09-16 | `xswap-patches-v2-sep/0004` |
+| `2159` | mm, swap: add sysfs create interface for xswap | Baoquan He | 2026-09-16 | `xswap-patches-v2-sep/0005` |
+| `2160` | mm, swap: add xswap grow trigger on cluster allocation | Baoquan He | 2026-09-16 | `xswap-patches-v2-sep/0006` |
+| `2161` | mm, swap: add xswap_try_shrink and shrink trigger on | Baoquan He | 2026-09-16 | `xswap-patches-v2-sep/0007` |
+| `2162` | mm, swap: free backing pages in xswap_unmap_clusters | Baoquan He | 2026-09-16 | `xswap-patches-v2-sep/0008` |
+| `2163` | mm, swap: defer xswap shrink to workqueue to avoid lock | Baoquan He | 2026-09-16 | `xswap-patches-v2-sep/0009` |
+| `2164` | mm, swap: refactor swapoff and add xswap_destroy | Baoquan He | 2026-09-16 | `xswap-patches-v2-sep/0010` |
+| `2165` | mm, swap: require zswap for xswap devices | Baoquan He | 2026-09-16 | `xswap-patches-v2-sep/0011` |
+| `2166` | mm, swap: cap xswap growth at nr_clusters | Baoquan He | 2026-09-16 | `xswap-patches-v2-sep/0012` |
+| `2167` | mm, swap: add sysfs per-device size limit for xswap | Baoquan He | 2026-09-16 | `xswap-patches-v2-sep/0013` |
+| `2168` | mm, swap: shrink xswap to the ceiling when it drops | Baoquan He | 2026-09-16 | `xswap-patches-v2-sep/0014` |
+| `2170` | mm: distinguish large folio swap allocation failures | Xueyuan Chen | 2026-08-30 | `20260830042920.2280454-3-xueyuan.chen21@gmail.com` |
 | `2200` | 7.2-nap-v0.5.0 | Masahito S | 2026-06-05 | `04aef34448bb` |
 | `2303.patch` | kallsyms: index symbols by token to speed up table compression | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-2-39817ec5db23@kernel.org` |
 | `2304.patch` | kallsyms: output binary data to speed output and kallsyms assembly | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-3-39817ec5db23@kernel.org` |
@@ -533,6 +538,72 @@ subset** of sirlucjan's `7.3-rc/zstd-dev-patches` merge, not an independent
 submission; the rest of that merge was not taken, because it refactors the
 `bmi2` field into `ZSTD_*Ctx_get_bmi2()` accessors that `2128`–`2130` depend on.
 
+`2173`–`2182` are the 2026-09-16 sweep's mm and lib picks, all `Fixes:`-tagged
+and absent from the rc3 base. **Two of them touch the same `zswap_setup()`
+region, so the order in `source=()` is a dependency, not a preference** —
+`2173` must precede `2174`. Reversing them makes `2174` fail its context check
+and be silently skipped by `patch --forward`.
+
+- `2173` publishes the initial zswap pool with `list_add_rcu()`, so a concurrent
+  reader cannot observe a half-linked pool.
+- `2174` moves `static_branch_enable(&zswap_ever_enabled)` from `zswap_setup()`
+  into `zswap_pool_create()`. Without it, a boot where the default-on pool
+  creation fails leaves the static key off; a pool created later by writing
+  `zswap.compressor` then stores through zswap while the swapin path skips it,
+  and pages read back **zeroed**. The reporter measured 131072/131072 zeroed
+  pages under fault injection. `Cc: stable`.
+- `2175` fixes `SWAP_USAGE_OFFLIST_BIT` colliding with a real usage count.
+  `Cc: stable`, one line. Unreachable below 4 TiB of swap, so prophylactic here.
+- `2176` fixes a NULL dereference when a sleep-table allocation is retried.
+  Directly relevant: this machine swaps through xswap continuously.
+- `2177` stops a large-folio swapin from failing when only part of the range is
+  in zswap. It replaces an unconditional `WARN_ON_ONCE` + `-EINVAL` for every
+  large folio with a range scan: `-EIO` only if a slot really is in zswap, and
+  `-ENOENT` otherwise. **Checked against our own swap stack before adopting,
+  because a new `-ENOENT` return could send a swapin to a backing device that
+  xswap does not have.** It cannot: `2155` already guards exactly this in
+  `swap_read_folio()` — `if (unlikely(sis->flags & SWP_XSWAP)) { folio_unlock();
+  goto finish; }` sits immediately after the `zswap_load() != -ENOENT` test — so
+  on an xswap device the new path stops there instead of reading. No corruption
+  path is opened, and the spurious `WARN_ON_ONCE` on our setup goes away.
+- `2179` validates the in-memory LZ4 chunk length. **Live on every boot here**:
+  `/etc/mkinitcpio.conf` sets `COMPRESSION="lz4"`.
+- `2180` fixes `plist_requeue()` corrupting order in the last node. `plist` is
+  live in `rtmutex`/`futex` (`Cc: stable`).
+- `2181` avoids accesses after waking `klist_remove()` — driver core
+  (`Cc: stable`).
+- `2182` fixes an incorrect `mod_ct` in `dynamic_debug_init()`;
+  `CONFIG_DYNAMIC_DEBUG=y`.
+
+**`2178` was vacated, and the reason is worth recording.** It was `848d2ce2fce1`
+(`mm: filemap: retain mapped dropbehind folios`), which the sweep reported as
+absent from the base — true, but it was **already carried here as `2141`**. The
+diff bodies are byte-identical. It passed every pre-adoption check (`git apply
+--check` and GNU `patch --dry-run` on the audit worktree) and was then **silently
+skipped in the real build**: the build log reads
+
+```
+Applying patch 2176-mm-filemap-retain-mapped-dropbehind-folios.patch...
+  SKIPPED: does not apply cleanly
+```
+
+against `Reversed (or previously applied) patch detected!`. The audit worktree
+had been built from an earlier series state, so it did not contain `2141`.
+
+**The durable lesson: an "is it in base?" test is not a duplicate test.** The
+authoritative check is `patch --forward --dry-run` run in series order against
+the real tree, which is exactly what `prepare()` does and what
+`audit_series.py` reports as `Skipping patch`. A hash scan over the whole series
+(body of each patch, `index`/`similarity` lines stripped) now shows `2141`≡`2178`
+as the only duplicate pair; the gap at `2178` is left in place rather than
+renumbering, matching `2401`/`2402`/`2501`.
+
+**Three further candidates were rejected as inert, not as wrong.**
+`392dee2b81f4` and `8679598143f2` (bootconfig) touch a subsystem this machine
+does not use — `/proc/bootconfig` is empty and nothing on the command line
+enables it. `c922c000d06e` (bunzip2 run-length bound) guards an initramfs
+compressor we do not build.
+
 ### CPU idle (2200–2299)
 
 `2200` is the NAP governor, firelzrd's `7.2-nap-v0.5.0`. sirlucjan's `7.3-rc/`
@@ -563,6 +634,30 @@ load-balancing half is therefore bypassed on this machine, which makes `2401`,
 `2402` and every other `fair.c` patchset item inert or partly inert while
 scx_cake is loaded. They remain correct if sched-ext is ever not loaded.
 
+`2405`–`2411` are `sched_ext-for-7.3-rc3-fixes` (pull `9b87fdc9af2f`, Tejun
+Heo), the fixes batch for the 7.3-rc3 sched-ext rework. **These are not inert
+here the way the `fair.c` items above are** — `scx_loader` runs `cake_1.2.1`,
+so this *is* the live scheduler. The pull's own description names two real
+bugs: a use-after-free where an error raised by a BPF program *before* the
+scheduler finished enabling was consumed by the disable path's pre-enable
+shortcut, leaving a running scheduler that could not be disabled and was later
+freed while in use; and two compat kfuncs dereferencing a NULL scheduler when
+handed an exited or idle task, oopsing the kernel (`2407`).
+
+`2405` passes the initial `cpu.idle` state in, `2406` stops delivering duplicate
+`ops.cgroup_set_idle()` for the same ctx, `2407` fixes the NULL sub-sched
+deref, `2408` renames `sch` to `root_sch` in `dispatch_one()`, `2409` uses
+`@prev`'s scheduler for the keep decisions, `2410` restores unused idle claims
+and `2411` maintains an online `cid` mask in the scheduler arena.
+
+**Three commits of that pull are deliberately not carried.** `a0d356696f87`,
+`63b4ff622244` and `89ff16f07139` touch only `tools/sched_ext/scx_qmap.bpf.c`
+and `scx_qmap.h`. This PKGBUILD does not build `tools/` (the only reference is
+a commented-out `bpftool` line), so they would apply cleanly and change nothing
+in the shipped kernel. The eleventh commit in the pull, `c7a1c6e8004a`, is
+**already ours as `2404`** — the code is byte-identical and only a comment is
+worded differently, because ours is the v1 mailing-list version.
+
 ### x86, arch and timers (2500–2600)
 
 `2500` is a one-line data-loss fix: `pmd_modify()` masked out `_PAGE_DIRTY`
@@ -573,6 +668,16 @@ byte-identical and the series carries one, under the merged tip subject.
 
 `2501` fixes inverted AMD MCE threshold-interrupt enablement. `2600` makes
 `hrtimer` use the hard expiry when updating timers on the same base.
+
+`2503`–`2507` are the 2026-09-16 sweep's x86 picks, all `Fixes:`-tagged and
+absent from the rc3 base. They are one group: `2503` and `2504` take
+`init_mm`'s read lock around attribute changes and its write lock around
+collapse, so a concurrent `change_page_attr` cannot race `lookup_address`;
+`2505` fixes the effective-RW computation in `lookup_address`; `2506` allocates
+split page tables as kernel page tables; `2507` excludes alternatives text
+poking from racing a concurrent `change_page_attr`. `CONFIG_X86_PAT=y`, and PAT
+is per-CPU and on the hot path of every `ioremap`/`set_memory_*` caller, so
+this is live code rather than a latent corner.
 
 ### agd5f staging backports (9000–9099)
 
@@ -599,6 +704,108 @@ free-dw count could encode a 1 GB copy inside the IB pool and hang the ring.
 
 **Do not re-add `9051` and `9052`.** They were the DCN4 flip-schedule pair,
 dropped because AMD is reverting both upstream.
+
+### The 2026-09-16 second sweep — 59 patches (`1065`–`1069`, `1167`, `2014`–`2044`, `2183`–`2197`, `2412`–`2415`, `2603`–`2605`)
+
+Adopted after the five-lane sweep below. Every one was verified with
+`patch -p1 --forward --dry-run -F2` against a worktree carrying the **full
+series** (`repos/_sweep-full`), never against a bare rc3 tree and never against
+a worktree whose HEAD is the base tag. Series order matters for three groups:
+`eabd297f77a2` -> `1808dccdef42` -> `9ffd38b0f610`, `422d8f12c09c` -> `3e2f847821dd`,
+and the ten io_uring ring-close patches in posting order.
+
+- **`1065`** — `1065-amdgpu-reserve-eviction-fence-slot-at-wptr-caller.patch`
+- **`1066`** — `1066-amdgpu-reserve-root-pd-fence-slots-userq-rearm.patch`
+- **`1067`** — `1067-amdgpu-skip-kfd-mapping-clear-before-init.patch`
+- **`1068`** — `1068-amdgpu-fix-pcie-link-capability-reporting.patch`
+- **`1069`** — `1069-amdgpu-fix-rmmio-iounmap-skipped-on-removal.patch`
+- **`1167`** — `1167-dm-restore-native-cursor-early-return-disabled-crtc.patch`
+- **`2014`** — `2014-blk-mq-check-passthrough-before-cached-request.patch`
+- **`2015`** — `2015-nvme-bump-genctr-when-cancelling-a-request.patch`
+- **`2016`** — `2016-nvme-multipath-fix-ana-log-bounds-underflow.patch`
+- **`2017`** — `2017-io-wq-order-exit-bit-against-worker-creation.patch`
+- **`2018`** — `2018-io_uring-put-request-file-before-completion.patch`
+- **`2019`** — `2019-io_uring-post-io-wq-completions-last-reference.patch`
+- **`2020`** — `2020-io_uring-rw-dont-reap-iopoll-while-io-wq-ref.patch`
+- **`2021`** — `2021-io_uring-put-request-files-before-completions.patch`
+- **`2022`** — `2022-io_uring-uring_cmd-cancel-only-given-task.patch`
+- **`2023`** — `2023-io_uring-notif-count-zerocopy-per-ring.patch`
+- **`2024`** — `2024-io_uring-cancel-wait-all-requests-on-exit.patch`
+- **`2025`** — `2025-io_uring-run-cancelations-sync-on-release.patch`
+- **`2026`** — `2026-io_uring-drop-files-buffers-at-release.patch`
+- **`2027`** — `2027-io_uring-wait-inflight-requests-on-release.patch`
+- **`2028`** — `2028-r8169-propagate-errors-from-phy-write.patch`
+- **`2029`** — `2029-r8169-propagate-firmware-access-errors.patch`
+- **`2030`** — `2030-r8169-release-firmware-on-application-failure.patch`
+- **`2031`** — `2031-tcp-exclude-old-acks-from-fast-path.patch`
+- **`2032`** — `2032-tcp-preserve-timestamps-across-recv-collapse.patch`
+- **`2033`** — `2033-tcp-init-skb-tx-timestamp-key-before-clone.patch`
+- **`2034`** — `2034-tcp-do-not-let-tcp_rmem-go-below-4096.patch`
+- **`2035`** — `2035-net-lock-socket-in-sock_gettstamp.patch`
+- **`2036`** — `2036-net-tcp-account-zerocopy-receive-vma-memory.patch`
+- **`2037`** — `2037-net-neighbour-serialize-proxy-timer-teardown.patch`
+- **`2038`** — `2038-net-sched-codel-bound-drop-loop-per-dequeue.patch`
+- **`2039`** — `2039-net-sched-avoid-quadratic-qdisc_alloc_handle.patch`
+- **`2040`** — `2040-net-sched-reject-idr-error-pointers-act-api.patch`
+- **`2041`** — `2041-net-gso-limit-recursive-ip-in-ip-segmentation.patch`
+- **`2042`** — `2042-net-skbuff-no-stale-headers-after-pskb_carve.patch`
+- **`2043`** — `2043-fs-avoid-repeated-scans-in-evict_inodes.patch`
+- **`2044`** — `2044-lib-group_cpus-snapshot-cluster-masks-hotplug.patch`
+- **`2183`** — `2181-mm-shmem-split-large-folios-only-on-e2big.patch`
+- **`2184`** — `2182-mm-page_counter-avoid-overflow-effective-protection.patch`
+- **`2185`** — `2183-mm-swap-cache-replace-fix-off-by-one.patch`
+- **`2186`** — `2184-memcg-fix-stuck-flushing-cached-charge-bit.patch`
+- **`2187`** — `2185-memcg-clear-flushing-cached-charge-cpu-offline.patch`
+- **`2188`** — `2186-mm-swap-clusters-info-after-solidstate-init.patch`
+- **`2189`** — `2187-mm-huge_memory-zap-deposited-tables-after-rcu.patch`
+- **`2190`** — `2188-mm-zswap-release-retired-pools-queue-rcu-work.patch`
+- **`2191`** — `2189-mm-zswap-invalidate-takes-a-range.patch`
+- **`2192`** — `2190-mm-zswap-skip-xarray-walk-when-unused.patch`
+- **`2193`** — `2191-mm-zswap-reuse-invalidate-in-zswap_store.patch`
+- **`2194`** — `2192-mm-swap-drop-unneeded-swap_extend_table_try_free.patch`
+- **`2195`** — `2193-mm-swap-return-early-from-swap_extend_table_try_free.patch`
+- **`2196`** — `2194-memcg-avoid-charging-root-memcg-obj-cgroup.patch`
+- **`2197`** — `2195-mm-mremap-account-locked_vm-mremap-dontunmap.patch`
+- **`2412`** — `2412-cgroup-avoid-iterating-dying-tasks-zero-refcount.patch`
+- **`2413`** — `2413-sched_ext-protect-idle-search-nodemask-irqsave.patch`
+- **`2414`** — `2414-sched_ext-scx_locked_rq-return-null-from-nmi.patch`
+- **`2415`** — `2415-sched_ext-reject-nmi-calls-lock-taking-kfuncs.patch`
+- **`2603`** — `2603-sysctl-check-range-proc_dointvec_ms_jiffies_minmax.patch`
+- **`2604`** — `2604-sysctl-check-range-do_proc_ulong_conv_ms_jiffies.patch`
+- **`2605`** — `2605-sysctl-fix-type-truncation-sysctl_msecs_to_jiffies.patch`
+
+
+## Two ledger defects found by the 2026-09-16 sweep
+
+**Four numbers are indexed as carried but exist nowhere.** `2401`, `2402`,
+`2501` and `2600` all appear in the patch index above and are described in the
+prose as if present, but none is in `source=()` and none is on disk:
+
+```
+2401  in-PKGBUILD=0  on-disk=0    2501  in-PKGBUILD=0  on-disk=0
+2402  in-PKGBUILD=0  on-disk=0    2600  in-PKGBUILD=0  on-disk=0
+```
+
+`2600` is the hrtimer hard-expiry patch, and no carried patch touches
+`kernel/time/hrtimer.c` at all. Either they were dropped without the index being
+updated, or they were planned and never added. **The new sysctl trio is numbered
+`2603`-`2605` rather than `2600`-`2602` specifically to avoid squatting a number
+the ledger already documents.** Resolve before the 7.4 bump.
+
+**A carried patch applies with fuzz, which is why one candidate could not.**
+Patch `2155`'s `mm/zswap.c` hunk expects the context line
+
+```
+	if (!si)
+		return -ENOENT;
+```
+
+but our base has `return -EEXIST;` at `mm/zswap.c:1001`. GNU `patch` accepted the
+hunk with fuzz, so the file was not rejected and the build reports success. The
+`SWP_XSWAP` guard itself landed in the right function, so this is harmless
+today — but the tree and the patch text disagree, and it is exactly why
+`c93496f5133e` ("return -ENOENT when the swap device is gone") cannot apply.
+Regenerate the hunk against the current base rather than editing it by hand.
 
 ## The CachyOS squashes (0101–0112)
 
@@ -660,6 +867,16 @@ sweep does not re-derive the same conclusion.
 
 ### Individually rejected
 
+- **`364e520095b2` / `4cf50332b538`** (`crypto: rsassa-pkcs1 - reject undersized
+  keys`, verifying and signing halves; KASAN out-of-bounds on an undersized
+  key). Both are genuine, both are absent from the rc3 base, and
+  `CONFIG_CRYPTO_RSA=y` with `CONFIG_MODULE_SIG=y`. **Not taken, because on this
+  kernel it is not a security boundary:** `CONFIG_MODULE_SIG_FORCE` is unset, so
+  an unsigned module loads regardless, and the parser here only ever sees
+  signatures this machine produced with its own generated key under
+  `CONFIG_MODULE_SIG_ALL`. The bug needs an attacker-supplied malformed
+  signature to reach, and nothing on this machine accepts one. Recorded rather
+  than silently dropped — revisit if `MODULE_SIG_FORCE` is ever enabled.
 - **`evdev`: `call_rcu` instead of `synchronize_rcu`** (identical in
   XanMod, zen and tkg; Kenny Levinsen, 2020). Attractive on paper, because the
   author measured 27.1 s down to 0.018 s for 1000 open-close cycles and this
@@ -679,9 +896,11 @@ sweep does not re-derive the same conclusion.
   `CONFIG_PAGE_BLOCK_MAX_ORDER`, and lowering it alongside
   `TRANSPARENT_HUGEPAGE_ALWAYS` and `HUGETLBFS` risks both THP success and 2 MB
   hugetlb pages.
-- **`nvme: bump genctr when cancelling a request`** (`7f607455c3b9`) has two
-  hunks that fail against rc2 and needs a rebase. Relevant to the Phison E16, so
-  worth revisiting.
+- **`nvme: bump genctr when cancelling a request`** — **now carried as `2015`.**
+  The sha recorded here previously (`7f607455c3b9`) was wrong: it resolves in
+  `torvalds` to a 2010 OMAP merge commit. The real commit is
+  `7f60745ec3ff54acb2b8afa5781b18ab596aed53`. The note said it "needs a rebase";
+  that rebase has since happened upstream and it now applies clean (offset 17).
 - **`finish_task_switch()` always-inline** (zen and tkg) quotes a 34.8% figure
   that applies to spectre_v2 retpolines. This machine reports Enhanced /
   Automatic IBRS, so only the roughly 8.6% clang function-level case applies,
@@ -730,13 +949,13 @@ mainline, and re-check for a v3 before rebasing. `CONFIG_XSWAP=y` is set in
 
 ## 2026-09-15 note: 2169 (formerly 2142) needed its series prerequisites
 
-`2169` — carried as `2142` until the 2026-09-15 renumber — is patch **3/4** of Xueyuan Chen's "[PATCH v7 0/4] mm: avoid large folio
+`2171` — carried as `2142` until the 2026-09-15 renumber — is patch **3/4** of Xueyuan Chen's "[PATCH v7 0/4] mm: avoid large folio
 splits when swap is unavailable". Only 3/4 was ever carried. On its own it is
 not just incomplete but wrong: it gates the large-folio split fallback on
 `ret != -E2BIG`, and nothing in the tree returned `-E2BIG` — 2/4 is what
 introduces that classification — so every `folio_alloc_swap()` failure took the
-"do not split" branch and the split fallback was dead code. `2167` (1/4) and
-`2168` (2/4) complete the series and restore the intended behaviour: split only
+"do not split" branch and the split fallback was dead code. `2169` (1/4) and
+`2170` (2/4) complete the series and restore the intended behaviour: split only
 when splitting might actually help (`-E2BIG`), skip the pointless split when
 swap is exhausted (`-ENOSPC`) or would not help (`-ENOMEM`). Patch 4/4 (shmem)
 is not carried and not needed for correctness here.

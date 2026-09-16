@@ -1,0 +1,130 @@
+From e87da88a8d8f8614461e0221cfb48feed25416af Mon Sep 17 00:00:00 2001
+From: Zihan Xi <zihanx@nebusec.ai>
+To: netdev@vger.kernel.org
+Cc: linux-kernel@vger.kernel.org,
+	zihanx@nebusec.ai,
+	davem@davemloft.net,
+	edumazet@google.com,
+	kuba@kernel.org,
+	pabeni@redhat.com,
+	horms@kernel.org,
+	dsahern@kernel.org,
+	idosch@nvidia.com,
+	willemb@google.com,
+	kuniyu@google.com,
+	kees@kernel.org,
+	richardbgobert@gmail.com,
+	jiayuan.chen@linux.dev,
+	stable@vger.kernel.org,
+	Vega <vega@nebusec.ai>,
+	Luxing Yin <root@tr0jan.top>
+Subject: [PATCH net 1/1] net: gso: limit recursive IP-in-IP segmentation
+Date: Sun, 13 Sep 2026 14:12:12 +0000
+Message-ID: <a4f108b00c7d3c0997bfcee84a9e7e481c07ad5b.1789302084.git.zihanx@nebusec.ai>
+X-Mailer: git-send-email 2.47.3
+In-Reply-To: <cover.1789302084.git.zihanx@nebusec.ai>
+References: <cover.1789302084.git.zihanx@nebusec.ai>
+Precedence: bulk
+X-Mailing-List: netdev@vger.kernel.org
+List-Id: <netdev.vger.kernel.org>
+List-Subscribe: <mailto:netdev+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:netdev+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+
+IPIP GSO/TSO support makes IP-in-IP GSO dispatch re-enter
+inet_gso_segment() or ipv6_gso_segment() for every nested IP header. The
+only state that tracks this nesting is encap_level, which records header
+bytes and has no recursion bound. A sufficiently deep chain can consume the
+kernel stack before a transport GSO callback is reached.
+
+The unbounded callback nesting was introduced when inet_gso_segment() was
+made stackable by "ipv4: gso: make inet_gso_segment() stackable". GRE GSO
+support predated that change, and IP-in-IP GSO/TSO support later made the
+affected path reachable.
+
+Track the number of IP GSO callbacks in skb_gso_cb and reject the 15th
+callback entry. Thus 14 callback entries are allowed to complete;
+GSO_RECURSION_LIMIT is the rejection threshold, not the number of
+successful callbacks. Initialize the counter for each top-level GSO
+operation and check it in both IPv4 and IPv6 handlers so mixed IP-in-IP
+nesting is bounded.
+
+Fixes: 3347c9602955 ("ipv4: gso: make inet_gso_segment() stackable")
+Cc: stable@vger.kernel.org
+Reported-by: Vega <vega@nebusec.ai>
+Assisted-by: LLM
+Co-developed-by: Luxing Yin <root@tr0jan.top>
+Signed-off-by: Luxing Yin <root@tr0jan.top>
+Signed-off-by: Zihan Xi <zihanx@nebusec.ai>
+---
+ include/net/gso.h      | 9 +++++++++
+ net/core/gso.c         | 1 +
+ net/ipv4/af_inet.c     | 3 +++
+ net/ipv6/ip6_offload.c | 3 +++
+ 4 files changed, 16 insertions(+)
+
+diff --git a/include/net/gso.h b/include/net/gso.h
+index 29975440cad5..2665acbb9205 100644
+--- a/include/net/gso.h
++++ b/include/net/gso.h
+@@ -19,10 +19,19 @@ struct skb_gso_cb {
+ 	int	encap_level;
+ 	__wsum	csum;
+ 	__u16	csum_start;
++	/* Number of GSO callbacks this packet already went through. */
++	u8	recursion_counter;
+ };
+ #define SKB_GSO_CB_OFFSET	32
+ #define SKB_GSO_CB(skb) ((struct skb_gso_cb *)((skb)->cb + SKB_GSO_CB_OFFSET))
+ 
++#define GSO_RECURSION_LIMIT	15	/* First callback depth to reject. */
++static inline int gso_recursion_inc_test(struct sk_buff *skb)
++{
++	return ++SKB_GSO_CB(skb)->recursion_counter ==
++	       GSO_RECURSION_LIMIT;
++}
++
+ static inline int skb_tnl_header_len(const struct sk_buff *inner_skb)
+ {
+ 	return (skb_mac_header(inner_skb) - inner_skb->head) -
+diff --git a/net/core/gso.c b/net/core/gso.c
+index bcd156372f4d..e96ef6350064 100644
+--- a/net/core/gso.c
++++ b/net/core/gso.c
+@@ -117,6 +117,7 @@ struct sk_buff *__skb_gso_segment(struct sk_buff *skb,
+ 
+ 	SKB_GSO_CB(skb)->mac_offset = skb_headroom(skb);
+ 	SKB_GSO_CB(skb)->encap_level = 0;
++	SKB_GSO_CB(skb)->recursion_counter = 0;
+ 
+ 	skb_reset_mac_header(skb);
+ 	skb_reset_mac_len(skb);
+diff --git a/net/ipv4/af_inet.c b/net/ipv4/af_inet.c
+index 32d006c1a8ee..2bd88ba05eb9 100644
+--- a/net/ipv4/af_inet.c
++++ b/net/ipv4/af_inet.c
+@@ -1374,6 +1374,9 @@ struct sk_buff *inet_gso_segment(struct sk_buff *skb,
+ 	int ihl;
+ 	int id;
+ 
++	if (unlikely(gso_recursion_inc_test(skb)))
++		goto out;
++
+ 	skb_reset_network_header(skb);
+ 	nhoff = skb_network_header(skb) - skb_mac_header(skb);
+ 	if (unlikely(!pskb_may_pull(skb, sizeof(*iph))))
+diff --git a/net/ipv6/ip6_offload.c b/net/ipv6/ip6_offload.c
+index 78f50c93c536..391527a1a47b 100644
+--- a/net/ipv6/ip6_offload.c
++++ b/net/ipv6/ip6_offload.c
+@@ -103,6 +103,9 @@ static struct sk_buff *ipv6_gso_segment(struct sk_buff *skb,
+ 	int nhoff;
+ 	bool gso_partial;
+ 
++	if (unlikely(gso_recursion_inc_test(skb)))
++		goto out;
++
+ 	skb_reset_network_header(skb);
+ 	nhoff = skb_network_header(skb) - skb_mac_header(skb);
+ 	if (unlikely(!pskb_may_pull(skb, sizeof(*ipv6h))))

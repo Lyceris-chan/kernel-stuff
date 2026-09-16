@@ -1,0 +1,58 @@
+From 0536475cf7d3865b05c1971b00c96d9d7ed2bf98 Mon Sep 17 00:00:00 2001
+From: Matheus Alves de Almeida <matheus.aalmeida@inf.ufrgs.br>
+To: Heiner Kallweit <hkallweit1@gmail.com>,
+	nic_swsd@realtek.com
+Cc: Andrew Lunn <andrew+netdev@lunn.ch>,
+	"David S. Miller" <davem@davemloft.net>,
+	Eric Dumazet <edumazet@google.com>,
+	Jakub Kicinski <kuba@kernel.org>,
+	Paolo Abeni <pabeni@redhat.com>,
+	netdev@vger.kernel.org,
+	linux-kernel@vger.kernel.org,
+	Matheus Alves de Almeida <matheus.aalmeida@inf.ufrgs.br>
+Subject: [PATCH net-next 3/3] r8169: release firmware on application failure
+Date: Wed, 16 Sep 2026 12:24:44 -0300
+Message-ID: <20260916152444.167196-4-matheus.aalmeida@inf.ufrgs.br>
+X-Mailer: git-send-email 2.43.0
+In-Reply-To: <20260916152444.167196-1-matheus.aalmeida@inf.ufrgs.br>
+References: <20260916152444.167196-1-matheus.aalmeida@inf.ufrgs.br>
+Precedence: bulk
+X-Mailing-List: netdev@vger.kernel.org
+List-Id: <netdev.vger.kernel.org>
+List-Subscribe: <mailto:netdev+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:netdev+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+
+After an rtl_fw_write_firmware() failure, r8169_apply_firmware() does
+not release the firmware. A TODO notes that it should be released
+in this case.
+
+Release the firmware on failure and remove the TODO.
+
+Signed-off-by: Matheus Alves de Almeida <matheus.aalmeida@inf.ufrgs.br>
+---
+ drivers/net/ethernet/realtek/r8169_main.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/ethernet/realtek/r8169_main.c b/drivers/net/ethernet/realtek/r8169_main.c
+index 3c37c5a6c..c54423cd2 100644
+--- a/drivers/net/ethernet/realtek/r8169_main.c
++++ b/drivers/net/ethernet/realtek/r8169_main.c
+@@ -2596,12 +2596,14 @@ void r8169_apply_firmware(struct rtl8169_private *tp)
+ {
+ 	int val;
+ 
+-	/* TODO: release firmware if rtl_fw_write_firmware signals failure. */
+ 	if (tp->rtl_fw) {
+-		rtl_fw_write_firmware(tp, tp->rtl_fw);
++		int rc = rtl_fw_write_firmware(tp, tp->rtl_fw);
+ 		/* At least one firmware doesn't reset tp->ocp_base. */
+ 		tp->ocp_base = OCP_STD_PHY_BASE;
+ 
++		if (rc < 0)
++			rtl_release_firmware(tp);
++
+ 		/* PHY soft reset may still be in progress */
+ 		if (tp->phydev)
+ 			phy_read_poll_timeout(tp->phydev, MII_BMCR, val,

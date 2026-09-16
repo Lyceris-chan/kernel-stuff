@@ -1,0 +1,124 @@
+From a12982b45dd8515a655f9387a6a6024538c00f47 Mon Sep 17 00:00:00 2001
+From: Jens Axboe <axboe@kernel.dk>
+To: io-uring@vger.kernel.org
+Cc: juanlu@fastmail.com,
+	Jens Axboe <axboe@kernel.dk>
+Subject: [PATCH 03/10] io_uring/rw: don't reap io-wq IOPOLL completions while io-wq has a reference
+Date: Fri, 11 Sep 2026 09:45:27 -0600
+Message-ID: <20260911154811.646705-4-axboe@kernel.dk>
+X-Mailer: git-send-email 2.55.0
+In-Reply-To: <20260911154811.646705-1-axboe@kernel.dk>
+References: <20260911154811.646705-1-axboe@kernel.dk>
+Precedence: bulk
+X-Mailing-List: io-uring@vger.kernel.org
+List-Id: <io-uring.vger.kernel.org>
+List-Subscribe: <mailto:io-uring+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:io-uring+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+
+IOPOLL requests issued from io-wq are reaped by io_do_iopoll() on the
+submitter, with the same window as the task_work completions: the CQE
+is posted while the worker may still hold its reference, and the file
+is only dropped once it does.
+
+Leave such a request on the iopoll list until the worker has dropped
+its reference, the next pass then reaps it and the put from
+io_free_batch_list() is the last one. Also move the reference handling
+for the task_work case into a helper.
+
+Signed-off-by: Jens Axboe <axboe@kernel.dk>
+---
+ io_uring/io_uring.c | 17 ++---------------
+ io_uring/refs.h     | 27 +++++++++++++++++++++++++++
+ io_uring/rw.c       |  4 ++++
+ 3 files changed, 33 insertions(+), 15 deletions(-)
+
+diff --git a/io_uring/io_uring.c b/io_uring/io_uring.c
+index 4787746a2d9d..69f1b3f4c4a1 100644
+--- a/io_uring/io_uring.c
++++ b/io_uring/io_uring.c
+@@ -1286,21 +1286,8 @@ void io_req_task_complete(struct io_tw_req tw_req, io_tw_token_t tw)
+ {
+ 	struct io_kiocb *req = tw_req.req;
+ 
+-	/*
+-	 * io-wq may still hold a reference if the issue completed async.
+-	 * Defer completion to the last put, so that file drop and CQE
+-	 * visibility are ordered. The last reference stays for the free
+-	 * path to put, a linked timeout may still look at the request.
+-	 */
+-	if ((req->flags & REQ_F_REFCOUNT) && !(req->flags & REQ_F_REISSUE) &&
+-	    atomic_read(&req->refs) != 1) {
+-		if (!req_ref_put_and_test(req))
+-			return;
+-		/* the other put raced us, ours was the last after all */
+-		atomic_set(&req->refs, 1);
+-	}
+-
+-	io_req_complete_defer(req);
++	if (io_req_complete_ready(req))
++		io_req_complete_defer(req);
+ }
+ 
+ /*
+diff --git a/io_uring/refs.h b/io_uring/refs.h
+index 0fe16b67c308..021bf0cd66af 100644
+--- a/io_uring/refs.h
++++ b/io_uring/refs.h
+@@ -56,6 +56,33 @@ static inline void __io_req_set_refcount(struct io_kiocb *req, int nr)
+ 	}
+ }
+ 
++/*
++ * io-wq may still hold a reference if the issue completed async. If so, the
++ * last put completes the request, so that file drop and CQE visibility are
++ * ordered. The last reference stays for the free path to put, a linked
++ * timeout may still look at the request until then.
++ */
++static inline bool io_req_complete_ready(struct io_kiocb *req)
++{
++	if (!(req->flags & REQ_F_REFCOUNT) || (req->flags & REQ_F_REISSUE))
++		return true;
++	if (atomic_read(&req->refs) == 1)
++		return true;
++	if (!req_ref_put_and_test(req))
++		return false;
++	/* the other put raced us, ours was the last after all */
++	atomic_set(&req->refs, 1);
++	return true;
++}
++
++/* io-wq still holds a reference, the request can't be completed yet */
++static inline bool io_req_shared(struct io_kiocb *req)
++{
++	if (!(req->flags & REQ_F_REFCOUNT) || (req->flags & REQ_F_REISSUE))
++		return false;
++	return atomic_read(&req->refs) > 1;
++}
++
+ static inline void io_req_set_refcount(struct io_kiocb *req)
+ {
+ 	__io_req_set_refcount(req, 1);
+diff --git a/io_uring/rw.c b/io_uring/rw.c
+index 95106dd1d7eb..19b7c64e5952 100644
+--- a/io_uring/rw.c
++++ b/io_uring/rw.c
+@@ -16,6 +16,7 @@
+ 
+ #include "filetable.h"
+ #include "io_uring.h"
++#include "refs.h"
+ #include "opdef.h"
+ #include "kbuf.h"
+ #include "alloc_cache.h"
+@@ -1370,6 +1371,9 @@ int io_do_iopoll(struct io_ring_ctx *ctx, bool force_nonspin)
+ 		/* order with io_complete_rw_iopoll(), e.g. ->result updates */
+ 		if (!smp_load_acquire(&req->iopoll_completed))
+ 			continue;
++		/* io-wq still has a reference, reap it on the next pass */
++		if (io_req_shared(req))
++			continue;
+ 		list_del(&req->iopoll_node);
+ 		wq_list_add_tail(&req->comp_list, &ctx->submit_state.compl_reqs);
+ 		nr_events++;

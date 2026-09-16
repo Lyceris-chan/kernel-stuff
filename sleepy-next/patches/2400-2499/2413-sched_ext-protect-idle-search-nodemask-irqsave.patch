@@ -1,0 +1,66 @@
+From 8b9b3698796a6b99f43fd09de23bfa5431e0f07e Mon Sep 17 00:00:00 2001
+From: Wanwu Li <liwanwu@kylinos.cn>
+Date: Thu, 3 Sep 2026 11:57:54 +0800
+Subject: [PATCH] sched_ext: Protect the idle-search scratch nodemask with
+ irqsave
+
+pick_idle_cpu_from_online_nodes() uses the per-CPU per_cpu_unvisited
+nodemask as scratch while walking the online nodes, protected only by
+preempt_disable(). preempt_disable() does not mask IRQs and the idle
+kfuncs are callable from IRQ-enabled contexts, so a nested invocation
+on the same CPU can overwrite the mask with nodes_copy() while the
+interrupted invocation is still iterating it, leading to a wrong node
+traversal and a wrong idle CPU pick.
+
+Switch to irqsave so a nested invocation can't run on the same CPU.
+A stack-allocated nodemask would also close the race, but that would
+enlarge the diff to fix a race that is already rare (per-node idle,
+CONFIG_NUMA and a cross-node search all at once); irqsave is the
+minimal fix for the context that actually triggers it. The NMI case is
+deliberately not addressed: there is no legitimate reason to
+call pick_idle from NMI and doing so poses no crash risk, so such a
+caller is on its own.
+
+Suggested-by: Tejun Heo <tj@kernel.org>
+Link: https://lore.kernel.org/r/d84b31727f04e1ed0d40042ba1c09e61@kernel.org
+Signed-off-by: Wanwu Li <liwanwu@kylinos.cn>
+Signed-off-by: Tejun Heo <tj@kernel.org>
+---
+ kernel/sched/ext/idle.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/sched/ext/idle.c b/kernel/sched/ext/idle.c
+index d2973fb3af6d..93e2e0b2d1f8 100644
+--- a/kernel/sched/ext/idle.c
++++ b/kernel/sched/ext/idle.c
+@@ -153,7 +153,18 @@ static s32 pick_idle_cpu_from_online_nodes(const struct cpumask *cpus_allowed, i
+ 	nodemask_t *unvisited;
+ 	s32 cpu = -EBUSY;
+ 
+-	preempt_disable();
++	/*
++	 * @per_cpu_unvisited is per-CPU scratch and the idle kfuncs can be
++	 * called from IRQ-enabled contexts, so mask IRQs to keep a nested
++	 * invocation from clobbering the mask an outer invocation is still
++	 * iterating.
++	 *
++	 * NMI nesting is not handled: there is no legitimate reason to call
++	 * pick_idle from NMI and doing so poses no crash risk, so such a
++	 * caller is on its own.
++	 */
++	guard(irqsave)();
++
+ 	unvisited = this_cpu_ptr(&per_cpu_unvisited);
+ 
+ 	/*
+@@ -183,7 +194,6 @@ static s32 pick_idle_cpu_from_online_nodes(const struct cpumask *cpus_allowed, i
+ 		if (cpu >= 0)
+ 			break;
+ 	}
+-	preempt_enable();
+ 
+ 	return cpu;
+ }
+-- 
+2.55.0
+

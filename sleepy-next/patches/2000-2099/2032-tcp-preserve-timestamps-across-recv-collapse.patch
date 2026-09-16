@@ -1,0 +1,53 @@
+From 795c2ac2c9f2db6d2a12a90b6475c69b5a6dd451 Mon Sep 17 00:00:00 2001
+From: Jason Xing <kerneljasonxing@gmail.com>
+To: davem@davemloft.net,
+	edumazet@google.com,
+	kuba@kernel.org,
+	pabeni@redhat.com,
+	horms@kernel.org,
+	willemb@google.com,
+	kuniyu@google.com
+Cc: netdev@vger.kernel.org,
+	Jason Xing <kerneljasonxing@gmail.com>
+Subject: [PATCH net] tcp: preserve timestamps across receive queue collapse
+Date: Wed, 16 Sep 2026 20:41:53 +0800
+Message-Id: <20260916124153.43457-1-kerneljasonxing@gmail.com>
+X-Mailer: git-send-email 2.33.0
+Precedence: bulk
+X-Mailing-List: netdev@vger.kernel.org
+List-Id: <netdev.vger.kernel.org>
+List-Subscribe: <mailto:netdev+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:netdev+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+
+When tcp_collapse() rebuilds skbs under memory pressure, the copy
+process doesn't include the right tstamp and hwtstamp from the
+old skb.
+
+In net timestamping case, if such an skb happens to be the last
+one consumed in a recvmsg() call, the application receives no RX
+timestamp for that call.
+
+Fix this by copying both tstamp and hwtstamp to the new skb right
+after the initialization.
+
+Fixes: 98aaa913b4ed ("tcp: Extend SOF_TIMESTAMPING_RX_SOFTWARE to TCP recvmsg")
+Signed-off-by: Jason Xing <kerneljasonxing@gmail.com>
+---
+ net/ipv4/tcp_input.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/net/ipv4/tcp_input.c b/net/ipv4/tcp_input.c
+index 0f60a1dbf927..c5756db892f2 100644
+--- a/net/ipv4/tcp_input.c
++++ b/net/ipv4/tcp_input.c
+@@ -5835,6 +5835,8 @@ tcp_collapse(struct sock *sk, struct sk_buff_head *list, struct rb_root *root,
+ 
+ 		memcpy(nskb->cb, skb->cb, sizeof(skb->cb));
+ 		skb_copy_decrypted(nskb, skb);
++		nskb->tstamp = skb->tstamp;
++		skb_hwtstamps(nskb)->hwtstamp = skb_hwtstamps(skb)->hwtstamp;
+ 		TCP_SKB_CB(nskb)->seq = TCP_SKB_CB(nskb)->end_seq = start;
+ 		if (list)
+ 			__skb_queue_before(list, skb, nskb);

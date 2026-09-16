@@ -1,0 +1,94 @@
+From 0fcd26b487c7376af2bd1311d4f8534f78965f12 Mon Sep 17 00:00:00 2001
+From: huhai <15815827059@163.com>
+To: axboe@kernel.dk
+Cc: linux-block@vger.kernel.org,
+	Henry Hu <huhai@kylinos.cn>
+Subject: [PATCH] blk-mq: check passthrough state before reusing cached requests
+Date: Wed, 16 Sep 2026 23:16:55 +0800
+Message-Id: <20260916151655.2588-1-15815827059@163.com>
+X-Mailer: git-send-email 2.25.1
+Precedence: bulk
+X-Mailing-List: linux-block@vger.kernel.org
+List-Id: <linux-block.vger.kernel.org>
+List-Subscribe: <mailto:linux-block+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:linux-block+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+X-CM-TRANSID:PSgvCgDXHxDtsqpql2XRQQ--.42685S2
+X-Coremail-Antispam: 1Uf129KBjvJXoWxXFyfCFyUGw4fGFWxKFykXwb_yoW5Xw48pr
+	WYqayqvr409F1IqF40yFWUXFyrKr45CF1xJrZ5C34YvF95GrsFkFyIqr10qFySy393CrWx
+	uFs5A3yDZF4jv3DanT9S1TB71UUUUU7qnTZGkaVYY2UrUUUUjbIjqfuFe4nvWSU5nxnvy2
+	9KBjDUYxBIdaVFxhVjvjDU0xZFpf9x07UD739UUUUU=
+X-CM-SenderInfo: rprvmiivyslimvzbiqqrwthudrp/xtbC7w8tsmqqsu9bmwAA3i
+
+From: Henry Hu <huhai@kylinos.cn>
+
+blk_mq_alloc_request() and blk_mq_submit_bio() share plug->cached_rqs,
+but neither lookup checks the passthrough state. This allows an io_uring
+batch to reuse a cached NVMe passthrough request for an ordinary bio.
+
+When an I/O scheduler is enabled, passthrough requests have RQF_SCHED_TAGS
+set but RQF_USE_SCHED clear, and skip ->prepare_request(). Reuse updates
+rq->cmd_flags without reinitializing the scheduler state, so the request
+is inserted into the scheduler on plug flush, while completion skips
+->finish_request(). With kyber, this leaks the domain token acquired at
+dispatch and can stall further I/O in that domain.
+
+This was reproduced with kyber and request merging disabled on a QEMU
+NVMe device by submitting a passthrough read followed by O_DIRECT writes
+in one io_uring batch. Tokens leak until the kyber write-domain token pool
+is exhausted, blocking ext4 journal I/O and fsync():
+
+  INFO: task jbd2/nvme0n1-8:97 blocked in I/O wait for more than 241 seconds.
+    Call Trace:
+      schedule+0xe9/0x300
+      io_schedule+0xca/0x150
+      bit_wait_io+0x1b/0x140
+      __wait_on_bit+0x63/0x170
+      jbd2_write_superblock+0x3d7/0x600
+      jbd2_journal_update_sb_log_tail+0x1e3/0x2d0
+      jbd2_journal_commit_transaction+0x11d1/0x5b50
+
+  INFO: task fsynctest:107 blocked in I/O wait for more than 241 seconds.
+    Call Trace:
+      schedule+0xe9/0x300
+      io_schedule+0xca/0x150
+      folio_wait_bit_common+0x2ed/0x780
+      folio_wait_bit+0x18/0x30
+      folio_wait_writeback+0x4b/0x1e0
+      __filemap_fdatawait_range+0x120/0x1e0
+      file_write_and_wait_range+0xeb/0x130
+      ext4_sync_file+0x368/0xa80
+      do_fsync+0xa2/0x200
+
+Require the passthrough state to match before reusing a cached request.
+With the fix, the workload completes normally.
+
+Assisted-by: LLM
+Signed-off-by: Henry Hu <huhai@kylinos.cn>
+---
+ block/blk-mq.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/block/blk-mq.c b/block/blk-mq.c
+index a26a11c73ee3..3a9d57f6a569 100644
+--- a/block/blk-mq.c
++++ b/block/blk-mq.c
+@@ -648,6 +648,8 @@ static struct request *blk_mq_alloc_cached_request(struct request_queue *q,
+ 			return NULL;
+ 		if (op_is_flush(rq->cmd_flags) != op_is_flush(opf))
+ 			return NULL;
++		if (blk_rq_is_passthrough(rq) != blk_op_is_passthrough(opf))
++			return NULL;
+ 
+ 		rq_list_pop(&plug->cached_rqs);
+ 		blk_mq_rq_time_init(rq, blk_time_get_ns());
+@@ -3062,6 +3064,8 @@ static struct request *blk_mq_get_cached_request(struct blk_plug *plug,
+ 		return NULL;
+ 	if (op_is_flush(rq->cmd_flags) != op_is_flush(opf))
+ 		return NULL;
++	if (blk_rq_is_passthrough(rq) != blk_op_is_passthrough(opf))
++		return NULL;
+ 	rq_list_pop(&plug->cached_rqs);
+ 	return rq;
+ }

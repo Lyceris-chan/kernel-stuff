@@ -3,11 +3,11 @@
 `linux-sleepy-next` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
 built from **mainline Linux 7.3-rc3** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 217 targeted
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 303 targeted
 upstream/local patches. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0_rc3-16` · **Artifact:**
-`linux-sleepy-next-7.3.0_rc3-16-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0_rc3-20` · **Artifact:**
+`linux-sleepy-next-7.3.0_rc3-20-x86_64.pkg.tar.zst`
 
 ## Target hardware
 
@@ -34,8 +34,17 @@ upstream/local patches. It is not a general-purpose kernel.
 - **kbuild build-speedup series** — full kernel builds in ~8 minutes.
 - **userq hardening** — Zhu Lingshan's kref lifecycle series closes use-after-free
   races in the user-queue submission path (`9062`–`9071`).
-- **xswap** — extendable compressed swap backed by zswap (`2155`–`2166`); it
+- **sched-ext 7.3-rc3 fixes** (`2405`–`2411`) — the batch behind the live
+  `cake_1.2.1` scheduler: a use-after-free where an error raised before the
+  scheduler finished enabling left it running but undisableable, and a NULL
+  sub-sched dereference in the compat kfuncs.
+- **xswap** — extendable compressed swap backed by zswap (`2155`–`2168`, v2); it
   replaces the fixed-size zram device on this machine.
+- **59-patch second sweep** (`1065`–`1069`, `1167`, `2014`–`2044`, `2181`–`2197`,
+  `2412`–`2415`, `2603`–`2605`) — the io_uring ring-close cancel series, the
+  r8169 error-propagation trio, TCP and net/sched fixes, a `#DE` divide-error
+  fix in `effective_protection()`, the `zswap_invalidate()` range conversion,
+  `lib/group_cpus` cluster-mask snapshotting, and the sched-ext NMI trio.
 
 ## Build and install
 
@@ -91,7 +100,7 @@ fix lands.
 
 ## Patch series
 
-217 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+303 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 
 | Range | Category |
 |---|---|

@@ -1,0 +1,72 @@
+From e074c9d4a9076fc98e0d55b50568f7f8a75f384b Mon Sep 17 00:00:00 2001
+From: Tom Chung <chiahsuan.chung@amd.com>
+Date: Mon, 24 Aug 2026 16:01:52 +0800
+Subject: [PATCH] drm/amd/display: Restore the native cursor mode early return
+ for disabled CRTCs
+
+[WHY]
+commit c6417b87e7c3 ("drm/amd/display: Set native cursor mode for
+disabled CRTCs again") made amdgpu_dm_crtc_get_cursor_mode() report
+native mode for a disabled CRTC, by adding !dm_crtc_state->base.enable
+to the DCN4x IP version check that returned early.
+
+commit b7d7e714de44 ("drm/amd/display: Fall back to overlay cursor on
+dcn4x when top plane doesn't fill CRTC") then replaced that early
+return with a skip_fmt_scale_restrictions flag, so dcn4x falls through
+to the coverage check instead. The disabled CRTC condition shared the
+same if statement and lost its early return as well. A disabled CRTC
+now reaches the coverage check and is given overlay mode whenever the
+top plane does not fill the CRTC, which can make an atomic commit that
+disables the CRTC fail.
+
+[HOW]
+Move the disabled CRTC check into its own early return ahead of the DCN4x
+IP version check, so it reports native mode on every ASIC.
+
+Fixes: b7d7e714de44 ("drm/amd/display: Fall back to overlay cursor on dcn4x when top plane doesn't fill CRTC")
+Reviewed-by: Leo Li <sunpeng.li@amd.com>
+Signed-off-by: Tom Chung <chiahsuan.chung@amd.com>
+Signed-off-by: Alex Hung <alex.hung@amd.com>
+Tested-by: Dan Wheeler <daniel.wheeler@amd.com>
+---
+ .../amd/display/amdgpu_dm/amdgpu_dm_cursor.c    | 17 +++++++++++------
+ 1 file changed, 11 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_cursor.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_cursor.c
+index c41fce07b8fa..8204ad4018e6 100644
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_cursor.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_cursor.c
+@@ -287,19 +287,24 @@ int amdgpu_dm_crtc_get_cursor_mode(struct amdgpu_device *adev,
+ 	int i;
+ 	bool skip_fmt_scale_restrictions = false;
+ 
+-	/* Overlay cursor not supported on HW before DCN
+-	 * DCN401/420 does not have the cursor-on-scaled-plane or cursor-on-yuv-plane restrictions
+-	 * as previous DCN generations, so enable native mode on DCN401/420
+-	 *
++	/*
+ 	 * Always set native cursor mode when the CRTC is disabled,
+ 	 * to make sure it doesn't cause atomic commits to fail when
+ 	 * they are trying to disable the CRTC.
+ 	 */
++	if (!crtc_state->enable) {
++		*cursor_mode = DM_CURSOR_NATIVE_MODE;
++		return 0;
++	}
++
++	/* Overlay cursor not supported on HW before DCN
++	 * DCN401/420 does not have the cursor-on-scaled-plane or cursor-on-yuv-plane restrictions
++	 * as previous DCN generations, so enable native mode on DCN401/420
++	 */
+ 	if (amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(4, 0, 1) ||
+ 	    amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(4, 2, 0) ||
+ 	    amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(4, 2, 1) ||
+-	    amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(6, 0, 0) ||
+-	    !dm_crtc_state->base.enable) {
++	    amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(6, 0, 0)) {
+ 		/*
+ 		 * Newer DCN has no cursor-on-scaled/yuv-plane restriction, so
+ 		 * skip those overlay triggers below. A plane that does not fill
+-- 
+2.55.0
+

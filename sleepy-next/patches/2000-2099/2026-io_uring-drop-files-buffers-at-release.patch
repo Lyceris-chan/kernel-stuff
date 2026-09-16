@@ -1,0 +1,57 @@
+From 4882e3ed7fab5ef7f80989218c1d468d3d8c20fb Mon Sep 17 00:00:00 2001
+From: Jens Axboe <axboe@kernel.dk>
+To: io-uring@vger.kernel.org
+Cc: juanlu@fastmail.com,
+	Jens Axboe <axboe@kernel.dk>
+Subject: [PATCH 09/10] io_uring: drop registered files and buffers at release time
+Date: Fri, 11 Sep 2026 09:45:33 -0600
+Message-ID: <20260911154811.646705-10-axboe@kernel.dk>
+X-Mailer: git-send-email 2.55.0
+In-Reply-To: <20260911154811.646705-1-axboe@kernel.dk>
+References: <20260911154811.646705-1-axboe@kernel.dk>
+Precedence: bulk
+X-Mailing-List: io-uring@vger.kernel.org
+List-Id: <io-uring.vger.kernel.org>
+List-Subscribe: <mailto:io-uring+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:io-uring+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+
+Registered file and buffer tables are only torn down from
+io_ring_ctx_free(), which only runs when all requests have completed and
+the ctx refs have hit zero. Before this, every registered file remains
+open.
+
+The resource nodes are reference counted and any request using a
+registered file or buffer holds its own reference to the node, so this
+only releases what is actually unused. The rest follow as those requests
+complete or get canceled.
+
+Signed-off-by: Jens Axboe <axboe@kernel.dk>
+---
+ io_uring/io_uring.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/io_uring/io_uring.c b/io_uring/io_uring.c
+index eb8a3626c684..977c8c510b85 100644
+--- a/io_uring/io_uring.c
++++ b/io_uring/io_uring.c
+@@ -2196,8 +2196,6 @@ static __cold void io_ring_ctx_free(struct io_ring_ctx *ctx)
+ 	io_sq_thread_finish(ctx);
+ 
+ 	mutex_lock(&ctx->uring_lock);
+-	io_sqe_buffers_unregister(ctx);
+-	io_sqe_files_unregister(ctx);
+ 	io_unregister_zcrx(ctx);
+ 	io_cqring_overflow_kill(ctx);
+ 	io_eventfd_unregister(ctx);
+@@ -2463,6 +2461,9 @@ static __cold void io_ring_ctx_wait_and_kill(struct io_ring_ctx *ctx)
+ 	xa_for_each(&ctx->personalities, index, creds)
+ 		io_unregister_personality(ctx, index);
+ 	io_terminate_zcrx(ctx);
++	/* Drop these now, rather than async, to unpin the files */
++	io_sqe_buffers_unregister(ctx);
++	io_sqe_files_unregister(ctx);
+ 	mutex_unlock(&ctx->uring_lock);
+ 
+ 	/*

@@ -1,22 +1,16 @@
-From nobody Mon Sep 17 00:00:00 2001
+From 49369159d2c613b8cb64cf7b07e6adfc086e9607 Mon Sep 17 00:00:00 2001
 From: Baoquan He <hebaoquan@kylinos.cn>
-To: linux-mm@kvack.org
-Cc: akpm@linux-foundation.org, chrisl@kernel.org, kasong@tencent.com, nphamcs@gmail.com, baohua@kernel.org, youngjun.park@lge.com, hannes@cmpxchg.org, yosry@kernel.org, shikemeng@huaweicloud.com, chengming.zhou@linux.dev, baoquan.he@linux.dev, david@kernel.org, linux-kernel@vger.kernel.org, Baoquan He <hebaoquan@kylinos.cn>
-Subject: [PATCH v2 03/12] mm, swap: refactor free_swap_cluster_info to take swap_info_struct
-Date: Sun, 13 Sep 2026 15:50:05 +0800
-Message-ID: <20260913075014.1732524-4-hebaoquan@kylinos.cn>
+Date: Wed, 16 Sep 2026 18:19:10 +0800
+Subject: [PATCH 03/14] mm, swap: refactor free_swap_cluster_info to take
+ swap_info_struct
 
-Change free_swap_cluster_info() to accept struct swap_info_struct*
-instead of (cluster_info, maxpages) directly. Extract cluster_info
-and maxpages from si inside the function, and clear si->cluster_info
-after freeing so a caller's error path cannot free it again (a
-double free on the swapon() error path). Also clean up swapoff:
-remove the snapshot locals (maxpages/cluster_info) and move the
-p->max/p->cluster_info clearing after free_swap_cluster_info().
+Change free_swap_cluster_info() to take struct swap_info_struct* instead
+of (cluster_info, maxpages). It now extracts the fields from si and
+clears si->cluster_info after freeing to avoid a double free on the
+swapon() error path.
 
-The new signature will allow the xswap path (added in the next patch)
-to access si->flags and call xswap_unmap_clusters() from within
-free_swap_cluster_info().
+The new parameter also lets the xswap path access si->flags in the
+function.
 
 Signed-off-by: Baoquan He <hebaoquan@kylinos.cn>
 ---
@@ -24,10 +18,10 @@ Signed-off-by: Baoquan He <hebaoquan@kylinos.cn>
  1 file changed, 14 insertions(+), 12 deletions(-)
 
 diff --git a/mm/swapfile.c b/mm/swapfile.c
-index 193b08a54908..25bdb2f2fe0a 100644
+index a74960ccb..4d7047b6b 100644
 --- a/mm/swapfile.c
 +++ b/mm/swapfile.c
-@@ -3055,14 +3055,17 @@ static void wait_for_allocation(struct swap_info_struct *si)
+@@ -3043,14 +3043,17 @@ static void wait_for_allocation(struct swap_info_struct *si)
  	}
  }
  
@@ -48,7 +42,7 @@ index 193b08a54908..25bdb2f2fe0a 100644
  	for (i = 0; i < nr_clusters; i++) {
  		ci = cluster_info + i;
  		/* Cluster with bad marks count will have a remaining table */
-@@ -3074,6 +3077,7 @@ static void free_swap_cluster_info(struct swap_cluster_info *cluster_info,
+@@ -3062,6 +3065,7 @@ static void free_swap_cluster_info(struct swap_cluster_info *cluster_info,
  		spin_unlock(&ci->lock);
  	}
  	kvfree(cluster_info);
@@ -56,7 +50,7 @@ index 193b08a54908..25bdb2f2fe0a 100644
  }
  
  /*
-@@ -3101,11 +3105,9 @@ static void flush_percpu_swap_cluster(struct swap_info_struct *si)
+@@ -3089,11 +3093,9 @@ static void flush_percpu_swap_cluster(struct swap_info_struct *si)
  SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
  {
  	struct swap_info_struct *p = NULL;
@@ -68,7 +62,7 @@ index 193b08a54908..25bdb2f2fe0a 100644
  	int err, found = 0;
  
  	if (!capable(CAP_SYS_ADMIN))
-@@ -3197,10 +3199,6 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
+@@ -3185,10 +3187,6 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
  
  	swap_file = p->swap_file;
  	p->swap_file = NULL;
@@ -79,7 +73,7 @@ index 193b08a54908..25bdb2f2fe0a 100644
  	spin_unlock(&p->lock);
  	spin_unlock(&swap_lock);
  	arch_swap_invalidate_area(p->type);
-@@ -3208,7 +3206,9 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
+@@ -3196,7 +3194,9 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
  	mutex_unlock(&swapon_mutex);
  	kfree(p->global_cluster);
  	p->global_cluster = NULL;
@@ -90,7 +84,7 @@ index 193b08a54908..25bdb2f2fe0a 100644
  
  	inode = mapping->host;
  
-@@ -3575,6 +3575,8 @@ static int setup_swap_clusters_info(struct swap_info_struct *si,
+@@ -3563,6 +3563,8 @@ static int setup_swap_clusters_info(struct swap_info_struct *si,
  	if (!cluster_info)
  		goto err;
  
@@ -99,7 +93,7 @@ index 193b08a54908..25bdb2f2fe0a 100644
  	for (i = 0; i < nr_clusters; i++)
  		spin_lock_init(&cluster_info[i].lock);
  
-@@ -3638,7 +3640,7 @@ static int setup_swap_clusters_info(struct swap_info_struct *si,
+@@ -3626,7 +3628,7 @@ static int setup_swap_clusters_info(struct swap_info_struct *si,
  	si->cluster_info = cluster_info;
  	return 0;
  err:
@@ -108,7 +102,7 @@ index 193b08a54908..25bdb2f2fe0a 100644
  	return err;
  }
  
-@@ -3857,7 +3859,7 @@ SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
+@@ -3845,7 +3847,7 @@ SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
  	si->global_cluster = NULL;
  	inode = NULL;
  	destroy_swap_extents(si, swap_file);
@@ -118,4 +112,5 @@ index 193b08a54908..25bdb2f2fe0a 100644
  	/*
  	 * Clear the SWP_USED flag after all resources are freed so
 -- 
-2.54.0
+2.55.0
+

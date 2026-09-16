@@ -1,10 +1,8 @@
-From nobody Mon Sep 17 00:00:00 2001
+From 8eaba8154b3cce0334731cc4181295824ff14905 Mon Sep 17 00:00:00 2001
 From: Baoquan He <hebaoquan@kylinos.cn>
-To: linux-mm@kvack.org
-Cc: akpm@linux-foundation.org, chrisl@kernel.org, kasong@tencent.com, nphamcs@gmail.com, baohua@kernel.org, youngjun.park@lge.com, hannes@cmpxchg.org, yosry@kernel.org, shikemeng@huaweicloud.com, chengming.zhou@linux.dev, baoquan.he@linux.dev, david@kernel.org, linux-kernel@vger.kernel.org, Baoquan He <hebaoquan@kylinos.cn>
-Subject: [PATCH v2 02/12] mm, swap: add CONFIG_XSWAP and xswap fields to swap_info_struct
-Date: Sun, 13 Sep 2026 15:50:04 +0800
-Message-ID: <20260913075014.1732524-3-hebaoquan@kylinos.cn>
+Date: Wed, 16 Sep 2026 18:19:09 +0800
+Subject: [PATCH 02/14] mm, swap: add CONFIG_XSWAP and xswap fields to
+ swap_info_struct
 
 Add CONFIG_XSWAP Kconfig option for extendable swap device support.
 It depends on SWAP && 64BIT && ZSWAP, since xswap devices are backed by
@@ -23,7 +21,7 @@ Signed-off-by: Baoquan He <hebaoquan@kylinos.cn>
  2 files changed, 14 insertions(+)
 
 diff --git a/include/linux/swap.h b/include/linux/swap.h
-index 787fe463dcbb..09ecef1b5e90 100644
+index 787fe463d..09ecef1b5 100644
 --- a/include/linux/swap.h
 +++ b/include/linux/swap.h
 @@ -248,6 +248,11 @@ struct swap_info_struct {
@@ -39,7 +37,7 @@ index 787fe463dcbb..09ecef1b5e90 100644
  	struct list_head full_clusters; /* full clusters list */
  	struct list_head nonfull_clusters[SWAP_NR_ORDERS];
 diff --git a/mm/Kconfig b/mm/Kconfig
-index 604c58199acb..e9837c0f5d8a 100644
+index 604c58199..e9837c0f5 100644
 --- a/mm/Kconfig
 +++ b/mm/Kconfig
 @@ -122,6 +122,15 @@ config ZSWAP_COMPRESSOR_DEFAULT
@@ -59,4 +57,5 @@ index 604c58199acb..e9837c0f5d8a 100644
  	tristate
  
 -- 
-2.54.0
+2.55.0
+

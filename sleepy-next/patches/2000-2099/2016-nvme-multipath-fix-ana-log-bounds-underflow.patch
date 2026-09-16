@@ -1,0 +1,105 @@
+From 9e437dd0508e2cc694fec14ef4e25ee3493ee5fa Mon Sep 17 00:00:00 2001
+From: Daehyeon Ko <4ncienth@gmail.com>
+To: kbusch@kernel.org,
+	axboe@kernel.dk,
+	hch@lst.de,
+	sagi@grimberg.me
+Cc: linux-nvme@lists.infradead.org,
+	linux-kernel@vger.kernel.org
+Subject: [PATCH] nvme-multipath: fix underflow in ANA log bounds checks
+Date: Tue, 15 Sep 2026 11:19:56 +0900
+Message-ID: <20260915021956.3142320-1-4ncienth@gmail.com>
+X-Mailer: git-send-email 2.55.0
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.9.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20260914_192010_449756_AEA75011 
+X-CRM114-Status: GOOD (  15.54  )
+X-BeenThere: linux-nvme@lists.infradead.org
+X-Mailman-Version: 2.1.34
+Precedence: list
+List-Id: <linux-nvme.lists.infradead.org>
+List-Unsubscribe: <http://lists.infradead.org/mailman/options/linux-nvme>,
+ <mailto:linux-nvme-request@lists.infradead.org?subject=unsubscribe>
+List-Archive: <http://lists.infradead.org/pipermail/linux-nvme/>
+List-Post: <mailto:linux-nvme@lists.infradead.org>
+List-Help: <mailto:linux-nvme-request@lists.infradead.org?subject=help>
+List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-nvme>,
+ <mailto:linux-nvme-request@lists.infradead.org?subject=subscribe>
+Sender: "Linux-nvme" <linux-nvme-bounces@lists.infradead.org>
+Errors-To: linux-nvme-bounces+linux-nvme=archiver.kernel.org@lists.infradead.org
+
+The number of ANA groups advertised through Identify Controller sizes the
+ANA log buffer. The ANA log header and group descriptors independently
+supply the number of groups and namespace IDs to parse.
+
+Both bounds checks subtract an untrusted object size from ana_log_size
+before comparing the current offset. If the object is larger than the
+buffer, the size_t subtraction underflows and lets the parser read beyond
+ana_log_buf.
+
+Check the current offset before the first subtraction and compare each
+object size with the remaining buffer instead. This rejects inconsistent
+ANA data before dereferencing a truncated group descriptor or walking an
+oversized namespace ID array.
+
+Fixes: 0d0b660f214d ("nvme: add ANA support")
+Cc: stable@vger.kernel.org
+Assisted-by: LLM
+Signed-off-by: Daehyeon Ko <4ncienth@gmail.com>
+---
+Affected versions: v4.19-rc1 through current mainline 587858367581.
+
+Triggering conditions:
+- CONFIG_NVME_MULTIPATH=y and the controller advertises ANA support.
+- Identify Controller sizes a 52-byte ANA log with MNAN=1 and
+  NANAGRPID=1.
+- The returned ANA log has NGRPS=1 and NNSIDS=16.
+
+An nvme-loop target returning the values above reproduced the host-side
+KASAN read on 3/3 fresh v7.2 boots.  The first report was:
+
+  BUG: KASAN: slab-out-of-bounds in nvme_update_ana_state+0x2eb/0x360
+  Read of size 4
+  Workqueue: nvme-wq nvme_ana_work
+  nvme_update_ana_state
+  nvme_parse_ana_log
+  nvme_read_ana_log
+  nvme_ana_work
+
+KASAN identified the access as zero bytes beyond the allocated 52-byte
+region and traced the allocation to nvme_mpath_init_identify().  With this
+fix, the same target response produced no KASAN report on 3/3 fresh boots
+and was rejected with -EINVAL at the corrected check.  The changed object
+also builds warning-free with W=1 and an x86_64 allmodconfig.  Reproducer
+source is available privately on request and is intentionally not included
+in this public mail.
+
+ drivers/nvme/host/multipath.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/nvme/host/multipath.c b/drivers/nvme/host/multipath.c
+index 75dbb58286a3..29d447a5d0de 100644
+--- a/drivers/nvme/host/multipath.c
++++ b/drivers/nvme/host/multipath.c
+@@ -845,7 +845,8 @@ static int nvme_parse_ana_log(struct nvme_ctrl *ctrl, void *data,
+ 		u32 nr_nsids;
+ 		size_t nsid_buf_size;
+ 
+-		if (WARN_ON_ONCE(offset > ctrl->ana_log_size - sizeof(*desc)))
++		if (WARN_ON_ONCE(offset > ctrl->ana_log_size ||
++				 sizeof(*desc) > ctrl->ana_log_size - offset))
+ 			return -EINVAL;
+ 
+ 		nr_nsids = le32_to_cpu(desc->nnsids);
+@@ -861,7 +862,7 @@ static int nvme_parse_ana_log(struct nvme_ctrl *ctrl, void *data,
+ 			return -EINVAL;
+ 
+ 		offset += sizeof(*desc);
+-		if (WARN_ON_ONCE(offset > ctrl->ana_log_size - nsid_buf_size))
++		if (WARN_ON_ONCE(nsid_buf_size > ctrl->ana_log_size - offset))
+ 			return -EINVAL;
+ 
+ 		error = cb(ctrl, desc, data);
+
+base-commit: 587858367581b9c55c3690f4e63382ad622719d4

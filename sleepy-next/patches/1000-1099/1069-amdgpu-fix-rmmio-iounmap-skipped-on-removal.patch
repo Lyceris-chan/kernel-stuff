@@ -1,0 +1,49 @@
+From 1a6953f46146fd4129d21d27ee3a8f30fbb78086 Mon Sep 17 00:00:00 2001
+From: Chengjun Yao <Chengjun.Yao@amd.com>
+Date: Tue, 8 Sep 2026 10:15:43 +0800
+Subject: [PATCH] drm/amdgpu: fix rmmio iounmap skipped on device removal
+
+amdgpu_pci_remove() calls drm_dev_unplug() before fini_sw(), so
+drm_dev_enter() is already false there and the iounmap() guarded by it
+is skipped. This .remove path runs on both hot-unplug and plain rmmod,
+so the register BAR ioremap mapping leaks one instance per unload.
+
+Unmap rmmio unconditionally (guard only on non-NULL) and drop the now
+unused idx.
+
+Fixes: 62d5f9f7110a ("drm/amdgpu: Unmap MMIO mappings when device is not unplugged")
+Signed-off-by: Chengjun Yao <Chengjun.Yao@amd.com>
+Reviewed-by: Asad Kamal <asad.kamal@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_device.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
+index 07121d4aed3d..ee7ae27cc3b7 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
+@@ -4329,7 +4329,7 @@ void amdgpu_device_fini_hw(struct amdgpu_device *adev)
+ 
+ void amdgpu_device_fini_sw(struct amdgpu_device *adev)
+ {
+-	int i, idx;
++	int i;
+ 	bool px;
+ 
+ 	amdgpu_device_ip_fini(adev);
+@@ -4371,11 +4371,9 @@ void amdgpu_device_fini_sw(struct amdgpu_device *adev)
+ 	if ((adev->pdev->class >> 8) == PCI_CLASS_DISPLAY_VGA)
+ 		vga_client_unregister(adev->pdev);
+ 
+-	if (drm_dev_enter(adev_to_drm(adev), &idx)) {
+-
++	if (adev->rmmio) {
+ 		iounmap(adev->rmmio);
+ 		adev->rmmio = NULL;
+-		drm_dev_exit(idx);
+ 	}
+ 
+ 	if (IS_ENABLED(CONFIG_PERF_EVENTS))
+-- 
+2.55.0
+

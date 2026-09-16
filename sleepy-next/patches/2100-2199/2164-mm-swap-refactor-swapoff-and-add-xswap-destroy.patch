@@ -1,42 +1,33 @@
-From nobody Mon Sep 17 00:00:00 2001
+From de97b1cef6d3a228f12cf46abced3d647f52419a Mon Sep 17 00:00:00 2001
 From: Baoquan He <hebaoquan@kylinos.cn>
-To: linux-mm@kvack.org
-Cc: akpm@linux-foundation.org, chrisl@kernel.org, kasong@tencent.com, nphamcs@gmail.com, baohua@kernel.org, youngjun.park@lge.com, hannes@cmpxchg.org, yosry@kernel.org, shikemeng@huaweicloud.com, chengming.zhou@linux.dev, baoquan.he@linux.dev, david@kernel.org, linux-kernel@vger.kernel.org, Baoquan He <hebaoquan@kylinos.cn>
-Subject: [PATCH v2 10/12] mm, swap: refactor swapoff + add xswap_destroy
-Date: Sun, 13 Sep 2026 15:50:12 +0800
-Message-ID: <20260913075014.1732524-11-hebaoquan@kylinos.cn>
+Date: Wed, 16 Sep 2026 18:19:17 +0800
+Subject: [PATCH 10/14] mm, swap: refactor swapoff and add xswap_destroy
 
-1. Extract __swapoff() from sys_swapoff(): the core teardown logic
-   now lives in __swapoff(), shared by sys_swapoff() and the new
-   xswap_destroy(). swap_file operations are guarded with NULL check
-   so __swapoff() works for file-less devices too. sys_swapoff()
-   retains file-matching; a NULL guard on p->swap_file ensures xswap
-   devices are never matched by the file path.
-2. Add xswap_destroy(int type): tears down a file-less xswap device
-   by its swap type. Validates SWP_XSWAP | SWP_WRITEOK, removes
-   from lists, delegates to __swapoff().
-3. Add /sys/kernel/mm/xswap/destroy: write a swap type to tear down
-   that xswap device. Requires CAP_SYS_ADMIN. Out-of-range types
-   are rejected before the implicit int truncation.
+Extract __swapoff() from sys_swapoff() so the teardown logic can be
+shared, and make it work for file-less devices.
+
+Add xswap_destroy() to tear down a file-less xswap device by swap type,
+exposed via /sys/kernel/mm/xswap/destroy. Writing a swap type tears down
+that device; it requires CAP_SYS_ADMIN.
 
 Signed-off-by: Baoquan He <hebaoquan@kylinos.cn>
 ---
- mm/swapfile.c | 199 ++++++++++++++++++++++++++++++++++----------------
- 1 file changed, 138 insertions(+), 61 deletions(-)
+ mm/swapfile.c | 205 +++++++++++++++++++++++++++++++++++++-------------
+ 1 file changed, 151 insertions(+), 54 deletions(-)
 
 diff --git a/mm/swapfile.c b/mm/swapfile.c
-index d2a3303b0572..0321b6b0da56 100644
+index 416a21fcc..214310c63 100644
 --- a/mm/swapfile.c
 +++ b/mm/swapfile.c
-@@ -74,6 +74,7 @@ static void xswap_try_shrink(struct swap_info_struct *si);
+@@ -73,6 +73,7 @@ static int xswap_mapped_end(pte_t *pte, unsigned long addr, void *data);
+ static void xswap_try_shrink(struct swap_info_struct *si);
  
- #ifdef CONFIG_SYSFS
  static int xswap_create(int prio);
 +static int xswap_destroy(int type);
  
  static ssize_t xswap_create_store(struct kobject *kobj,
  				  struct kobj_attribute *attr,
-@@ -104,8 +105,35 @@ static ssize_t xswap_create_store(struct kobject *kobj,
+@@ -103,8 +104,35 @@ static ssize_t xswap_create_store(struct kobject *kobj,
  static struct kobj_attribute xswap_create_attr = __ATTR(create, 0200, NULL,
  							xswap_create_store);
  
@@ -72,15 +63,19 @@ index d2a3303b0572..0321b6b0da56 100644
  	NULL,
  };
  
-@@ -3294,61 +3322,13 @@ static void flush_percpu_swap_cluster(struct swap_info_struct *si)
+@@ -3300,65 +3328,44 @@ static void flush_percpu_swap_cluster(struct swap_info_struct *si)
  }
  
  
 -SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
-+/* Common swap teardown after list removal; shared by sys_swapoff() and
-+ * xswap_destroy().
++/*
++ * Drop @p from the avail and active lists and undo its accounting.  The
++ * caller must hold swap_lock and have checked that @p is WRITEOK and not
++ * pinned for hibernation.
++ *
++ * Returns 0, or -ENOMEM with swap_lock still held.
 + */
-+static int __swapoff(struct swap_info_struct *p)
++static int swap_info_remove(struct swap_info_struct *p)
  {
 -	struct swap_info_struct *p = NULL;
 -	struct file *swap_file, *victim;
@@ -121,26 +116,46 @@ index d2a3303b0572..0321b6b0da56 100644
 -		goto out_dput;
 -	}
 -
--	if (!security_vm_enough_memory_mm(current->mm, p->pages))
--		vm_unacct_memory(p->pages);
+ 	if (!security_vm_enough_memory_mm(current->mm, p->pages))
+ 		vm_unacct_memory(p->pages);
 -	else {
 -		err = -ENOMEM;
 -		spin_unlock(&swap_lock);
 -		goto out_dput;
 -	}
--	spin_lock(&p->lock);
--	del_from_avail_list(p, true);
--	plist_del(&p->list, &swap_active_head);
--	atomic_long_sub(p->pages, &nr_swap_pages);
--	total_swap_pages -= p->pages;
--	spin_unlock(&p->lock);
++	else
++		return -ENOMEM;
++
+ 	spin_lock(&p->lock);
+ 	del_from_avail_list(p, true);
+ 	plist_del(&p->list, &swap_active_head);
+ 	atomic_long_sub(p->pages, &nr_swap_pages);
+ 	total_swap_pages -= p->pages;
+ 	spin_unlock(&p->lock);
 -	spin_unlock(&swap_lock);
++	return 0;
++}
++
++/* Common swap teardown after list removal; shared by sys_swapoff() and
++ * xswap_destroy().
++ */
++static int __swapoff(struct swap_info_struct *p)
++{
 +	struct file *swap_file = NULL;
 +	int err;
  
  #ifdef CONFIG_XSWAP
- 	if (p->flags & SWP_XSWAP)
-@@ -3364,7 +3344,7 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
+-	if (p->flags & SWP_XSWAP)
++	if (p->flags & SWP_XSWAP) {
+ 		cancel_work_sync(&p->xswap_shrink_work);
++		/* Wait out a shrink racing us from the sysfs write path. */
++		mutex_lock(&p->xswap_lock);
++		mutex_unlock(&p->xswap_lock);
++	}
+ #endif
+ 
+ 	wait_for_allocation(p);
+@@ -3370,7 +3377,7 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
  	if (err) {
  		/* re-insert swap space back into swap_list */
  		reinsert_swap_info(p);
@@ -149,7 +164,14 @@ index d2a3303b0572..0321b6b0da56 100644
  	}
  
  	/*
-@@ -3407,12 +3387,14 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
+@@ -3410,15 +3417,21 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
+ 	kfree(p->global_cluster);
+ 	p->global_cluster = NULL;
+ 	free_swap_cluster_info(p);
++	/*
++	 * The device is off swap_active_head and no longer WRITEOK, so no
++	 * reader can observe these; clearing them here needs no lock.
++	 */
  	p->max = 0;
  	p->cluster_info = NULL;
  
@@ -169,7 +191,7 @@ index d2a3303b0572..0321b6b0da56 100644
  
  	/*
  	 * Clear the SWP_USED flag after all resources are freed so that swapon
-@@ -3423,10 +3405,69 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
+@@ -3429,10 +3442,61 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
  	p->flags = 0;
  	spin_unlock(&swap_lock);
  
@@ -220,19 +242,11 @@ index d2a3303b0572..0321b6b0da56 100644
 +		goto out_dput;
 +	}
 +
-+	if (!security_vm_enough_memory_mm(current->mm, p->pages))
-+		vm_unacct_memory(p->pages);
-+	else {
-+		err = -ENOMEM;
++	err = swap_info_remove(p);
++	if (err) {
 +		spin_unlock(&swap_lock);
 +		goto out_dput;
 +	}
-+	spin_lock(&p->lock);
-+	del_from_avail_list(p, true);
-+	plist_del(&p->list, &swap_active_head);
-+	atomic_long_sub(p->pages, &nr_swap_pages);
-+	total_swap_pages -= p->pages;
-+	spin_unlock(&p->lock);
 +	spin_unlock(&swap_lock);
 +
 +	err = __swapoff(p);
@@ -240,7 +254,18 @@ index d2a3303b0572..0321b6b0da56 100644
  out_dput:
  	filp_close(victim, NULL);
  	return err;
-@@ -4322,6 +4363,42 @@ static int xswap_create(int prio)
+@@ -4029,6 +4093,10 @@ static void xswap_try_shrink(struct swap_info_struct *si)
+ 
+ 	mutex_lock(&si->xswap_lock);
+ 
++	/* A swapoff raced us and is about to walk this mapping. */
++	if (!(READ_ONCE(si->flags) & SWP_WRITEOK))
++		goto out_unlock;
++
+ 	nr_mapped = READ_ONCE(si->nr_clusters_mapped);
+ 	if (nr_mapped <= 1)	/* keep cluster 0 */
+ 		goto out_unlock;
+@@ -4336,6 +4404,35 @@ static int xswap_create(int prio)
  	spin_unlock(&swap_lock);
  	return error;
  }
@@ -249,6 +274,7 @@ index d2a3303b0572..0321b6b0da56 100644
 +static int xswap_destroy(int type)
 +{
 +	struct swap_info_struct *p;
++	int err;
 +
 +	p = swap_type_to_info(type);
 +	if (!p)
@@ -264,24 +290,17 @@ index d2a3303b0572..0321b6b0da56 100644
 +		spin_unlock(&swap_lock);
 +		return -EBUSY;
 +	}
-+	if (!security_vm_enough_memory_mm(current->mm, p->pages))
-+		vm_unacct_memory(p->pages);
-+	else {
-+		spin_unlock(&swap_lock);
-+		return -ENOMEM;
-+	}
-+	spin_lock(&p->lock);
-+	del_from_avail_list(p, true);
-+	plist_del(&p->list, &swap_active_head);
-+	atomic_long_sub(p->pages, &nr_swap_pages);
-+	total_swap_pages -= p->pages;
-+	spin_unlock(&p->lock);
++
++	err = swap_info_remove(p);
 +	spin_unlock(&swap_lock);
++	if (err)
++		return err;
 +
 +	return __swapoff(p);
 +}
- #endif /* CONFIG_SYSFS */
  #endif /* CONFIG_XSWAP */
  
+ SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
 -- 
-2.54.0
+2.55.0
+

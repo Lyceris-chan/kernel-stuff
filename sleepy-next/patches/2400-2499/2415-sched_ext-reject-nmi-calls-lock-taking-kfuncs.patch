@@ -1,0 +1,184 @@
+From c659e506f9a77d7a0e100d3555bccd5a44babf0e Mon Sep 17 00:00:00 2001
+From: Wanwu Li <liwanwu@kylinos.cn>
+Date: Wed, 2 Sep 2026 17:36:11 +0800
+Subject: [PATCH] sched_ext: Reject NMI calls to lock-taking kfuncs
+
+commit e06ece82d7b0 ("sched_ext: Report NMI kicks with scx_error()") made
+scx_bpf_kick_cpu() reject NMI calls, and its cover letter describes the
+reachability: sched_ext kfuncs in the "any" category "are callable from
+tracing progs that can attach to functions running in NMI", and an unlucky
+call from there "could deadlock the machine". The fix in that series made
+the error/exit path lock-free so scx_error() is safe to call from NMI. That
+closes the *error* path of every kfunc, but not a kfunc's own
+business-logic lock acquisition on its success path.
+
+The remaining lock-taking kfuncs that scx_kfunc_context_filter() exposes to
+BPF_PROG_TYPE_TRACING have the same hazard: if an NMI lands on a CPU whose
+interrupted context already holds the lock, the kfunc's raw spinlock
+acquisition spins forever and hard-locks the CPU:
+
+ - scx_bpf_destroy_dsq()                    -> dsq->lock
+ - scx_bpf_dsq_reenq()                      -> rq's deferred_reenq_lock
+ - scx_bpf_cpuperf_set() / scx_bpf_cidperf_set() -> rq->lock
+ - scx_bpf_sub_grant() / scx_bpf_sub_revoke()     -> pshard lock
+   (via the shared sub_cap_preamble())
+ - bpf_iter_scx_dsq_next() / bpf_iter_scx_dsq_destroy() -> dsq->lock
+   (the reject is placed in bpf_iter_scx_dsq_new(), which is otherwise
+    lockless, so next() and destroy() are no-ops while it leaves kit->dsq
+    NULL)
+
+As things stand, there is no scenario for reenqueueing, iterating a DSQ,
+setting a performance target or granting sub-caps from NMI. The guards
+defend against a buggy or malicious BPF program turning an "any"-category
+kfunc into a machine-wide hard-lockup through the door that
+scx_kfunc_context_filter() already opens. This matches the intent of
+scx_bpf_kick_cpu()'s NMI check, which the commit cited above added not to
+enable an NMI use case but to surface such a bug as a clean abort.
+
+Route all of them through a new scx_kf_allowed_ctx() helper and reuse
+scx_bpf_kick_cpu()'s existing in_nmi() check - now shared with its cid
+equivalent scx_bpf_kick_cid() through scx_kick_cpu() - so the rule is
+stated once and the coverage is auditable from one place. scx_error() is
+already NMI-safe (commit f883dbb64ca5 ("sched_ext: Make exit claiming
+lock-free")), so the reject-abort cannot deadlock the lock acquisition.
+Kfuncs with an error return report -EDEADLK, the situation being avoided.
+
+Read-only members of the reachable sets (dsq_peek, dsq_nr_queued,
+cpuperf_cur/cap, sub_caps, the idle cpumask helpers and the cid lookups)
+take no scheduler lock on the path a tracing program reaches them, and were
+audited to that effect; they are correctly left unguarded. The select_cpu
+kfuncs do take pi_lock, but scx_kfunc_context_filter() only exposes the
+any/idle/cid sets to BPF_PROG_TYPE_TRACING, and struct_ops programs never
+run in NMI, so no lock-taking path here is reachable from NMI.
+
+Link: https://lore.kernel.org/r/20260901095652.1009104-1-liwanwu@kylinos.cn
+Signed-off-by: Wanwu Li <liwanwu@kylinos.cn>
+Acked-by: Andrea Righi <arighi@nvidia.com>
+Signed-off-by: Tejun Heo <tj@kernel.org>
+---
+ kernel/sched/ext/ext.c      | 30 +++++++++++++++++++++---------
+ kernel/sched/ext/internal.h | 16 ++++++++++++++++
+ kernel/sched/ext/sub.c      |  3 +++
+ 3 files changed, 40 insertions(+), 9 deletions(-)
+
+diff --git a/kernel/sched/ext/ext.c b/kernel/sched/ext/ext.c
+index 6a5c83aea047..387953b92668 100644
+--- a/kernel/sched/ext/ext.c
++++ b/kernel/sched/ext/ext.c
+@@ -9537,14 +9537,8 @@ void scx_kick_cpu(struct scx_sched *sch, s32 cpu, u64 flags)
+ 	struct rq *this_rq;
+ 	unsigned long irq_flags;
+ 
+-	/*
+-	 * The per-cpu kick list is guarded only by local_irq_save(), which does
+-	 * not mask NMIs, so kicking from NMI could corrupt it and is unsupported.
+-	 */
+-	if (unlikely(in_nmi())) {
+-		scx_error(sch, "scx_bpf_kick_cpu() called from NMI");
++	if (!scx_kf_allowed_ctx(sch))
+ 		return;
+-	}
+ 
+ 	local_irq_save(irq_flags);
+ 
+@@ -9712,8 +9706,13 @@ __bpf_kfunc void scx_bpf_destroy_dsq(u64 dsq_id, const struct bpf_prog_aux *aux)
+ 
+ 	guard(rcu)();
+ 	sch = scx_prog_sched(aux);
+-	if (sch)
+-		destroy_dsq(sch, dsq_id);
++	if (unlikely(!sch))
++		return;
++
++	if (!scx_kf_allowed_ctx(sch))
++		return;
++
++	destroy_dsq(sch, dsq_id);
+ }
+ 
+ /**
+@@ -9750,6 +9749,9 @@ __bpf_kfunc int bpf_iter_scx_dsq_new(struct bpf_iter_scx_dsq *it, u64 dsq_id,
+ 	if (unlikely(!sch))
+ 		return -ENODEV;
+ 
++	if (!scx_kf_allowed_ctx(sch))
++		return -EDEADLK;
++
+ 	if (flags & ~__SCX_DSQ_ITER_USER_FLAGS)
+ 		return -EINVAL;
+ 
+@@ -9876,6 +9878,9 @@ __bpf_kfunc void scx_bpf_dsq_reenq(u64 dsq_id, u64 reenq_flags,
+ 		return;
+ 	}
+ 
++	if (!scx_kf_allowed_ctx(sch))
++		return;
++
+ 	/* not specifying any filter bits is the same as %SCX_REENQ_ANY */
+ 	if (!(reenq_flags & __SCX_REENQ_FILTER_MASK))
+ 		reenq_flags |= SCX_REENQ_ANY;
+@@ -10263,6 +10268,9 @@ __bpf_kfunc void scx_bpf_cpuperf_set(s32 cpu, u32 perf, const struct bpf_prog_au
+ 	if (unlikely(!sch))
+ 		return;
+ 
++	if (!scx_kf_allowed_ctx(sch))
++		return;
++
+ 	scx_cpuperf_set(sch, cpu, perf);
+ }
+ 
+@@ -10288,6 +10296,10 @@ __bpf_kfunc s32 scx_bpf_cidperf_set(s32 cid, u32 perf,
+ 	sch = scx_prog_sched(aux);
+ 	if (unlikely(!sch))
+ 		return -ENODEV;
++
++	if (!scx_kf_allowed_ctx(sch))
++		return -EDEADLK;
++
+ 	cpu = scx_cid_to_cpu(sch, cid);
+ 	if (cpu < 0)
+ 		return cpu;
+diff --git a/kernel/sched/ext/internal.h b/kernel/sched/ext/internal.h
+index 076a351bb3f2..4f876e8f0655 100644
+--- a/kernel/sched/ext/internal.h
++++ b/kernel/sched/ext/internal.h
+@@ -2115,6 +2115,22 @@ extern struct scx_sched *scx_enabling_sub_sched;
+ #define scx_error(sch, fmt, args...)						\
+ 	scx_exit((sch), SCX_EXIT_ERROR, 0, fmt, ##args)
+ 
++/*
++ * Tracing progs can call kfuncs from NMI. Kfuncs that take scheduler locks or
++ * touch the kick lists, which are only protected by irq masking, can't run
++ * there, so abort the scheduler instead. scx_error() is NMI-safe.
++ */
++static __always_inline bool __scx_kf_allowed_ctx(struct scx_sched *sch, const char *who)
++{
++	if (unlikely(in_nmi())) {
++		scx_error(sch, "%s called from NMI", who);
++		return false;
++	}
++	return true;
++}
++
++#define scx_kf_allowed_ctx(sch)	__scx_kf_allowed_ctx((sch), __func__)
++
+ /**
+  * scx_root_protected_live - Root sched for paths that only run while live
+  *
+diff --git a/kernel/sched/ext/sub.c b/kernel/sched/ext/sub.c
+index a17d84db93bd..380a5653dc52 100644
+--- a/kernel/sched/ext/sub.c
++++ b/kernel/sched/ext/sub.c
+@@ -2267,6 +2267,9 @@ static s32 sub_cap_preamble(u64 cgroup_id, u64 caps, const struct bpf_prog_aux *
+ 	if (unlikely(!parent))
+ 		return -ENODEV;
+ 
++	if (!scx_kf_allowed_ctx(parent))
++		return -EDEADLK;
++
+ 	if (!scx_is_cid_type()) {
+ 		scx_error(parent, "sub-cap kfuncs require a cid-form scheduler");
+ 		return -EOPNOTSUPP;
+-- 
+2.55.0
+

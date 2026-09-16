@@ -1,10 +1,7 @@
-From nobody Mon Sep 17 00:00:00 2001
+From 341c2a7ce93e0221e23e60e6174499b03d1097c4 Mon Sep 17 00:00:00 2001
 From: Baoquan He <hebaoquan@kylinos.cn>
-To: linux-mm@kvack.org
-Cc: akpm@linux-foundation.org, chrisl@kernel.org, kasong@tencent.com, nphamcs@gmail.com, baohua@kernel.org, youngjun.park@lge.com, hannes@cmpxchg.org, yosry@kernel.org, shikemeng@huaweicloud.com, chengming.zhou@linux.dev, baoquan.he@linux.dev, david@kernel.org, linux-kernel@vger.kernel.org, Baoquan He <hebaoquan@kylinos.cn>
-Subject: [PATCH v2 06/12] mm, swap: add xswap grow trigger on cluster allocation
-Date: Sun, 13 Sep 2026 15:50:08 +0800
-Message-ID: <20260913075014.1732524-7-hebaoquan@kylinos.cn>
+Date: Wed, 16 Sep 2026 18:19:13 +0800
+Subject: [PATCH 06/14] mm, swap: add xswap grow trigger on cluster allocation
 
 When cluster_alloc_swap_entry() fails to find a free cluster and
 the xswap device still has room to grow, expand the mapped range
@@ -23,23 +20,20 @@ only protects the per-cpu cluster cache, which this path does not touch.
 
 Signed-off-by: Baoquan He <hebaoquan@kylinos.cn>
 ---
- mm/swapfile.c | 50 ++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
+ mm/swapfile.c | 41 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
 diff --git a/mm/swapfile.c b/mm/swapfile.c
-index 4861e2d49e36..f603f8c4b599 100644
+index 6d2a14d48..c762a2801 100644
 --- a/mm/swapfile.c
 +++ b/mm/swapfile.c
-@@ -1270,6 +1270,56 @@ static unsigned long cluster_alloc_swap_entry(struct swap_info_struct *si,
+@@ -1265,6 +1265,47 @@ static unsigned long cluster_alloc_swap_entry(struct swap_info_struct *si,
  		if (found)
  			goto done;
  	}
 +
 +#ifdef CONFIG_XSWAP
-+	/*
-+	 * For xswap: if no free cluster was found and more clusters
-+	 * can be mapped, grow the cluster_info array and retry.
-+	 */
++	/* For xswap: grow the cluster_info array, then retry. */
 +	if (!found && (si->flags & SWP_XSWAP) &&
 +	    READ_ONCE(si->nr_clusters_mapped) < READ_ONCE(si->nr_clusters_max) &&
 +	    list_empty(&si->free_clusters)) {
@@ -51,10 +45,8 @@ index 4861e2d49e36..f603f8c4b599 100644
 +		int ret;
 +
 +		/*
-+		 * Mapping pages into the VM_SPARSE area can sleep, which is
-+		 * not allowed under local_lock.  The lock only protects the
-+		 * per-cpu cluster cache, which this path does not touch, so
-+		 * it can be dropped across the call.
++		 * Mapping pages can sleep.  The lock only guards the per-cpu
++		 * cluster cache, which this path does not touch.
 +		 */
 +		local_unlock(&percpu_swap_cluster.lock);
 +		ret = xswap_map_clusters(si, start, nr_new);
@@ -65,11 +57,8 @@ index 4861e2d49e36..f603f8c4b599 100644
 +				struct swap_cluster_info *ci = &si->cluster_info[i];
 +
 +				/*
-+				 * A concurrent grower may have already added
-+				 * these clusters to the free list.  Only add
-+				 * clusters that are still off-list (NONE).
-+				 * Lock ci->lock first: move_cluster() takes
-+				 * si->lock internally.
++				 * A concurrent grower may have taken these already;
++				 * only add the off-list ones.
 +				 */
 +				spin_lock(&ci->lock);
 +				if (ci->flags == CLUSTER_FLAG_NONE)
@@ -78,7 +67,6 @@ index 4861e2d49e36..f603f8c4b599 100644
 +				spin_unlock(&ci->lock);
 +			}
 +
-+			/* Retry allocation from the free list */
 +			found = alloc_swap_scan_list(si, &si->free_clusters,
 +						    folio, false);
 +		}
@@ -88,4 +76,5 @@ index 4861e2d49e36..f603f8c4b599 100644
  	if (!(si->flags & SWP_SOLIDSTATE))
  		spin_unlock(&si->global_cluster_lock);
 -- 
-2.54.0
+2.55.0
+

@@ -1,0 +1,87 @@
+From ad753524056e6e4eb368ff8df84db9d7d79b06e0 Mon Sep 17 00:00:00 2001
+From: Jens Axboe <axboe@kernel.dk>
+To: io-uring@vger.kernel.org
+Cc: juanlu@fastmail.com,
+	Jens Axboe <axboe@kernel.dk>
+Subject: [PATCH 05/10] io_uring/uring_cmd: only cancel requests of the given task
+Date: Fri, 11 Sep 2026 09:45:29 -0600
+Message-ID: <20260911154811.646705-6-axboe@kernel.dk>
+X-Mailer: git-send-email 2.55.0
+In-Reply-To: <20260911154811.646705-1-axboe@kernel.dk>
+References: <20260911154811.646705-1-axboe@kernel.dk>
+Precedence: bulk
+X-Mailing-List: io-uring@vger.kernel.org
+List-Id: <io-uring.vger.kernel.org>
+List-Subscribe: <mailto:io-uring+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:io-uring+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+
+io_uring_try_cancel_uring_cmd() ignores the task it is asked to cancel
+on behalf of as soon as cancel_all is true, and cancels every cancelable
+command on the ring instead. That differs from how other requests are
+matched, where a valid task always restricts matching to that task's
+requests and cancel_all simply lifts the REQ_F_INFLIGHT restriction.
+
+So far the only caller passing both a task and cancel_all is exec, where
+tearing down another task's commands on a shared ring is somewhat
+impolite. The exit path is about to do the same for every exiting
+process though, so bring it in line. Match on the task if one is given,
+and cancel everything only for ring teardown, which passes NULL. This
+leaves cancel_all as useless, hence drop it.
+
+Signed-off-by: Jens Axboe <axboe@kernel.dk>
+---
+ io_uring/cancel.c    | 2 +-
+ io_uring/uring_cmd.c | 4 ++--
+ io_uring/uring_cmd.h | 2 +-
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/io_uring/cancel.c b/io_uring/cancel.c
+index 7d7820eab878..5ee94246c43c 100644
+--- a/io_uring/cancel.c
++++ b/io_uring/cancel.c
+@@ -560,7 +560,7 @@ __cold bool io_uring_try_cancel_requests(struct io_ring_ctx *ctx,
+ 	ret |= io_poll_remove_all(ctx, tctx, cancel_all);
+ 	ret |= io_waitid_remove_all(ctx, tctx, cancel_all);
+ 	ret |= io_futex_remove_all(ctx, tctx, cancel_all);
+-	ret |= io_uring_try_cancel_uring_cmd(ctx, tctx, cancel_all);
++	ret |= io_uring_try_cancel_uring_cmd(ctx, tctx);
+ 	ret |= io_kill_timeouts(ctx, tctx, cancel_all);
+ 	mutex_unlock(&ctx->uring_lock);
+ 	if (tctx)
+diff --git a/io_uring/uring_cmd.c b/io_uring/uring_cmd.c
+index 726a659f38c3..28a87480626c 100644
+--- a/io_uring/uring_cmd.c
++++ b/io_uring/uring_cmd.c
+@@ -49,7 +49,7 @@ void io_uring_cmd_cleanup(struct io_kiocb *req)
+ }
+ 
+ bool io_uring_try_cancel_uring_cmd(struct io_ring_ctx *ctx,
+-				   struct io_uring_task *tctx, bool cancel_all)
++				   struct io_uring_task *tctx)
+ {
+ 	struct hlist_node *tmp;
+ 	struct io_kiocb *req;
+@@ -63,7 +63,7 @@ bool io_uring_try_cancel_uring_cmd(struct io_ring_ctx *ctx,
+ 				struct io_uring_cmd);
+ 		struct file *file = req->file;
+ 
+-		if (!cancel_all && req->tctx != tctx)
++		if (tctx && req->tctx != tctx)
+ 			continue;
+ 
+ 		if (cmd->flags & IORING_URING_CMD_CANCELABLE) {
+diff --git a/io_uring/uring_cmd.h b/io_uring/uring_cmd.h
+index 041aef8a8aa3..a5cb3f2ee1c5 100644
+--- a/io_uring/uring_cmd.h
++++ b/io_uring/uring_cmd.h
+@@ -14,7 +14,7 @@ void io_uring_cmd_sqe_copy(struct io_kiocb *req);
+ void io_uring_cmd_cleanup(struct io_kiocb *req);
+ 
+ bool io_uring_try_cancel_uring_cmd(struct io_ring_ctx *ctx,
+-				   struct io_uring_task *tctx, bool cancel_all);
++				   struct io_uring_task *tctx);
+ 
+ bool io_uring_cmd_post_mshot_cqe32(struct io_uring_cmd *cmd,
+ 				   unsigned int issue_flags,

@@ -1,0 +1,66 @@
+From 8848333264b73cb6617fc04e11c245ab1bd22b28 Mon Sep 17 00:00:00 2001
+From: Wanwu Li <liwanwu@kylinos.cn>
+Date: Thu, 3 Sep 2026 11:57:19 +0800
+Subject: [PATCH] sched_ext: Make scx_locked_rq() return NULL from NMI
+
+scx_locked_rq() reads the per-CPU scx_locked_rq_state, which tracks the
+rq locked by the context running on the CPU. Tracing progs can call
+kfuncs from NMI, and an NMI interrupts - rather than replaces - the
+context that set scx_locked_rq_state, so a non-NULL read from NMI
+falsely tells the caller that it holds the interrupted context's rq
+lock.
+
+Three "any"-category kfuncs read scx_locked_rq() on their success path
+and take an unsafe fast path on a non-NULL return:
+
+ - scx_bpf_task_set_slice() writes p->scx.slice directly, racing
+   update_curr_scx()'s non-atomic read-modify-write of the same field.
+ - scx_bpf_dsq_nr_queued() resolves %SCX_DSQ_LOCAL to
+   (scx_locked_rq() ?: this_rq()) and can report the interrupted
+   context's local DSQ length instead of the caller's.
+ - scx_bpf_locked_rq() hands the interrupted context's rq to the BPF
+   program, which may then operate on it as if it owned the rq lock.
+
+Make scx_locked_rq() return NULL from NMI so that all three take their
+unlocked paths: scx_bpf_task_set_slice() stashes the request into the
+atomic p->scx.slice_oob for application under the rq lock,
+scx_bpf_dsq_nr_queued() falls back to this_rq(), and
+scx_bpf_locked_rq() reports an error and aborts the scheduler through
+the NMI-safe exit path.
+
+The kfuncs that take scheduler locks reject NMI calls through
+scx_kf_allowed_ctx() before reaching scx_locked_rq(), and the internal
+callers only run from struct_ops callbacks, which never run in NMI, so
+no other caller is affected.
+
+Suggested-by: Tejun Heo <tj@kernel.org>
+Link: https://lore.kernel.org/r/d84b31727f04e1ed0d40042ba1c09e61@kernel.org
+Signed-off-by: Wanwu Li <liwanwu@kylinos.cn>
+Signed-off-by: Tejun Heo <tj@kernel.org>
+---
+ kernel/sched/ext/internal.h | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/kernel/sched/ext/internal.h b/kernel/sched/ext/internal.h
+index 4f876e8f0655..e1eb3a0d456c 100644
+--- a/kernel/sched/ext/internal.h
++++ b/kernel/sched/ext/internal.h
+@@ -2221,6 +2221,15 @@ static inline void scx_schedule_reenq_local(struct rq *rq, u64 reenq_flags)
+  */
+ static inline struct rq *scx_locked_rq(void)
+ {
++	/*
++	 * Tracing progs can call kfuncs from NMI. scx_locked_rq_state tracks
++	 * the rq locked by the interrupted context, so a non-NULL read from
++	 * NMI would falsely claim its lock. Return NULL from NMI so that
++	 * callers take their unlocked paths.
++	 */
++	if (unlikely(in_nmi()))
++		return NULL;
++
+ 	return __this_cpu_read(scx_locked_rq_state);
+ }
+ 
+-- 
+2.55.0
+

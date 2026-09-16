@@ -1,0 +1,87 @@
+From 8ba7ab538b839ffde2006e01ec3647e997025445 Mon Sep 17 00:00:00 2001
+From: Jens Axboe <axboe@kernel.dk>
+To: io-uring@vger.kernel.org
+Cc: juanlu@fastmail.com,
+	Jens Axboe <axboe@kernel.dk>
+Subject: [PATCH 01/10] io_uring/io-wq: put the request file before posting a completion
+Date: Fri, 11 Sep 2026 09:45:25 -0600
+Message-ID: <20260911154811.646705-2-axboe@kernel.dk>
+X-Mailer: git-send-email 2.55.0
+In-Reply-To: <20260911154811.646705-1-axboe@kernel.dk>
+References: <20260911154811.646705-1-axboe@kernel.dk>
+Precedence: bulk
+X-Mailing-List: io-uring@vger.kernel.org
+List-Id: <io-uring.vger.kernel.org>
+List-Subscribe: <mailto:io-uring+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:io-uring+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+
+Once io-wq is done with the request, put any potential file that request
+had pinned upfront. This ensures any file references are fully put by
+the time io-wq posts a completion. Registered files are held by the
+resource node and don't need this.
+
+Signed-off-by: Jens Axboe <axboe@kernel.dk>
+---
+ io_uring/io_uring.c | 25 ++++++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
+
+diff --git a/io_uring/io_uring.c b/io_uring/io_uring.c
+index 61053421d809..f96dd2d8c6b1 100644
+--- a/io_uring/io_uring.c
++++ b/io_uring/io_uring.c
+@@ -907,6 +907,24 @@ bool io_req_post_cqe32(struct io_kiocb *req, struct io_uring_cqe cqe[2])
+ 	return posted;
+ }
+ 
++/*
++ * Drop any io-wq request with a file upfront, otherwise it gets deferred to
++ * much later post CQE posting.
++ */
++static void io_req_put_file_iowq(struct io_kiocb *req, bool sync)
++{
++	struct file *file = req->file;
++
++	if (!file || (req->flags & (REQ_F_FIXED_FILE | REQ_F_REISSUE)))
++		return;
++
++	WRITE_ONCE(req->file, NULL);
++	if (sync)
++		__fput_sync(file);
++	else
++		fput(file);
++}
++
+ static void io_req_complete_post(struct io_kiocb *req, unsigned issue_flags)
+ {
+ 	struct io_ring_ctx *ctx = req->ctx;
+@@ -919,6 +937,8 @@ static void io_req_complete_post(struct io_kiocb *req, unsigned issue_flags)
+ 	if (WARN_ON_ONCE(!(issue_flags & IO_URING_F_IOWQ)))
+ 		return;
+ 
++	io_req_put_file_iowq(req, true);
++
+ 	/*
+ 	 * Handle special CQ sync cases via task_work. DEFER_TASKRUN requires
+ 	 * the submitter task context, IOPOLL protects with uring_lock.
+@@ -1480,6 +1500,7 @@ void io_wq_submit_work(struct io_wq_work *work)
+ 	/* either cancelled or io-wq is dying, so don't touch tctx->iowq */
+ 	if (atomic_read(&work->flags) & IO_WQ_WORK_CANCEL) {
+ fail:
++		io_req_put_file_iowq(req, false);
+ 		io_req_task_queue_fail(req, err);
+ 		return;
+ 	}
+@@ -1555,8 +1576,10 @@ void io_wq_submit_work(struct io_wq_work *work)
+ 	} while (1);
+ 
+ 	/* avoid locking problems by failing it from a clean context */
+-	if (ret)
++	if (ret) {
++		io_req_put_file_iowq(req, true);
+ 		io_req_task_queue_fail(req, ret);
++	}
+ }
+ 
+ inline struct file *io_file_get_fixed(struct io_kiocb *req, int fd,
