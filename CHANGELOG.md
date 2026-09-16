@@ -440,7 +440,7 @@ The six-source sweep that ran alongside this release is recorded in
 ### Deep sweep results not adopted
 - **Work items**: `dc66/59` ("Return success status from check_mode_supported",
   Alvin Lee, AMD) is the one AMD recommends in #5834's NULL-deref reports and
-  it applies cleanly to our series. Not adopted yet **because of what it
+  it applies cleanly to the series. Not adopted yet **because of what it
   changes**: it makes DML2 mode validation actually return failure instead of a
   hardcoded `true`. If DML2 dislikes 1920x1080@240 it would now be rejected, and
   this display just got fixed. It arrives with the DC 3.2.398 drop in the next
@@ -449,18 +449,18 @@ The six-source sweep that ran alongside this release is recorded in
   is skipped on evidence: this machine logs **zero** "Unsupported screen format"
   messages in dmesg and the journal, so it is not hit here.
 - superm1's EDID-override pair (#5779) only matters if an override is in use.
-  Correcting an earlier note: it does **not** collide with our `1143` (different
+  Correcting an earlier note: it does **not** collide with `1143` (different
   files entirely).
 - MM: Kefeng Wang's zswap invalidate/store v3 has **no measured claim** in its
   cover letter ("eliminate redundant per-slot lookups"), and it shares
-  `swap_range_free()` with our xswap series — still deferred for that reason.
+  `swap_range_free()` with the xswap series — still deferred for that reason.
   Usama Arif's PMD-level swap v7 does not apply as posted (needs `f078c72e5ca2`
   + `94edc3c732625` for 12/29 and a hugetlb patch absent from rc3 for 14/29).
   Hugh Dickins' fbatch v2 collides with LRU-MARIE in `mm/folio.c` (436 changed
   lines) and its author expects "some disappointments".
-- The Ghiti zswap-writeback fixes fail on our series state at `mm/zswap.c:1001`
+- The Ghiti zswap-writeback fixes fail on the series state at `mm/zswap.c:1001`
   — exactly where xswap's `2155` rewrites the store/writeback path. They are
-  accounting fixes, and we have no writeback target (no disk swap).
+  accounting fixes, and there is no writeback target (no disk swap).
 
 ### Changed
 - `pkgrel` 12 → 13. Series is now 215 patches.
@@ -575,8 +575,8 @@ customization toolkit (TUI, build configs, and a patch set). Reviewed on
 - Nothing new in agd5f, drm-next, linux-pm, or the CachyOS branches today.
 - **`next-20260915`**: its tree diff against `next-20260914` is 737 files
   (+42k/-12k). Nothing in it needs adding. Two commits checked by content:
-  `aa55d949bf9f` is byte-identical to `f7491d7c81db`, the fix we already carry
-  as `2500` (same author, same date, identical diff), and `eddf1f80667e` is our
+  `aa55d949bf9f` is byte-identical to `f7491d7c81db`, the fix already carried
+  as `2500` (same author, same date, identical diff), and `eddf1f80667e` is
   `2151`. *Method note:* `git log A..B` between two linux-next tags returns
   **1.47 million** commits, because the tags are rebased onto fresh bases daily
   — the commit list is meaningless. Use `git diff` for content and the tag's own
@@ -610,13 +610,13 @@ customization toolkit (TUI, build configs, and a patch set). Reviewed on
   series (10 patches, amd-gfx, RESEND 2026-09-14,
   `<20260914130724.130794-2..11-lingshan.zhu@amd.com>`). A doorbell lookup
   helper that holds the queue kref, userq-manager lifetime tied to its
-  queues, kref held in the gfx11/gfx12 private fault workers (our chip is
+  queues, kref held in the gfx11/gfx12 private fault workers (this chip is
   the gfx12 one), asynchronous userq destruction, kref held across MES
   reset / isolation scheduling / suspend-resume, and create-path UAF fixes.
   Hardens the user-queue submission path that the 9000s backports ship.
   Still under review (the author pinged AMD on 2026-09-14); drop or refresh
   when the series lands in agd5f. Two of the ten patches apply only against
-  our series-applied tree, not clean rc3 — the context comes from our
+  the series-applied tree, not clean rc3 — the context comes from the
   existing userq backports.
 
 ### Sweep 2026-09-15
@@ -637,7 +637,7 @@ customization toolkit (TUI, build configs, and a patch set). Reviewed on
   (#5800), VRR black level over DisplayPort (#5812), HDMI FRL after
   standby (#5780).
 - **Skipped**: ESMTP guest hardening (EPYC/SEV, not this machine), EROFS
-  LZ4 rollback (not our filesystem), jitterentropy hardware mixer (watch
+  LZ4 rollback (not this filesystem), jitterentropy hardware mixer (watch
   only), Zen6 EPP tunings (wrong CPU).
 
 ### Changed
@@ -657,7 +657,7 @@ define the field anywhere, and `1163`'s guard reads it.
 ### Fixed
 - **VRR advertisement regression — the MAG251RX flicker bisect ends here.**
   The clean CachyOS 7.3 rc kernel (rc2-based) reports `vrr_capable=0` and
-  `passive_vrr_capable=0` on both HDMI ports and does not flicker; our rc3
+  `passive_vrr_capable=0` on both HDMI ports and does not flicker; this rc3
   line reported 1/1 and flickered at 240 Hz. Bisecting the diff between the
   two trees: the MSI MAG251RX EDID has an AMD VSDB **v1** (48–240 Hz, MCCS
   flag) and no HF-VSDB VRR block (`hdmi.vrr_cap.supported=0`), so the only
@@ -697,7 +697,7 @@ define the field anywhere, and `1163`'s guard reads it.
 - sched_ext lazy preemption v3 (Righi, for-7.4): a feature for the next
   window, not a fix for this base.
 - MGLRU rejected-folios v3 (Baolin Wang): inert here — LRU-MARIE owns
-  reclaim — and it needs a rebase past our eight `mm/vmscan.c` patches.
+  reclaim — and it needs a rebase past the eight `mm/vmscan.c` patches.
 - Seven post-rc3 mm fixes (`12e9ac7bc5b2` SWAP_USAGE_OFFLIST_BIT,
   `6e673d0879ef` root-memcg charging, `397432cab17b` mremap locked_vm,
   `e384abeb559d` THP tuneables, `932cfb25e7ce` shrinker nokmem, plus two
@@ -726,7 +726,7 @@ define the field anywhere, and `1163`'s guard reads it.
   HF-VSDB VRR range in the MAG251RX's EDID. CachyOS's tree carries the
   `drm_hdmi_vrr_cap` struct but never sets the flag.
 
-  The chain that follows from the advertisement: our `0060` (dropped in the same build) had a fallback that set
+  The chain that follows from the advertisement: `0060` (dropped in the same build) had a fallback that set
   `freesync_capable=true`, the driver sends FreeSync signalling to a G-Sync
   Compatible panel whose scalar then sits in a half-negotiated VRR state —
   flicker at 240 Hz where content changes (cursor movement), and the box, whose
@@ -783,7 +783,7 @@ define the field anywhere, and `1163`'s guard reads it.
   `det_size` update flag on pipes. CachyOS does not carry it.
 
   The identification came from the kernel-to-kernel diff the bisect demanded:
-  our applied display tree against CachyOS `7.3/base` shows 32 differing
+  the applied display tree against CachyOS `7.3/base` shows 32 differing
   files, and the DCN401 hardware-sequencer difference is this patch alone —
   everything else in `dcn401_hwseq.c` is identical between the two trees.
 
@@ -805,7 +805,7 @@ define the field anywhere, and `1163`'s guard reads it.
 
 ### Noted, nothing to add
 - **The Vernon Yang link** (`20260903031608.1194238-1-vernon2gm`) is a reply on
-  the thread of our `2500` (x86/mm `pmd_modify()` dropping the dirty bit) — it
+  the thread of `2500` (x86/mm `pmd_modify()` dropping the dirty bit) — it
   just accepts the `Reported-by:` trailer Andrew Morton added. No new patch.
 - **linux-next `next-20260914` is out**, and it is the 7.4 merge-window preview
   (455 display files changed, 33k insertions; mm +5.4k lines). Per this
@@ -950,7 +950,7 @@ define the field anywhere, and `1163`'s guard reads it.
   fail against the current series.
 - **sirlucjan's full zstd dev update.** Asked for explicitly, and the answer is
   no: it is a 1.5.7 → 1.6.0 vendored sync whose only x86-relevant deltas are
-  already our `2128` and `2143` — and it **conflicts with both**, so carrying it
+  already `2128` and `2143` — and it **conflicts with both**, so carrying it
   would mean dropping them. Its bulk is ARM SVE2 and RISC-V RVV code that
   cannot execute on Zen 4, and its gcc workaround is inert under Clang.
 - **CachyOS `sched/fair: do not scan twice in detach_tasks()`.** `fair.c` is
