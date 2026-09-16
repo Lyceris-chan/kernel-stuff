@@ -55,3 +55,24 @@ tc filter show dev <iface> ingress     # expect a `mirred` redirect
 
 A service status of `active (exited)` is **not** proof of shaping — check the
 qdiscs.
+
+## 99-net-tune.conf
+
+`net-tune.sh` applies `net.core.netdev_max_backlog=1000` and the `busy_poll`/
+`busy_read` pair at `network-online`. Those live only in the running kernel, so
+any later `sysctl --system` re-applies
+`/usr/lib/sysctl.d/70-cachyos-settings.conf` (`netdev_max_backlog = 4096`) and
+silently reverts them — observed live: net-tune logged
+`net.core.netdev_max_backlog = 1000` at 06:43:48, and a `sysctl --system` run
+afterwards put the box back on 4096 with no warning.
+
+`99-net-tune.conf` declares the same values under `/etc/sysctl.d/`, so
+`sysctl --system` now lands on the same numbers the script wants. The script
+still re-asserts them per interface at boot; this drop-in only removes the
+footgun.
+
+Install it alongside the service:
+
+```bash
+sudo install -Dm644 99-net-tune.conf /etc/sysctl.d/99-net-tune.conf
+```
