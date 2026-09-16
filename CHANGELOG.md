@@ -229,6 +229,37 @@ drive`, `Ext4`, `Power management`, `XDG Autostart`).
   installed; it costs no boot time. `lvm2-monitor` (47 ms) and `acpid` have no
   work here but are equally cheap.
 
+### swappiness corrected to 180 (2026-09-16)
+
+The swap stack shipped `vm.swappiness=150`, which was only ever CachyOS's zram
+udev-rule default preserved for continuity. Checked against the primary sources:
+
+- **`Documentation/admin-guide/sysctl/vm.rst`** defines swappiness as a relative
+  IO cost over 0-200, where 100 means equal cost between swap and filesystem
+  paging, and says "for in-memory swap, like zram or zswap, as well as hybrid
+  setups that have swap on faster devices than the filesystem, values beyond 100
+  can be considered". Its worked example gives **133** when swap is 2x faster
+  than the filesystem (`x + 2x = 200, 2x = 133.33`).
+- **The Arch Wiki's Zram article** ("Optimizing swap on zram") recommends
+  **180**, together with `watermark_boost_factor = 0`,
+  `watermark_scale_factor = 125` and `page-cluster = 0`.
+
+The second point is what settles it: `/etc/sysctl.d/99-custom-tweaks.conf`
+*already* sets the other three values of that Arch Wiki block — so the machine
+was running three quarters of a scheme whose fourth member is 180, and 150 was
+mixed in from a different origin entirely. An xswap device has no backing store,
+so its "IO" is a compress and decompress in RAM, further past the kernel's
+2x example than zram itself.
+
+An earlier note in this session claimed "no official source recommends 180" —
+that was wrong, and came from reading only the first paragraph of the sysctl
+documentation. The section continues past it.
+
+`vm.swappiness` is therefore 180, documented in
+`sleepy-next/swap-stack/99-xswap-swappiness.conf`. The kernel documentation is
+explicit that the optimum is workload-dependent: "An optimal value will require
+experimentation."
+
 ## [7.3.0-rc3-15-sleepy-next]: 2026-09-15
 
 ### Added

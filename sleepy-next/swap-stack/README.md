@@ -246,5 +246,20 @@ sudo sed -i 's/^LINUX_OPTIONS="/LINUX_OPTIONS="zswap.enabled=0 /' /etc/sdboot-ma
 sudo sdboot-manage gen
 ```
 
-The masked udev rule set `vm.swappiness=150`; the sysctl drop-in keeps that
-value once the rule is gone. Revert it too if you go back to zram.
+The masked udev rule set `vm.swappiness=150`. The sysctl drop-in does **not**
+keep that value: it sets **180**, with the reasoning in the file's comments.
+Two independent sources put in-memory swap above 150 — the kernel's own
+`Documentation/admin-guide/sysctl/vm.rst`, which defines swappiness as a
+relative IO cost over 0-200 (100 = equal cost) and says "for in-memory swap,
+like zram or zswap ... values beyond 100 can be considered", working out to 133
+when swap is 2x faster than the filesystem; and the Arch Wiki's Zram article
+("Optimizing swap on zram"), which recommends 180 together with
+`watermark_boost_factor = 0`, `watermark_scale_factor = 125` and
+`page-cluster = 0`. The other three of those are already set in
+`/etc/sysctl.d/99-custom-tweaks.conf`, so 180 completes the set. This device has
+no backing store at all, so its "IO" is a compress and decompress in RAM — well
+past the 2x the kernel's example assumes.
+
+The kernel documentation is explicit that this is not exact: "An optimal value
+will require experimentation and will also be workload-dependent." Revert the
+drop-in too if you go back to zram.
