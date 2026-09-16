@@ -644,6 +644,32 @@ only where stdin genuinely is the password. Same family as the `rg -rn` and
 changes what the command means. `pgrep -af <pattern>` self-matches the invoking
 shell exactly like `pkill -f` — `pgrep -x <name>` is the form that does not.
 
+### Second occurrence, different spelling (2026-09-16)
+
+A pipe into `echo` looks harmless and is not — `echo` ignores its stdin, so
+anything piped into it is silently discarded and `echo`'s own output becomes the
+next stage's input:
+
+```bash
+printf '[Journal]\nSystemMaxUse=500M\n' | echo 'pw' | sudo -S tee /etc/foo.conf
+```
+
+The `printf`'s content goes nowhere, and `tee` writes **the password** (9 bytes)
+into a system config file. This actually happened, to
+`/etc/systemd/journald.conf.d/00-size.conf`, and was caught only because the
+resulting config was checked for effect and reported `SystemMaxUse=50M` — the
+old value — which is what sent me back to look at the file.
+
+Two rules, both cheap:
+
+- **Never mix a data-producing pipe with `echo <secret> |` in one pipeline.**
+  They compete for the same stdin and the loser is silent. Use the Write tool
+  and `sudo install`, as above.
+- **After writing any config, verify the value is in effect**, not that the
+  command exited 0. `systemd-analyze cat-config`, `sysctl -n`, `systemctl show`
+  — a file that exists and is syntactically valid can still contain the wrong
+  thing entirely.
+
 ## Attribute a kernel warning by boot, not by reasoning (2026-09-16)
 
 `mem_cgroup_update_lru_size(): lru_size -2522` was firing once per boot in a tree
