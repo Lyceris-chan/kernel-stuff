@@ -121,6 +121,58 @@ negative results — recorded here so the same ground is not covered twice.
 ### Changed
 - `pkgrel` 15 → 16.
 
+### Verified after the reboot (2026-09-16 05:34, running `7.3.0-rc3-16`)
+
+- **The gate is gone.** `graphical.target` is reached after **2.083s** of
+  userspace, down from 14.751s: 29.5s → 24.9s total, and **17.2s from power-on
+  to a usable desktop**. `NetworkManager-wait-online.service` still takes
+  7.666s but now runs behind the desktop — nothing waits for it. The NIC change
+  landed as well: `r8169` probes at **0.663s**, down from 7.211s. Carrier only
+  moved 10.13s → 9.79s, because the PHY attach and link-up are now gated by
+  userspace (udev renames at 6.4s) rather than by the driver, and ~2.9s of that
+  is autonegotiation.
+- **New finding, unrelated to the boot work: LRU-MARIE underflows memcg LRU
+  accounting on every boot.**
+
+  ```
+  mem_cgroup_update_lru_size(...): lru_size -2522
+  WARNING: mm/memcontrol.c:1548 at mem_cgroup_update_lru_size
+    lru_reparent_memcg+0x1c4/0x460      <- the classic-LRU branch
+    mem_cgroup_css_offline+0x20f/0x440
+  ```
+
+  It fires on **every `sleepy-next` boot from rc3-6 through rc3-16 and on
+  neither `cachyos-rc` boot**, so it is ours rather than upstream's.
+  `mm/memcontrol.c` calls `lru_gen_reparent_memcg()` when `lru_gen_enabled()` is
+  true and the classic `lru_reparent_memcg()` otherwise; `2101` forces
+  `lru_gen_enabled()` false whenever LRU-MARIE is on, so we always take the
+  classic branch, which sums the child's `lru_zone_size` into the parent. The
+  child's counter was already `-2522` — something debited it more often than it
+  credited it.
+
+  The LRU-MARIE patch documents this failure mode in its own comments — *"a
+  legacy debit, so `mz->lru_zone_size` drifts and a later legacy/Marie del
+  underflows ("marie underflow-del" / `mem_cgroup_update_lru_size lru_size
+  -1`)"* — and carries fixes for several instances. At least one path remains
+  in 0.11.1r2, and that is the newest revision upstream, so there is nothing to
+  upgrade to.
+
+  Two things make this more than cosmetic. The warning is `WARN_ONCE`, so only
+  the first occurrence per boot prints while the `*lru_size = 0` recovery runs
+  on *every* occurrence — the real frequency is unknown and one per boot is a
+  lower bound. And `lru_zone_size` is what `lruvec_lru_size()` sums, which
+  reclaim reads. `CONFIG_DEBUG_VM` is off, so the `VM_BUG_ON(1)` next to the
+  warning is inert; with it on this would be a `BUG()`, not a warning.
+- **What is left, and why none of it is worth taking.** Firmware 9.835s is BIOS
+  POST — the only Linux-side lever is `kexec` on reboots, which re-initialises
+  the GPU from a running kernel. Kernel 2.100s is PCI/USB/SATA enumeration with
+  no gap above 250 ms and nothing dominant. The initrd's 2.717s includes a
+  725 ms wait between fsck finishing (2.789) and `/sysroot` mounting (3.489),
+  filled with a USB hub cascade; `systemd-udev-settle` is not in the initramfs,
+  so the usual cause is ruled out. Userspace is 2.083s. Dropping the `kms` hook
+  would cut roughly 245 ms from the 485 ms ESP read, at the cost of moving when
+  the display modesets.
+
 ## [7.3.0-rc3-15-sleepy-next]: 2026-09-15
 
 ### Added

@@ -643,3 +643,49 @@ only where stdin genuinely is the password. Same family as the `rg -rn` and
 `pkill -f` traps: the convenient-looking shell construct is the one that quietly
 changes what the command means. `pgrep -af <pattern>` self-matches the invoking
 shell exactly like `pkill -f` — `pgrep -x <name>` is the form that does not.
+
+## Attribute a kernel warning by boot, not by reasoning (2026-09-16)
+
+`mem_cgroup_update_lru_size(): lru_size -2522` was firing once per boot in a tree
+carrying 217 patches, most of them in mm. Reading the call path was enough to see
+the function was **upstream** — `lru_reparent_memcg` lives in `mm/folio.c` and
+appears in no patch of ours — and that is exactly where the reasoning would have
+stopped, concluding "not ours". The wrong conclusion.
+
+The attribution that holds up is per boot:
+
+```bash
+journalctl --list-boots | while read -r id rest; do
+  id=$(echo "$id" | tr -d ' ')
+  k=$(journalctl -b "$id" -k | rg -o 'Linux version [0-9][^ ]*' | head -1)
+  w=$(journalctl -b "$id" -k | rg -c 'lru_size -')
+  printf '%s %s warns=%s\n' "$id" "$k" "${w:-0}"
+done
+```
+
+Every `sleepy-next` boot reported it from rc3-6 through rc3-16; neither
+`cachyos-rc` boot did. Same upstream code, different result — so the delta is
+ours, and the delta is what matters, not the provenance of the function that
+printed the line. **Keep a second kernel installed and boot it occasionally: it
+is the only control group this project has**, and it is what turned "probably
+fine, upstream warns sometimes" into "we take the classic-LRU branch and
+mis-account because of it".
+
+**`WARN_ONCE` hides frequency.**
+
+```c
+if (WARN_ONCE(cond, "fmt", ...)) {
+    VM_BUG_ON(1);
+    *lru_size = 0;
+}
+```
+
+The *print* happens once per boot; the branch body runs every time the condition
+holds. So "one warning per boot" is a lower bound on how often the kernel is in
+that state, and a silent `*counter = 0` recovery firing N times is a worse
+symptom than the single line implies. Never read a `WARN_ONCE` count as an
+occurrence count.
+
+Check the guard too: `VM_BUG_ON(1)` is a no-op unless `CONFIG_DEBUG_VM`, so the
+same condition that warns politely here is a hard `BUG()` on a debug build. Know
+which one you have before calling something "just a warning".
