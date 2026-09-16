@@ -163,10 +163,73 @@ Beyond "it shows up in `swapon --show`", the stack was driven under real load:
 1xRAM = 8,107,519 pages here) and memory is allocated lazily per cluster, so a
 nominally 30 GiB device costs nothing while idle.
 
+## Code audit of the series (2026-09-16)
+
+Patches `2155`–`2166` were read end to end against a reconstructed post-series
+tree. **No reachable lifetime, locking, use-after-free, double-free, or
+accounting defect was found in the xswap paths.** The concerns worth naming:
+
+- `destroy_swap_extents(si, NULL)` is **safe** — the argument is used only inside
+  `if (sis->flags & SWP_ACTIVATED)`, and `SWP_ACTIVATED` is set only by
+  `setup_swap_extents()`, which only `SYSCALL_DEFINE2(swapon)` calls.
+  `xswap_create` never reaches it.
+- `free_swap_cluster_info()` returning early on the xswap branch is **correct**:
+  for xswap, `cluster_info` is the vmalloc area address, so falling through to
+  `kvfree()` is the bug it avoids.
+- `swapoff`'s `p->swap_file &&` guard is **load-bearing** — an active xswap
+  device has `SWP_WRITEOK` set and `swap_file == NULL`, so `swapoff <anything>`
+  would NULL-deref without it.
+- Growth and shrink invariants around the lazily-mapped `cluster_info[]` hold,
+  including the alignment that makes a growth chunk (85 clusters × 48 B = 4080 B
+  here) straddle at most two pages, so the live cluster just below a shrink
+  boundary always stays inside a still-mapped page.
+- Locking is sound: grow and unmap are serialized by `si->xswap_lock`; the
+  shrink's `spin_trylock(&ci->lock)` under `si->lock` is what avoids an ABBA
+  against `move_cluster()`'s `ci->lock → si->lock` order; RCU pairs completely
+  (`rcu_read_lock()` in the allocators against
+  `flush_percpu_swap_cluster()` + `synchronize_rcu()` before every unmap).
+
+Three things are genuinely dead or soft. **All three are zero-impact on this
+machine**, recorded so they are not rediscovered:
+
+1. **`nr_real_swapfiles` is not exported** while `mm/zswap.c` reads it without a
+   `CONFIG_XSWAP` guard. Confirmed live: `/proc/kallsyms` has the symbol but no
+   `__ksymtab_nr_real_swapfiles`, where its neighbour `nr_swap_pages` has
+   `__ksymtab_nr_swap_pages`. This breaks only a `CONFIG_ZSWAP=m` build
+   (`modpost: "nr_real_swapfiles" [mm/zswap.ko] undefined!`); this kernel is
+   `CONFIG_ZSWAP=y`, so it cannot bite here. **Worth reporting upstream** — it
+   would block any distro that builds zswap as a module.
+2. **The `-EBUSY` branch in the map path is unreachable**, and is wrong in the
+   way a defensive branch must not be: `vmap_pte_range()` in this base
+   `BUG()`s on a double map (`dump_page(page, "remapping already mapped page")`)
+   and `return -EBUSY` appears nowhere in `mm/vmalloc.c`. Should a future base
+   restore an `-EBUSY` return, the `fail_nounmap` path would free pages still
+   referenced by live PTEs. Not reachable today — `si->xswap_lock` is the only
+   serializer and the range is pre-scanned.
+3. **`free_swap_cluster_info()` ignores `xswap_unmap_clusters()`'s `-ENOMEM`**,
+   which can occur before anything is unmapped, so `free_vm_area()` would drop
+   page tables without freeing data pages — up to ~744 KB on an OOM teardown
+   only. It also returns before clearing `si->cluster_info`, leaving a pointer
+   into a freed vmalloc area; today every caller clears it itself, so it is a
+   latent trap rather than a live double-free.
+
+None of the three justify carrying a local patch, since none can fire on a
+`CONFIG_ZSWAP=y` build with no limit written.
+
 ## Tune
 
-`/sys/kernel/mm/xswap/type<N>/limit` caps a device, in pages. Grow and shrink
-both work without it, and the default ceiling is 1xRAM.
+`/sys/kernel/mm/xswap/type<N>/limit` sets the device size in pages (1xRAM by
+default). **It is a soft bound, not a hard cap**, and this README previously
+overstated it. The field's own comment calls it a "growth ceiling", but the only
+reader in the series is `xswap_try_shrink()` (`nr_ceiling = READ_ONCE(si->nr_clusters)`),
+while the *grow* path is gated on `nr_clusters_max`, which is fixed when the
+device is created. Writing a limit below current usage therefore makes the
+shrinker unmap clusters the allocator immediately maps again, rather than
+refusing the allocation. The store does clamp to the in-use count
+(`new_pages < swap_usage_in_pages(si)`), so `si->pages` never drops below what is
+actually stored and `SwapTotal`/`SwapFree` stay truthful. Nothing in this setup
+writes it, so `nr_clusters == nr_clusters_max` and the whole branch is inert
+here. Read it as "the size the shrinker trims back to", not as a quota.
 
 `/sys/module/zswap/parameters/max_pool_percent` (default 20) is the real memory
 ceiling: with no disk swap behind it, the compressed pool *is* the swap
