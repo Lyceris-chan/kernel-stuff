@@ -19,124 +19,113 @@ full entries remain in git history.
 
 ### Changed
 
-- **xswap replaced with the current upstream revision.** Our `2155`-`2166` (the
-  12-patch `v2/12` posting) is superseded by sirlucjan's 14-patch
-  `xswap-patches-v2-sep`, now carried as **`2155`-`2168`**. The existing
-  `2167`-`2195` block shifted to `2169`-`2197` so the series keeps its position
-  in `source=()` — the 119 later patches were tested against that position.
+- Replace the xswap series with the current upstream revision. The 12-patch
+  `v2/12` posting (`2155`-`2166`) is superseded by the 14-patch
+  `xswap-patches-v2-sep`, carried as `2155`-`2168`. The `2167`-`2195` block
+  moves to `2169`-`2197` so the series keeps its position in `source=()`; the
+  119 later patches were verified against that position. All 14 patches apply,
+  and all 119 subsequent patches apply on top.
+- Add `2166`, which caps xswap growth at `nr_clusters`, and `2168`, which
+  shrinks the device to the ceiling when the ceiling drops. Together they make
+  `type<N>/limit` a hard cap; the previous revision read it only in the
+  shrinker, so a limit below current usage caused unmap-and-remap churn.
+- Revise the remaining carried patches. `2158` replaces `READ_ONCE()` with
+  `smp_load_acquire()` and `smp_store_release()` in the cluster grow/unmap
+  protocol. `2167` makes `si->pages` mutable at runtime and adds kobject
+  add/del helpers.
+- Mark the swap-stack runtime verification `NOT YET RE-VERIFIED`. The 4.4x
+  forced swap cycle, the 262,144-page round trip and the five-cycle leak check
+  measured the superseded revision. Re-run them on a kernel carrying v2.
 
-  Verified before swapping: the 14 apply cleanly **and all 119 subsequent
-  patches still apply on top**, zero failures, zero rejects.
+### Fixed
 
-  The revisions are not cosmetic. `2158` replaces `READ_ONCE()` with
-  `smp_load_acquire()`/`smp_store_release()` in the cluster grow/unmap protocol;
-  `2167` makes `si->pages` mutable at runtime and adds kobject add/del helpers;
-  and two patches are new — `2166` caps growth at `nr_clusters`, `2168` shrinks
-  to the ceiling when it drops. **Those two turn `type<N>/limit` from a soft
-  bound into a real cap**, which is exactly the wart our
-  `swap-stack/README.md` documented ("It is a soft bound, not a hard cap").
+- Correct the nvme `genctr` sha in `PATCH_SOURCES.md`. The entry recorded
+  `7f607455c3b9`, which resolves in `torvalds` to a 2010 OMAP merge commit.
 
-  **This invalidates the runtime verification of the previous revision** — the
-  4.4x forced swap cycle, the 262,144-page round trip and the five-cycle leak
-  check all measured code that is no longer in the tree. That section is now
-  marked `NOT YET RE-VERIFIED` rather than deleted, so the procedure survives;
-  it must be re-run on a kernel carrying v2.
+### Rejected
 
-### Considered and rejected
+- BBR3: no newer revision exists. `bbr3-cachyos-patches` and its `-sep` variant
+  date to 2026-08-31, and the newest CachyOS commits that touch `tcp_bbr3.c`
+  are `7235d70addc6` (2026-06-27) and `af253e921d6f` (2026-04-27). Carried
+  `0101` has provenance `55d248b79ea6` (2026-09-02).
 
-- **BBR3: there is nothing newer to move to.** The premise for swapping it does
-  not hold. sirlucjan's `bbr3-cachyos-patches` and `bbr3-cachyos-patches-sep`
-  are dated **2026-08-31**, and the newest CachyOS commits touching `tcp_bbr3.c`
-  are `7235d70addc6` (2026-06-27) and `af253e921d6f` (2026-04-27) — all older
-  than our `0101` (provenance `55d248b79ea6`, 2026-09-02). Ours is the current
-  revision; the other 19-file squashes differ only in comments and context.
-- **The real BBR3 problem is a 7.4 problem, and no patchset solves it yet.**
-  `cb145191e9d3` ("tcp: Replace min_tso_segs() with tso_segs() CC callback")
-  rewrites `include/net/tcp.h`, `tcp_output.c` and `bpf_tcp_ca.c` — the files
-  `0101` lives in — renaming the callback, adding a `u32 mss_now` argument and
-  changing return semantics. **Every BBR3 variant in the tree still references
-  `min_tso_segs` 13 times**, so none has been adapted. This is a rebase owed at
-  the version bump, not something to swap now.
+### Known issues
+
+- BBR3 needs a rebase for the 7.4 bump. `cb145191e9d3` replaces
+  `min_tso_segs()` with a `tso_segs()` CC callback, which rewrites
+  `include/net/tcp.h`, `tcp_output.c` and `bpf_tcp_ca.c`. Every BBR3 variant in
+  the tree still references `min_tso_segs`, so none is adapted.
+- `8a3c76523e44` (r8169 phylink conversion) is not inert. It rewrites shared
+  PHY/EEE plumbing and touches `rtl_is_8125()` and `RTL_GIGA_MAC_VER_61/63/70/80`.
 
 ### Changed
 - `pkgrel` 19 -> 20. Series is now 303 patches.
 
 ## [7.3.0-rc3-19-sleepy-next]: 2026-09-16
 
-Second sweep of the day: five lanes — mailing lists, the drm/amd work-items
-tracker, the mainline `v7.3-rc3..origin/master` window, each repo merged into
-linux-next, and the distro patchsets. **59 patches adopted; series 242 -> 301.**
+Add 59 patches (242 -> 301) from a five-lane sweep: mailing lists, the drm/amd
+work-items tracker, the `v7.3-rc3..origin/master` window, the repos merged into
+linux-next, and the distro patchsets. Each patch is verified with
+`patch -p1 --forward --dry-run -F2` against a worktree carrying the full series.
 
 ### Added
 
-- **GPU (`1065`-`1069`, `1167`)** — amdgpu: reserve the eviction-fence slot at the
-  WPTR caller (stops a `BUG_ON` in `amdgpu_userq_restore_worker`) and its
-  root-PD companion; skip the KFD mapping clear before init (NULL deref on
-  reset, Cc stable); GPU PCIe link capability reporting; rmmio iounmap on
-  removal; and the native-cursor early return for disabled CRTCs.
-- **MM and swap (`2181`-`2195`)** — `cead15891dad` is **4/4 of the series we
-  already carry as `2167`/`2168`/`2169`**, a series gap rather than a new
-  feature. Also: a `#DE` divide-error fix in `effective_protection()`
-  (Cc stable), an off-by-one OOB read in the swap-cache replace check, the
-  stuck `FLUSHING_CACHED_CHARGE` pair (Cc stable), `setup_swap_clusters_info()`
-  ordering — directly on our xswap path — and the three-patch `zswap_invalidate`
-  range conversion that removes a per-slot loop of up to 512 iterations on PMD
-  folios.
-- **Block, I/O, network, filesystems (`2014`-`2044`)** — the ten-patch io_uring
-  ring-close cancel series plus the io-wq exit-bit ordering (Cc stable);
-  blk-mq cached-passthrough state; two nvme fixes; the r8169 error-propagation
-  trio (our RTL8125B); seven TCP fixes; three net/sched; GSO recursion and
-  `pskb_carve` header staleness; and `lib/group_cpus` snapshotting cluster masks
-  (Cc stable) — `group_cpus_evenly()` builds the managed-IRQ affinity spread for
-  multi-queue NVMe, and the reported failure is an AMD box left with NVMe queues
-  whose interrupts are never delivered.
-- **Scheduler (`2412`-`2415`)** — the sched-ext NMI trio, live because
-  `scx_loader` runs `cake_1.2.1`
-- **Time (`2603`-`2605`)** — the sysctl ms->jiffies range/truncation trio, used
-  by ARP/neighbour, route-gc and IPv6 timers
+- GPU (`1065`-`1069`, `1167`): reserve the amdgpu eviction-fence slot at the
+  WPTR caller, which stops a `BUG_ON` in `amdgpu_userq_restore_worker()`, and
+  its root-PD companion; skip the KFD mapping clear before init (NULL deref on
+  reset, Cc stable); report GPU PCIe link capability; unmap rmmio on device
+  removal; restore the native-cursor early return for disabled CRTCs.
+- Memory and swap (`2181`-`2197`): `cead15891dad`, which is patch 4/4 of the
+  series carried as `2167`-`2169`; a `#DE` divide error in
+  `effective_protection()` (Cc stable); an off-by-one out-of-bounds read in the
+  swap-cache replace check; the stuck `FLUSHING_CACHED_CHARGE` bit (Cc stable);
+  `setup_swap_clusters_info()` ordering, which affects xswap device creation;
+  the three-patch `zswap_invalidate()` range conversion, which replaces a
+  per-slot loop of up to 512 iterations on PMD folios; `mm->locked_vm`
+  accounting for `MREMAP_DONTUNMAP`; root memcg charging from
+  `obj_cgroup_charge_pages()`.
+- Block, I/O, network and filesystems (`2014`-`2044`): the ten-patch io_uring
+  ring-close cancel series and the io-wq exit-bit ordering (Cc stable); blk-mq
+  cached passthrough state; nvme `genctr` and ANA underflow; the r8169
+  error-propagation trio; seven TCP fixes; three net/sched fixes; GSO recursion
+  and `pskb_carve()` header staleness; `lib/group_cpus` cluster-mask
+  snapshotting (Cc stable), which affects the managed-IRQ affinity spread for
+  multi-queue NVMe.
+- Scheduler (`2412`-`2415`): the cgroup dying-task use-after-free (Cc stable)
+  and the sched-ext NMI trio.
+- Time (`2603`-`2605`): the sysctl ms-to-jiffies range and truncation fixes,
+  which cover ARP/neighbour, route-gc and IPv6 timers.
 
-### Considered and rejected
+### Rejected
 
-- **The rc4 window is mostly not ours**: 32 `net/` commits are all SUNRPC/NFS,
-  28 `drivers/` are all RDMA, and `fs/` is 127 nfsd + 10 lockd.
-- **Already carried, re-proposed by the sweep**: `6cc27d821963` and
-  `e14a34548064` are our `2145`/`2146`; `848d2ce2fce1` is our `2141`;
-  `63a68656e48b`/`656581d1d349` are our `2169`/`2170`.
-- **Already carried, which is the finding**: the sweep's single highest-value
-  lead — the DC patch AMD's Mario Limonciello said on four open pageflip/stutter
-  issues "will be going into 7.3-rc4", the one that serialises the IRQ registers
-  whose comment names **`VUPDATE_NO_LOCK`** — is **already ours as `1159`**. It
-  touches the identical nine files. Our display "box" traces to a
-  `VUPDATE_NO_LOCK` flip event, so this was the right patch; we simply got it
-  early.
-- **Inert by config**: `5a5d26f2cfe1` CFI FineIBT (`CONFIG_CFI_CLANG` unset);
-  `f65d38155aef` div64 (a compile-only constraint fix); `7891fbb9512f`
-  (`CONFIG_KVM` unset); `932cfb25e7ce` (no `cgroup.memory=nokmem`);
-  `e384abeb559d` (`huge_pfnmap` absent from rc3); `228200f695c0` (Zen 5).
-- **Fails to apply**: the mm/truncate data-loss series (`aa226fc0` is 2/3 and
-  fails), `48b0789dec0a` (our xswap clamp block), `c93496f5133e`, and the
-  amd-pstate EPP trio (`1201`/`1202` reworked the same code).
-- **Needs the whole stack, not individual patches**: the pixelcluster amdgpu
-  set (collides with `1058`/`1061`/`9055`).
-
-### Watch items
-
-- **BBR3 needs a real rebase before the 7.4 bump.** `cb145191e9d3` replaces
-  `min_tso_segs()` with a `tso_segs()` CC callback — rewriting `include/net/tcp.h`,
-  `tcp_output.c` and `bpf_tcp_ca.c`, exactly where `0101-cachy-bbr3.patch` lives,
-  and it references `min_tso_segs` 13 times. The callback is renamed, gains a
-  `u32 mss_now` argument and changes return semantics. Not an offset fix.
-- **`8a3c76523e44` (r8169 phylink conversion) is not inert** — it rewrites shared
-  PHY/EEE plumbing and touches `rtl_is_8125(tp)` and `RTL_GIGA_MAC_VER_61/63/70/80`.
-- **xswap v2 supersedes our `2155`-`2166`** — sirlucjan rewrote the series from
-  12 to 14 patches, nine positions changed. That removes twelve carried patches,
-  so it needs explicit approval before anything happens.
+- Already carried: `6cc27d821963` and `e14a34548064` are `2145`/`2146`;
+  `848d2ce2fce1` is `2141`; `63a68656e48b` and `656581d1d349` are
+  `2169`/`2170`; `6795913f` is `1159`.
+- Inert by configuration: `5a5d26f2cfe1` (CFI FineIBT; `CONFIG_CFI_CLANG`
+  unset), `f65d38155aef` (div64; compile-only constraint fix),
+  `7891fbb9512f` (`CONFIG_KVM` unset), `932cfb25e7ce` (no
+  `cgroup.memory=nokmem`), `e384abeb559d` (`huge_pfnmap` absent from rc3),
+  `228200f695c0` (Zen 5).
+- Does not apply: the mm/truncate data-loss series (`aa226fc0` is 2/3),
+  `48b0789dec0a`, `c93496f5133e`, and the amd-pstate EPP trio (`1201`/`1202`
+  rework the same code).
+- Out of scope: the rc4 window is 32 SUNRPC/NFS commits under `net/`, 28 RDMA
+  commits under `drivers/`, and 127 nfsd plus 10 lockd commits under `fs/`.
+- Needs the whole stack: the pixelcluster amdgpu set, which collides with
+  `1058`/`1061`/`9055`.
 
 ### Fixed
 
-- `2015` also **corrects a corrupt sha in our own ledger**: the nvme `genctr`
-  entry recorded `7f607455c3b9`, which resolves in `torvalds` to a 2010 OMAP
-  merge commit.
+- `2176` is vacated. `848d2ce2fce1` was reported absent from the base
+  but was already carried as `2141`; it was staged as `2176`, then skipped by
+  the build. The number is not reused, matching the gaps at
+  `2401`/`2402`/`2501`.
+- `2401`, `2402`, `2501` and `2600` are indexed in
+  `PATCH_SOURCES.md` but are absent from `source=()` and from disk. The sysctl
+  trio is numbered `2603`-`2605` to avoid the `2600` collision.
+- Carried patch `2155` applies with fuzz. Its `mm/zswap.c` hunk
+  expects `return -ENOENT`, but the base has `return -EEXIST`, which is why
+  `c93496f5133e` cannot apply.
 
 ### Changed
 - `pkgrel` 18 -> 19. Series is now 301 patches.
@@ -145,81 +134,59 @@ linux-next, and the distro patchsets. **59 patches adopted; series 242 -> 301.**
 
 ### Added
 
-- **`2405`–`2411`** — `sched_ext-for-7.3-rc3-fixes` (pull `9b87fdc9af2f`, Tejun
-  Heo), the fixes batch for the 7.3-rc3 sched-ext rework. Unlike the `fair.c`
-  items in `2400`–`2402`, **this is not inert here**: `scx_loader` runs
-  `cake_1.2.1`, so sched-ext owns scheduling on this machine. The pull names
-  two real bugs — a use-after-free where an error raised by a BPF program
-  *before* the scheduler finished enabling was consumed by the disable path's
-  pre-enable shortcut, leaving a running scheduler that could not be disabled
-  and was later freed while in use; and two compat kfuncs dereferencing a NULL
-  scheduler for an exited or idle task, oopsing the kernel (`2407`).
-- **`2171`–`2180`** (nine patches — `2176` was vacated, see below) — the sweep's
-  memory and lib picks, all `Fixes:`-tagged and
-  absent from the rc3 base. The one with teeth is `2172`: if a boot with
-  `CONFIG_ZSWAP_DEFAULT_ON=y` fails its initial pool creation, the
-  `zswap_ever_enabled` key stayed off, so a pool later created by writing
-  `zswap.compressor` stored through zswap while the swapin path skipped it and
-  **pages read back zeroed**. Also `2171` (publish the initial pool with
-  `list_add_rcu()`), `2173` (`SWAP_USAGE_OFFLIST_BIT` collision), `2174` (NULL
-  deref retrying a sleep-table allocation — xswap swaps here continuously),
-  `2175` (large-folio swapin returning `VM_FAULT_SIGBUS` for a range not in
-  zswap), `2177` (**in-memory
-  LZ4 chunk-length validation — live on every boot, `COMPRESSION="lz4"`**),
-  `2178` (`plist_requeue()` order corruption in `rtmutex`/`futex`), `2179`
-  (`klist_remove()` access-after-wake) and `2180` (`dynamic_debug_init()`
-  `mod_ct`).
-- **`2503`–`2507`** — the x86 PAT/alternatives group: `init_mm` read and write
-  locking around attribute changes and collapse, the effective-RW computation
-  in `lookup_address`, split page tables allocated as kernel page tables, and
-  alternatives text poking excluded from racing `change_page_attr`.
+- Add `2405`-`2411`, the `sched_ext-for-7.3-rc3-fixes` pull (`9b87fdc9af2f`,
+  Tejun Heo). These are live on this machine because `scx_loader` runs
+  `cake_1.2.1`; the `fair.c` items in `2400`-`2402` are inert under it. The pull
+  fixes a use-after-free, where an error raised before the scheduler finished
+  enabling was consumed by the disable path's pre-enable shortcut and left a
+  running scheduler that could not be disabled, and a NULL scheduler
+  dereference in two compat kfuncs (`2407`).
+- Add `2171`-`2175` and `2177`-`2180`, all `Fixes:`-tagged and absent from the
+  base:
+  - `2171` publishes the initial zswap pool with `list_add_rcu()`.
+  - `2172` enables `zswap_ever_enabled` in `zswap_pool_create()`. Without it, a
+    failed boot-time pool creation left the key off, and a pool created later
+    through `zswap.compressor` stored through zswap while the swapin path
+    skipped it, returning zeroed pages.
+  - `2173` fixes the `SWAP_USAGE_OFFLIST_BIT` collision.
+  - `2174` fixes a NULL dereference when a sleep-table allocation is retried.
+  - `2175` stops a large-folio swapin from returning `VM_FAULT_SIGBUS` for a
+    range that is not in zswap.
+  - `2177` validates the in-memory LZ4 chunk length. This runs on every boot;
+    `/etc/mkinitcpio.conf` sets `COMPRESSION="lz4"`.
+  - `2178` fixes `plist_requeue()` order corruption in `rtmutex`/`futex`.
+  - `2179` fixes access after wake in `klist_remove()`.
+  - `2180` fixes the `mod_ct` value in `dynamic_debug_init()`.
+- Add `2503`-`2507`, the x86 PAT group: `init_mm` read and write locking around
+  attribute changes and collapse, the effective-RW computation in
+  `lookup_address()`, split page tables allocated as kernel page tables, and
+  alternatives text poking excluded from a concurrent `change_page_attr`.
 
-### Considered and rejected (same sweep)
+### Rejected
 
-- **`a0d356696f87`, `63b4ff622244`, `89ff16f07139`** — three commits of the
-  sched-ext pull that touch only `tools/sched_ext/scx_qmap.bpf.c` and
-  `scx_qmap.h`. This PKGBUILD does not build `tools/`, so they apply cleanly
-  and change nothing in the shipped kernel.
-- **`c7a1c6e8004a`** — the pull's eleventh commit is already ours as `2404`.
-  Byte-identical code; only a comment is worded differently, because ours is
-  the v1 mailing-list version.
-- **`392dee2b81f4`, `8679598143f2` (bootconfig)** — this machine does not use
-  bootconfig: `/proc/bootconfig` is empty and the command line enables nothing.
-- **`c922c000d06e` (bunzip2 run-length bound)** — guards an initramfs
-  compressor we do not build; `COMPRESSION="lz4"`.
-- **`364e520095b2` / `4cf50332b538` (`crypto: rsassa-pkcs1 - reject undersized
-  keys`)** — real KASAN out-of-bounds, and `CONFIG_CRYPTO_RSA=y` with
-  `CONFIG_MODULE_SIG=y`. Not taken: `CONFIG_MODULE_SIG_FORCE` is unset, so an
-  unsigned module loads anyway, and the parser only ever sees signatures this
-  machine produced with its own key. Not a security boundary here.
-- **`63a68656e48b` and `656581d1d349`** — flagged by the mm sweep, but both are
-  **already ours** as `2169` and `2170`; the diffs hash identically.
-- **`848d2ce2fce1` (`mm: filemap: retain mapped dropbehind folios`)** — the mm
-  sweep reported it as absent from the base, which was true, but it was
-  **already carried as `2141`** with a byte-identical diff. It passed every
-  pre-adoption check against the audit worktree and was then **silently skipped
-  in the real build** (`SKIPPED: does not apply cleanly` against `Reversed (or
-  previously applied) patch detected!`), because that worktree was built from an
-  earlier series state and did not contain `2141`. It was staged as `2176` and
-  that number is now **vacated** rather than reused, matching the existing gaps
-  at `2401`/`2402`/`2501`. The lesson: *an "is it in base?" test is not a
-  duplicate test* — only a `patch --forward --dry-run` in series order against
-  the real tree is. A hash scan over all 241 diff bodies now reports `2141`≡`2176`
-  as the only duplicate pair.
+- `a0d356696f87`, `63b4ff622244` and `89ff16f07139` touch only
+  `tools/sched_ext/scx_qmap.bpf.c` and `scx_qmap.h`. The PKGBUILD does not build
+  `tools/`, so they change nothing in the shipped kernel.
+- `c7a1c6e8004a` is carried as `2404`.
+- `392dee2b81f4` and `8679598143f2` (bootconfig): `/proc/bootconfig` is empty
+  and the command line enables nothing.
+- `c922c000d06e` (bunzip2 run-length bound) guards an initramfs compressor this
+  machine does not build.
+- `364e520095b2` and `4cf50332b538` (`crypto: rsassa-pkcs1`): `MODULE_SIG_FORCE`
+  is unset, so an unsigned module loads regardless, and the parser only sees
+  signatures this machine produced.
 
 ### Changed
-- `pkgrel` 17 → 18. Series is now 242 patches. The per-range table in
-  `PATCH_SOURCES.md` was also stale for `9000`–`9099` (41 recorded, 45 present)
-  and is corrected.
+- `pkgrel` 17 -> 18. Series is now 242 patches. Correct the per-range table in
+  `PATCH_SOURCES.md` for `9000`-`9099` (41 recorded, 45 present).
 
 ## [7.3.0-rc3-17-sleepy-next]: 2026-09-16
 
 ### Added
 
-- **`9072`–`9075`** — Jesse Zhang's SDMA hung-queue detection and recovery series
+- Add `9072`-`9075`, Jesse Zhang's SDMA hung-queue detection and recovery series
   (amd-staging `972a8cd8fba1`, `994dea375802`, `ba07df579939`, `10a6760a1a64`;
-  in linux-next as `4a3ef2809c88`, `17bd3e9f404e`, `6537bd210878`,
-  `4a263bc34083`):
+  linux-next `4a3ef2809c88`, `17bd3e9f404e`, `6537bd210878`, `4a263bc34083`):
 
   | # | Patch |
   |---|---|
@@ -228,50 +195,38 @@ linux-next, and the distro patchsets. **59 patches adopted; series 242 -> 301.**
   | `9074` | `drm/amdgpu/sdma7: implement detect_hung_queue` |
   | `9075` | `drm/amdgpu/userq: reset a hung SDMA user queue over MMIO` |
 
-  `9074` is the one for this machine: it walks the per-queue doorbell-offset
-  registers (`SDMA0_QUEUE0_DOORBELL_OFFSET + q * SDMA_V7_0_QUEUE_REG_STRIDE`)
-  to find the hardware slot whose doorbell matches the stuck one. SDMA 7.0 is
-  Navi 48's SDMA block. `9075` then recovers the queue by resetting it over
-  MMIO rather than taking a full GPU reset — the SDMA hang class tracked in
-  drm/amd **#5663** and **#5693**.
+  `9074` walks the per-queue doorbell-offset registers
+  (`SDMA0_QUEUE0_DOORBELL_OFFSET + q * SDMA_V7_0_QUEUE_REG_STRIDE`) to find the
+  hardware slot whose doorbell matches the stuck one. SDMA 7.0 is the Navi 48
+  SDMA block. `9075` recovers the queue over MMIO instead of taking a full GPU
+  reset. This covers the SDMA hang class in drm/amd #5663 and #5693.
+- Apply on two subsystems this machine runs: SDMA7, and the userq path where the
+  kref series (`9062`-`9071`) is already carried. `9075` touches
+  `mes_userqueue.c`, which `9067` also modifies.
+- Verify all four against a clean `v7.3-rc3` worktree and against the
+  series-applied tree, under both `git apply --check` and
+  `patch -p1 --forward -F2 --dry-run`. Each carries `Signed-off-by` and a
+  `Reviewed-by` or `Acked-by`.
 
-  It sits on two subsystems this machine actually runs: SDMA7, and the userq
-  path where we already carry Zhu Lingshan's kref series (`9062`–`9071`) —
-  `9075` touches `mes_userqueue.c`, which `9067` also modifies.
+### Rejected
 
-  Verified before adopting, per the sweep rules: applies **4/4 clean** both to a
-  clean `v7.3-rc3` worktree and to the **series-applied** tree, under
-  `git apply --check` *and* GNU `patch -p1 --forward -F2 --dry-run`. The second
-  check matters — running it on an already-applied tree reports "already
-  applied", which is not a failure, and `git apply` alone gives false negatives.
-  All four carry `Signed-off-by` plus a `Reviewed-by`/`Acked-by`. The cumulative
-  apply of the whole series is clean at 221 patches.
-
-### Considered and rejected (same sweep)
-
-- **`gpu/buddy: Fix use-after-free in split_block() call sites`**
-  (`0251963afd22`, Francois Dugast) — a genuine UAF plus rbtree corruption in
-  the GPU buddy allocator, and *not* in v7.3-rc3, so it looked like a strong
-  candidate. It does not apply, and the reason is the point: this base already
-  has the fix by another route. `__gpu_buddy_undo_splits()` (`drivers/gpu/buddy.c:737`)
-  calls `rbtree_remove(mm, block)` **before** `__gpu_buddy_free()`, which is
-  exactly the ordering the May patch introduces; the patch targets the
-  pre-refactor shape of the four `err_undo` sites. Not carried.
-- **`dml2_core_dcn4_calcs.c` (+172 lines)** — DCN4, so nominally on-target, but
-  the churn is in `max_flip_time` / `lb_flip_bw` / `iflip_enable`, the **exact
-  area AMD reverted for causing regressions** (`c010ccac1358`, `04009276da2d`,
-  *"Because it causes some regression"*). That is what the standing "never carry
-  `9051`/`9052`" rule exists for. Not touched.
-- **HDMI RGB quantization** (Alex Hung) — `broadcast_rgb ==
-  DRM_HDMI_BROADCAST_RGB_LIMITED` now selects `COLOR_SPACE_2020_RGB_LIMITEDRANGE`
-  in `amdgpu_dm_connector.c`, a file we patch heavily. 7.4 content; noted as a
-  rebase point rather than backported.
-- The September DC patchsets (`00/40`, `00/66`): of 106 patches, **three** are
-  ours (`1154`, `1159`, `1166`); the rest is DCN6 / DCN35 / DCN42B / DCN50 /
-  DCN60 / DML2.1 — other silicon.
+- `0251963afd22` (`gpu/buddy: Fix use-after-free in split_block() call sites`):
+  a genuine use-after-free and rbtree corruption, but the base already has the
+  fix. `__gpu_buddy_undo_splits()` (`drivers/gpu/buddy.c:737`) calls
+  `rbtree_remove()` before `__gpu_buddy_free()`, which is the ordering the patch
+  introduces; the patch targets the pre-refactor shape of the four `err_undo`
+  sites.
+- `dml2_core_dcn4_calcs.c` (+172 lines): DCN4, but the churn is in
+  `max_flip_time`, `lb_flip_bw` and `iflip_enable`, the area AMD reverted for
+  causing regressions (`c010ccac1358`, `04009276da2d`).
+- HDMI RGB quantization (Alex Hung): selects `COLOR_SPACE_2020_RGB_LIMITEDRANGE`
+  in `amdgpu_dm_connector.c`. 7.4 content; noted as a rebase point.
+- The September DC patchsets (`00/40`, `00/66`): of 106 patches, three are
+  carried (`1154`, `1159`, `1166`). The rest is DCN6, DCN35, DCN42B, DCN50,
+  DCN60 and DML2.1.
 
 ### Changed
-- `pkgrel` 16 → 17. Series is now 221 patches.
+- `pkgrel` 16 -> 17. Series is now 221 patches.
 
 ## [7.3.0-rc3-16-sleepy-next]: 2026-09-15
 
