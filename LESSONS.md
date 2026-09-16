@@ -689,3 +689,61 @@ occurrence count.
 Check the guard too: `VM_BUG_ON(1)` is a no-op unless `CONFIG_DEBUG_VM`, so the
 same condition that warns politely here is a hard `BUG()` on a debug build. Know
 which one you have before calling something "just a warning".
+
+## A stray line in a PAM config makes a password a log line (2026-09-16)
+
+`/etc/security/faillock.conf` had the user's sudo password as its first line.
+`pam_faillock` parsed it as an option, did not recognise it, and **logged it on
+every authentication in every PAM stack** — `sudo`, `login`, `greetd`,
+`cosmic-greeter`. 226 copies in the persistent journal before anyone noticed:
+
+```
+pam_faillock(sudo:auth): Unknown option: <the password>
+```
+
+The config file had done nothing for two weeks except leak. Two lessons:
+
+- **A secret in a config file is also a secret in the logs of anything that
+  parses that file.** Config parsers print unrecognised input, and PAM parsers
+  print it on every auth. `rg -l '<secret>' /etc` is the check worth running
+  after any config mishap — it is one command and it is what found this.
+- Removing the line stopped it immediately; the *existing* log entries are a
+  separate job (`journalctl --rotate && journalctl --vacuum-time=1s`). Fixing
+  the source and clearing the history are two different actions, and only the
+  first is safe to do without asking.
+
+## `pacman -Qkk` is the sfc/DISM equivalent, and its output needs reading (2026-09-16)
+
+There is no `sfc /scannow` on Arch; the equivalent is verifying installed files
+against the package digest database. Use two independent tools — they read
+different fields and agreeing on the total is the point:
+
+```bash
+sudo pacman -Qkk      # mtree: size, mtime, permissions, SHA256
+paccheck --quiet      # independent implementation, md5
+```
+
+`pacman -Qkk` **does** verify checksums on this version (7.1.0), so a real
+content change shows up as `SHA256 checksum mismatch`, not just a size or mtime
+diff.
+
+Almost everything it reports on a lived-in machine is not damage. Read the
+prefix before panicking:
+
+| Output | Means |
+|---|---|
+| `backup file: <pkg>: /etc/...` | pacman marks these user-editable; differing is *correct* |
+| `(No such file or directory)` under `/usr/share/locale`, `man`, `help`, `X11/locale` | a cleaner removed translations/docs; the DB still lists them |
+| `(Permissions mismatch)` on `/boot` | the fstab mount option (`umask=0077`), not the package |
+| `(File type mismatch)` on `/etc/resolv.conf` | it is a symlink to systemd-resolved's stub, by design |
+| checksum mismatch on one obscure file | read it — here it was the stock Garuda terminal launcher, wired to nothing |
+
+**Deleting translations is not free, even though it looks free.** The filesystem
+and the package database stop agreeing, so every future integrity check reports
+the same 6,679 files and a real finding has to be picked out of that noise
+every time. If a cleaner is going to strip locales, set `NoExtract` in
+`pacman.conf` so the database records the intent and `-Qkk` stays meaningful.
+
+**A clean integrity result says nothing about hardware.** Run `smartctl -H` and
+read the superblock too (`tune2fs -l` for ext4): state, error count, and whether
+a periodic check is even scheduled (`Maximum mount count: -1` means it is not).
