@@ -230,401 +230,123 @@ linux-next, and the distro patchsets. Each patch is verified with
 
 ## [7.3.0-rc3-16-sleepy-next]: 2026-09-15
 
-### Boot speed
+### Changed
 
-Measured before touching anything: `9.406s firmware + 485ms loader + 2.099s
-kernel + 2.777s initrd + 14.751s userspace = 29.521s`. The userspace half was
-almost entirely one thing, visible straight from the critical chain:
+- Move `net-tune.service` and `blocky.service` under `network-online.target`.
+  Both carried `WantedBy=multi-user.target` with `After=network-online.target`,
+  which made `multi-user.target` wait for DHCP: `NetworkManager-wait-online`
+  took 12.346s and held `graphical.target` to 14.751s. `net-tune` moves in the
+  package, including its `WantedBy`, enable symlink and install step. `blocky`
+  uses an explicit `network-online.target.wants` symlink, because
+  `systemctl enable` reads `[Install]` from the unit file and ignores a
+  drop-in's `WantedBy`. Both still start when the link comes up.
+- Build `R8169` and `REALTEK_PHY` in rather than as modules. As modules, udev
+  loaded them after the root switch, so driver probe and the approximately 3s
+  of autonegotiation ran after most of boot. The PHY driver must be built in as
+  well, or the carrier waits for it to load.
+- Raise `vm.swappiness` from 150 to 180. The 150 was CachyOS's zram udev-rule
+  default, kept for continuity. `Documentation/admin-guide/sysctl/vm.rst`
+  defines swappiness as a relative IO cost over 0-200 in which 100 means equal
+  cost, and states that in-memory swap can go beyond 100. The Arch Wiki's Zram
+  article recommends 180 together with `watermark_boost_factor = 0`,
+  `watermark_scale_factor = 125` and `page-cluster = 0`; the other three are
+  already set in `/etc/sysctl.d/99-custom-tweaks.conf`. Documented in
+  `sleepy-next/swap-stack/99-xswap-swappiness.conf`.
+- Drop the dead `vm.swappiness` line from
+  `/etc/sysctl.d/99-custom-tweaks.conf`. It also set 180, so the 150 won by
+  lexicographic filename order.
 
-```
-graphical.target @14.751s
-└─ multi-user.target @14.720s
-   └─ net-tune.service @14.689s
-      └─ network-online.target @14.685s
-         └─ NetworkManager-wait-online.service @2.339s +12.346s
-```
+### Fixed
 
-**The session was waiting 12.3s for DHCP.** Two of our own units were pulling
-that wait into the boot: `net-tune.service` was `WantedBy=multi-user.target`
-with `After=network-online.target`, and the same shape had been added to
-`blocky.service` by a drop-in. A unit that `multi-user.target` pulls in **is
-waited for**, so an `After=network-online` service enabled there holds the
-desktop back until the link is up — the earlier note in the unit ("deliberately
-NOT ordered Before=network.target") had fixed one half of this and missed the
-other.
+- Remove `After=local-fs.target` from `xswap-create.service`. It formed an
+  ordering cycle (`tmp.mount -> swap.target -> xswap-create ->
+  local-fs.target -> tmp.mount`) that systemd broke by deleting the `tmp.mount`
+  job at every boot. The root filesystem is mounted by the initramfs, so
+  `Before=swap.target` is sufficient.
 
-- Both are now pulled in by `network-online.target` instead:
-  `net-tune.service` in the package (its `WantedBy`, the enable symlink, and the
-  `install` step), `blocky.service` by an explicit
-  `network-online.target.wants` symlink — `systemctl enable` reads `[Install]`
-  from the unit file and ignores a drop-in's `WantedBy`, so the symlink is the
-  mechanism and the drop-in keeps only the ordering. Both still start the moment
-  the link is up; the desktop no longer waits for either.
-- **`2170`-adjacent, found by `systemd-analyze verify` while doing this:**
-  `xswap-create.service` had an ordering *cycle*
-  (`tmp.mount → swap.target → xswap-create → local-fs.target → tmp.mount`),
-  which systemd resolved by deleting the `tmp.mount` job at every boot. It
-  happened to mount anyway, but the fix is to drop `After=local-fs.target` —
-  the root is mounted by the initramfs, so `Before=swap.target` is all the unit
-  needs.
-- **`R8169` and `REALTEK_PHY` are built in, not modules.** As modules, udev
-  loaded them after the root switch: probe at 6.26s, PHY attached at 7.05s,
-  carrier at 10.13s — the ~3s of link negotiation ran *after* most of the boot
-  and pushed DHCP to the very end. Built in, the probe happens during kernel
-  init and that negotiation overlaps with the rest of boot. The PHY driver has
-  to be built in too, or the carrier waits for it to be loaded anyway.
+### Removed
 
-Not touched, with reasons: the initramfs (`54.5 MB`, but it unpacks in 25 ms —
-`Unpacking initramfs...` at 0.311756 to `Freeing initrd memory: 55776K` at
-0.336762 — so trimming it saves almost nothing). The bulk is not microcode: the
-`microcode` hook adds one 128,644-byte file, and the rest is mkinitcpio moving
-already-compressed payloads into the early CPIO so they are not compressed
-twice — here ~29 MiB of `amdgpu` firmware (699 `.bin.zst` files, pulled in
-because the driver declares 638 firmware entries) plus `amdgpu.ko.zst`. The
-`kms` hook could shave the initrd's early module load but changes when the
-display modesets, which is not a trade to make blind on this monitor. The 9.4s
-of firmware time is POST, not the kernel.
-
-### Boot speed, second pass (Arch wiki + CachyOS wiki)
-
-Both wikis were read against this machine's measured boot. Most of what they
-recommend is already in place or does not apply, so the useful output is
-negative results — recorded here so the same ground is not covered twice.
-
-- **The 12.346s is DHCP, not systemd overhead.** NetworkManager starts at
-  22:29:37.69, carrier at 40.90 (+3.2s), lease at 50.19 (+9.3s). Building the
-  NIC in moves the driver probe from 7.2s to kernel init, so the negotiation
-  overlaps boot instead of following it.
-- **`cachyos-rate-mirrors.timer` reads like a second gate and is not one.** It
-  carries `Wants=` *and* `After=network-online.target`, and `timers.target` is
-  `WantedBy=basic.target`, which looks like a CachyOS packaging bug holding the
-  whole session. On this boot `basic.target` entered at `6883384µs` and
-  `timers.target` at `19563507µs`, and `basic.target` is `After=timers.target`:
-  systemd had already broken that edge as part of the cycle `basic.target →
-  timers.target → cachyos-rate-mirrors.timer → network-online.target →
-  NetworkManager-wait-online → NetworkManager → basic.target`. The timer waits
-  on the network-online wave; it does not cause it. A drop-in clearing its
-  `After=` was written, measured to change nothing — an empty `After=` does not
-  reset an ordering list from a drop-in — and reverted. Its `Wants=` is
-  load-bearing and stays: it is one of the units that pulls
-  `network-online.target` in, and `net-tune` and `blocky` are `WantedBy` that
-  target.
-- **Disabled: `system76-power-monitor.service`.** Hand-written, owned by no
+- Disable `system76-power-monitor.service`. It is hand-written, owned by no
   package, ordered `After=com.system76.PowerDaemon.service` which does not
-  exist, running `/usr/local/bin/s76-profile-monitor` — a
-  `while true; do system76-power profile; sleep 3; done` loop for a binary that
-  is not installed. It forks three processes every three seconds and can never
-  succeed. The unit and the script are left on disk; re-enable with
-  `systemctl enable --now system76-power-monitor.service`.
-- **Rejected, with the reason.** `kexec` reboots would skip the 9.4s POST but
-  re-initialise the GPU from a running kernel, which is not a change to make
-  while the display path is under A/B. Also rejected: dropping the `kms` hook;
-  dropping the `base` hook (it is the recovery shell, and the presets build no
-  fallback image); `MODULES_DECOMPRESS="yes"` with `xz -9e` (trades a ~250 ms
-  ESP read for single-threaded decompression); `libahci.ignore_sss=1`
-  (applicable — `ahci 0000:10:00.0: SSS flag set, parallel bus scan disabled` —
-  but the MX500 is `x-systemd.automount` and nothing on the critical path waits
-  for it); and the silent-boot console flags (the console is the GPU
-  framebuffer, so they touch the display path). Each is worth a few hundred ms
-  at most, against a 12.3s win already taken.
-- **Left open.** A 748 ms gap inside the initrd, between the root fsck
-  finishing (2.730555) and `/sysroot` being mounted (3.478237), with only USB
-  enumeration in the log. Nothing in the initrd accounts for it.
+  exist, and runs a polling loop for a binary that is not installed. The unit
+  and script remain on disk.
+
+### Verified
+
+Measured on `7.3.0-rc3-16` after reboot:
+
+- The DHCP gate is gone. `graphical.target` is reached after 2.083s of
+  userspace, down from 14.751s. Total boot is 29.5s to 24.9s, and 17.2s from
+  power-on to a usable desktop. `NetworkManager-wait-online.service` still
+  takes 7.666s but runs behind the desktop.
+- `r8169` probes at 0.663s, down from 7.211s. Carrier moved from 10.13s to
+  9.79s, because PHY attach and link-up are now gated by userspace, with udev
+  renames at 6.4s and approximately 2.9s of autonegotiation.
+- Stage timings: firmware 9.835s, kernel 2.100s, initrd 2.717s, userspace
+  2.083s.
+
+### Known issues
+
+- `mem_cgroup_update_lru_size()` underflows on every boot (`lru_size -2522`),
+  from `lru_reparent_memcg()` through `mem_cgroup_css_offline()`. LRU-MARIE's
+  own comments document the cause: a folio entering MARIE receives a legacy
+  debit that MARIE never credits, so the per-memcg counter drifts downward. It
+  fires on every `sleepy-next` boot from rc3-6 and on no `cachyos-rc` boot.
+  LRU-MARIE 0.11.1r2 is the newest revision and retains at least one such path.
+  `WARN_ONCE` makes one occurrence per boot a lower bound. `CONFIG_DEBUG_VM` is
+  off, so the adjacent `VM_BUG_ON(1)` is inert; with it enabled this would be a
+  `BUG()`.
+- `network-online.target` is not reached until approximately 12s into boot, so
+  `net-tune` (CAKE) and `blocky` (DNS) are inactive until then. Nothing waits
+  for the target, so this is a functional gap rather than a boot-time one.
+  Closing it requires triggering both from the interface coming up;
+  `net-tune.sh` exits 1 when no interface is up.
+- A 725ms gap inside the initrd, between fsck finishing at 2.730555 and
+  `/sysroot` mounting at 3.478237. Only USB enumeration appears in the log, and
+  `systemd-udev-settle` is not in the initramfs.
+- Dead configuration prints errors every boot. All of it is owned by CachyOS
+  packages under `/usr/lib`, so the fix belongs upstream: amdgpu
+  `si_support=1 cik_support=1`, which are GCN-era options that do not exist for
+  Navi 48; `70-cachyos-settings.conf` writing `kernel/nmi_watchdog` and
+  `kernel/unprivileged_userns_clone`, neither of which this kernel has; and a
+  `sp5100_tco` blacklist for a driver that is not built.
+- `nowatchdog` on the command line is inert. The kernel reports `Unknown kernel
+  command line parameters "nowatchdog"`, and `CONFIG_SOFTLOCKUP_DETECTOR` and
+  `CONFIG_HARDLOCKUP_DETECTOR` are both unset. `CONFIG_CLOCKSOURCE_WATCHDOG=y`
+  is running and was never controlled by it.
+
+### Rejected
+
+- `kexec` reboots. They skip the 9.835s POST but re-initialise the GPU from a
+  running kernel, which is not appropriate while the display path is under A/B.
+- Dropping the `kms` hook. It saves approximately 245ms of the 485ms ESP read
+  but changes when the display modesets.
+- Dropping the `base` hook. It provides the recovery shell, and the presets
+  build no fallback image.
+- `MODULES_DECOMPRESS="yes"` with `xz -9e`. It trades an approximately 250ms
+  ESP read for single-threaded decompression.
+- Trimming the 54.5 MB initramfs. It unpacks in 25ms, so there is nothing to
+  win. The bulk is approximately 29 MiB of amdgpu firmware that mkinitcpio
+  moves into the early CPIO to avoid double compression.
+- Clearing `After=` on `cachyos-rate-mirrors.timer` through a drop-in. It was
+  measured to change nothing, because an empty `After=` in a drop-in does not
+  reset the ordering list. Its `Wants=` is load-bearing and stays.
+- `libahci.ignore_sss=1`. It is applicable, but nothing on the critical path
+  waits for the MX500, which is `x-systemd.automount`.
+- Silent-boot console flags. The console is the GPU framebuffer, so they touch
+  the display path.
+- Disabling `bpftune`. This package builds `-d TCP_CONG_BBR -e
+  TCP_CONG_BBR3`, so CachyOS's bpftune looks for a congestion control named
+  `bbr` that cannot exist here, then rewrites
+  `net.ipv4.tcp_allowed_congestion_control` three times per boot chasing it,
+  and counts the failures as successes. `net-tune` sets that key regardless.
+  Working tuning tool with a broken edge; left enabled.
 
 ### Changed
-- `pkgrel` 15 → 16.
+- `pkgrel` 15 -> 16.
 
-### Verified after the reboot (2026-09-16 05:34, running `7.3.0-rc3-16`)
-
-- **The gate is gone.** `graphical.target` is reached after **2.083s** of
-  userspace, down from 14.751s: 29.5s → 24.9s total, and **17.2s from power-on
-  to a usable desktop**. `NetworkManager-wait-online.service` still takes
-  7.666s but now runs behind the desktop — nothing waits for it. The NIC change
-  landed as well: `r8169` probes at **0.663s**, down from 7.211s. Carrier only
-  moved 10.13s → 9.79s, because the PHY attach and link-up are now gated by
-  userspace (udev renames at 6.4s) rather than by the driver, and ~2.9s of that
-  is autonegotiation.
-- **New finding, unrelated to the boot work: LRU-MARIE underflows memcg LRU
-  accounting on every boot.**
-
-  ```
-  mem_cgroup_update_lru_size(...): lru_size -2522
-  WARNING: mm/memcontrol.c:1548 at mem_cgroup_update_lru_size
-    lru_reparent_memcg+0x1c4/0x460      <- the classic-LRU branch
-    mem_cgroup_css_offline+0x20f/0x440
-  ```
-
-  It fires on **every `sleepy-next` boot from rc3-6 through rc3-16 and on
-  neither `cachyos-rc` boot**, so it is ours rather than upstream's.
-  `mm/memcontrol.c` calls `lru_gen_reparent_memcg()` when `lru_gen_enabled()` is
-  true and the classic `lru_reparent_memcg()` otherwise; `2101` forces
-  `lru_gen_enabled()` false whenever LRU-MARIE is on, so we always take the
-  classic branch, which sums the child's `lru_zone_size` into the parent. The
-  child's counter was already `-2522` — something debited it more often than it
-  credited it.
-
-  The LRU-MARIE patch documents this failure mode in its own comments — *"a
-  legacy debit, so `mz->lru_zone_size` drifts and a later legacy/Marie del
-  underflows ("marie underflow-del" / `mem_cgroup_update_lru_size lru_size
-  -1`)"* — and carries fixes for several instances. At least one path remains
-  in 0.11.1r2, and that is the newest revision upstream, so there is nothing to
-  upgrade to.
-
-  Two things make this more than cosmetic. The warning is `WARN_ONCE`, so only
-  the first occurrence per boot prints while the `*lru_size = 0` recovery runs
-  on *every* occurrence — the real frequency is unknown and one per boot is a
-  lower bound. And `lru_zone_size` is what `lruvec_lru_size()` sums, which
-  reclaim reads. `CONFIG_DEBUG_VM` is off, so the `VM_BUG_ON(1)` next to the
-  warning is inert; with it on this would be a `BUG()`, not a warning.
-- **What is left, and why none of it is worth taking.** Firmware 9.835s is BIOS
-  POST — the only Linux-side lever is `kexec` on reboots, which re-initialises
-  the GPU from a running kernel. Kernel 2.100s is PCI/USB/SATA enumeration with
-  no gap above 250 ms and nothing dominant. The initrd's 2.717s includes a
-  725 ms wait between fsck finishing (2.789) and `/sysroot` mounting (3.489),
-  filled with a USB hub cascade; `systemd-udev-settle` is not in the initramfs,
-  so the usual cause is ruled out. Userspace is 2.083s. Dropping the `kms` hook
-  would cut roughly 245 ms from the 485 ms ESP read, at the cost of moving when
-  the display modesets.
-
-### Third pass: service audit and dead config (2026-09-16)
-
-Every enabled unit was audited against this hardware, plus the wiki pages the
-first two passes had not read (`Systemd`, `Improving performance`, `Solid state
-drive`, `Ext4`, `Power management`, `XDG Autostart`).
-
-- **`nowatchdog` is inert on this kernel, and the kernel says so:**
-  `Unknown kernel command line parameters "nowatchdog"`.
-  `CONFIG_SOFTLOCKUP_DETECTOR` and `CONFIG_HARDLOCKUP_DETECTOR` are both unset,
-  so the parameter has nothing to disable. What *is* running is
-  `CONFIG_CLOCKSOURCE_WATCHDOG=y`, which `nowatchdog` never controlled.
-- **The 159 ms stall that watchdog reports is not its fault.** `Watchdog remote
-  CPU 4 read timed out` lands inside the 725 ms initrd gap and reads like a
-  cheap 159 ms win. It is not: `watchdog_handle_remote_timeout()`
-  (`kernel/time/clocksource.c`) runs from `schedule_work(&watchdog_work)` and
-  prints *after* the stall it detected, so the line is a symptom. Disabling the
-  watchdog would hide it and cost TSC-drift detection on a machine whose A/B
-  methodology depends on stable timing. Left on.
-- **`bpftune` is malfunctioning against this kernel's deliberate config.**
-  Because this package builds `-d TCP_CONG_BBR -e TCP_CONG_BBR3`, CachyOS's
-  bpftune hunts a congestion control named `bbr` that cannot exist here —
-  `modprobe: FATAL: Module tcp_bbr not found in directory
-  /lib/modules/7.3.0-rc3-16-sleepy-next` — then rewrites
-  `net.ipv4.tcp_allowed_congestion_control` three times per boot
-  (`reno bbr3 cubic` → `+htcp` → `+dctcp`) chasing it, and counts the failed
-  attempts as successes. It holds 69 MB, and `net-tune` sets that key anyway.
-  Recommended but not done, because it is a working tuning tool with a broken
-  edge rather than a defect, so the call is the user's:
-  `systemctl disable --now bpftune.service`.
-- **`network-online.target` is not reached until ~12 s into the boot**, so
-  `net-tune` (CAKE) and `blocky` (DNS) are both down until then. A functional
-  gap, not a boot-time one — `graphical.target` is at 2.083s and nothing waits
-  for the target. Closing it means triggering those two off the interface coming
-  up rather than off the target, and `net-tune.sh` `exit 1`s when no UP
-  interface exists, so it is not a one-line change.
-- **Dead config that prints errors every boot**, all of it owned by CachyOS
-  packages under `/usr/lib`, so the fix belongs upstream rather than in an
-  override: amdgpu's `si_support=1 cik_support=1` (GCN-era options that no longer
-  exist for Navi 48); `70-cachyos-settings.conf` writing `kernel/nmi_watchdog`
-  and `kernel/unprivileged_userns_clone`, neither of which this kernel has; and a
-  `sp5100_tco` blacklist for a driver that is not built. The swappiness conflict
-  is ours: `99-custom-tweaks.conf` sets 180 and `99-xswap-swappiness.conf` sets
-  150, so 180 is dead by lexicographic order and still carries a comment about
-  zram.
-- **`journald` `SystemMaxUse=50M` retains about 14 boots, or two days.** That is
-  the history every A/B comparison depends on, and raising it is free on a 1 TB
-  NVMe — but clear the `faillock` entries first (see `LESSONS.md`), or the extra
-  space preserves those too.
-- Verified as deliberate and left alone: `power-profiles-daemon` is CachyOS's
-  build and is wired to `scx_loader` (its binary carries `org.scx.Loader`
-  strings), so the two are not duplicates and changing the power profile also
-  switches sched-ext mode. `cachyos-iw-set-regdomain.path` watches
-  `/etc/localtime` rather than a NIC and is enabled only because `iw` is
-  installed; it costs no boot time. `lvm2-monitor` (47 ms) and `acpid` have no
-  work here but are equally cheap.
-
-### swappiness corrected to 180 (2026-09-16)
-
-The swap stack shipped `vm.swappiness=150`, which was only ever CachyOS's zram
-udev-rule default preserved for continuity. Checked against the primary sources:
-
-- **`Documentation/admin-guide/sysctl/vm.rst`** defines swappiness as a relative
-  IO cost over 0-200, where 100 means equal cost between swap and filesystem
-  paging, and says "for in-memory swap, like zram or zswap, as well as hybrid
-  setups that have swap on faster devices than the filesystem, values beyond 100
-  can be considered". Its worked example gives **133** when swap is 2x faster
-  than the filesystem (`x + 2x = 200, 2x = 133.33`).
-- **The Arch Wiki's Zram article** ("Optimizing swap on zram") recommends
-  **180**, together with `watermark_boost_factor = 0`,
-  `watermark_scale_factor = 125` and `page-cluster = 0`.
-
-The second point is what settles it: `/etc/sysctl.d/99-custom-tweaks.conf`
-*already* sets the other three values of that Arch Wiki block — so the machine
-was running three quarters of a scheme whose fourth member is 180, and 150 was
-mixed in from a different origin entirely. An xswap device has no backing store,
-so its "IO" is a compress and decompress in RAM, further past the kernel's
-2x example than zram itself.
-
-An earlier note in this session claimed "no official source recommends 180" —
-that was wrong, and came from reading only the first paragraph of the sysctl
-documentation. The section continues past it.
-
-`vm.swappiness` is therefore 180, documented in
-`sleepy-next/swap-stack/99-xswap-swappiness.conf`. The kernel documentation is
-explicit that the optimum is workload-dependent: "An optimal value will require
-experimentation."
-
-### Six-source sweep (2026-09-16)
-
-Base is current: **v7.3-rc3 is still the newest mainline tag** (no rc4 yet).
-Today's snapshot is **next-20260916**.
-
-**1. xswap v1 → v2 — the sweep's actionable item.** Baoquan He has posted a v2
-of the series we carry as `2155`–`2166`: **12 patches became 14**. It is present
-in both `sirlucjan-kernel-patches/7.3-rc/xswap-patches-v2-sep/` and the CachyOS
-`7.3/xswap` branch independently. The two additions are:
-
-- `0012 mm, swap: cap xswap growth at nr_clusters` — not carried
-- `0014 mm, swap: shrink xswap to the ceiling when it drops` — not carried
-
-These fix exactly what the code audit recorded in *"Code audit of the series
-(2026-09-16)"* above: the `type<N>/limit` attribute is a soft bound because the
-**grow** path is gated on `nr_clusters_max` (fixed at creation) while the only
-reader of `nr_clusters` is `xswap_try_shrink()`. The author has closed that gap
-upstream. Adopting v2 is a series replacement, not a two-patch append: most v2
-patches differ from ours in content, so v2 is a revision of the whole set.
-
-Tested against a clean `v7.3-rc3` worktree: **v2 applies 14/14 clean**, while our
-v1 fails 8/12 there (expected — earlier patches in our series supply its context,
-per the *"clean-base FAIL is not a series FAIL"* rule).
-
-**2. Verified drop list for the next bump.** Subjects of all 217 patches were
-matched against linux-next; the 15 hits were then checked **by content**, because
-subject matching alone produces false positives — four were exactly that
-(`1061`, `1062`, `1152`, `2005` all matched a subject but differ in content and
-stay). **Eleven are content-identical to upstream commits:**
-
-| Ours | Upstream | Subject |
-|---|---|---|
-| `0050` | `5c1a6c9736a6` | drm/edid: Parse AMD VSDB for FreeSync refresh range |
-| `0058` | `482b6542a862` | drm/amd/display: restore FRL cap on non-destructive |
-| `0061` | `8b607d6f54b0` | drm/amd/display: Enable HDMI ALLM for Gaming-VRR |
-| `1056` | `0e118b936dc5` | drm/sched: Lock drm_sched_entity_is_idle() |
-| `1060` | `38f4fe785b5d` | drm/amdgpu: cancel hang_detect_work before taking |
-| `1135` | `6ee70c955ffc` | drm/amd/display: fix HPD program filter programming |
-| `1136` | `455c7c34707c` | drm/amd/display: Update and revert FRL LT Timeout |
-| `1138` | `20331505df9c` | drm/amd/display: pull colorops into state |
-| `1140` | `50eed169c0ab` | drm/amd/display: clamp force_min_dcfclk to dcn42b |
-| `1154` | `dd601ed4ce28` | drm/amd/display: Fix NULL deref of new_stream->sink |
-| `2006` | `3de3d4336b8c` | zram: convert to SG-list zsmalloc object read API |
-
-**These are drop-at-the-bump, not drop-now.** They are in linux-next (7.4-bound),
-not in our 7.3-rc3 base — dropping them today would remove the fixes. `1140` is
-the one to drop first when its base arrives: it is a DCN42B clamp, inert on
-DCN 4.0.1, and already flagged for removal.
-
-**3. 7.4 conflicts to watch** — all land with the next base, none need action now:
-
-- **amd-pstate EPP rework** (`amd-pstate-v7.4-2026-09-14`, Mario Limonciello):
-  adds a per-SoC / per-core-type EPP table and `cpudata->epp_default_ac/dc`.
-  **Collides with our `1202`** (`epp_boost`): both add fields to
-  `struct amd_cpudata` and both touch `amd_pstate_epp_cpu_init()`. Ours is *not*
-  superseded — upstream never mentions `epp_boost`; they are different
-  mechanisms that clash textually.
-- **zswap rework** (Longlong Xia, Kefeng Wang, Jianyue Wu; 2026-09-06..10):
-  rewrites the tail of `zswap_store()` (`bcfacfe16322`) where **our `2155` hunk
-  lives**, changes `zswap_invalidate()` to take a **range** (`6a391b347b5e`) —
-  the path xswap pages leave the pool by — and moves pools to an xarray with
-  `entry->pool` becoming `pool_idx`. Our series barely touches the structs
-  (one `struct zswap_entry` reference, zero `->pool`), so the struct churn is
-  harmless; the `zswap_store()` overlap is not.
-- **`0412b1064a3b` "Cover EDID CEA parsing helpers"** — refactors
-  `dm_edid_parser_send_cea()` in `amdgpu_dm_connector.c`, the file our flicker
-  fix patches (`1151`: 8 hunks, `1163`: 4, `1164`: 9). Mechanical
-  (`STATIC_IFN_KUNIT` visibility), so a rebase rather than a redesign.
-
-**4. Work items.** `#5616` (RX 9070 XT `flip_done timed out`) **closed
-2026-09-16** — its whole history is the Atomize GLOBAL_SYNC_STATUS patch, which
-is our `1159`. Confirmed as the fix. `#5663` (artifacts after S3 resume on
-RX 9070 XT) remains open with only a **user-posted, unmerged workaround diff**
-pinning DCC BO moves to move-entity 0 in `amdgpu_move_blit()`; the maintainer
-calls it a Navi 4x SDMA hardware bug. Not adopted — no upstream commit, and it
-is not ours to carry. The `[PATCH 00/66] DC Patches Sep 14 2026` series (source
-of `1159`/`1166`, heading to 7.3-rc4) contains on-target items we lack,
-notably `40/66 Decouple HUBP_UPDATE_PLANE_ADDR from pipe_ctx` — the HUBP
-plane-address path our "box" misread lives in. They arrive with the bump.
-
-**5. Source health.** `repos/drm-next` is stuck at 2026-09-11 (its shallow clone
-fails to unshallow: *"error in object: unshallow 00d66b29…"*) — its content is
-covered because linux-next aggregates it. `repos/amd-staging-drm-next` is stale
-at **2026-07-23**, and `repos/akpm-mm` at **2026-08-10** and will not refresh;
-treat negative results from those two as weak. `repos/linux-tkg` and
-`repos/cachyos-linux` local refs are behind their remotes.
-
-**6. Nothing new** from `firelzrd-lru-marie` (our `2101` is code-identical to
-0.11.1r2), `firelzrd-bore-scheduler`, `firelzrd-le9uo` (dormant since May),
-`clearlinux-linux` (archived), or the CachyOS fixes branch (off-target by
-policy — we do not carry the fixes squash). x86/security: nothing on-target
-since 09-13.
-
-**7. Mailing lists.** No re-adds: the DCN4 flip-schedule reverts (`9051`/`9052`,
-Ray Wu, landed in AMD's tree as `c010ccac1358`/`04009276da2d`, *"Because it
-causes some regression"*) are still correctly absent from our series. Both
-September DC patchsets (`00/40` Ray Wu and `00/66` Chenyu Chen) were diffed
-subject-by-subject against our 217: **only three are ours** — `1154`, `1159`,
-`1166`. Everything else is DCN6 / DCN35 / DCN42B / DCN50 / DCN60 / DML2.1,
-different silicon. A scan of both mboxes for `smu_v14|psp_v14|sdma_v7|vcn_v5|
-mmhub_v4|gmc_v12` returned **zero** hits for September.
-
-One new gfx12 candidate to track, unmerged and not carried:
-`[PATCH v4 4/8] drm/amdgpu/gfx12: honor mqd_prop modify flag in init_mqd`
-(Jesse Zhang, 2026-09-07) — touches **only** `gfx_v12_0.c` (+14/−9), consuming
-the `mqd_prop` modify flag so a re-enabled queue keeps the firmware context-saved
-rptr/wptr. Not in amd-staging either. No traceable merge yet, so nothing to
-extract.
-
-Also under review, none carried: `drm/amdgpu: Fix GPU PCIe link capability
-reporting` (Limonciello, Cc stable — host-side PCIe caps were being reported as
-the GPU's); `drm/amdgpu: fix sched entity leak in ttm buffer entity init`;
-`drm/amdgpu: fix rmmio iounmap skipped on device removal` (leaks the register BAR
-once per unload); `drm/amd/display: Fix HDMI RGB quantization updates` (Alex
-Hung — relevant to our HDMI work).
-
-**8. Phoronix trace-through.** Every claim was traced to a tree rather than
-taken at face value:
-
-- **"AMDGPU HDMI 2.1 enabled by default" (7.4)** — `f13a8b4a7e86`,
-  `0505751e5019`, `9ec95eed935c`, `2151ff7f88f3`, `453506fdab7c`. These are
-  **exactly what our `0055`/`0059`/`0061` carry**, so all three become drop
-  candidates at the 7.4 bump. **`0059` will likely conflict**: `730c6d807`
-  ("Drop KUnit tests for removed `parse_hdmi_amd_vsdb()`") records that
-  `parse_hdmi_amd_vsdb()` was removed when HDMI FreeSync detection moved to the
-  common EDID parser — verified gone at drm-next HEAD, still present on
-  amd-staging. Flagged, not acted on.
-- **"AMD P-State for Zen 6"** — Zen 6 (family 1Ah models 0x80/81/84/85/0xe0).
-  Wrong generation. The article says the boost-ratio change is driver-wide,
-  which could oblige a `1202` rebase, but the article does not say and the
-  patches were not read — recorded as unverified.
-- **Zstd "avoid redundant initialization" (7.4)** — goes into the cryptodev
-  crypto branch and is exercised via `crypto_acomp`, **not** `lib/zstd`, so it
-  does not touch our `2100`. No action.
-- **Safe-RET SRSO (Zen 1–4, our CPU)** — merge `f5fdd6665ac4` is **already in
-  our v7.3-rc3 base** (confirmed by ancestry), and we correctly carry no local
-  SRSO patch. No action.
-- **MADV_FREE + THP silent data loss** — the most consequential claim checked,
-  and it resolved cleanly: the fix is **not** in v7.3-rc3 (so carrying it is
-  right) and **we already have it** as `2500`, content-identical to
-  `f7491d7c81db` (added-lines md5 `36075f380c10` on both sides). `aa55d949bf9f`
-  is the same fix under linux-next's hash — the "one fix, two hashes" case
-  already documented in the patch-sweep skill.
-- Phoronix published **nothing** in September 2026 on BFQ / mq-deadline,
-  sched-ext, or zswap/zram/MGLRU.
-
-**9. Regressions on our base.** `[REGRESSION] amdgpu: "pixel format with alpha
-exposed but blend mode not setup"` (Leemhuis, 2026-09-01) comes from
-`9813e158d13d` in v7.3-rc1 and is fixed for 7.4 by mwen's atomic-state-helper
-series. Leemhuis states it is a dmesg warning only, no functional impact, and it
-is present in our base — which matches the boot audit: no such message appears
-here. The 120 Hz DCN32 scanout-corruption regression is DCN32, not our silicon.
+The six-source sweep that ran alongside this release is recorded in
+`PATCH_SOURCES.md` under *Sweep 2026-09-16*.
 
 ## [7.3.0-rc3-15-sleepy-next]: 2026-09-15
 

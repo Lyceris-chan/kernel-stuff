@@ -807,6 +807,88 @@ today — but the tree and the patch text disagree, and it is exactly why
 `c93496f5133e` ("return -ENOENT when the swap device is gone") cannot apply.
 Regenerate the hunk against the current base rather than editing it by hand.
 
+## Sweep 2026-09-16 (from the rc3-16 cycle)
+
+Base was current: `v7.3-rc3` was the newest mainline tag and `next-20260916` the
+newest snapshot.
+
+### Drop list for the next bump
+
+Subjects of all 217 carried patches were matched against linux-next, then the
+15 hits were checked by content, because subject matching alone produces false
+positives: `1061`, `1062`, `1152` and `2005` each matched a subject but differ
+in content, and stay. **Eleven are content-identical to upstream commits:**
+
+| Ours | Upstream | Subject |
+|---|---|---|
+| `0050` | `5c1a6c9736a6` | drm/edid: Parse AMD VSDB for FreeSync refresh range |
+| `0058` | `482b6542a862` | drm/amd/display: restore FRL cap on non-destructive |
+| `0061` | `8b607d6f54b0` | drm/amd/display: Enable HDMI ALLM for Gaming-VRR |
+| `1056` | `0e118b936dc5` | drm/sched: Lock drm_sched_entity_is_idle() |
+| `1060` | `38f4fe785b5d` | drm/amdgpu: cancel hang_detect_work before taking |
+| `1135` | `6ee70c955ffc` | drm/amd/display: fix HPD program filter programming |
+| `1136` | `455c7c34707c` | drm/amd/display: Update and revert FRL LT Timeout |
+| `1138` | `20331505df9c` | drm/amd/display: pull colorops into state |
+| `1140` | `50eed169c0ab` | drm/amd/display: clamp force_min_dcfclk to dcn42b |
+| `1154` | `dd601ed4ce28` | drm/amd/display: Fix NULL deref of new_stream->sink |
+| `2006` | `3de3d4336b8c` | zram: convert to SG-list zsmalloc object read API |
+
+These are **drop-at-the-bump, not drop-now**: they are in linux-next and 7.4
+bound, not in the 7.3-rc3 base, so dropping them today would remove the fixes.
+`1140` is the first to drop when its base arrives — a DCN42B clamp, inert on
+DCN 4.0.1.
+
+### Conflicts to expect at the 7.4 bump
+
+- **amd-pstate EPP rework** (`amd-pstate-v7.4-2026-09-14`, Mario Limonciello)
+  adds a per-SoC and per-core-type EPP table plus `cpudata->epp_default_ac/dc`.
+  It collides with `1202` (`epp_boost`): both add fields to
+  `struct amd_cpudata` and both touch `amd_pstate_epp_cpu_init()`. `1202` is not
+  superseded — upstream never mentions `epp_boost`; they are different
+  mechanisms that clash textually.
+- **zswap rework** (Longlong Xia, Kefeng Wang, Jianyue Wu; 2026-09-06 to 09-10)
+  rewrites the tail of `zswap_store()` (`bcfacfe16322`), which is where the
+  xswap hunk lives, changes `zswap_invalidate()` to take a range
+  (`6a391b347b5e`) — the path xswap pages leave the pool by — and moves pools to
+  an xarray with `entry->pool` becoming `pool_idx`. The series barely touches
+  the structs, so the struct churn is harmless; the `zswap_store()` overlap is
+  not.
+- **`0412b1064a3b` "Cover EDID CEA parsing helpers"** refactors
+  `dm_edid_parser_send_cea()` in `amdgpu_dm_connector.c`, the file the flicker
+  fixes patch (`1151`: 8 hunks, `1163`: 4, `1164`: 9). Mechanical
+  (`STATIC_IFN_KUNIT` visibility), so a rebase rather than a redesign.
+- **`0059` will likely conflict.** `730c6d807` ("Drop KUnit tests for removed
+  `parse_hdmi_amd_vsdb()`") records that `parse_hdmi_amd_vsdb()` was removed
+  when HDMI FreeSync detection moved to the common EDID parser. It is gone at
+  drm-next HEAD and still present on amd-staging.
+- **AMDGPU HDMI 2.1 enabled by default (7.4)** — `f13a8b4a7e86`,
+  `0505751e5019`, `9ec95eed935c`, `2151ff7f88f3`, `453506fdab7c` are what
+  `0055`/`0059`/`0061` carry, so all three become drop candidates.
+
+### Source health at the time
+
+`repos/drm-next` was stuck at 2026-09-11, its shallow clone failing to
+unshallow; linux-next aggregates its content. `repos/amd-staging-drm-next` was
+stale at 2026-07-23 and `repos/akpm-mm` at 2026-08-10, both refusing to refresh,
+so negative results from those two were weak. `repos/linux-tkg` and
+`repos/cachyos-linux` local refs were behind their remotes.
+
+### Not carried, tracked
+
+- `[PATCH v4 4/8] drm/amdgpu/gfx12: honor mqd_prop modify flag in init_mqd`
+  (Jesse Zhang, 2026-09-07) touches only `gfx_v12_0.c` (+14/-9), consuming the
+  `mqd_prop` modify flag so a re-enabled queue keeps the firmware
+  context-saved rptr/wptr. Not in amd-staging and no merge yet.
+- `drm/amdgpu: fix sched entity leak in ttm buffer entity init`.
+- `drm/amd/display: Fix HDMI RGB quantization updates` (Alex Hung).
+- `#5663` (artifacts after S3 resume on RX 9070 XT) carries only a user-posted,
+  unmerged workaround diff pinning DCC BO moves to move-entity 0 in
+  `amdgpu_move_blit()`; the maintainer calls it a Navi 4x SDMA hardware bug.
+  No upstream commit, so nothing to carry.
+- `[PATCH 00/66] DC Patches Sep 14 2026` contains on-target items, notably
+  `40/66 Decouple HUBP_UPDATE_PLANE_ADDR from pipe_ctx` — the HUBP plane-address
+  path the display "box" misread lives in. Arrives with the bump.
+
 ## The CachyOS squashes (0101–0112)
 
 Each squash is generated **against the current series state**, not against a
