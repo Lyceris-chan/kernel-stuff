@@ -260,6 +260,99 @@ documentation. The section continues past it.
 explicit that the optimum is workload-dependent: "An optimal value will require
 experimentation."
 
+### Six-source sweep (2026-09-16)
+
+Base is current: **v7.3-rc3 is still the newest mainline tag** (no rc4 yet).
+Today's snapshot is **next-20260916**.
+
+**1. xswap v1 → v2 — the sweep's actionable item.** Baoquan He has posted a v2
+of the series we carry as `2155`–`2166`: **12 patches became 14**. It is present
+in both `sirlucjan-kernel-patches/7.3-rc/xswap-patches-v2-sep/` and the CachyOS
+`7.3/xswap` branch independently. The two additions are:
+
+- `0012 mm, swap: cap xswap growth at nr_clusters` — not carried
+- `0014 mm, swap: shrink xswap to the ceiling when it drops` — not carried
+
+These fix exactly what the code audit recorded in *"Code audit of the series
+(2026-09-16)"* above: the `type<N>/limit` attribute is a soft bound because the
+**grow** path is gated on `nr_clusters_max` (fixed at creation) while the only
+reader of `nr_clusters` is `xswap_try_shrink()`. The author has closed that gap
+upstream. Adopting v2 is a series replacement, not a two-patch append: most v2
+patches differ from ours in content, so v2 is a revision of the whole set.
+
+Tested against a clean `v7.3-rc3` worktree: **v2 applies 14/14 clean**, while our
+v1 fails 8/12 there (expected — earlier patches in our series supply its context,
+per the *"clean-base FAIL is not a series FAIL"* rule).
+
+**2. Verified drop list for the next bump.** Subjects of all 217 patches were
+matched against linux-next; the 15 hits were then checked **by content**, because
+subject matching alone produces false positives — four were exactly that
+(`1061`, `1062`, `1152`, `2005` all matched a subject but differ in content and
+stay). **Eleven are content-identical to upstream commits:**
+
+| Ours | Upstream | Subject |
+|---|---|---|
+| `0050` | `5c1a6c9736a6` | drm/edid: Parse AMD VSDB for FreeSync refresh range |
+| `0058` | `482b6542a862` | drm/amd/display: restore FRL cap on non-destructive |
+| `0061` | `8b607d6f54b0` | drm/amd/display: Enable HDMI ALLM for Gaming-VRR |
+| `1056` | `0e118b936dc5` | drm/sched: Lock drm_sched_entity_is_idle() |
+| `1060` | `38f4fe785b5d` | drm/amdgpu: cancel hang_detect_work before taking |
+| `1135` | `6ee70c955ffc` | drm/amd/display: fix HPD program filter programming |
+| `1136` | `455c7c34707c` | drm/amd/display: Update and revert FRL LT Timeout |
+| `1138` | `20331505df9c` | drm/amd/display: pull colorops into state |
+| `1140` | `50eed169c0ab` | drm/amd/display: clamp force_min_dcfclk to dcn42b |
+| `1154` | `dd601ed4ce28` | drm/amd/display: Fix NULL deref of new_stream->sink |
+| `2006` | `3de3d4336b8c` | zram: convert to SG-list zsmalloc object read API |
+
+**These are drop-at-the-bump, not drop-now.** They are in linux-next (7.4-bound),
+not in our 7.3-rc3 base — dropping them today would remove the fixes. `1140` is
+the one to drop first when its base arrives: it is a DCN42B clamp, inert on
+DCN 4.0.1, and already flagged for removal.
+
+**3. 7.4 conflicts to watch** — all land with the next base, none need action now:
+
+- **amd-pstate EPP rework** (`amd-pstate-v7.4-2026-09-14`, Mario Limonciello):
+  adds a per-SoC / per-core-type EPP table and `cpudata->epp_default_ac/dc`.
+  **Collides with our `1202`** (`epp_boost`): both add fields to
+  `struct amd_cpudata` and both touch `amd_pstate_epp_cpu_init()`. Ours is *not*
+  superseded — upstream never mentions `epp_boost`; they are different
+  mechanisms that clash textually.
+- **zswap rework** (Longlong Xia, Kefeng Wang, Jianyue Wu; 2026-09-06..10):
+  rewrites the tail of `zswap_store()` (`bcfacfe16322`) where **our `2155` hunk
+  lives**, changes `zswap_invalidate()` to take a **range** (`6a391b347b5e`) —
+  the path xswap pages leave the pool by — and moves pools to an xarray with
+  `entry->pool` becoming `pool_idx`. Our series barely touches the structs
+  (one `struct zswap_entry` reference, zero `->pool`), so the struct churn is
+  harmless; the `zswap_store()` overlap is not.
+- **`0412b1064a3b` "Cover EDID CEA parsing helpers"** — refactors
+  `dm_edid_parser_send_cea()` in `amdgpu_dm_connector.c`, the file our flicker
+  fix patches (`1151`: 8 hunks, `1163`: 4, `1164`: 9). Mechanical
+  (`STATIC_IFN_KUNIT` visibility), so a rebase rather than a redesign.
+
+**4. Work items.** `#5616` (RX 9070 XT `flip_done timed out`) **closed
+2026-09-16** — its whole history is the Atomize GLOBAL_SYNC_STATUS patch, which
+is our `1159`. Confirmed as the fix. `#5663` (artifacts after S3 resume on
+RX 9070 XT) remains open with only a **user-posted, unmerged workaround diff**
+pinning DCC BO moves to move-entity 0 in `amdgpu_move_blit()`; the maintainer
+calls it a Navi 4x SDMA hardware bug. Not adopted — no upstream commit, and it
+is not ours to carry. The `[PATCH 00/66] DC Patches Sep 14 2026` series (source
+of `1159`/`1166`, heading to 7.3-rc4) contains on-target items we lack,
+notably `40/66 Decouple HUBP_UPDATE_PLANE_ADDR from pipe_ctx` — the HUBP
+plane-address path our "box" misread lives in. They arrive with the bump.
+
+**5. Source health.** `repos/drm-next` is stuck at 2026-09-11 (its shallow clone
+fails to unshallow: *"error in object: unshallow 00d66b29…"*) — its content is
+covered because linux-next aggregates it. `repos/amd-staging-drm-next` is stale
+at **2026-07-23**, and `repos/akpm-mm` at **2026-08-10** and will not refresh;
+treat negative results from those two as weak. `repos/linux-tkg` and
+`repos/cachyos-linux` local refs are behind their remotes.
+
+**6. Nothing new** from `firelzrd-lru-marie` (our `2101` is code-identical to
+0.11.1r2), `firelzrd-bore-scheduler`, `firelzrd-le9uo` (dormant since May),
+`clearlinux-linux` (archived), or the CachyOS fixes branch (off-target by
+policy — we do not carry the fixes squash). x86/security: nothing on-target
+since 09-13.
+
 ## [7.3.0-rc3-15-sleepy-next]: 2026-09-15
 
 ### Added
