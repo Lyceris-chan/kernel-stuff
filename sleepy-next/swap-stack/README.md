@@ -87,8 +87,32 @@ no backing store, and therefore no device node.
   It costs nothing: `swap.target` is reached, the device is live, and the
   shutdown path logs no swap errors. `udisksd` makes the same lookup and logs
   `Error statting xswap0: No such file or directory` three times per boot for
-  the same reason. Neither is fixable from userspace — the unit name comes from
-  the kernel's swap naming.
+  the same reason.
+
+  **The precise mechanism**, so this is not re-investigated: `swap_verify()`
+  (`src/core/swap.c`) re-derives the unit name from the swap's `What=` with
+  `unit_name_from_path(s->what, ".swap")` and requires it to match the unit's own
+  name. An xswap device has no `swap_file`, so the kernel prints a synthetic bare
+  name in `/proc/swaps` — `xswap0` — which is not an absolute path, and
+  `unit_name_from_path()` cannot derive a name from it. It can never round-trip.
+
+  **It cannot be silenced from userspace, and that was tested rather than
+  assumed.** Masking the unit (`ln -sf /dev/null /etc/systemd/system/xswap0.swap`)
+  leaves it in `error`, because systemd rebuilds the unit from `/proc/swaps`
+  regardless; a drop-in supplying `[Swap] What=/xswap0` is ignored; and
+  `daemon-reload` never re-runs the verification on an already-loaded unit. A
+  kernel-side change is worse than the disease: the only path that keeps the unit
+  named `xswap0.swap` — and therefore passes the name check — is `/xswap0`, and a
+  swap unit that loads is stopped by spawning `swapoff "$what"` (`swap.c`,
+  "Failed to spawn 'swapoff' task"), which can never succeed for a file-less
+  swap. That trades a cosmetic load error for a cosmetic shutdown failure.
+
+  As it stands `systemctl --failed` is empty, the device is live, nothing about it
+  is logged at boot, and shutdown is clean — it is visible only if you go looking
+  at swap units specifically. The real fix belongs upstream: either the series
+  registers a name systemd can consume, or systemd stops requiring a
+  round-trippable path for a swap it discovered from `/proc/swaps` itself.
+
 - **Hibernation is impossible.** `disk` is listed in `/sys/power/state`, but the
   image has to be written to a swap device that survives power-off, and an xswap
   device lives entirely in zswap's compressed RAM pool. Nothing regressed here:
