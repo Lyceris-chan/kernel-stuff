@@ -467,174 +467,36 @@ The six-source sweep that ran alongside this release is recorded in
 
 ## [7.3.0-rc3-12-sleepy-next]: 2026-09-15
 
-### Added (from the 2026-09-15 sweep)
-- **`2012`–`2013`** — Zhenxian Ma's "block: avoid redundant flushes for O_DSYNC
-  direct writes" pair (linux-next `bec7d36a6514`, `0d492f40c4ad`, `Reviewed-by:
-  Christoph Hellwig`, merged by Jens for 7.4). `blkdev_write_iter()` called
-  `generic_write_sync()` unconditionally, so an `O_DIRECT|O_DSYNC` write paid a
-  `REQ_PREFLUSH` on top of the `REQ_FUA` the direct path had already set. The
-  author measured 4 KiB `O_DIRECT|O_DSYNC` writes on a Seagate ST20000NM007D
-  going from 119.7 to 7497 IOPS. This machine's Phison E16 reports `fua=1`, so
-  `2013` (use FUA only when the device supports it) is inert here; `2012` is the
-  one that removes the redundant flush.
-- **`2100`** regenerated from sirlucjan's 2026-09-14 `zstd-7.3` cut
-  (`e0f9795534f4`, 2741 lines, 25 files vs 20). The newer cut carries more
+### Added
+
+- Add `2012`-`2013`, Zhenxian Ma's "block: avoid redundant flushes for O_DSYNC
+  direct writes" pair (linux-next `bec7d36a6514`, `0d492f40c4ad`).
+  `blkdev_write_iter()` called `generic_write_sync()` unconditionally, so an
+  `O_DIRECT|O_DSYNC` write paid a `REQ_PREFLUSH` on top of the `REQ_FUA` the
+  direct path had already set. The author measured 4 KiB `O_DIRECT|O_DSYNC`
+  writes on a Seagate ST20000NM007D going from 119.7 to 7497 IOPS. The Phison
+  E16 reports `fua=1`, so `2013` is inert here; `2012` removes the redundant
+  flush.
+- Regenerate `2100` from sirlucjan's 2026-09-14 `zstd-7.3` cut (`e0f9795534f4`,
+  2741 lines across 25 files, up from 20). The newer cut carries additional
   upstream zstd work, including a BMI2 dispatch refactor
-  (`lib/zstd/common/bmi2.h`). zstd is now load-bearing for the swap stack, not
-  just for btrfs.
+  (`lib/zstd/common/bmi2.h`). zstd is load-bearing for the swap stack, not only
+  for btrfs.
 
-### Removed (superseded by `2100`)
-- **`2128`** (use `ZSTD_cpuSupportsBmi2()` in `ZSTD_initStaticCCtx()`) and
-  **`2143`** (DDict hash-set probe wrap-around) are inside the new `2100`; its
-  hunk reports already-applied and `2143` is skipped as present. Removed with
-  the user's approval — the code stays in the tree through `2100`.
+### Removed
 
-### Sweep 2026-09-15: three parallel sweeps (MM, crypto/block/net, PM/x86/sched + work items)
-
-**Hazard for the 7.4 bump — re-test the flicker fix.** Upstream has merged
-"Enable HDMI FRL by default" (`af6139855b55`, in amd-staging only for now,
-targeted 7.4), which sets `DC_FRL_MASK` in `amdgpu_dc_feature_mask`. That is
-exactly the variable this project bisected for the 240 Hz flicker and dropped
-as `1144` (`PATCH_SOURCES.md`). When the bump lands, re-check the MAG251RX at
-1920x1080@240 Hz before shipping. Related: Fangzhi Zuo's FRL patches 61/66 and
-65/66 in Chenyu Chen's DC 3.2.398 series sit on the same surface as our `0058`
-and `1136`.
-
-**Already carried — the sweeps re-found our own patches.**
-- `2500` is `f7491d7c81db` (the Phoronix "silent user-space data loss since
-  2023" item); `2502` is `27600805e62f` (x86/amd_node PCI refcount);
-  `2404` is `c7a1c6e8004a` (sched_ext). All three are now upstream post-rc3
-  and go on the drop-list for the next bump.
-- `1159` is patch 58/66 of Chenyu Chen's DC 3.2.398 series — the patch AMD
-  developers recommend in work items #5829, #5834 and #5839 for `update_config`
-  NULL dereferences. Carrying it already.
-- The kbuild series Phoronix covered on 2026-09-15 ("~36% faster builds") is
-  the `[PATCH v2 00/21]` series we already carry as `2302`–`2322`.
-- `2140` (direct compaction for costly `__GFP_NORETRY`) is in mm-unstable —
-  ours already. `2011` is byte-identical to the r8169 LTR ML v4.
-
-**Deferred, with reasons.**
-- zswap "optimize zswap invalidate and store" v3 (Kefeng Wang, 3 patches)
-  applies cleanly and is on-target now that zswap backs the swap stack. Held
-  back deliberately: it rewrites `swap_range_free()`, the same function the
-  xswap series (`2155`–`2166`) rewrites, and both are unmerged review-stage
-  series. Composing two of those in the swap hot path is how this project got
-  the flicker. Re-evaluate at the 7.4 bump, when at least one of them lands.
-- Usama Arif's PMD-level swap entries for anonymous THPs v7 (29 patches) is
-  the most on-target MM series found (THP swap + zswap + xswap all in play),
-  but it is a large review-stage rewrite of the same paths. Watch.
-- Hugh Dickins' `mm/fbatch` drain v2 (26 patches): the author states he is
-  taking three weeks off, expects "some disappointments" on performance, and
-  asks someone else to shepherd it.
-- Lorenzo Stoakes' VMA-flag semantics v2 (40 patches) is the same churn that
-  already broke LRU-MARIE once (`vm_flags` → `vma_flags`).
-- CPPC: our `1210`–`1224` are Christian Loehle's **v5**; a **v6** exists
-  (2026-08-30, same 15-patch shape, still under review with an outstanding
-  request from Rafael Wysocki). Refresh at the bump rather than mid-cycle.
-- amd-pstate 7.4 pull: Zen 6 EPP tunings do not apply to Zen 4, but the pull
-  restructures `amd-pstate.c`/`.h` where our `1201`/`1202` live — expect a
-  rebase surface.
-- **BBR3 rebase surface**: linux-next `cb145191e9d3` renames `min_tso_segs()`
-  to `tso_segs()` with a new signature; `0101-cachy-bbr3.patch` references the
-  old name 13 times.
-- io_uring: cancel-at-ring-close (merged for 7.4) and Jens Axboe's 15-patch
-  thread-identity handoff RFC are 7.4 material — the RFC's own table shows
-  large queue-depth-1 wins but losses at higher depth (−65% fsync on ext4 at
-  qd32), so it is not obviously a win. `net/sched` qdisc handle scan needs 32767 HTB classes to
-  matter (ours has one). Rejected as off-target: r8169 RSS v13 (RTL8127),
-  realtek PHY firmware writes (RTL8261x), `xor_gen` AVX-512 (`CONFIG_BLK_DEV_MD`
-  is off), `tcp_poll()` `smp_rmb()` (an ARM64 win), zonelist/NUMA and
-  cache-aware-scheduling work (single-CCD desktop), ESMTP (SEV-SNP guests).
-
-**Checked and dismissed: the NAP governor.** A sweep pass reported that the
-NAP cpuidle governor never tests `states_usage[].disable` and could enter a
-C-state disabled via sysfs. It does test it — in `nap_fallback_heuristic()`,
-in `nap_find_min_valid_state()` (behind the cached-minimum path), and in the
-neural-net decision loop inside `nap_fpu_select()` before it accepts a
-candidate. No action.
-
-**Machine profile corrections that shrink the search space.** `CONFIG_NUMA` is
-**not set** in this build, so the NUMA-targeted optimizations that dominate mm
-and net-next (zonelist refactors, per-node reclaim, `skb_defer_free` node
-iteration, cache-aware scheduling) are inert here, and `for_each_node()` and
-`for_each_online_node()` compile to the same thing. `CONFIG_BLK_DEV_MD` is off,
-so the raid6/xor `vzeroupper` work is inert. `CONFIG_EROFS_FS` is off.
-
-**Two branches/dirs we do not adopt from, checked.** CachyOS's `7.3/vesa-dsc-bpp`
-carries VESA DSC EDID parsing and a DSC `max_qp` spec fix; the EDID side is
-already upstream in rc3 and this machine never negotiates DSC (1080p240 fits
-HDMI 2.0's 600 MHz TMDS without it), so nothing to take. sirlucjan ships
-**ADIOS**, a 2,062-line non-upstream "Adaptive Deadline I/O scheduler"
-(`block/adios.c`, Piotr Gorski, 3.3.0) that CachyOS patches to be the default.
-Not adopted: it is unreviewed third-party block-layer code, and this machine's
-scheduler is a deliberate distro choice — `60-ioschedulers.rules` sets **kyber**
-for NVMe, bfq for rotating, mq-deadline for other flash. Worth revisiting only
-if desktop I/O latency ever becomes a complaint.
-
-**Verified drop-list (reverse-apply audit against torvalds master, 2026-09-15).**
-Five carried patches are already in master and disappear at the next bump:
-`2141` (filemap retain mapped dropbehind folios), `2145` (mm/vma unaccount on
-mmap_prepare failure), `2146` (mm/mlock IRQ-safe NR_MLOCK accessor), `2500`
-(MADV_FREE/THP data loss) and `2502` (x86/amd_node PCI refcount). The check is
-`git apply --check -R` per patch against a worktree at `origin/master` — note it
-must run against a master checkout, not the repo's working tree, which sits at
-rc3 and makes every patch look un-applied.
-
-**Work items.** The five tracked issues (#5821 hang, #5820 SMU bus loss, #5800
-vblank timeout, #5812 VRR black level, #5780 HDMI FRL) still have no referenced
-fix. #5720's fix (`c4a5160e3be0`) is absent from rc3 but concerns YCbCr-4:2:0
-sinks, which this monitor is not. #5663 (TTM/SDMA artifacts after resume) is
-acknowledged by Christian König as known and being investigated.
-
-### Deep sweep 2026-09-15 (second pass): GPU/display, core, work items
-
-**A patch we carry does nothing on this hardware — `1140`.** It modifies only
-`dc/clk_mgr/dcn42b/dcn42b_clk_mgr.c`. That clk_mgr is instantiated exclusively
-under `AMDGPU_FAMILY_GC_11_5_0` with `DCN_VERSION_4_2B`
-(`dc/clk_mgr/clk_mgr.c`). Our GPU is GC IP (12,0,1), which
-`amdgpu_discovery.c` maps to `AMDGPU_FAMILY_GC_12_0_0` → `dcn401_clk_mgr_construct`,
-and the kernel reports "Display Core v3.2.392 initialized on DCN 4.0.1". The
-DCN42B file is dead code here, so the patch is inert — the "a patch that applies
-can still do nothing" trap again. A scan of every carried patch against the
-display blocks we do not instantiate (dcn42, dcn42b, dcn60) found this as the
-only case. Removal needs the user's approval; it is harmless where it sits.
-
-**DC 3.2.398 (66 patches) triage — nothing adopted.** The reviewer-recommended
-patch 58 is already ours (`1159`). The rest of the fix-shaped subset is
-off-target or inert:
-- patches 42, 43, 56, 57, 60 touch `pg/dcn42/`, `resource/dcn42b/` and the
-  DCN42B MALL/HPO paths — the same dead blocks as `1140`; patch 61 touches
-  `hpo/dcn42/` and `hpo/dcn60/`; patch 04 targets DCN31/35/42.
-- `35c21515dbe1` ("fix MALL hysteresis timer underflow at high refresh rates")
-  looked ideal — a 240 Hz-relevant underflow in the hysteresis timer — but it
-  patches `dcn30_apply_idle_power_optimizations()`, and DCN 4.0.1 has its own
-  `dcn401_apply_idle_power_optimizations()` (DMUB CAB based, no such timer).
-  It is the DCN 3.x implementation that underflows, not ours.
-- `37531443a4f3` ("mes12: clear event log on resume to avoid MES page fault",
-  Jesse Zhang, AMD, 2026-09-15) is on-target but **inert at defaults**: its
-  guard checks `amdgpu_mes_log_enable`, and
-  `amdgpu_mes_event_log_init()` returns before allocating the buffer unless
-  that parameter is set — it defaults to 0.
-- DC 59 and DC 52 are behaviour changes inside a 66-patch drop that lands with
-  the next drm merge; taking them piecemeal invites conflicts with the rest.
-
-**Deferred for breadth, not doubt.** `2d606b35a24c` ("drm/sched: fix
-use-after-free of the fence timeline name", v3 0/2) is a real UAF fix but a
-121-line rewrite of fence lifetime across `sched_fence.c`, `sched_main.c` and
-`gpu_scheduler.h` — and this series already carries four drm/sched patches.
-`1528781b16c7` ("drm/vblank: Don't arm vblank timer with invalid frame
-duration", v4) changes `drm_calc_timestamping_constants()` from `void` to `int`
-across DRM. Both land upstream; revisit at the bump.
-
-**Core sweep:** nothing includable. The only real candidate, a hrtick repick
-fix (Shubhang Kaushik), is measured on ARM64 and the author partially withdrew
-v2 ("please disregard the DL portion of v2") — and `CONFIG_SCHED_HRTICK` plus
-HRTICK_DL are on here, so the withdrawn half is not inert. Wait for v3.
-Everything else was already carried (`2012`/`2013`, `2148`/`2149`, `2302`–`2322`),
-queued for 7.4, or inert.
+- Remove `2128` (use `ZSTD_cpuSupportsBmi2()` in `ZSTD_initStaticCCtx()`) and
+  `2143` (DDict hash-set probe wrap-around). Both are now inside the
+  regenerated `2100`; its hunk reports already-applied and `2143` is skipped as
+  present. The code remains in the tree through `2100`.
 
 ### Changed
-- `pkgrel` 11 → 12.
+- `pkgrel` 11 -> 12.
+
+The three parallel sweeps that ran alongside this release, and the deep
+GPU/display pass that followed, are recorded in `PATCH_SOURCES.md` under
+*Sweeps 2026-09-15*.
+
 
 ## [7.3.0-rc3-11-sleepy-next]: 2026-09-15
 
