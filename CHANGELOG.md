@@ -353,6 +353,66 @@ treat negative results from those two as weak. `repos/linux-tkg` and
 policy — we do not carry the fixes squash). x86/security: nothing on-target
 since 09-13.
 
+**7. Mailing lists.** No re-adds: the DCN4 flip-schedule reverts (`9051`/`9052`,
+Ray Wu, landed in AMD's tree as `c010ccac1358`/`04009276da2d`, *"Because it
+causes some regression"*) are still correctly absent from our series. Both
+September DC patchsets (`00/40` Ray Wu and `00/66` Chenyu Chen) were diffed
+subject-by-subject against our 217: **only three are ours** — `1154`, `1159`,
+`1166`. Everything else is DCN6 / DCN35 / DCN42B / DCN50 / DCN60 / DML2.1,
+different silicon. A scan of both mboxes for `smu_v14|psp_v14|sdma_v7|vcn_v5|
+mmhub_v4|gmc_v12` returned **zero** hits for September.
+
+One new gfx12 candidate to track, unmerged and not carried:
+`[PATCH v4 4/8] drm/amdgpu/gfx12: honor mqd_prop modify flag in init_mqd`
+(Jesse Zhang, 2026-09-07) — touches **only** `gfx_v12_0.c` (+14/−9), consuming
+the `mqd_prop` modify flag so a re-enabled queue keeps the firmware context-saved
+rptr/wptr. Not in amd-staging either. No traceable merge yet, so nothing to
+extract.
+
+Also under review, none carried: `drm/amdgpu: Fix GPU PCIe link capability
+reporting` (Limonciello, Cc stable — host-side PCIe caps were being reported as
+the GPU's); `drm/amdgpu: fix sched entity leak in ttm buffer entity init`;
+`drm/amdgpu: fix rmmio iounmap skipped on device removal` (leaks the register BAR
+once per unload); `drm/amd/display: Fix HDMI RGB quantization updates` (Alex
+Hung — relevant to our HDMI work).
+
+**8. Phoronix trace-through.** Every claim was traced to a tree rather than
+taken at face value:
+
+- **"AMDGPU HDMI 2.1 enabled by default" (7.4)** — `f13a8b4a7e86`,
+  `0505751e5019`, `9ec95eed935c`, `2151ff7f88f3`, `453506fdab7c`. These are
+  **exactly what our `0055`/`0059`/`0061` carry**, so all three become drop
+  candidates at the 7.4 bump. **`0059` will likely conflict**: `730c6d807`
+  ("Drop KUnit tests for removed `parse_hdmi_amd_vsdb()`") records that
+  `parse_hdmi_amd_vsdb()` was removed when HDMI FreeSync detection moved to the
+  common EDID parser — verified gone at drm-next HEAD, still present on
+  amd-staging. Flagged, not acted on.
+- **"AMD P-State for Zen 6"** — Zen 6 (family 1Ah models 0x80/81/84/85/0xe0).
+  Wrong generation. The article says the boost-ratio change is driver-wide,
+  which could oblige a `1202` rebase, but the article does not say and the
+  patches were not read — recorded as unverified.
+- **Zstd "avoid redundant initialization" (7.4)** — goes into the cryptodev
+  crypto branch and is exercised via `crypto_acomp`, **not** `lib/zstd`, so it
+  does not touch our `2100`. No action.
+- **Safe-RET SRSO (Zen 1–4, our CPU)** — merge `f5fdd6665ac4` is **already in
+  our v7.3-rc3 base** (confirmed by ancestry), and we correctly carry no local
+  SRSO patch. No action.
+- **MADV_FREE + THP silent data loss** — the most consequential claim checked,
+  and it resolved cleanly: the fix is **not** in v7.3-rc3 (so carrying it is
+  right) and **we already have it** as `2500`, content-identical to
+  `f7491d7c81db` (added-lines md5 `36075f380c10` on both sides). `aa55d949bf9f`
+  is the same fix under linux-next's hash — the "one fix, two hashes" case
+  already documented in the patch-sweep skill.
+- Phoronix published **nothing** in September 2026 on BFQ / mq-deadline,
+  sched-ext, or zswap/zram/MGLRU.
+
+**9. Regressions on our base.** `[REGRESSION] amdgpu: "pixel format with alpha
+exposed but blend mode not setup"` (Leemhuis, 2026-09-01) comes from
+`9813e158d13d` in v7.3-rc1 and is fixed for 7.4 by mwen's atomic-state-helper
+series. Leemhuis states it is a dmesg warning only, no functional impact, and it
+is present in our base — which matches the boot audit: no such message appears
+here. The 120 Hz DCN32 scanout-corruption regression is DCN32, not our silicon.
+
 ## [7.3.0-rc3-15-sleepy-next]: 2026-09-15
 
 ### Added
