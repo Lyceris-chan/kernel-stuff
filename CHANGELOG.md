@@ -173,6 +173,62 @@ negative results — recorded here so the same ground is not covered twice.
   would cut roughly 245 ms from the 485 ms ESP read, at the cost of moving when
   the display modesets.
 
+### Third pass: service audit and dead config (2026-09-16)
+
+Every enabled unit was audited against this hardware, plus the wiki pages the
+first two passes had not read (`Systemd`, `Improving performance`, `Solid state
+drive`, `Ext4`, `Power management`, `XDG Autostart`).
+
+- **`nowatchdog` is inert on this kernel, and the kernel says so:**
+  `Unknown kernel command line parameters "nowatchdog"`.
+  `CONFIG_SOFTLOCKUP_DETECTOR` and `CONFIG_HARDLOCKUP_DETECTOR` are both unset,
+  so the parameter has nothing to disable. What *is* running is
+  `CONFIG_CLOCKSOURCE_WATCHDOG=y`, which `nowatchdog` never controlled.
+- **The 159 ms stall that watchdog reports is not its fault.** `Watchdog remote
+  CPU 4 read timed out` lands inside the 725 ms initrd gap and reads like a
+  cheap 159 ms win. It is not: `watchdog_handle_remote_timeout()`
+  (`kernel/time/clocksource.c`) runs from `schedule_work(&watchdog_work)` and
+  prints *after* the stall it detected, so the line is a symptom. Disabling the
+  watchdog would hide it and cost TSC-drift detection on a machine whose A/B
+  methodology depends on stable timing. Left on.
+- **`bpftune` is malfunctioning against this kernel's deliberate config.**
+  Because this package builds `-d TCP_CONG_BBR -e TCP_CONG_BBR3`, CachyOS's
+  bpftune hunts a congestion control named `bbr` that cannot exist here —
+  `modprobe: FATAL: Module tcp_bbr not found in directory
+  /lib/modules/7.3.0-rc3-16-sleepy-next` — then rewrites
+  `net.ipv4.tcp_allowed_congestion_control` three times per boot
+  (`reno bbr3 cubic` → `+htcp` → `+dctcp`) chasing it, and counts the failed
+  attempts as successes. It holds 69 MB, and `net-tune` sets that key anyway.
+  Recommended but not done, because it is a working tuning tool with a broken
+  edge rather than a defect, so the call is the user's:
+  `systemctl disable --now bpftune.service`.
+- **`network-online.target` is not reached until ~12 s into the boot**, so
+  `net-tune` (CAKE) and `blocky` (DNS) are both down until then. A functional
+  gap, not a boot-time one — `graphical.target` is at 2.083s and nothing waits
+  for the target. Closing it means triggering those two off the interface coming
+  up rather than off the target, and `net-tune.sh` `exit 1`s when no UP
+  interface exists, so it is not a one-line change.
+- **Dead config that prints errors every boot**, all of it owned by CachyOS
+  packages under `/usr/lib`, so the fix belongs upstream rather than in an
+  override: amdgpu's `si_support=1 cik_support=1` (GCN-era options that no longer
+  exist for Navi 48); `70-cachyos-settings.conf` writing `kernel/nmi_watchdog`
+  and `kernel/unprivileged_userns_clone`, neither of which this kernel has; and a
+  `sp5100_tco` blacklist for a driver that is not built. The swappiness conflict
+  is ours: `99-custom-tweaks.conf` sets 180 and `99-xswap-swappiness.conf` sets
+  150, so 180 is dead by lexicographic order and still carries a comment about
+  zram.
+- **`journald` `SystemMaxUse=50M` retains about 14 boots, or two days.** That is
+  the history every A/B comparison depends on, and raising it is free on a 1 TB
+  NVMe — but clear the `faillock` entries first (see `LESSONS.md`), or the extra
+  space preserves those too.
+- Verified as deliberate and left alone: `power-profiles-daemon` is CachyOS's
+  build and is wired to `scx_loader` (its binary carries `org.scx.Loader`
+  strings), so the two are not duplicates and changing the power profile also
+  switches sched-ext mode. `cachyos-iw-set-regdomain.path` watches
+  `/etc/localtime` rather than a NIC and is enabled only because `iw` is
+  installed; it costs no boot time. `lvm2-monitor` (47 ms) and `acpid` have no
+  work here but are equally cheap.
+
 ## [7.3.0-rc3-15-sleepy-next]: 2026-09-15
 
 ### Added

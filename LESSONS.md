@@ -747,3 +747,44 @@ every time. If a cleaner is going to strip locales, set `NoExtract` in
 **A clean integrity result says nothing about hardware.** Run `smartctl -H` and
 read the superblock too (`tune2fs -l` for ext4): state, error count, and whether
 a periodic check is even scheduled (`Maximum mount count: -1` means it is not).
+
+## A flag that does nothing, and a report that is not a cause (2026-09-16)
+
+Two findings from one boot audit — the same mistake wearing different clothes.
+
+**`nowatchdog` has been on the kernel command line for months, doing nothing.**
+The kernel says so on every boot, in a line nobody reads:
+
+```
+Unknown kernel command line parameters "nowatchdog", will be passed to user space.
+```
+
+`CONFIG_SOFTLOCKUP_DETECTOR` and `CONFIG_HARDLOCKUP_DETECTOR` are both unset, so
+there is no lockup detector for the parameter to disable. And the watchdog that
+*is* running — `CONFIG_CLOCKSOURCE_WATCHDOG=y`, an unrelated mechanism — was never
+controlled by `nowatchdog` at all.
+
+**Check that a tunable exists before believing something is tuned.** A cmdline
+flag, a `--set-str` against a symbol that no longer exists, a sysctl written by a
+vendor file for a kernel that lacks it: all silent. The kernel *does* warn about
+unknown cmdline parameters. It is one line at `[0.023]`, it says "will be passed
+to user space", and it reads like noise. It is not noise.
+
+**A log line that appears at the end of a stall usually reports it, not causes
+it.** `Watchdog remote CPU 4 read timed out` sits 159 ms into the unexplained
+initrd gap and looks like a free 159 ms:
+
+```c
+static void watchdog_handle_remote_timeout(struct clocksource *cs)
+{
+	pr_info_once("Watchdog remote CPU %u read timed out\n", watchdog_data.curr_cpu);
+```
+
+It runs from `schedule_work(&watchdog_work)` — a workqueue on its own schedule —
+and prints *after* the read that was already slow. The stall is the cause; the
+line is the receipt. Disabling the watchdog would delete the receipt and cost
+TSC-instability detection, which this project's A/B methodology depends on.
+
+Same shape as *"A unit that waits is not the unit that gates"* above: the thing
+that *mentions* a problem is rarely the thing that *is* the problem. Ask what had
+to be true for the message to be printed, not merely what printed it.
