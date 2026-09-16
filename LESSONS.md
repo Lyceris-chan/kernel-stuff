@@ -670,6 +670,41 @@ Two rules, both cheap:
   — a file that exists and is syntactically valid can still contain the wrong
   thing entirely.
 
+## `tar rf` on a `.tar.gz` destroys the archive (2026-09-16)
+
+A backup archive was built with `tar czf`, then added to later with `tar rf`.
+`rf` appends to an **uncompressed** tar; pointed at a gzip file it discards the
+compressed stream and rewrites the file as a plain tar. The result:
+
+- The five config files originally archived were **gone** — the gzip magic
+  (`1f 8b`) was not anywhere in the file, so nothing was recoverable from it.
+- `file` reported `POSIX tar archive (GNU)`, i.e. the `.tar.gz` extension lied.
+- It failed silently. Nothing warned at append time; the corruption only
+  surfaced on the next `tar tzf`, by which point the source files had already
+  been deleted.
+
+**Appending to a compressed archive is not a thing.** To add to one, unpack it,
+add the files, and re-create it:
+
+```bash
+mkdir -p /tmp/rebuild && tar xzf arch.tar.gz -C /tmp/rebuild
+# ... copy the new files in ...
+tar czf arch.tar.gz -C /tmp/rebuild .
+```
+
+Two habits that would have caught it:
+
+- **`tar tf` (no `z`) on a `.tar.gz`, or `file` on it, right after writing it.**
+  The archive here was created, appended to twice, and never re-listed.
+- **Archive *before* deleting, and confirm the archive reads back first.** Here
+  the `rm` ran in the same command block as the append, so a failed append could
+  not stop the delete. Sequence those separately.
+
+The lost files were dead config that had been removed deliberately, and the
+archive was rebuilt with a `README` recording which entries are byte-exact and
+which are reconstructed — but only because every one of them happened to appear
+verbatim in the session log. That was luck, not a process.
+
 ## Attribute a kernel warning by boot, not by reasoning (2026-09-16)
 
 `mem_cgroup_update_lru_size(): lru_size -2522` was firing once per boot in a tree
