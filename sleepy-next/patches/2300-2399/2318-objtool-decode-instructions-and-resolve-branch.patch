@@ -1,10 +1,61 @@
-From nobody Mon Sep 17 00:00:00 2001
+From 6d81f0eb42b34007bc0c754bb9cf5b0da095f6ec Mon Sep 17 00:00:00 2001
 From: "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
-Date: Mon, 14 Sep 2026 10:22:16 +0100
-Subject: [PATCH v2 17/21] objtool: decode instructions and resolve branch targets in parallel
-Message-Id: <20260914-build-speedup-v2-17-39817ec5db23@kernel.org>
-To: Linus Torvalds <torvalds@linux-foundation.org>,  Nathan Chancellor <nathan@kernel.org>, Nicolas Schier <nsc@kernel.org>,  Nick Desaulniers <ndesaulniers@google.com>,  Bill Wendling <morbo@google.com>, Justin Stitt <justinstitt@google.com>,  Masahiro Yamada <masahiroy@kernel.org>, Alexey Gladkov <legion@kernel.org>,  Thomas Gleixner <tglx@kernel.org>, Ingo Molnar <mingo@redhat.com>,  Borislav Petkov <bp@alien8.de>, Dave Hansen <dave.hansen@linux.intel.com>,  x86@kernel.org, "H. Peter Anvin" <hpa@zytor.com>,  Paul Walmsley <pjw@kernel.org>, Palmer Dabbelt <palmer@dabbelt.com>,  Albert Ou <aou@eecs.berkeley.edu>, Alexandre Ghiti <alex@ghiti.fr>,  Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,  Will Deacon <will@kernel.org>, Mark Rutland <mark.rutland@arm.com>,  Ard Biesheuvel <ardb@kernel.org>,  Ilias Apalodimas <ilias.apalodimas@linaro.org>,  Josh Poimboeuf <jpoimboe@kernel.org>, Peter Zijlstra <peterz@infradead.org>,  Miguel Ojeda <ojeda@kernel.org>, Boqun Feng <boqun@kernel.org>,  Gary Guo <gary@garyguo.net>,  =?utf-8?q?Bj=C3=B6rn_Roy_Baron?= <bjorn3_gh@protonmail.com>,  Benno Lossin <lossin@kernel.org>, Andreas Hindborg <a.hindborg@kernel.org>,  Alice Ryhl <aliceryhl@google.com>, Trevor Gross <tmgross@umich.edu>,  Danilo Krummrich <dakr@kernel.org>,  Daniel Almeida <daniel.almeida@collabora.com>,  Tamir Duberstein <tamird@kernel.org>,  Alexandre Courbot <acourbot@nvidia.com>,  =?utf-8?q?Onur_=C3=96zkan?= <work@onurozkan.dev>,  Jonathan Corbet <corbet@lwn.net>, Randy Dunlap <rdunlap@infradead.org>,  Kees Cook <kees@kernel.org>, "Gustavo A. R. Silva" <gustavoars@kernel.org>
-Cc: linux-kbuild@vger.kernel.org, linux-kernel@vger.kernel.org,  llvm@lists.linux.dev, linux-riscv@lists.infradead.org,  linux-arch@vger.kernel.org, linux-arm-kernel@lists.infradead.org,  linux-efi@vger.kernel.org, rust-for-linux@vger.kernel.org,  linux-doc@vger.kernel.org, Jens Axboe <axboe@kernel.dk>,  linux-hardening@vger.kernel.org, "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
+Date: Thu, 17 Sep 2026 17:06:27 +0100
+Subject: [PATCH v3 17/20] objtool: decode instructions and resolve branch
+ targets in parallel
+Precedence: bulk
+X-Mailing-List: rust-for-linux@vger.kernel.org
+List-Id: <rust-for-linux.vger.kernel.org>
+List-Subscribe: <mailto:rust-for-linux+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:rust-for-linux+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+Message-Id: <20260917-build-speedup-v3-17-9ecf4163ff36@kernel.org>
+References: <20260917-build-speedup-v3-0-9ecf4163ff36@kernel.org>
+In-Reply-To: <20260917-build-speedup-v3-0-9ecf4163ff36@kernel.org>
+To: Linus Torvalds <torvalds@linux-foundation.org>, 
+ Nathan Chancellor <nathan@kernel.org>, Nicolas Schier <nsc@kernel.org>, 
+ Nick Desaulniers <ndesaulniers@google.com>, 
+ Bill Wendling <morbo@google.com>, Justin Stitt <justinstitt@google.com>, 
+ Masahiro Yamada <masahiroy@kernel.org>, Alexey Gladkov <legion@kernel.org>, 
+ Thomas Gleixner <tglx@kernel.org>, Ingo Molnar <mingo@redhat.com>, 
+ Borislav Petkov <bp@alien8.de>, Dave Hansen <dave.hansen@linux.intel.com>, 
+ x86@kernel.org, "H. Peter Anvin" <hpa@zytor.com>, 
+ Paul Walmsley <pjw@kernel.org>, Palmer Dabbelt <palmer@dabbelt.com>, 
+ Albert Ou <aou@eecs.berkeley.edu>, Alexandre Ghiti <alex@ghiti.fr>, 
+ Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>, 
+ Will Deacon <will@kernel.org>, Mark Rutland <mark.rutland@arm.com>, 
+ Ard Biesheuvel <ardb@kernel.org>, 
+ Ilias Apalodimas <ilias.apalodimas@linaro.org>, 
+ Josh Poimboeuf <jpoimboe@kernel.org>, Peter Zijlstra <peterz@infradead.org>, 
+ Miguel Ojeda <ojeda@kernel.org>, Boqun Feng <boqun@kernel.org>, 
+ Gary Guo <gary@garyguo.net>, 
+ =?utf-8?q?Bj=C3=B6rn_Roy_Baron?= <bjorn3_gh@protonmail.com>, 
+ Benno Lossin <lossin@kernel.org>, Andreas Hindborg <a.hindborg@kernel.org>, 
+ Alice Ryhl <aliceryhl@google.com>, Trevor Gross <tmgross@umich.edu>, 
+ Danilo Krummrich <dakr@kernel.org>, 
+ Daniel Almeida <daniel.almeida@collabora.com>, 
+ Tamir Duberstein <tamird@kernel.org>, 
+ Alexandre Courbot <acourbot@nvidia.com>, 
+ =?utf-8?q?Onur_=C3=96zkan?= <work@onurozkan.dev>, 
+ Jonathan Corbet <corbet@lwn.net>, Randy Dunlap <rdunlap@infradead.org>, 
+ Kees Cook <kees@kernel.org>, "Gustavo A. R. Silva" <gustavoars@kernel.org>
+Cc: linux-kbuild@vger.kernel.org, linux-kernel@vger.kernel.org, 
+ llvm@lists.linux.dev, linux-riscv@lists.infradead.org, 
+ linux-arch@vger.kernel.org, linux-arm-kernel@lists.infradead.org, 
+ linux-efi@vger.kernel.org, rust-for-linux@vger.kernel.org, 
+ linux-doc@vger.kernel.org, Jens Axboe <axboe@kernel.dk>, 
+ linux-hardening@vger.kernel.org, "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
+X-Mailer: b4 0.14.3
+X-Developer-Signature: v=1; a=openpgp-sha256; l=27680; i=ljs@kernel.org;
+ h=from:subject:message-id; bh=8efIJflAwt4iSBRIzHUposoQNlV2/MRSC4pkeCKRZm0=;
+ b=owGbwMvMwCV2fu7ZrsZH9SKMp9WSGLLW8P8/e+CsdNo75vPFJ0wvuqvvXeNm0e1YbC+2L+X/h
+ HOF91as7yhlYRDjYpAVU2R5/kV8f5BI2LzOC/5uMHNYmUCGMHBxCsBE9BwY/qnw7s+XsMiZKnik
+ PGRS3FuTKSymjjfqP7bHqk297Z0Xl8nwTzk6siAy+OSpK4Ishs1pCx8/r+f9NVEx7djfiPhFH3k
+ 9GAE=
+X-Developer-Key: i=ljs@kernel.org; a=openpgp;
+ fpr=E7F417BF5214569E89D04F46CF9DCD8A81E27F14
 
 During a kernel build objtool is used to decode vmlinux.o's instructions
 and resolve every jump and call destination.
@@ -12,13 +63,15 @@ and resolve every jump and call destination.
 This forms a large part of the work objtool does during the build process,
 and it is all done in serial.
 
-Decode these in parallel at a function granularity to speed things up.
+Decode these in parallel at a function granularity to speed things up, but
+limit this to invocations that pass --link, and only where the there is 8
+MiB or more text to justify it.
+
+In practice this limits this to processing vmlinux.o in the kernel build
+and modules are processed as they were before.
 
 Only the instruction hash is shared between the threads and nothing is ever
 removed from it, so an insertion is a compare-and-swap on the bucket head.
-
-Threads are only created for objects with 8 MiB or more of text, meaning
-that runs involving smaller objects remain unaffected.
 
 Threading is limited to decoding and the jump pass, so the gain flattens
 out at 16 threads and any further threads were found to only add overhead.
@@ -56,9 +109,9 @@ Assisted-by: LLM
 Signed-off-by: Lorenzo Stoakes (ARM) <ljs@kernel.org>
 ---
  tools/objtool/Makefile  |   2 +-
- tools/objtool/check.c   | 714 ++++++++++++++++++++++++++++++++++++------------
+ tools/objtool/check.c   | 717 ++++++++++++++++++++++++++++++++++++------------
  tools/objtool/objtool.c |  14 +-
- 3 files changed, 543 insertions(+), 187 deletions(-)
+ 3 files changed, 546 insertions(+), 187 deletions(-)
 
 diff --git a/tools/objtool/Makefile b/tools/objtool/Makefile
 index a4484fd22a96..2de50c3917ba 100644
@@ -74,7 +127,7 @@ index a4484fd22a96..2de50c3917ba 100644
  # Allow old libelf to be used:
  elfshdr := $(shell echo '$(pound)include <libelf.h>' | $(HOSTCC) $(OBJTOOL_CFLAGS) -x c -E - 2>/dev/null | grep elf_getshdr)
 diff --git a/tools/objtool/check.c b/tools/objtool/check.c
-index 62a3e1d4e9e5..a7499f247818 100644
+index 62a3e1d4e9e5..52af91e048a2 100644
 --- a/tools/objtool/check.c
 +++ b/tools/objtool/check.c
 @@ -7,6 +7,9 @@
@@ -119,7 +172,7 @@ index 62a3e1d4e9e5..a7499f247818 100644
  static unsigned long nr_insns;
  static unsigned long nr_insns_visited;
  
-+/* Only an object this large, e.g. vmlinux.o, is decoded on several threads. */
++/* Only the vmlinux.o link, and only if it is this large, runs on several threads. */
 +#define DECODE_THREADED_MIN_TEXT	SZ_8M
 +/* Only decoding and the branch passes are threaded, so more gains nothing. */
 +#define DECODE_MAX_THREADS		16
@@ -128,7 +181,7 @@ index 62a3e1d4e9e5..a7499f247818 100644
  /*
   * sec_offset_hash() keys on OFFSET_STRIDE windows, so the instructions of a
   * window share a chain and buckets beyond one per window would sit empty.
-@@ -451,24 +460,347 @@ static int alloc_insn_hash(struct objtool_file *file, unsigned long text_size)
+@@ -451,24 +460,350 @@ static int alloc_insn_hash(struct objtool_file *file, unsigned long text_size)
  	return 0;
  }
  
@@ -435,6 +488,9 @@ index 62a3e1d4e9e5..a7499f247818 100644
 +{
 +	const long nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
 +
++	/* Modules are processed inside the parallel build, on one thread. */
++	if (!opts.link || opts.module)
++		return 1;
 +	if (text_size < DECODE_THREADED_MIN_TEXT || nr_cpus < 2)
 +		return 1;
 +
@@ -482,7 +538,7 @@ index 62a3e1d4e9e5..a7499f247818 100644
  
  		if (!is_text_sec(sec))
  			continue;
-@@ -493,41 +825,20 @@ static int decode_instructions(struct objtool_file *file)
+@@ -493,41 +828,20 @@ static int decode_instructions(struct objtool_file *file)
  		if (!strcmp(sec->name, ".init.text") && !opts.module)
  			sec->init = true;
  
@@ -535,7 +591,7 @@ index 62a3e1d4e9e5..a7499f247818 100644
  
  		sec_for_each_sym(sec, func) {
  			if (!is_notype_sym(func) && !is_func_sym(func))
-@@ -1570,133 +1881,147 @@ static bool is_first_func_insn(struct objtool_file *file,
+@@ -1570,133 +1884,147 @@ static bool is_first_func_insn(struct objtool_file *file,
  /*
   * Find the destination instructions for all jumps.
   */
@@ -782,7 +838,7 @@ index 62a3e1d4e9e5..a7499f247818 100644
  static struct symbol *find_call_destination(struct section *sec, unsigned long offset)
  {
  	struct symbol *call_dest;
-@@ -1711,59 +2036,82 @@ static struct symbol *find_call_destination(struct section *sec, unsigned long o
+@@ -1711,59 +2039,82 @@ static struct symbol *find_call_destination(struct section *sec, unsigned long o
  /*
   * Find the destination instructions for all calls.
   */
@@ -904,7 +960,7 @@ index 62a3e1d4e9e5..a7499f247818 100644
  	}
  
  	return 0;
-@@ -2732,6 +3080,8 @@ int decode_file(struct objtool_file *file)
+@@ -2732,6 +3083,8 @@ int decode_file(struct objtool_file *file)
  	if (read_annotate(file, __annotate_late))
  		return -1;
  
@@ -953,7 +1009,3 @@ index 71e048f8582a..f472dfe7a773 100644
 +	pthread_mutex_unlock(&pv_ops_lock);
  	return 0;
  }
- 
-
--- 
-2.55.0

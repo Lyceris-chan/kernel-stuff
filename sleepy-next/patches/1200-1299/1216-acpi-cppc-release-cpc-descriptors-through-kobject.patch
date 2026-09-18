@@ -1,3 +1,4 @@
+From 21a79a5a1c7f3da67e89385d11f8604655e2733d Mon Sep 17 00:00:00 2001
 From: Christian Loehle <christian.loehle@arm.com>
 To: "Rafael J . Wysocki" <rafael@kernel.org>,
 	Viresh Kumar <viresh.kumar@linaro.org>
@@ -14,12 +15,19 @@ Cc: linux-pm@vger.kernel.org,
 	zhongqiu.han@oss.qualcomm.com,
 	Christian Loehle <christian.loehle@arm.com>,
 	Sashiko <sashiko-bot@kernel.org>
-Subject: [PATCH v5 07/15] ACPI: CPPC: Release CPC descriptors through kobject
-Date: Thu, 27 Aug 2026 07:30:52 +0100
-Message-Id: <20260827063100.2741066-8-christian.loehle@arm.com>
+Subject: [PATCH v6 07/15] ACPI: CPPC: Release CPC descriptors through kobject
+Date: Sun, 30 Aug 2026 12:56:36 +0100
+Message-Id: <20260830115644.2056983-8-christian.loehle@arm.com>
 X-Mailer: git-send-email 2.34.1
-In-Reply-To: <20260827063100.2741066-1-christian.loehle@arm.com>
-References: <20260827063100.2741066-1-christian.loehle@arm.com>
+In-Reply-To: <20260830115644.2056983-1-christian.loehle@arm.com>
+References: <20260830115644.2056983-1-christian.loehle@arm.com>
+Precedence: bulk
+X-Mailing-List: linux-pm@vger.kernel.org
+List-Id: <linux-pm.vger.kernel.org>
+List-Subscribe: <mailto:linux-pm+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:linux-pm+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
 
 The CPC descriptor embeds the kobject used for its sysfs directory, but
 it has no release callback and processor exit frees the descriptor
@@ -42,11 +50,11 @@ Reported-by: Sashiko <sashiko-bot@kernel.org>
 Link: https://sashiko.dev/#/patchset/20260724134251.1632824-1-christian.loehle%40arm.com
 Signed-off-by: Christian Loehle <christian.loehle@arm.com>
 ---
- drivers/acpi/cppc_acpi.c | 50 +++++++++++++++++++++++-----------------
- 1 file changed, 29 insertions(+), 21 deletions(-)
+ drivers/acpi/cppc_acpi.c | 49 ++++++++++++++++++++++++----------------
+ 1 file changed, 29 insertions(+), 20 deletions(-)
 
 diff --git a/drivers/acpi/cppc_acpi.c b/drivers/acpi/cppc_acpi.c
-index 0fda08628c27..4bf17d954d87 100644
+index f9866563466b..37ff54a048c9 100644
 --- a/drivers/acpi/cppc_acpi.c
 +++ b/drivers/acpi/cppc_acpi.c
 @@ -350,7 +350,27 @@ static struct attribute *cppc_attrs[] = {
@@ -77,7 +85,7 @@ index 0fda08628c27..4bf17d954d87 100644
  	.sysfs_ops = &kobj_sysfs_ops,
  	.default_groups = cppc_groups,
  };
-@@ -1133,7 +1153,7 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
+@@ -1147,21 +1167,14 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
  	if (ret) {
  		per_cpu(cpc_desc_ptr, pr->id) = NULL;
  		kobject_put(&cpc_ptr->kobj);
@@ -86,11 +94,9 @@ index 0fda08628c27..4bf17d954d87 100644
  	}
  
  	kfree(output.pointer);
-@@ -1141,15 +1161,7 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
+ 	return 0;
  
  out_free:
- 	pr_err("CPU%d: failed to initialize _CPC: %d\n", pr->id, ret);
--
 -	/* Free all the mapped sys mem areas for this CPU */
 -	for (i = 2; i < cpc_ptr->num_entries; i++) {
 -		void __iomem *addr = cpc_ptr->cpc_regs[i-2].sys_mem_vaddr;
@@ -102,8 +108,8 @@ index 0fda08628c27..4bf17d954d87 100644
 +	cppc_free_desc(cpc_ptr);
  
  out_buf_free:
- 	kfree(output.pointer);
-@@ -1166,10 +1178,14 @@ EXPORT_SYMBOL_GPL(acpi_cppc_processor_probe);
+ 	if (cpc_present)
+@@ -1180,10 +1193,14 @@ EXPORT_SYMBOL_GPL(acpi_cppc_processor_probe);
  void acpi_cppc_processor_exit(struct acpi_processor *pr)
  {
  	struct cpc_desc *cpc_ptr;
@@ -120,7 +126,7 @@ index 0fda08628c27..4bf17d954d87 100644
  	if (pcc_ss_id >= 0 && pcc_data[pcc_ss_id]) {
  		if (pcc_data[pcc_ss_id]->pcc_channel_acquired) {
  			pcc_data[pcc_ss_id]->refcount--;
-@@ -1180,20 +1196,12 @@ void acpi_cppc_processor_exit(struct acpi_processor *pr)
+@@ -1194,20 +1211,12 @@ void acpi_cppc_processor_exit(struct acpi_processor *pr)
  			}
  		}
  	}
@@ -141,7 +147,3 @@ index 0fda08628c27..4bf17d954d87 100644
 -	kfree(cpc_ptr);
  }
  EXPORT_SYMBOL_GPL(acpi_cppc_processor_exit);
- 
--- 
-2.34.1
-

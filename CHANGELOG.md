@@ -15,6 +15,95 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc3-23-sleepy-next]: 2026-09-18
+
+### Changed
+
+- Replace `2100` with sirlucjan's zstd **v5** (`zstd-dev-patches-v5`,
+  2026-09-18; ours was the 2026-09-14 revision). The delta is 14 added and 7
+  removed lines: a tightened `longOffsets` assertion, and FSE state updates in
+  `zstd_decompress_block.c` that pass `DInfo` directly instead of copying
+  `nextState`/`nbBits` into locals. zstd is this machine's zswap compressor.
+  The file name is unchanged, so this is a byte-level replacement rather than a
+  renumber. Verified by substitution against the series tree, including the four
+  zstd dependents that follow it, and again by the full build: 305 patches
+  applied, zero skipped.
+
+### Added
+
+- `2045` — `tcp: Don't call skb_clone_and_charge_r() for close()d listener in
+  tcp_v6_do_rcv()` (Kuniyuki Iwashima, 2026-09-14). The IPv6 receive path
+  charged an skb to a listener that had already closed.
+- `2198` — `mm: filemap: move lruvec accounting outside the xarray lock` (Usama
+  Arif, 2026-09-16). Moves `NR_FILE_PAGES`/`NR_FILE_THPS` accounting past
+  `xas_unlock_irq()`, shortening the xarray critical section on the page-cache
+  add path. Taken from `akpm-mm` `mm-everything` and absent from linux-next, so
+  a version bump would not bring it.
+
+`2045` sits in the `v7.3-rc3`..`master` window that drains into rc4, so carrying
+it shortens the wait rather than adding anything rc4 will not have. `2198` is
+not in that window and is the only part of this release that a bump would not
+reproduce.
+
+### Fixed
+
+- Correct the duplicate test used during sweeps. Comparing an upstream commit
+  subject against the carried patches reported `1587d3394`, `e14a34548`,
+  `93d88ac4a` and `9a0b159ff` as absent; all four are carried (`2507`, `2146`,
+  `2405`, `2410`) under shortened subjects. Reverse-applicability against the
+  series-applied tree is the authoritative test.
+
+## [7.3.0-rc3-22-sleepy-next]: 2026-09-18
+
+### Changed
+
+- Replace the kbuild build-speedup series with **v3** (`2302`-`2321`, 20 patches;
+  was `2302`-`2322`). Verified by substitution: all 21 carried patches reverse
+  cleanly, all 20 v3 patches apply, zero rejects, and no later patch touches any
+  of the 49 files v3 modifies.
+- Export `KRUSTFLAGS="-Zthreads=8"`. v3 drops the rustc front-end threading
+  patch; its cover letter states the flag restores the same behaviour. This
+  build has `CONFIG_RUST=y`, so the flag preserves the parallelism the dropped
+  patch provided.
+- Adopt v3's other fixes: the relocation hash is dropped in favour of building
+  one section at a time incrementally with a linear-scan fallback;
+  parallelisation is limited to the `--link` step; pigz uses the make job server
+  through a new `KPGZIP` variable; `modules_prepare` no longer duplicates a
+  `rust/` build; and `.module-common.o` is built only by the top-level make.
+- Replace the ACPI CPPC series with **v6** (`1210`-`1224`, 15 patches). Ours were
+  v5, three days older. This is live code: `amd-pstate` is built on ACPI CPPC.
+- Replace `2041` (net GSO recursion limit) with its **v2**, posted four days
+  after the v1 carried.
+- Replace `2147` (memcg clear folio memcg) with its **v5**; ours was four
+  revisions behind.
+
+- Add `1070`, a locally adapted **SDMA 7.0 compact IB emission** patch from
+  Tvrtko Ursulin's `[PATCH 17/18]` (2026-09-18). It replaces repeated
+  `ib->ptr[ib->length_dw++]` stores with a register pointer written back once,
+  and skips the padding loop when `pad_count` is zero. Only `17/18` of that
+  series targets Navi 48; the rest are GFX8/9, SI, CIK, UVD, VCE and SDMA 2.4-6.0.
+- Adapt hunk 4 rather than reject it. It is written against a tree carrying a
+  prerequisite refactor this base lacks — it expects
+  `const bool burst_nop = sdma->burst_nop;` hoisted out of the loop and the
+  `sdma &&` NULL check dropped. The port applies that hunk's delta (the early
+  `return`, the register pointer, the single `ib->length_dw += pad_count`) to the
+  rc3 form of `sdma_v7_0_ring_pad_ib()` and changes nothing else. The diff body
+  was regenerated with `git diff`; the only textual difference from the original
+  is one spacing fix, `*ptr++=` to `*ptr++ =`, matching the sibling branch in the
+  same hunk. Verification: applies cleanly to clean v7.3-rc3 under both
+  `git apply --check` and GNU `patch -p1 --forward -F2 --dry-run`, and the
+  cumulative audit applies all 303 patches.
+
+### Fixed
+
+- **Re-clone `repos/torvalds` and `repos/drm-next`.** Both were corrupt — 394 and
+  144 filesystem-check issues, and neither could fetch. `torvalds` now reaches
+  2026-09-18. Any GPU or mainline negative result recorded before this re-clone
+  was less trustworthy than it read.
+
+### Changed
+- `pkgrel` 20 -> 22. Series is 303 patches.
+
 ## [7.3.0-rc3-20-sleepy-next]: 2026-09-16
 
 ### Changed

@@ -1,10 +1,61 @@
-From nobody Mon Sep 17 00:00:00 2001
+From ff5a197374127f6697de80348b0cf8d735df87d5 Mon Sep 17 00:00:00 2001
 From: "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
-Date: Mon, 14 Sep 2026 10:22:10 +0100
-Subject: [PATCH v2 11/21] kbuild: avoid re-running compiler and linker probes
-Message-Id: <20260914-build-speedup-v2-11-39817ec5db23@kernel.org>
-To: Linus Torvalds <torvalds@linux-foundation.org>,  Nathan Chancellor <nathan@kernel.org>, Nicolas Schier <nsc@kernel.org>,  Nick Desaulniers <ndesaulniers@google.com>,  Bill Wendling <morbo@google.com>, Justin Stitt <justinstitt@google.com>,  Masahiro Yamada <masahiroy@kernel.org>, Alexey Gladkov <legion@kernel.org>,  Thomas Gleixner <tglx@kernel.org>, Ingo Molnar <mingo@redhat.com>,  Borislav Petkov <bp@alien8.de>, Dave Hansen <dave.hansen@linux.intel.com>,  x86@kernel.org, "H. Peter Anvin" <hpa@zytor.com>,  Paul Walmsley <pjw@kernel.org>, Palmer Dabbelt <palmer@dabbelt.com>,  Albert Ou <aou@eecs.berkeley.edu>, Alexandre Ghiti <alex@ghiti.fr>,  Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,  Will Deacon <will@kernel.org>, Mark Rutland <mark.rutland@arm.com>,  Ard Biesheuvel <ardb@kernel.org>,  Ilias Apalodimas <ilias.apalodimas@linaro.org>,  Josh Poimboeuf <jpoimboe@kernel.org>, Peter Zijlstra <peterz@infradead.org>,  Miguel Ojeda <ojeda@kernel.org>, Boqun Feng <boqun@kernel.org>,  Gary Guo <gary@garyguo.net>,  =?utf-8?q?Bj=C3=B6rn_Roy_Baron?= <bjorn3_gh@protonmail.com>,  Benno Lossin <lossin@kernel.org>, Andreas Hindborg <a.hindborg@kernel.org>,  Alice Ryhl <aliceryhl@google.com>, Trevor Gross <tmgross@umich.edu>,  Danilo Krummrich <dakr@kernel.org>,  Daniel Almeida <daniel.almeida@collabora.com>,  Tamir Duberstein <tamird@kernel.org>,  Alexandre Courbot <acourbot@nvidia.com>,  =?utf-8?q?Onur_=C3=96zkan?= <work@onurozkan.dev>,  Jonathan Corbet <corbet@lwn.net>, Randy Dunlap <rdunlap@infradead.org>,  Kees Cook <kees@kernel.org>, "Gustavo A. R. Silva" <gustavoars@kernel.org>
-Cc: linux-kbuild@vger.kernel.org, linux-kernel@vger.kernel.org,  llvm@lists.linux.dev, linux-riscv@lists.infradead.org,  linux-arch@vger.kernel.org, linux-arm-kernel@lists.infradead.org,  linux-efi@vger.kernel.org, rust-for-linux@vger.kernel.org,  linux-doc@vger.kernel.org, Jens Axboe <axboe@kernel.dk>,  linux-hardening@vger.kernel.org, "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
+Date: Thu, 17 Sep 2026 17:06:21 +0100
+Subject: [PATCH v3 11/20] kbuild: avoid re-running compiler and linker
+ probes
+Precedence: bulk
+X-Mailing-List: rust-for-linux@vger.kernel.org
+List-Id: <rust-for-linux.vger.kernel.org>
+List-Subscribe: <mailto:rust-for-linux+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:rust-for-linux+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+Message-Id: <20260917-build-speedup-v3-11-9ecf4163ff36@kernel.org>
+References: <20260917-build-speedup-v3-0-9ecf4163ff36@kernel.org>
+In-Reply-To: <20260917-build-speedup-v3-0-9ecf4163ff36@kernel.org>
+To: Linus Torvalds <torvalds@linux-foundation.org>, 
+ Nathan Chancellor <nathan@kernel.org>, Nicolas Schier <nsc@kernel.org>, 
+ Nick Desaulniers <ndesaulniers@google.com>, 
+ Bill Wendling <morbo@google.com>, Justin Stitt <justinstitt@google.com>, 
+ Masahiro Yamada <masahiroy@kernel.org>, Alexey Gladkov <legion@kernel.org>, 
+ Thomas Gleixner <tglx@kernel.org>, Ingo Molnar <mingo@redhat.com>, 
+ Borislav Petkov <bp@alien8.de>, Dave Hansen <dave.hansen@linux.intel.com>, 
+ x86@kernel.org, "H. Peter Anvin" <hpa@zytor.com>, 
+ Paul Walmsley <pjw@kernel.org>, Palmer Dabbelt <palmer@dabbelt.com>, 
+ Albert Ou <aou@eecs.berkeley.edu>, Alexandre Ghiti <alex@ghiti.fr>, 
+ Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>, 
+ Will Deacon <will@kernel.org>, Mark Rutland <mark.rutland@arm.com>, 
+ Ard Biesheuvel <ardb@kernel.org>, 
+ Ilias Apalodimas <ilias.apalodimas@linaro.org>, 
+ Josh Poimboeuf <jpoimboe@kernel.org>, Peter Zijlstra <peterz@infradead.org>, 
+ Miguel Ojeda <ojeda@kernel.org>, Boqun Feng <boqun@kernel.org>, 
+ Gary Guo <gary@garyguo.net>, 
+ =?utf-8?q?Bj=C3=B6rn_Roy_Baron?= <bjorn3_gh@protonmail.com>, 
+ Benno Lossin <lossin@kernel.org>, Andreas Hindborg <a.hindborg@kernel.org>, 
+ Alice Ryhl <aliceryhl@google.com>, Trevor Gross <tmgross@umich.edu>, 
+ Danilo Krummrich <dakr@kernel.org>, 
+ Daniel Almeida <daniel.almeida@collabora.com>, 
+ Tamir Duberstein <tamird@kernel.org>, 
+ Alexandre Courbot <acourbot@nvidia.com>, 
+ =?utf-8?q?Onur_=C3=96zkan?= <work@onurozkan.dev>, 
+ Jonathan Corbet <corbet@lwn.net>, Randy Dunlap <rdunlap@infradead.org>, 
+ Kees Cook <kees@kernel.org>, "Gustavo A. R. Silva" <gustavoars@kernel.org>
+Cc: linux-kbuild@vger.kernel.org, linux-kernel@vger.kernel.org, 
+ llvm@lists.linux.dev, linux-riscv@lists.infradead.org, 
+ linux-arch@vger.kernel.org, linux-arm-kernel@lists.infradead.org, 
+ linux-efi@vger.kernel.org, rust-for-linux@vger.kernel.org, 
+ linux-doc@vger.kernel.org, Jens Axboe <axboe@kernel.dk>, 
+ linux-hardening@vger.kernel.org, "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
+X-Mailer: b4 0.14.3
+X-Developer-Signature: v=1; a=openpgp-sha256; l=19000; i=ljs@kernel.org;
+ h=from:subject:message-id; bh=k0t1jfB0LdEvB561bXcAq0tnUTQ1OLC0VT5CfmUIjJI=;
+ b=owGbwMvMwCV2fu7ZrsZH9SKMp9WSGLLW8P+btIHrXOS/mNg9kTKX7hyRzKrfdZHvyuczGbavv
+ jy0YYy91VHKwiDGxSArpsjy/Iv4/iCRsHmdF/zdYOawMoEMYeDiFICJnNdi+Kc9hflbW9eJ8kdS
+ TLyezN4nplqwOC9bzPH9acfKjEiWYD1GhnXLXGad3DTp2O+G0xOPleaw1oXdW7jEyo55Ap+lSe/
+ 2Ag4A
+X-Developer-Key: i=ljs@kernel.org; a=openpgp;
+ fpr=E7F417BF5214569E89D04F46CF9DCD8A81E27F14
 
 Each kernel make invocation begins with ~30 compiler and linker runs each
 of which performs duplicate probe for a number of compiler and linker
@@ -17,7 +68,7 @@ A convention already exists for this - CC_HAS_xxx, LD_HAS_xxx in Kconfig
 files (for example, CC_HAS_COUNTED_BY), so convert these probes to Kconfig
 options where appropriate.
 
-This change avoids a sublte issue with ppc32 (big endian) - clang doesn't
+This change avoids a subtle issue with ppc32 (big endian) - clang doesn't
 accept -fno-stack-clash-protection on this sub-target, so keep this option
 in the Makefile.
 
@@ -429,7 +480,3 @@ index 35af7d6c6d18..83d274fcbfaf 100644
 +KBUILD_CFLAGS += $(if $(CONFIG_CC_HAS_WNO_STRINGOP_TRUNCATION),-Wno-stringop-truncation)
  
  KBUILD_CFLAGS += -Wno-override-init # alias for -Wno-initializer-overrides in clang
- 
-
--- 
-2.55.0

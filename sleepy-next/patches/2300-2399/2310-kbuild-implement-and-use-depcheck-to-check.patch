@@ -1,10 +1,61 @@
-From nobody Mon Sep 17 00:00:00 2001
+From fa602cd860d458bba4ca48ea86285bb854184d43 Mon Sep 17 00:00:00 2001
 From: "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
-Date: Mon, 14 Sep 2026 10:22:08 +0100
-Subject: [PATCH v2 09/21] kbuild: implement and use depcheck to check dependency timestamps
-Message-Id: <20260914-build-speedup-v2-9-39817ec5db23@kernel.org>
-To: Linus Torvalds <torvalds@linux-foundation.org>,  Nathan Chancellor <nathan@kernel.org>, Nicolas Schier <nsc@kernel.org>,  Nick Desaulniers <ndesaulniers@google.com>,  Bill Wendling <morbo@google.com>, Justin Stitt <justinstitt@google.com>,  Masahiro Yamada <masahiroy@kernel.org>, Alexey Gladkov <legion@kernel.org>,  Thomas Gleixner <tglx@kernel.org>, Ingo Molnar <mingo@redhat.com>,  Borislav Petkov <bp@alien8.de>, Dave Hansen <dave.hansen@linux.intel.com>,  x86@kernel.org, "H. Peter Anvin" <hpa@zytor.com>,  Paul Walmsley <pjw@kernel.org>, Palmer Dabbelt <palmer@dabbelt.com>,  Albert Ou <aou@eecs.berkeley.edu>, Alexandre Ghiti <alex@ghiti.fr>,  Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,  Will Deacon <will@kernel.org>, Mark Rutland <mark.rutland@arm.com>,  Ard Biesheuvel <ardb@kernel.org>,  Ilias Apalodimas <ilias.apalodimas@linaro.org>,  Josh Poimboeuf <jpoimboe@kernel.org>, Peter Zijlstra <peterz@infradead.org>,  Miguel Ojeda <ojeda@kernel.org>, Boqun Feng <boqun@kernel.org>,  Gary Guo <gary@garyguo.net>,  =?utf-8?q?Bj=C3=B6rn_Roy_Baron?= <bjorn3_gh@protonmail.com>,  Benno Lossin <lossin@kernel.org>, Andreas Hindborg <a.hindborg@kernel.org>,  Alice Ryhl <aliceryhl@google.com>, Trevor Gross <tmgross@umich.edu>,  Danilo Krummrich <dakr@kernel.org>,  Daniel Almeida <daniel.almeida@collabora.com>,  Tamir Duberstein <tamird@kernel.org>,  Alexandre Courbot <acourbot@nvidia.com>,  =?utf-8?q?Onur_=C3=96zkan?= <work@onurozkan.dev>,  Jonathan Corbet <corbet@lwn.net>, Randy Dunlap <rdunlap@infradead.org>,  Kees Cook <kees@kernel.org>, "Gustavo A. R. Silva" <gustavoars@kernel.org>
-Cc: linux-kbuild@vger.kernel.org, linux-kernel@vger.kernel.org,  llvm@lists.linux.dev, linux-riscv@lists.infradead.org,  linux-arch@vger.kernel.org, linux-arm-kernel@lists.infradead.org,  linux-efi@vger.kernel.org, rust-for-linux@vger.kernel.org,  linux-doc@vger.kernel.org, Jens Axboe <axboe@kernel.dk>,  linux-hardening@vger.kernel.org, "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
+Date: Thu, 17 Sep 2026 17:06:19 +0100
+Subject: [PATCH v3 09/20] kbuild: implement and use depcheck to check
+ dependency timestamps
+Precedence: bulk
+X-Mailing-List: rust-for-linux@vger.kernel.org
+List-Id: <rust-for-linux.vger.kernel.org>
+List-Subscribe: <mailto:rust-for-linux+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:rust-for-linux+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+Message-Id: <20260917-build-speedup-v3-9-9ecf4163ff36@kernel.org>
+References: <20260917-build-speedup-v3-0-9ecf4163ff36@kernel.org>
+In-Reply-To: <20260917-build-speedup-v3-0-9ecf4163ff36@kernel.org>
+To: Linus Torvalds <torvalds@linux-foundation.org>, 
+ Nathan Chancellor <nathan@kernel.org>, Nicolas Schier <nsc@kernel.org>, 
+ Nick Desaulniers <ndesaulniers@google.com>, 
+ Bill Wendling <morbo@google.com>, Justin Stitt <justinstitt@google.com>, 
+ Masahiro Yamada <masahiroy@kernel.org>, Alexey Gladkov <legion@kernel.org>, 
+ Thomas Gleixner <tglx@kernel.org>, Ingo Molnar <mingo@redhat.com>, 
+ Borislav Petkov <bp@alien8.de>, Dave Hansen <dave.hansen@linux.intel.com>, 
+ x86@kernel.org, "H. Peter Anvin" <hpa@zytor.com>, 
+ Paul Walmsley <pjw@kernel.org>, Palmer Dabbelt <palmer@dabbelt.com>, 
+ Albert Ou <aou@eecs.berkeley.edu>, Alexandre Ghiti <alex@ghiti.fr>, 
+ Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>, 
+ Will Deacon <will@kernel.org>, Mark Rutland <mark.rutland@arm.com>, 
+ Ard Biesheuvel <ardb@kernel.org>, 
+ Ilias Apalodimas <ilias.apalodimas@linaro.org>, 
+ Josh Poimboeuf <jpoimboe@kernel.org>, Peter Zijlstra <peterz@infradead.org>, 
+ Miguel Ojeda <ojeda@kernel.org>, Boqun Feng <boqun@kernel.org>, 
+ Gary Guo <gary@garyguo.net>, 
+ =?utf-8?q?Bj=C3=B6rn_Roy_Baron?= <bjorn3_gh@protonmail.com>, 
+ Benno Lossin <lossin@kernel.org>, Andreas Hindborg <a.hindborg@kernel.org>, 
+ Alice Ryhl <aliceryhl@google.com>, Trevor Gross <tmgross@umich.edu>, 
+ Danilo Krummrich <dakr@kernel.org>, 
+ Daniel Almeida <daniel.almeida@collabora.com>, 
+ Tamir Duberstein <tamird@kernel.org>, 
+ Alexandre Courbot <acourbot@nvidia.com>, 
+ =?utf-8?q?Onur_=C3=96zkan?= <work@onurozkan.dev>, 
+ Jonathan Corbet <corbet@lwn.net>, Randy Dunlap <rdunlap@infradead.org>, 
+ Kees Cook <kees@kernel.org>, "Gustavo A. R. Silva" <gustavoars@kernel.org>
+Cc: linux-kbuild@vger.kernel.org, linux-kernel@vger.kernel.org, 
+ llvm@lists.linux.dev, linux-riscv@lists.infradead.org, 
+ linux-arch@vger.kernel.org, linux-arm-kernel@lists.infradead.org, 
+ linux-efi@vger.kernel.org, rust-for-linux@vger.kernel.org, 
+ linux-doc@vger.kernel.org, Jens Axboe <axboe@kernel.dk>, 
+ linux-hardening@vger.kernel.org, "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
+X-Mailer: b4 0.14.3
+X-Developer-Signature: v=1; a=openpgp-sha256; l=15962; i=ljs@kernel.org;
+ h=from:subject:message-id; bh=yAbXrDXG7VdFDFRiFn8pVEd6adxTWGnW134OALwRIaA=;
+ b=owGbwMvMwCV2fu7ZrsZH9SKMp9WSGLLW8P/zmKQbfvG5cHvptnPx/86V7ctUa/0cc/Jdco2ea
+ J7+3djzHaUsDGJcDLJiiizPv4jvDxIJm9d5wd8NZg4rE8gQBi5OAZiIw3lGhjksXBv3m8T1S199
+ k6J33mhdNydb5C4pIS0hvlW7fCXPRjIybDi7/oTRVgau6Gszq5OMlonE8TLM2Hs1NOj8ev1QvyO
+ inAA=
+X-Developer-Key: i=ljs@kernel.org; a=openpgp;
+ fpr=E7F417BF5214569E89D04F46CF9DCD8A81E27F14
 
 Each object's .cmd file lists its header dependencies, which often
 consists of over a thousand dependencies.
@@ -55,8 +106,8 @@ Signed-off-by: Lorenzo Stoakes (ARM) <ljs@kernel.org>
  scripts/Makefile.build   |  14 +-
  scripts/basic/.gitignore |   1 +
  scripts/basic/Makefile   |   2 +-
- scripts/basic/depcheck.c | 443 +++++++++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 459 insertions(+), 2 deletions(-)
+ scripts/basic/depcheck.c | 441 +++++++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 457 insertions(+), 2 deletions(-)
 
 diff --git a/Makefile b/Makefile
 index dd4c10afbb7f..8105123bcf4d 100644
@@ -119,10 +170,10 @@ index fb8e2c38fbc7..ff98780e474d 100644
  # before running a Clang kernel build.
 diff --git a/scripts/basic/depcheck.c b/scripts/basic/depcheck.c
 new file mode 100644
-index 000000000000..ce5c4565ae31
+index 000000000000..622101c33650
 --- /dev/null
 +++ b/scripts/basic/depcheck.c
-@@ -0,0 +1,443 @@
+@@ -0,0 +1,441 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * depcheck - check the dependency timestamps of a directory's targets so that
@@ -414,17 +465,15 @@ index 000000000000..ce5c4565ae31
 +	const char *slash = strrchr(cmd_path, '/');
 +	const char *base = slash ? slash + 1 : cmd_path;
 +	const size_t dir_len = base - cmd_path;
-+	size_t name_len;
++	const size_t affix_len = strlen(".") + strlen(CMD_SUFFIX);
++	const size_t base_len = strlen(base);
 +
-+	if (base[0] != '.' || !str_ends_with(base, CMD_SUFFIX))
-+		return false;
-+
-+	name_len = strlen(base) - strlen(".") - strlen(CMD_SUFFIX);
-+	if (!name_len)
++	if (base[0] != '.' || !str_ends_with(base, CMD_SUFFIX) ||
++	    base_len <= affix_len)
 +		return false;
 +
 +	return snprintf(target, size, "%.*s%.*s", (int)dir_len, cmd_path,
-+			(int)name_len, base + 1) < (int)size;
++			(int)(base_len - affix_len), base + 1) < (int)size;
 +}
 +
 +/*
@@ -566,6 +615,3 @@ index 000000000000..ce5c4565ae31
 +
 +	return 0;
 +}
-
--- 
-2.55.0

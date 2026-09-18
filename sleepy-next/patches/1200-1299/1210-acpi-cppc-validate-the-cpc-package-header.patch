@@ -1,3 +1,4 @@
+From ed09cd3891568bbfe820f4819d003586f1bbdcf8 Mon Sep 17 00:00:00 2001
 From: Christian Loehle <christian.loehle@arm.com>
 To: "Rafael J . Wysocki" <rafael@kernel.org>,
 	Viresh Kumar <viresh.kumar@linaro.org>
@@ -14,12 +15,19 @@ Cc: linux-pm@vger.kernel.org,
 	zhongqiu.han@oss.qualcomm.com,
 	Christian Loehle <christian.loehle@arm.com>,
 	Sashiko <sashiko-bot@kernel.org>
-Subject: [PATCH v5 01/15] ACPI: CPPC: Validate the _CPC package header
-Date: Thu, 27 Aug 2026 07:30:46 +0100
-Message-Id: <20260827063100.2741066-2-christian.loehle@arm.com>
+Subject: [PATCH v6 01/15] ACPI: CPPC: Validate the _CPC package header
+Date: Sun, 30 Aug 2026 12:56:30 +0100
+Message-Id: <20260830115644.2056983-2-christian.loehle@arm.com>
 X-Mailer: git-send-email 2.34.1
-In-Reply-To: <20260827063100.2741066-1-christian.loehle@arm.com>
-References: <20260827063100.2741066-1-christian.loehle@arm.com>
+In-Reply-To: <20260830115644.2056983-1-christian.loehle@arm.com>
+References: <20260830115644.2056983-1-christian.loehle@arm.com>
+Precedence: bulk
+X-Mailing-List: linux-pm@vger.kernel.org
+List-Id: <linux-pm.vger.kernel.org>
+List-Subscribe: <mailto:linux-pm+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:linux-pm+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
 
 The _CPC NumEntries field includes every package element, including
 NumEntries and Revision. acpi_cppc_processor_probe() nevertheless reads
@@ -95,6 +103,3 @@ index fef54fcd00b7..3b8cdf88e31d 100644
  		cpc_rev = cpc_obj->integer.value;
  	} else {
  		pr_debug("Unexpected _CPC Revision entry type (%d) for CPU:%d\n",
--- 
-2.34.1
-

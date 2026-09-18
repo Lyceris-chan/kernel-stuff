@@ -953,6 +953,188 @@ HRTICK_DL are on here, so the withdrawn half is not inert. Wait for v3.
 Everything else was already carried (`2012`/`2013`, `2148`/`2149`, `2302`–`2322`),
 queued for 7.4, or inert.
 
+## Sweep 2026-09-18 — four series replaced with their current revisions
+
+Fetched every source and swept the carried series for newer revisions. Four
+replacements were verified and taken; the series is 303 -> 302.
+
+### build-speedup v3 (`2302`-`2321`, was `2302`-`2322`)
+
+`[PATCH v3 0/20] kbuild: significantly speed up kernel builds`, Lorenzo Stoakes,
+2026-09-17. Found via the lore **git** endpoint
+(`git clone --mirror https://lore.kernel.org/rust-for-linux/0`) — the web UI is
+blocked, the git endpoint is not.
+
+Verified by substitution: all 21 carried patches reverse cleanly, all 20 v3
+patches apply, zero rejects. v3 touches 49 files and **no later carried patch
+(`>2322`) touches any of them**, so there is no ordering hazard.
+
+**v3 drops the rustc front-end threading patch** (was `2319`). Its cover letter
+states the reason and the remedy:
+
+> "Dropped what was 18/21 - the rustc front end threading patch, as the parallel
+> flag name is still uncertain and a user can set `KRUSTFLAGS=-Zthreads=8` to get
+> the behaviour without it."
+
+`CONFIG_RUST=y` here, so the PKGBUILD now exports `KRUSTFLAGS="-Zthreads=8"`
+(line 643) to keep the parallelism. Other v3 changes: `15/20` drops the
+relocation hash and builds one section at a time incrementally, falling back to
+a linear scan; `17/20` limits parallelisation to the `--link` step only;
+`20/20` moves pigz onto the make job server via `KPGZIP`; `19/20` stops
+`modules_prepare` duplicating a `rust/` build; `14/20` restricts
+`.module-common.o` to the top-level make instance.
+
+### ACPI CPPC v6 (`1210`-`1224`, 15 patches)
+
+`[PATCH v6 0/15] ACPI: CPPC: Fix register access and lifetime bugs`,
+Christian Loehle, 2026-08-30. Ours were v5, posted 2026-08-27 — three days
+older. Live on this machine: `amd-pstate` is built on ACPI CPPC.
+
+### net GSO `2041` (v2)
+
+`[PATCH net v2 1/1] net: gso: limit recursive IP-in-IP segmentation`, Zihan Xi,
+2026-09-17. Ours was v1, posted 2026-09-13 — the v2 landed four days later.
+
+### `2147` (v5)
+
+`[PATCH v5] mm/memcg: clear folio memcg after changing per memcg stats`,
+Bingfang Guo, 2026-09-10. Ours was four revisions behind.
+
+### Locally adapted and taken
+
+- **`1070` — SDMA 7.0 compact IB emission**, from `[PATCH 17/18]` of Tvrtko
+  Ursulin's "More compact IB emission" series
+  (`<20260918120518.96922-18-tvrtko.ursulin@igalia.com>`, 2026-09-18). Authorship
+  stays with Ursulin; the patch carries his `Signed-off-by` plus an
+  `Assisted-by: Claude` trailer for the adaptation.
+
+  Upstream hunk 4 targets `sdma_v7_0_ring_pad_ib()` and is written against a
+  base carrying a prerequisite refactor this tree does not have: it expects
+  `const bool burst_nop = sdma->burst_nop;` hoisted out of the loop with the
+  `sdma &&` NULL check dropped, where rc3 still reads
+  `sdma && sdma->burst_nop && (i == 0)`. The hunk therefore does not apply, on
+  the series tree **or** on clean rc3.
+
+  The adaptation ports that hunk's delta — the early `return` when
+  `pad_count == 0`, the register pointer, and the single
+  `ib->length_dw += pad_count` write-back — onto the rc3 function form and
+  changes nothing else. The diff body was regenerated with `git diff` rather
+  than written by hand (the `1026` reconstruction method). The only textual
+  difference from the original is one spacing fix, `*ptr++=` to `*ptr++ =`,
+  matching the sibling branch in the same hunk.
+
+  Of the 18-patch series, only `17/18` targets Navi 48; the rest are GFX8/9, SI,
+  CIK, UVD, VCE and SDMA 2.4-6.0, so they are not carried.
+
+### Other findings
+
+- **`repos/torvalds` and `repos/drm-next` were corrupt** (394 and 144 fsck
+  issues respectively, both unable to fetch). Both re-cloned; `torvalds` now
+  reaches 2026-09-18. Any GPU or mainline negative result recorded before this
+  re-clone is weaker than it reads.
+- **`lore-dri-devel` and `lore-netdev-new`** carry two unresolved pack deltas
+  each. Usable, but `lore-netdev-new` reports a 2026-09-22 commit — a sender's
+  bad clock on a Lynx PCS patch, not corruption.
+- **`lore-rust-for-linux`** added to `repos/` as the build-speedup series source.
+- The drm/amd work items reference message-id `20260908113338` across five
+  open issues (`#5834`, `#5839`, `#5843`, `#5846`, `#5859`). That is the DC IRQ
+  register read-modify-write patch, **already carried as `1159`**. The two
+  commit shas the tracker cites are dead ends: `112d2111f50a…` is 32 characters
+  and not a valid kernel sha, and `dc59e4fe…` resolves to the `Linux 7.2-rc1`
+  tag.
+
+## Sweep 2026-09-18 (second round)
+
+Three passes: the accumulated `v7.3-rc3`..`master` window, a fresh pull of the
+third-party patchset repos, and a re-clone of the two remaining damaged trees.
+
+### `v7.3-rc3`..`master` — 415 commits (364 non-merge)
+
+`v7.3-rc4` is not tagged yet, but 14 `-rc4` pull tags are already merged, so
+this window drains into rc4 within days. Everything below is rc4-bound unless
+stated otherwise; carrying it now only shortens the wait.
+
+**Adopted**
+
+- **`2045`** — `8e759cd1f` `tcp: Don't call skb_clone_and_charge_r() for
+  close()d listener in tcp_v6_do_rcv()`, Kuniyuki Iwashima, 2026-09-14. The
+  IPv6 receive path charged an skb to a listener that had already closed. One
+  file, two lines.
+- **`2198`** — `2081d8d042e4` `mm: filemap: move lruvec accounting outside the
+  xarray lock`, Usama Arif, 2026-09-16. Taken from `akpm-mm`
+  `mm-everything`, and **not** in linux-next, so a version bump would not bring
+  it. `NR_FILE_PAGES`/`NR_FILE_THPS` accounting moves past `xas_unlock_irq()`,
+  shortening the xarray critical section on the page-cache add path.
+
+**Evaluated and not carried**
+
+- `55a8e1451` `x86/mm: Don't force unencrypted DMA for IOMMU-backed devices` —
+  `CONFIG_AMD_MEM_ENCRYPT=y` is set, but SME is not active on this desktop, so
+  the path is unreachable. rc4-bound.
+- `150dba2c6` `net: remove WARN_ON_ONCE() from the dev_fill_forward_path() loop
+  check` — removes a warning, changes no behaviour. rc4-bound.
+- The `scx_qmap` quartet (`89ff16f07`, `63b4ff622`, `a0d356696`, plus the
+  userspace half of `9a0b159ff`) — they touch `tools/sched_ext/scx_qmap.bpf.c`,
+  a userspace sample. This machine runs `cake_1.2.1` from the `scx-scheds`
+  package, so none of it is loaded. `9a0b159ff` is already carried as `2410`
+  for its kernel-side hunk.
+- The Ghiti swap-dropbehind trio (`2b09efabae8f`, `e42fa88021a8`,
+  `f9abcb602ef3`) — none are in linux-next, so they are genuinely incremental,
+  but the two that do the work hang off swap writeback completion and this
+  machine's xswap has no backing store. `2b09efabae8f` on its own is pure
+  plumbing. `f9abcb602ef3` additionally fails to apply (hunks 1 and 3). Left
+  out.
+- `7891fbb95` `mm/folio: EXPORT_SYMBOL_FOR_KVM(lru_cache_drain_for_folio)` — a
+  symbol export for KVM, partially present already and not needed here.
+
+### Third-party repos
+
+- **sirlucjan** — `zstd-dev-patches-v4` and `-v5` landed 2026-09-18. `2100`
+  replaced with v5; see below.
+- **CachyOS** — no commits since 2026-09-15.
+- **linux-tkg** — the 2026-09-18 activity is BORE, linux-hardened, a Gentoo
+  Kconfig patch and a 7.2 config refresh. None of it is on-target: this machine
+  runs sched-ext rather than BORE, and is not a `-hardened` tree.
+
+### `2100` replaced with sirlucjan zstd `v5`
+
+`zstd-dev-patches-v5/0001-zstd-7.3-merge-v1.6.0-into-kernel-tree.patch`,
+Piotr Gorski, 2026-09-18, supersedes the 2026-09-14 revision already carried.
+The delta is 14 added and 7 removed lines: an
+`assert(MEM_32bits() || !longOffsets)` guard tightened to
+`MEM_32bits() && longOffsets`, and the FSE state updates in
+`zstd_decompress_block.c` switched to pass `DInfo` directly instead of copying
+`nextState`/`nbBits` into locals first.
+
+The file name is unchanged, so this is a byte-level replacement at `2100`, not
+a renumber. Verified by reverse-applying the old revision from the
+series-applied tree, applying v5 in its place, and re-running
+`audit_series.py`: every patch then in the series still applied, including the
+four zstd dependents (`2129`, `2130`, `2148`, `2149`) that follow it. The full
+build then applied all 305 with zero skips.
+
+### Clone repair
+
+`repos/tip` and `repos/akpm-mm` were still the damaged trees. Both re-cloned
+with `--depth=300`; `--shallow-since` is what fails against these two, with
+`fatal: error processing shallow info: 4`. `tip` now reaches 2026-09-18 and
+`akpm-mm` 2026-09-05, both with sane dates, and `akpm-mm`'s non-`master`
+branches needed an explicit `+refs/heads/*:refs/remotes/origin/*` fetch. The
+damaged trees are parked as `repos/tip.damaged` and `repos/akpm-mm.damaged`.
+
+### Methodology correction: subject matching is not a duplicate test
+
+The first pass through the window classified candidates by searching the
+carried patches for the upstream commit subject. That produced four **false
+negatives** — `1587d3394`, `e14a34548`, `93d88ac4a` and `9a0b159ff` were
+reported as absent, and all four are carried (`2507`, `2146`, `2405`, `2410`),
+filed under subjects shortened relative to upstream. Our subjects and upstream
+subjects differ often enough that text matching cannot decide this.
+
+The authoritative test is reverse-applicability against the series-applied
+tree: if `patch -R` succeeds, the change is already in the series. Recorded in
+`LESSONS.md`.
+
 ## Sweep 2026-09-16 (from the rc3-16 cycle)
 
 Base was current: `v7.3-rc3` was the newest mainline tag and `next-20260916` the

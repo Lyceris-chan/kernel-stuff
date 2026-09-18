@@ -1,3 +1,4 @@
+From 7882a91cae4d112337b7774517cba3bb4a870ff4 Mon Sep 17 00:00:00 2001
 From: Christian Loehle <christian.loehle@arm.com>
 To: "Rafael J . Wysocki" <rafael@kernel.org>,
 	Viresh Kumar <viresh.kumar@linaro.org>
@@ -14,12 +15,19 @@ Cc: linux-pm@vger.kernel.org,
 	zhongqiu.han@oss.qualcomm.com,
 	Christian Loehle <christian.loehle@arm.com>,
 	Sashiko <sashiko-bot@kernel.org>
-Subject: [PATCH v5 05/15] ACPI: CPPC: Serialize PCC single-register payload updates
-Date: Thu, 27 Aug 2026 07:30:50 +0100
-Message-Id: <20260827063100.2741066-6-christian.loehle@arm.com>
+Subject: [PATCH v6 05/15] ACPI: CPPC: Serialize PCC single-register payload updates
+Date: Sun, 30 Aug 2026 12:56:34 +0100
+Message-Id: <20260830115644.2056983-6-christian.loehle@arm.com>
 X-Mailer: git-send-email 2.34.1
-In-Reply-To: <20260827063100.2741066-1-christian.loehle@arm.com>
-References: <20260827063100.2741066-1-christian.loehle@arm.com>
+In-Reply-To: <20260830115644.2056983-1-christian.loehle@arm.com>
+References: <20260830115644.2056983-1-christian.loehle@arm.com>
+Precedence: bulk
+X-Mailing-List: linux-pm@vger.kernel.org
+List-Id: <linux-pm.vger.kernel.org>
+List-Subscribe: <mailto:linux-pm+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:linux-pm+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
 
 The PCC doorbell protocol requires OSPM to confirm ownership of the shared
 subspace before placing a command and its payload there.
@@ -46,14 +54,32 @@ Link: https://sashiko.dev/#/patchset/20260724134251.1632824-1-christian.loehle%4
 Link: https://sashiko.dev/#/patchset/20260807111303.1062391-1-christian.loehle%40arm.com
 Signed-off-by: Christian Loehle <christian.loehle@arm.com>
 ---
- drivers/acpi/cppc_acpi.c | 21 ++++++++++++++++-----
- 1 file changed, 16 insertions(+), 5 deletions(-)
+ drivers/acpi/cppc_acpi.c | 32 +++++++++++++++++++++++++++-----
+ 1 file changed, 27 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/acpi/cppc_acpi.c b/drivers/acpi/cppc_acpi.c
-index 1caac71d3e00..3f025cfa30f6 100644
+index 9ddcce7dc1a9..085e775b3637 100644
 --- a/drivers/acpi/cppc_acpi.c
 +++ b/drivers/acpi/cppc_acpi.c
-@@ -1504,7 +1504,7 @@ static int cppc_get_reg_val(int cpu, enum cppc_regs reg_idx, u64 *val)
+@@ -407,6 +407,17 @@ static void cppc_complete_pcc_write(struct cppc_pcc_data *pcc_ss_data,
+ 	wake_up_all(&pcc_ss_data->pcc_write_wait_q);
+ }
+ 
++/* The caller must hold pcc_lock for write. */
++static void cppc_abort_pending_pcc_write(struct cppc_pcc_data *pcc_ss_data,
++					 int ret)
++{
++	if (!pcc_ss_data->pending_pcc_write_cmd)
++		return;
++
++	pcc_ss_data->pending_pcc_write_cmd = false;
++	cppc_complete_pcc_write(pcc_ss_data, ret);
++}
++
+ /*
+  * This function transfers the ownership of the PCC to the platform
+  * So it must be called while holding write_lock(pcc_lock)
+@@ -1507,7 +1518,7 @@ static int cppc_get_reg_val(int cpu, enum cppc_regs reg_idx, u64 *val)
  static int cppc_set_reg_val_in_pcc(int cpu, struct cpc_register_resource *reg, u64 val)
  {
  	int pcc_ss_id = per_cpu(cpu_pcc_subspace_idx, cpu);
@@ -62,7 +88,7 @@ index 1caac71d3e00..3f025cfa30f6 100644
  	int ret;
  
  	if (pcc_ss_id < 0) {
-@@ -1512,15 +1512,26 @@ static int cppc_set_reg_val_in_pcc(int cpu, struct cpc_register_resource *reg, u
+@@ -1515,15 +1526,26 @@ static int cppc_set_reg_val_in_pcc(int cpu, struct cpc_register_resource *reg, u
  		return -ENODEV;
  	}
  
@@ -93,6 +119,3 @@ index 1caac71d3e00..3f025cfa30f6 100644
  	up_write(&pcc_ss_data->pcc_lock);
  
  	return ret;
--- 
-2.34.1
-

@@ -1,10 +1,60 @@
-From nobody Mon Sep 17 00:00:00 2001
+From 2f0bfafc109a85698d8a405365fff65beefa4d19 Mon Sep 17 00:00:00 2001
 From: "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
-Date: Mon, 14 Sep 2026 10:22:06 +0100
-Subject: [PATCH v2 07/21] kallsyms: reimplement mksysmap in C
-Message-Id: <20260914-build-speedup-v2-7-39817ec5db23@kernel.org>
-To: Linus Torvalds <torvalds@linux-foundation.org>,  Nathan Chancellor <nathan@kernel.org>, Nicolas Schier <nsc@kernel.org>,  Nick Desaulniers <ndesaulniers@google.com>,  Bill Wendling <morbo@google.com>, Justin Stitt <justinstitt@google.com>,  Masahiro Yamada <masahiroy@kernel.org>, Alexey Gladkov <legion@kernel.org>,  Thomas Gleixner <tglx@kernel.org>, Ingo Molnar <mingo@redhat.com>,  Borislav Petkov <bp@alien8.de>, Dave Hansen <dave.hansen@linux.intel.com>,  x86@kernel.org, "H. Peter Anvin" <hpa@zytor.com>,  Paul Walmsley <pjw@kernel.org>, Palmer Dabbelt <palmer@dabbelt.com>,  Albert Ou <aou@eecs.berkeley.edu>, Alexandre Ghiti <alex@ghiti.fr>,  Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,  Will Deacon <will@kernel.org>, Mark Rutland <mark.rutland@arm.com>,  Ard Biesheuvel <ardb@kernel.org>,  Ilias Apalodimas <ilias.apalodimas@linaro.org>,  Josh Poimboeuf <jpoimboe@kernel.org>, Peter Zijlstra <peterz@infradead.org>,  Miguel Ojeda <ojeda@kernel.org>, Boqun Feng <boqun@kernel.org>,  Gary Guo <gary@garyguo.net>,  =?utf-8?q?Bj=C3=B6rn_Roy_Baron?= <bjorn3_gh@protonmail.com>,  Benno Lossin <lossin@kernel.org>, Andreas Hindborg <a.hindborg@kernel.org>,  Alice Ryhl <aliceryhl@google.com>, Trevor Gross <tmgross@umich.edu>,  Danilo Krummrich <dakr@kernel.org>,  Daniel Almeida <daniel.almeida@collabora.com>,  Tamir Duberstein <tamird@kernel.org>,  Alexandre Courbot <acourbot@nvidia.com>,  =?utf-8?q?Onur_=C3=96zkan?= <work@onurozkan.dev>,  Jonathan Corbet <corbet@lwn.net>, Randy Dunlap <rdunlap@infradead.org>,  Kees Cook <kees@kernel.org>, "Gustavo A. R. Silva" <gustavoars@kernel.org>
-Cc: linux-kbuild@vger.kernel.org, linux-kernel@vger.kernel.org,  llvm@lists.linux.dev, linux-riscv@lists.infradead.org,  linux-arch@vger.kernel.org, linux-arm-kernel@lists.infradead.org,  linux-efi@vger.kernel.org, rust-for-linux@vger.kernel.org,  linux-doc@vger.kernel.org, Jens Axboe <axboe@kernel.dk>,  linux-hardening@vger.kernel.org, "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
+Date: Thu, 17 Sep 2026 17:06:17 +0100
+Subject: [PATCH v3 07/20] kallsyms: reimplement mksysmap in C
+Precedence: bulk
+X-Mailing-List: rust-for-linux@vger.kernel.org
+List-Id: <rust-for-linux.vger.kernel.org>
+List-Subscribe: <mailto:rust-for-linux+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:rust-for-linux+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+Message-Id: <20260917-build-speedup-v3-7-9ecf4163ff36@kernel.org>
+References: <20260917-build-speedup-v3-0-9ecf4163ff36@kernel.org>
+In-Reply-To: <20260917-build-speedup-v3-0-9ecf4163ff36@kernel.org>
+To: Linus Torvalds <torvalds@linux-foundation.org>, 
+ Nathan Chancellor <nathan@kernel.org>, Nicolas Schier <nsc@kernel.org>, 
+ Nick Desaulniers <ndesaulniers@google.com>, 
+ Bill Wendling <morbo@google.com>, Justin Stitt <justinstitt@google.com>, 
+ Masahiro Yamada <masahiroy@kernel.org>, Alexey Gladkov <legion@kernel.org>, 
+ Thomas Gleixner <tglx@kernel.org>, Ingo Molnar <mingo@redhat.com>, 
+ Borislav Petkov <bp@alien8.de>, Dave Hansen <dave.hansen@linux.intel.com>, 
+ x86@kernel.org, "H. Peter Anvin" <hpa@zytor.com>, 
+ Paul Walmsley <pjw@kernel.org>, Palmer Dabbelt <palmer@dabbelt.com>, 
+ Albert Ou <aou@eecs.berkeley.edu>, Alexandre Ghiti <alex@ghiti.fr>, 
+ Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>, 
+ Will Deacon <will@kernel.org>, Mark Rutland <mark.rutland@arm.com>, 
+ Ard Biesheuvel <ardb@kernel.org>, 
+ Ilias Apalodimas <ilias.apalodimas@linaro.org>, 
+ Josh Poimboeuf <jpoimboe@kernel.org>, Peter Zijlstra <peterz@infradead.org>, 
+ Miguel Ojeda <ojeda@kernel.org>, Boqun Feng <boqun@kernel.org>, 
+ Gary Guo <gary@garyguo.net>, 
+ =?utf-8?q?Bj=C3=B6rn_Roy_Baron?= <bjorn3_gh@protonmail.com>, 
+ Benno Lossin <lossin@kernel.org>, Andreas Hindborg <a.hindborg@kernel.org>, 
+ Alice Ryhl <aliceryhl@google.com>, Trevor Gross <tmgross@umich.edu>, 
+ Danilo Krummrich <dakr@kernel.org>, 
+ Daniel Almeida <daniel.almeida@collabora.com>, 
+ Tamir Duberstein <tamird@kernel.org>, 
+ Alexandre Courbot <acourbot@nvidia.com>, 
+ =?utf-8?q?Onur_=C3=96zkan?= <work@onurozkan.dev>, 
+ Jonathan Corbet <corbet@lwn.net>, Randy Dunlap <rdunlap@infradead.org>, 
+ Kees Cook <kees@kernel.org>, "Gustavo A. R. Silva" <gustavoars@kernel.org>
+Cc: linux-kbuild@vger.kernel.org, linux-kernel@vger.kernel.org, 
+ llvm@lists.linux.dev, linux-riscv@lists.infradead.org, 
+ linux-arch@vger.kernel.org, linux-arm-kernel@lists.infradead.org, 
+ linux-efi@vger.kernel.org, rust-for-linux@vger.kernel.org, 
+ linux-doc@vger.kernel.org, Jens Axboe <axboe@kernel.dk>, 
+ linux-hardening@vger.kernel.org, "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
+X-Mailer: b4 0.14.3
+X-Developer-Signature: v=1; a=openpgp-sha256; l=24381; i=ljs@kernel.org;
+ h=from:subject:message-id; bh=GWo0CxXaBWXcYOg19svJBPx8kLUj1IDVVHSapYXHYLA=;
+ b=owGbwMvMwCV2fu7ZrsZH9SKMp9WSGLLW8P+duink5ATztgLPorvB1S6NN5S/+xRPPrac5acAp
+ 5Dt0vSujlIWBjEuBlkxRZbnX8T3B4mEzeu84O8GM4eVCWQIAxenAExkTwsjw9Xoa4zNU2PCbpx/
+ HnB8/9LsY5m+mS8Cdr78ef1CNUuKXyzDP0vGFQdvf5QT36GUpvmao+LcBlZ5iy8q3+b3/9q3UOR
+ KIRMA
+X-Developer-Key: i=ljs@kernel.org; a=openpgp;
+ fpr=E7F417BF5214569E89D04F46CF9DCD8A81E27F14
 
 mksysmap is a sed script consisting of 30 patterns which link-vmlinux.sh
 uses to generate *.syms files, and which kallsyms is then called against to
@@ -848,6 +898,3 @@ index 856b26ba2ac0..000000000000
 -# ppc stub
 -/\.long_branch\./d
 -/\.plt_branch\./d
-
--- 
-2.55.0

@@ -1,10 +1,61 @@
-From nobody Mon Sep 17 00:00:00 2001
+From 6eda3c557bfd6ad9d3369f2c78536020dff86251 Mon Sep 17 00:00:00 2001
 From: "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
-Date: Mon, 14 Sep 2026 10:22:01 +0100
-Subject: [PATCH v2 02/21] kallsyms: index symbols by token to speed up table compression
-Message-Id: <20260914-build-speedup-v2-2-39817ec5db23@kernel.org>
-To: Linus Torvalds <torvalds@linux-foundation.org>,  Nathan Chancellor <nathan@kernel.org>, Nicolas Schier <nsc@kernel.org>,  Nick Desaulniers <ndesaulniers@google.com>,  Bill Wendling <morbo@google.com>, Justin Stitt <justinstitt@google.com>,  Masahiro Yamada <masahiroy@kernel.org>, Alexey Gladkov <legion@kernel.org>,  Thomas Gleixner <tglx@kernel.org>, Ingo Molnar <mingo@redhat.com>,  Borislav Petkov <bp@alien8.de>, Dave Hansen <dave.hansen@linux.intel.com>,  x86@kernel.org, "H. Peter Anvin" <hpa@zytor.com>,  Paul Walmsley <pjw@kernel.org>, Palmer Dabbelt <palmer@dabbelt.com>,  Albert Ou <aou@eecs.berkeley.edu>, Alexandre Ghiti <alex@ghiti.fr>,  Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,  Will Deacon <will@kernel.org>, Mark Rutland <mark.rutland@arm.com>,  Ard Biesheuvel <ardb@kernel.org>,  Ilias Apalodimas <ilias.apalodimas@linaro.org>,  Josh Poimboeuf <jpoimboe@kernel.org>, Peter Zijlstra <peterz@infradead.org>,  Miguel Ojeda <ojeda@kernel.org>, Boqun Feng <boqun@kernel.org>,  Gary Guo <gary@garyguo.net>,  =?utf-8?q?Bj=C3=B6rn_Roy_Baron?= <bjorn3_gh@protonmail.com>,  Benno Lossin <lossin@kernel.org>, Andreas Hindborg <a.hindborg@kernel.org>,  Alice Ryhl <aliceryhl@google.com>, Trevor Gross <tmgross@umich.edu>,  Danilo Krummrich <dakr@kernel.org>,  Daniel Almeida <daniel.almeida@collabora.com>,  Tamir Duberstein <tamird@kernel.org>,  Alexandre Courbot <acourbot@nvidia.com>,  =?utf-8?q?Onur_=C3=96zkan?= <work@onurozkan.dev>,  Jonathan Corbet <corbet@lwn.net>, Randy Dunlap <rdunlap@infradead.org>,  Kees Cook <kees@kernel.org>, "Gustavo A. R. Silva" <gustavoars@kernel.org>
-Cc: linux-kbuild@vger.kernel.org, linux-kernel@vger.kernel.org,  llvm@lists.linux.dev, linux-riscv@lists.infradead.org,  linux-arch@vger.kernel.org, linux-arm-kernel@lists.infradead.org,  linux-efi@vger.kernel.org, rust-for-linux@vger.kernel.org,  linux-doc@vger.kernel.org, Jens Axboe <axboe@kernel.dk>,  linux-hardening@vger.kernel.org, "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
+Date: Thu, 17 Sep 2026 17:06:12 +0100
+Subject: [PATCH v3 02/20] kallsyms: index symbols by token to speed up
+ table compression
+Precedence: bulk
+X-Mailing-List: rust-for-linux@vger.kernel.org
+List-Id: <rust-for-linux.vger.kernel.org>
+List-Subscribe: <mailto:rust-for-linux+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:rust-for-linux+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+Message-Id: <20260917-build-speedup-v3-2-9ecf4163ff36@kernel.org>
+References: <20260917-build-speedup-v3-0-9ecf4163ff36@kernel.org>
+In-Reply-To: <20260917-build-speedup-v3-0-9ecf4163ff36@kernel.org>
+To: Linus Torvalds <torvalds@linux-foundation.org>, 
+ Nathan Chancellor <nathan@kernel.org>, Nicolas Schier <nsc@kernel.org>, 
+ Nick Desaulniers <ndesaulniers@google.com>, 
+ Bill Wendling <morbo@google.com>, Justin Stitt <justinstitt@google.com>, 
+ Masahiro Yamada <masahiroy@kernel.org>, Alexey Gladkov <legion@kernel.org>, 
+ Thomas Gleixner <tglx@kernel.org>, Ingo Molnar <mingo@redhat.com>, 
+ Borislav Petkov <bp@alien8.de>, Dave Hansen <dave.hansen@linux.intel.com>, 
+ x86@kernel.org, "H. Peter Anvin" <hpa@zytor.com>, 
+ Paul Walmsley <pjw@kernel.org>, Palmer Dabbelt <palmer@dabbelt.com>, 
+ Albert Ou <aou@eecs.berkeley.edu>, Alexandre Ghiti <alex@ghiti.fr>, 
+ Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>, 
+ Will Deacon <will@kernel.org>, Mark Rutland <mark.rutland@arm.com>, 
+ Ard Biesheuvel <ardb@kernel.org>, 
+ Ilias Apalodimas <ilias.apalodimas@linaro.org>, 
+ Josh Poimboeuf <jpoimboe@kernel.org>, Peter Zijlstra <peterz@infradead.org>, 
+ Miguel Ojeda <ojeda@kernel.org>, Boqun Feng <boqun@kernel.org>, 
+ Gary Guo <gary@garyguo.net>, 
+ =?utf-8?q?Bj=C3=B6rn_Roy_Baron?= <bjorn3_gh@protonmail.com>, 
+ Benno Lossin <lossin@kernel.org>, Andreas Hindborg <a.hindborg@kernel.org>, 
+ Alice Ryhl <aliceryhl@google.com>, Trevor Gross <tmgross@umich.edu>, 
+ Danilo Krummrich <dakr@kernel.org>, 
+ Daniel Almeida <daniel.almeida@collabora.com>, 
+ Tamir Duberstein <tamird@kernel.org>, 
+ Alexandre Courbot <acourbot@nvidia.com>, 
+ =?utf-8?q?Onur_=C3=96zkan?= <work@onurozkan.dev>, 
+ Jonathan Corbet <corbet@lwn.net>, Randy Dunlap <rdunlap@infradead.org>, 
+ Kees Cook <kees@kernel.org>, "Gustavo A. R. Silva" <gustavoars@kernel.org>
+Cc: linux-kbuild@vger.kernel.org, linux-kernel@vger.kernel.org, 
+ llvm@lists.linux.dev, linux-riscv@lists.infradead.org, 
+ linux-arch@vger.kernel.org, linux-arm-kernel@lists.infradead.org, 
+ linux-efi@vger.kernel.org, rust-for-linux@vger.kernel.org, 
+ linux-doc@vger.kernel.org, Jens Axboe <axboe@kernel.dk>, 
+ linux-hardening@vger.kernel.org, "Lorenzo Stoakes (ARM)" <ljs@kernel.org>
+X-Mailer: b4 0.14.3
+X-Developer-Signature: v=1; a=openpgp-sha256; l=10123; i=ljs@kernel.org;
+ h=from:subject:message-id; bh=zbRPUYikjG0pj4tnd7o4NOVhRtKN6z8Aq2ACsXCdP64=;
+ b=owGbwMvMwCV2fu7ZrsZH9SKMp9WSGLLW8P+tac2rXKc+N6ws94vJu/TKuOhH25jcLRzKV1zn3
+ v829A1bRykLgxgXg6yYIsvzL+L7g0TC5nVe8HeDmcPKBDKEgYtTACYisY3hD5f6A4merwl9vkGZ
+ +e/8H75wPFVzr2qPmdeD8kl7/YS1jBgZbtxgTOrwubTtyY6HqVOyorq/MB/ctjzDyq1TZaXVvE1
+ cTAA=
+X-Developer-Key: i=ljs@kernel.org; a=openpgp;
+ fpr=E7F417BF5214569E89D04F46CF9DCD8A81E27F14
 
 The kallsyms program compresses symbols by figuring out the most commonly
 used substrings in all of the input symbols then uses special character
@@ -309,6 +360,3 @@ index 494852ade6d8..350d118c3b9e 100644
  }
  
  /* search the token with the maximum profit */
-
--- 
-2.55.0

@@ -972,3 +972,48 @@ question are indistinguishable.
 
 The fix is to stop generating deeply-escaped one-liners: write the loop to a file
 and run it with `bash <file>`, so there is no quoting layer at all.
+
+## A carried patch does not carry its upstream subject (2026-09-18)
+
+Sweeping the `v7.3-rc3`..`master` window produced a candidate list, and each
+candidate was marked already-carried or not by searching the series for the
+upstream commit subject:
+
+```bash
+key=$(git -C repos/torvalds log -1 --format='%s' "$sha" | sed 's/^[a-z0-9_/,. -]*: //')
+rg -l -F "$key" sleepy-next/patches/
+```
+
+Four of the "not carried" results were wrong. `1587d3394`
+(`x86/alternatives: Exclude text poking against change_page_attr()`) is carried
+as `2507-x86-alternatives-exclude-text-poking-vs-cpa.patch`, whose subject
+reads `x86/alternatives: Exclude text poking vs CPA`. The same held for
+`e14a34548` (`2146`), `93d88ac4a` (`2405`) and `9a0b159ff` (`2410`).
+
+**A patch filed here keeps its authorship and its diff but not always its
+subject.** Subjects get shortened when a patch is rebuilt from a lore mirror,
+adapted to this tree, or squashed out of a series, so absence of the upstream
+subject string proves nothing. The `rg` was answering "is this exact sentence
+in the series?" and being read as "is this change in the series?"
+
+**Reverse-applicability is the test.** Against the series-applied tree:
+
+```bash
+patch -d repos/_audit -R -p1 --batch --forward -F2 --dry-run < cand.patch
+```
+
+No `FAILED`/`ignored`/`No file` means the tree already contains exactly those
+changes. It asks the tree directly, is immune to subject drift, and also
+catches a candidate that is *partly* present — which is what `7891fbb95` and
+`f9abcb602ef3` turned out to be.
+
+Two corollaries. A forward dry-run alone cannot classify a candidate: it fails
+both for "not carried, context shifted" and for "already carried", and those
+need opposite responses. And the series tree has to be rebuilt for the current
+series state before any of this — see *"Is it in the base?" is not a duplicate
+test* above for why a stale `repos/_audit` answers confidently and wrongly.
+
+Related: *"A crashed command and an empty result look identical"* above. That
+one is a search that returns nothing because it broke; this one is a search
+that returns nothing because it asked the wrong question. Both read as "no
+candidates".

@@ -1,3 +1,4 @@
+From a97185a66490a14d3ddd517381316ef5a131b40e Mon Sep 17 00:00:00 2001
 From: Christian Loehle <christian.loehle@arm.com>
 To: "Rafael J . Wysocki" <rafael@kernel.org>,
 	Viresh Kumar <viresh.kumar@linaro.org>
@@ -14,12 +15,19 @@ Cc: linux-pm@vger.kernel.org,
 	zhongqiu.han@oss.qualcomm.com,
 	Christian Loehle <christian.loehle@arm.com>,
 	Sashiko <sashiko-bot@kernel.org>
-Subject: [PATCH v5 04/15] ACPI: CPPC: Use 64-bit masks for register fields
-Date: Thu, 27 Aug 2026 07:30:49 +0100
-Message-Id: <20260827063100.2741066-5-christian.loehle@arm.com>
+Subject: [PATCH v6 04/15] ACPI: CPPC: Use 64-bit masks for register fields
+Date: Sun, 30 Aug 2026 12:56:33 +0100
+Message-Id: <20260830115644.2056983-5-christian.loehle@arm.com>
 X-Mailer: git-send-email 2.34.1
-In-Reply-To: <20260827063100.2741066-1-christian.loehle@arm.com>
-References: <20260827063100.2741066-1-christian.loehle@arm.com>
+In-Reply-To: <20260830115644.2056983-1-christian.loehle@arm.com>
+References: <20260830115644.2056983-1-christian.loehle@arm.com>
+Precedence: bulk
+X-Mailing-List: linux-pm@vger.kernel.org
+List-Id: <linux-pm.vger.kernel.org>
+List-Subscribe: <mailto:linux-pm+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:linux-pm+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
 
 MASK_VAL_READ() and MASK_VAL_WRITE() operate on u64 values but construct
 their masks with GENMASK(), whose type is unsigned long. On 32-bit kernels
@@ -40,7 +48,7 @@ Signed-off-by: Christian Loehle <christian.loehle@arm.com>
  1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/acpi/cppc_acpi.c b/drivers/acpi/cppc_acpi.c
-index 3fbfb2eea6cf..1caac71d3e00 100644
+index 925be772041c..9ddcce7dc1a9 100644
 --- a/drivers/acpi/cppc_acpi.c
 +++ b/drivers/acpi/cppc_acpi.c
 @@ -248,10 +248,10 @@ static bool cpc_pcc_write_supported(const struct cpc_register_resource *reg)
@@ -57,6 +65,3 @@ index 3fbfb2eea6cf..1caac71d3e00 100644
  
  static u64 cpc_sysmem_access_size(const struct cpc_register_resource *reg)
  {
--- 
-2.34.1
-

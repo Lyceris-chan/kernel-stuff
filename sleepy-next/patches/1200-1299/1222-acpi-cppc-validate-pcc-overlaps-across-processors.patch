@@ -1,3 +1,4 @@
+From 6b489a2af450ad394caa9e8c20eb6d8e57225f26 Mon Sep 17 00:00:00 2001
 From: Christian Loehle <christian.loehle@arm.com>
 To: "Rafael J . Wysocki" <rafael@kernel.org>,
 	Viresh Kumar <viresh.kumar@linaro.org>
@@ -13,12 +14,19 @@ Cc: linux-pm@vger.kernel.org,
 	Ionela Voinescu <ionela.voinescu@arm.com>,
 	zhongqiu.han@oss.qualcomm.com,
 	Christian Loehle <christian.loehle@arm.com>
-Subject: [PATCH v5 13/15] ACPI: CPPC: Validate PCC overlaps across processors
-Date: Thu, 27 Aug 2026 07:30:58 +0100
-Message-Id: <20260827063100.2741066-14-christian.loehle@arm.com>
+Subject: [PATCH v6 13/15] ACPI: CPPC: Validate PCC overlaps across processors
+Date: Sun, 30 Aug 2026 12:56:42 +0100
+Message-Id: <20260830115644.2056983-14-christian.loehle@arm.com>
 X-Mailer: git-send-email 2.34.1
-In-Reply-To: <20260827063100.2741066-1-christian.loehle@arm.com>
-References: <20260827063100.2741066-1-christian.loehle@arm.com>
+In-Reply-To: <20260830115644.2056983-1-christian.loehle@arm.com>
+References: <20260830115644.2056983-1-christian.loehle@arm.com>
+Precedence: bulk
+X-Mailing-List: linux-pm@vger.kernel.org
+List-Id: <linux-pm.vger.kernel.org>
+List-Subscribe: <mailto:linux-pm+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:linux-pm+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
 
 PCC shared-memory offsets are physical within a subspace, but the existing
 overlap check stops at one _CPC package. Two processors can therefore pass
@@ -35,6 +43,11 @@ per-subspace payload lock serializes exact writable aliases, including
 multi-byte fields copied with byte-oriented I/O. Reject every other overlap
 involving a writable entry.
 
+With that cross-processor protection in place, enable zero-offset,
+byte-multiple writable PCC fields. Ordinary performance controls remain at
+most 32 bits, while Performance Limited, CPPC Enable, and Autonomous
+Selection Enable may use byte-multiple fields through 64 bits.
+
 The interval tree keeps registration proportional to real overlaps rather
 than to the number of processors. Remove entries when processor teardown
 unpublishes its CPC descriptor, including every probe-failure path after
@@ -43,15 +56,15 @@ registration.
 Fixes: 85b1407bf6d2 ("ACPI / CPPC: Make CPPC ACPI driver aware of PCC subspace IDs")
 Signed-off-by: Christian Loehle <christian.loehle@arm.com>
 ---
- drivers/acpi/cppc_acpi.c | 157 +++++++++++++++++++++++++++++++++++++++
+ drivers/acpi/cppc_acpi.c | 193 ++++++++++++++++++++++++++++++++++++---
  include/acpi/cppc_acpi.h |   2 +
- 2 files changed, 159 insertions(+)
+ 2 files changed, 180 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/acpi/cppc_acpi.c b/drivers/acpi/cppc_acpi.c
-index 59a797b4250c..955067925cf0 100644
+index beeae0a983b8..cc749a487373 100644
 --- a/drivers/acpi/cppc_acpi.c
 +++ b/drivers/acpi/cppc_acpi.c
-@@ -109,6 +109,18 @@ struct cpc_sysmem_node {
+@@ -113,6 +113,18 @@ struct cpc_sysmem_node {
  	bool registered;
  };
  
@@ -70,7 +83,7 @@ index 59a797b4250c..955067925cf0 100644
  #define CPC_SYSMEM_START(node) ((node)->start)
  #define CPC_SYSMEM_LAST(node) ((node)->last)
  
-@@ -119,6 +131,16 @@ INTERVAL_TREE_DEFINE(struct cpc_sysmem_node, rb, u64, subtree_last,
+@@ -123,6 +135,16 @@ INTERVAL_TREE_DEFINE(struct cpc_sysmem_node, rb, u64, subtree_last,
  static struct rb_root_cached cpc_sysmem_tree = RB_ROOT_CACHED;
  static DEFINE_MUTEX(cpc_sysmem_lock);
  
@@ -87,7 +100,26 @@ index 59a797b4250c..955067925cf0 100644
  static struct cpc_sysmem_node *cpc_sysmem_first(u64 start, u64 last)
  {
  	return cpc_sysmem_itree_iter_first(&cpc_sysmem_tree, start, last);
-@@ -561,6 +583,134 @@ static int cpc_validate_non_mmio_overlaps(struct cpc_desc *cpc_desc,
+@@ -284,15 +306,9 @@ show_cppc_data(cppc_get_perf_ctrs, cppc_perf_fb_ctrs, wraparound_time);
+ 
+ static bool cpc_pcc_write_supported(const struct cpc_register_resource *reg)
+ {
+-	switch (GET_BIT_WIDTH(&reg->cpc_entry.reg)) {
+-	case 8:
+-	case 16:
+-	case 32:
+-	case 64:
+-		return true;
+-	default:
+-		return false;
+-	}
++	unsigned int width = reg->cpc_entry.reg.bit_width;
++
++	return width && width <= 32 && !(width % 8);
+ }
+ 
+ /* Shift and apply the mask for CPC reads/writes */
+@@ -629,6 +645,150 @@ static int cpc_validate_non_mmio_overlaps(struct cpc_desc *cpc_desc,
  	return 0;
  }
  
@@ -147,6 +179,22 @@ index 59a797b4250c..955067925cf0 100644
 +	unsigned int nr_regs = cpc_desc->num_entries - 2;
 +	unsigned int i;
 +	int ret = 0;
++	bool found = false;
++
++	for (i = 0; i < nr_regs; i++) {
++		struct cpc_register_resource *reg = &cpc_desc->cpc_regs[i];
++		u8 space_id;
++
++		if (!CPC_SUPPORTED(reg) || reg->type != ACPI_TYPE_BUFFER)
++			continue;
++		space_id = reg->cpc_entry.reg.space_id;
++		if (space_id == ACPI_ADR_SPACE_PLATFORM_COMM) {
++			found = true;
++			break;
++		}
++	}
++	if (!found)
++		return 0;
 +
 +	cpc_desc->non_mmio_nodes = kcalloc(nr_regs,
 +					   sizeof(*cpc_desc->non_mmio_nodes),
@@ -222,7 +270,7 @@ index 59a797b4250c..955067925cf0 100644
  static void cpc_mark_rmw_lock_users(struct cpc_desc *cpc_desc)
  {
  	int i;
-@@ -802,6 +952,7 @@ static void cppc_free_desc(struct cpc_desc *cpc_ptr)
+@@ -958,6 +1118,7 @@ static void cppc_free_desc(struct cpc_desc *cpc_ptr)
  {
  	unsigned int i;
  
@@ -230,7 +278,26 @@ index 59a797b4250c..955067925cf0 100644
  	cpc_unregister_sysmem_desc(cpc_ptr);
  
  	for (i = 2; i < cpc_ptr->num_entries; i++) {
-@@ -1675,6 +1826,10 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
+@@ -1672,16 +1833,12 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
+ 				bool wide_write = i - 2 == PERF_LIMITED ||
+ 						  i - 2 == ENABLE ||
+ 						  i - 2 == AUTO_SEL_ENABLE;
+-				bool write_width_supported = gas_t->bit_width == 8 ||
+-						     gas_t->bit_width == 16 ||
+-						     gas_t->bit_width == 32 ||
+-						     gas_t->bit_width == 64;
+ 
+ 				if (!gas_t->bit_width || gas_t->bit_width > 64 ||
+ 				    gas_t->bit_offset || gas_t->bit_width % 8 ||
+ 				    (cpc_reg_is_writable(i - 2) &&
+-				     (!write_width_supported ||
+-				      (!wide_write && gas_t->bit_width > 32)))) {
++				     !wide_write &&
++				     gas_t->bit_width > 32)) {
+ 					unsupported_regs |= BIT(i - 2);
+ 					continue;
+ 				}
+@@ -1865,6 +2022,10 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
  	if (ret)
  		goto out_free;
  
@@ -241,7 +308,7 @@ index 59a797b4250c..955067925cf0 100644
  	/* Everything looks okay */
  	pr_debug("Parsed CPC struct for CPU: %d\n", pr->id);
  
-@@ -1692,6 +1847,7 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
+@@ -1882,6 +2043,7 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
  			"acpi_cppc");
  	if (ret) {
  		per_cpu(cpc_desc_ptr, pr->id) = NULL;
@@ -249,7 +316,7 @@ index 59a797b4250c..955067925cf0 100644
  		cpc_unregister_sysmem_desc(cpc_ptr);
  		kobject_put(&cpc_ptr->kobj);
  		goto out_pcc_put;
-@@ -1735,6 +1891,7 @@ void acpi_cppc_processor_exit(struct acpi_processor *pr)
+@@ -1926,6 +2088,7 @@ void acpi_cppc_processor_exit(struct acpi_processor *pr)
  	pcc_ss_id = per_cpu(cpu_pcc_subspace_idx, pr->id);
  	per_cpu(cpc_desc_ptr, pr->id) = NULL;
  	kobject_del(&cpc_ptr->kobj);
@@ -258,10 +325,10 @@ index 59a797b4250c..955067925cf0 100644
  
  	pcc_data_put(pcc_ss_id);
 diff --git a/include/acpi/cppc_acpi.h b/include/acpi/cppc_acpi.h
-index 79702c7c9efd..3275ecb51ca5 100644
+index 4e5f59bc95f8..be22504eddce 100644
 --- a/include/acpi/cppc_acpi.h
 +++ b/include/acpi/cppc_acpi.h
-@@ -78,6 +78,7 @@ struct cpc_register_resource {
+@@ -80,6 +80,7 @@ struct cpc_register_resource {
  };
  
  struct cpc_sysmem_node;
@@ -269,14 +336,10 @@ index 79702c7c9efd..3275ecb51ca5 100644
  
  /* Container to hold the CPC details for each CPU */
  struct cpc_desc {
-@@ -91,6 +92,7 @@ struct cpc_desc {
+@@ -93,6 +94,7 @@ struct cpc_desc {
  	struct cpc_register_resource cpc_regs[MAX_CPC_REG_ENT];
  	struct acpi_psd_package domain_info;
  	struct cpc_sysmem_node *sysmem_nodes;
 +	struct cpc_non_mmio_node *non_mmio_nodes;
  	struct kobject kobj;
  };
- 
--- 
-2.34.1
-

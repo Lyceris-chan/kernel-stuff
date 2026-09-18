@@ -1,3 +1,4 @@
+From 2e67ce7e98f7a714a0a14353daf1d21a046c77b2 Mon Sep 17 00:00:00 2001
 From: Christian Loehle <christian.loehle@arm.com>
 To: "Rafael J . Wysocki" <rafael@kernel.org>,
 	Viresh Kumar <viresh.kumar@linaro.org>
@@ -13,12 +14,19 @@ Cc: linux-pm@vger.kernel.org,
 	Ionela Voinescu <ionela.voinescu@arm.com>,
 	zhongqiu.han@oss.qualcomm.com,
 	Christian Loehle <christian.loehle@arm.com>
-Subject: [PATCH v5 08/15] ACPI: CPPC: Release PCC data after probe failures
-Date: Thu, 27 Aug 2026 07:30:53 +0100
-Message-Id: <20260827063100.2741066-9-christian.loehle@arm.com>
+Subject: [PATCH v6 08/15] ACPI: CPPC: Release PCC data after probe failures
+Date: Sun, 30 Aug 2026 12:56:37 +0100
+Message-Id: <20260830115644.2056983-9-christian.loehle@arm.com>
 X-Mailer: git-send-email 2.34.1
-In-Reply-To: <20260827063100.2741066-1-christian.loehle@arm.com>
-References: <20260827063100.2741066-1-christian.loehle@arm.com>
+In-Reply-To: <20260830115644.2056983-1-christian.loehle@arm.com>
+References: <20260830115644.2056983-1-christian.loehle@arm.com>
+Precedence: bulk
+X-Mailing-List: linux-pm@vger.kernel.org
+List-Id: <linux-pm.vger.kernel.org>
+List-Subscribe: <mailto:linux-pm+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:linux-pm+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
 
 pcc_data_alloc() takes a per-processor reference while parsing the first
 PCC register. Every later probe failure currently frees the CPC descriptor
@@ -54,11 +62,11 @@ CPC descriptor has been published.
 Fixes: 85b1407bf6d2 ("ACPI / CPPC: Make CPPC ACPI driver aware of PCC subspace IDs")
 Signed-off-by: Christian Loehle <christian.loehle@arm.com>
 ---
- drivers/acpi/cppc_acpi.c | 159 ++++++++++++++++++++++++++-------------
- 1 file changed, 106 insertions(+), 53 deletions(-)
+ drivers/acpi/cppc_acpi.c | 153 ++++++++++++++++++++++++++-------------
+ 1 file changed, 101 insertions(+), 52 deletions(-)
 
 diff --git a/drivers/acpi/cppc_acpi.c b/drivers/acpi/cppc_acpi.c
-index 4bf17d954d87..118001e1687a 100644
+index 37ff54a048c9..e8ffd5b7094d 100644
 --- a/drivers/acpi/cppc_acpi.c
 +++ b/drivers/acpi/cppc_acpi.c
 @@ -36,6 +36,7 @@
@@ -209,37 +217,33 @@ index 4bf17d954d87..118001e1687a 100644
  }
  
  /*
-@@ -865,8 +913,15 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
+@@ -865,11 +913,17 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
  	acpi_handle handle = pr->handle;
  	unsigned int num_ent, i, cpc_rev;
  	int pcc_subspace_id = -1;
 +	bool pcc_data_ref = false;
+ 	bool cpc_present = false;
  	acpi_status status;
  	int ret = -ENODATA;
-+	int err;
-+
+ 	int err;
+ 
 +	if (per_cpu(cpc_desc_ptr, pr->id))
 +		return 0;
 +
 +	per_cpu(cpu_pcc_subspace_idx, pr->id) = -1;
- 
++
  	if (!osc_sb_cppc2_support_acked) {
  		pr_debug("CPPC v2 _OSC not acked\n");
-@@ -999,8 +1054,12 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
- 			if (gas_t->space_id == ACPI_ADR_SPACE_PLATFORM_COMM) {
- 				if (pcc_subspace_id < 0) {
- 					pcc_subspace_id = gas_t->access_width;
--					if (pcc_data_alloc(pcc_subspace_id))
-+					err = pcc_data_alloc(pcc_subspace_id);
-+					if (err) {
-+						ret = err;
+ 		if (!cpc_supported_by_cpu()) {
+@@ -1008,6 +1062,7 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
+ 						ret = err;
  						goto out_free;
-+					}
+ 					}
 +					pcc_data_ref = true;
  				} else if (pcc_subspace_id != gas_t->access_width) {
  					pr_debug("Mismatched PCC ids in _CPC for CPU:%d\n",
  						 pr->id);
-@@ -1126,13 +1185,10 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
+@@ -1140,13 +1195,10 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
  		goto out_free;
  
  	/* Register PCC channel once for all PCC subspace ID. */
@@ -254,7 +258,7 @@ index 4bf17d954d87..118001e1687a 100644
  	}
  
  	/* Everything looks okay */
-@@ -1153,7 +1209,7 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
+@@ -1167,7 +1219,7 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
  	if (ret) {
  		per_cpu(cpc_desc_ptr, pr->id) = NULL;
  		kobject_put(&cpc_ptr->kobj);
@@ -263,8 +267,8 @@ index 4bf17d954d87..118001e1687a 100644
  	}
  
  	kfree(output.pointer);
-@@ -1163,6 +1219,11 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
- 	pr_err("CPU%d: failed to initialize _CPC: %d\n", pr->id, ret);
+@@ -1176,6 +1228,11 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
+ out_free:
  	cppc_free_desc(cpc_ptr);
  
 +out_pcc_put:
@@ -273,9 +277,9 @@ index 4bf17d954d87..118001e1687a 100644
 +	per_cpu(cpu_pcc_subspace_idx, pr->id) = -1;
 +
  out_buf_free:
- 	kfree(output.pointer);
- 	return ret;
-@@ -1178,28 +1239,20 @@ EXPORT_SYMBOL_GPL(acpi_cppc_processor_probe);
+ 	if (cpc_present)
+ 		pr_err("CPU%d: failed to initialize _CPC: %d\n", pr->id, ret);
+@@ -1193,28 +1250,20 @@ EXPORT_SYMBOL_GPL(acpi_cppc_processor_probe);
  void acpi_cppc_processor_exit(struct acpi_processor *pr)
  {
  	struct cpc_desc *cpc_ptr;
@@ -313,6 +317,3 @@ index 4bf17d954d87..118001e1687a 100644
  
  	kobject_put(&cpc_ptr->kobj);
  }
--- 
-2.34.1
-
