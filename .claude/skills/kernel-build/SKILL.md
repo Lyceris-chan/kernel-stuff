@@ -73,6 +73,16 @@ Exit status: `0` clean, `1` one or more patches failed or were skipped, `2` an
 environment problem (with a message saying which). Flags: `--tag`, `--keep`,
 `--quiet`.
 
+**A plain run consumes the worktree it creates.** Only `--keep` leaves
+`repos/_audit` behind for later use, so any command that patches into
+`repos/_audit` after a normal run is testing a directory that no longer exists.
+That is worse than it sounds: `patch -d repos/_audit …` prints
+`Can't change to directory …` and **exits 0**, so a classifier branching on
+`FAILED|ignored` matches nothing and falls through to its default verdict —
+which, if that default is "already carried", reports the entire candidate list
+as duplicates. Assert the tree exists before using it, and treat "no verdict"
+as an error rather than a result.
+
 It exists because neither of the obvious shortcuts is sufficient —
 `git apply --check` gives false negatives, and `patch --forward` returns
 success when it *skips* a patch that is already applied, which is an inert

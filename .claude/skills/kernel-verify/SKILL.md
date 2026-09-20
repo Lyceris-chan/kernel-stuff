@@ -86,7 +86,8 @@ compiles through `make`, so it needs the generated headers and `.config`:
 
 ```bash
 cd sleepy-next && rm -rf src pkg && makepkg -o     # prepare only, keeps src/
-python3 .claude/skills/kernel-verify/scripts/verify.py --tier deep --tree sleepy-next/src/linux-7.3-rc2
+python3 .claude/skills/kernel-verify/scripts/verify.py --tier deep \
+    --tree sleepy-next/src/linux-<version>     # the directory makepkg -o created
 ```
 
 Run `--tier all` before a release; run the `fast` tier before every commit (the

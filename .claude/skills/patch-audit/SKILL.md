@@ -17,11 +17,12 @@ Never scrape `lore.kernel.org` — its anti-bot protection blocks agents.
 ## Reference tree
 
 All apply-checks and symbol greps target the **base tree**: a `git worktree` of
-`repos/linux-next` checked out at the PKGBUILD's `_srctag` (`v7.3-rc2` today).
+`repos/linux-next` checked out at the PKGBUILD's `_srctag` (read it from
+`sleepy-next/PKGBUILD` — it moves with every bump).
 Create one with
 
 ```bash
-git -C repos/linux-next worktree add --detach repos/_ref v7.3-rc2
+git -C repos/linux-next worktree add --detach repos/_ref <_srctag>
 ```
 
 Keep worktrees under `repos/` — never in `/tmp`. Remember that a worktree which

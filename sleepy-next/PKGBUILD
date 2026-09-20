@@ -182,7 +182,7 @@ _rcver=rc3
 
 pkgver=7.3.0_rc3
 _tagrel=1
-pkgrel=23
+pkgrel=25
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -279,6 +279,8 @@ source=(
   "patches/1000-1099/1068-amdgpu-fix-pcie-link-capability-reporting.patch"
   "patches/1000-1099/1069-amdgpu-fix-rmmio-iounmap-skipped-on-removal.patch"
   "patches/1000-1099/1070-drm-amdgpu-more-compact-SDMA-7.0-IB-emission.patch"
+  "patches/1000-1099/1071-drm-amdgpu-more-compact-VCN-IB-emission.patch"
+  "patches/1000-1099/1072-drm-amdgpu-atom-bound-the-VBIOS-getters.patch"
   "patches/1100-1199/1135-drm-amd-display-fix-HPD-program-filter-programming.patch"
   "patches/1100-1199/1136-drm-amd-display-update-and-revert-FRL-LT-timeout.patch"
   "patches/1100-1199/1138-drm-amd-display-pull-colorops-into-state-when-recreating-a-plane.patch"
@@ -305,25 +307,31 @@ source=(
   "patches/1200-1299/1210-acpi-cppc-validate-the-cpc-package-header.patch"
   "patches/1200-1299/1211-acpi-cppc-validate-cpc-entry-and-control-semantics.patch"
   "patches/1200-1299/1212-acpi-cppc-propagate-performance-control-write-errors.patch"
-  "patches/1200-1299/1213-acpi-cppc-use-64-bit-masks-for-register-fields.patch"
-  "patches/1200-1299/1214-acpi-cppc-serialize-pcc-single-register-payload-updates.patch"
-  "patches/1200-1299/1215-acpi-cppc-serialize-pcc-epp-payload-updates.patch"
-  "patches/1200-1299/1216-acpi-cppc-release-cpc-descriptors-through-kobject.patch"
-  "patches/1200-1299/1217-acpi-cppc-release-pcc-data-after-probe-failures.patch"
-  "patches/1200-1299/1218-acpi-cppc-reject-unsafe-cross-cpu-systemmemory-rmw.patch"
-  "patches/1200-1299/1219-acpi-cppc-reject-direct-reads-of-write-only-controls.patch"
-  "patches/1200-1299/1220-acpi-cppc-validate-and-access-pcc-register-layouts.patch"
-  "patches/1200-1299/1221-acpi-cppc-validate-systemio-register-layouts.patch"
-  "patches/1200-1299/1222-acpi-cppc-validate-pcc-overlaps-across-processors.patch"
-  "patches/1200-1299/1223-acpi-cppc-validate-systemio-overlaps-across-processors.patch"
-  "patches/1200-1299/1224-acpi-cppc-clear-performance-limited-without-a-stale-read.patch"
+  "patches/1200-1299/1213-acpi-cppc-serialize-pcc-single-register-payload-updates.patch"
+  "patches/1200-1299/1214-acpi-cppc-serialize-pcc-epp-payload-updates.patch"
+  "patches/1200-1299/1215-acpi-cppc-release-cpc-descriptors-through-kobject.patch"
+  "patches/1200-1299/1216-acpi-cppc-release-pcc-data-after-probe-failures.patch"
+  "patches/1200-1299/1217-acpi-cppc-reject-unsafe-cross-cpu-systemmemory-rmw.patch"
+  "patches/1200-1299/1218-acpi-cppc-reject-direct-reads-of-write-only-controls.patch"
+  "patches/1200-1299/1219-acpi-cppc-validate-and-access-pcc-register-layouts.patch"
+  "patches/1200-1299/1220-acpi-cppc-validate-systemio-register-layouts.patch"
+  "patches/1200-1299/1221-acpi-cppc-validate-pcc-overlaps-across-processors.patch"
+  "patches/1200-1299/1222-acpi-cppc-validate-systemio-overlaps-across-processors.patch"
+  "patches/1200-1299/1223-acpi-cppc-clear-performance-limited-without-a-stale-read.patch"
+  "patches/1200-1299/1224-acpi-cppc-keep-performance-limited-clearable-on-nvidia-t41.patch"
+  "patches/1200-1299/1225-acpi-cppc-validate-ffh-register-fields-before-hardware-acces.patch"
+  "patches/1200-1299/1226-acpi-cppc-propagate-errors-from-cross-cpu-ffh-calls.patch"
+  "patches/1200-1299/1227-acpi-cppc-accept-requests-to-retain-immutable-autonomous-sel.patch"
+  "patches/1200-1299/1228-acpi-cppc-select-the-frequency-invariance-callback-per-cpu.patch"
+  "patches/1200-1299/1229-acpi-cppc-create-the-fie-worker-before-enabling-pcc-callback.patch"
+  "patches/1200-1299/1230-cpufreq-amd-pstate-skip-auto-sel-write-when-it-matches.patch"
 
   "patches/2000-2099/2000-block-mq-deadline-pass-in-queue-directly-to-dd_inser.patch"
   "patches/2000-2099/2001-block-mq-deadline-skip-expensive-merge-lookups-if-co.patch"
   "patches/2000-2099/2002-block-bfq-pass-in-queue-directly-to-bfq_insert_reque.patch"
   "patches/2000-2099/2003-block-bfq-serialize-request-dispatching.patch"
   "patches/2000-2099/2004-block-bfq-skip-expensive-merge-lookups-if-contended.patch"
-  "patches/2000-2099/2005-sched-ext-skip-per-CPU-data-allocation-for-built-in-DSQs.patch"
+  "patches/2000-2099/2005-sched-ext-skip-per-cpu-data-allocation-for-built-in-dsqs.patch"
   "patches/2000-2099/2006-zram-convert-to-SG-list-zsmalloc-object-read-API.patch"
   "patches/2000-2099/2007-zsmalloc-remove-old-object-read-API.patch"
   "patches/2000-2099/2008-io_uring-io-wq-stop-a-single-cancel-after-one-running-match.patch"
@@ -538,15 +546,22 @@ source=(
 # subfolders for a clean repo view, so create root-level symlinks here — this
 # body code runs when makepkg sources the PKGBUILD, before source resolution.
 # The symlinks are gitignored (see .gitignore) so the repo root stays clean.
+# Drop links left behind by a patch that was renamed, replaced or dropped.
+# `[[ -e ]]` follows symlinks, so a dangling link fails the test and the
+# `ln -s` below then fails with "File exists" because the name is taken — the
+# stale link survives and makepkg later resolves the wrong file. Prune first.
+for _sleepy_stale in *.patch; do
+  [[ -L "$_sleepy_stale" && ! -e "$_sleepy_stale" ]] && rm -f "$_sleepy_stale"
+done
 for _sleepy_patch in "${source[@]}"; do
   case "$_sleepy_patch" in
     patches/*.patch)
       _sleepy_base="${_sleepy_patch##*/}"
-      [[ -e "$_sleepy_base" ]] || ln -s "$_sleepy_patch" "$_sleepy_base"
+      [[ -e "$_sleepy_base" ]] || ln -sf "$_sleepy_patch" "$_sleepy_base"
       ;;
   esac
 done
-unset _sleepy_patch _sleepy_base
+unset _sleepy_patch _sleepy_base _sleepy_stale
 
 validpgpkeys=(
   E18447AC260021D31F3FF6C4C8A2A4774B8B63C4  # Eric Naim <dnaim@cachyos.org>
@@ -924,6 +939,7 @@ _package() {
     echo "Installing net-tune service (SQM + latency tuning)..."
     install -Dm755 "$startdir/net-tune/net-tune.sh" -t "$pkgdir/usr/local/bin/"
     install -Dm644 "$startdir/net-tune/net-tune.service" -t "$pkgdir/usr/lib/systemd/system/"
+    install -Dm644 "$startdir/net-tune/net-tune-eee.service" -t "$pkgdir/usr/lib/systemd/system/"
     if [ -f "$startdir/src/net-tune.conf" ]; then
         install -Dm644 "$startdir/src/net-tune.conf" -t "$pkgdir/etc/"
     else
@@ -936,6 +952,18 @@ _package() {
     # The target still starts the shaping as soon as the link is up.
     install -d "$pkgdir/etc/systemd/system/network-online.target.wants"
     ln -s /usr/lib/systemd/system/net-tune.service "$pkgdir/etc/systemd/system/network-online.target.wants/net-tune.service"
+
+    # net-tune-eee turns EEE off *before* NetworkManager brings the link up.
+    # That ordering is the whole point: switching EEE restarts auto-negotiation
+    # and drops the link for ~3s, and doing it from the dispatcher (after
+    # activation) took the network out at exactly the moment blocky resolves
+    # its DoQ upstream and the user logs in -- ~11s of failing DNS after login,
+    # measured 2026-09-20 and present on every earlier boot too. Enabled
+    # through multi-user.target.wants (it has to run before NetworkManager, not
+    # after the link is up); it waits at most ~3s for the NIC to appear and
+    # does no route work, so it does not hold the boot back.
+    install -d "$pkgdir/etc/systemd/system/multi-user.target.wants"
+    ln -s /usr/lib/systemd/system/net-tune-eee.service "$pkgdir/etc/systemd/system/multi-user.target.wants/net-tune-eee.service"
 
     echo "Installing modules..."
     ZSTD_CLEVEL=19 make "${BUILD_FLAGS[@]}" INSTALL_MOD_PATH="$pkgdir/usr" INSTALL_MOD_STRIP=1 \
@@ -1199,6 +1227,8 @@ b2sums=('d400c07b3f76f262c51e88bfc34e419883f13ea12dc76975b624acd6712bef193c4bb88
         'cf7a54e66b46493e37f87be80de0681daae42d5533f579e1f16fe4c18e6400f5e8004c4018ed819fb0b85d0dbde6c234c87dea7afb00514de242e54e85d56bff'
         'f98aee60af2758ffe197921b317872a05f8c1ed4b67f31c6f3cc1fc16252989415c62f4f1e1d8ca9ebf77b6079492bddd196e0ae4b6292973f78a1760f023551'
         'c4980cfa6b3a6e166d2c0f179fe6868cf327ff761cf3c916bb8cd63dbfc495de9c3df37db28b4581a863444a7ec52b63c0034059913ac36ca3e4a77d1640b2e7'
+        '929621ccbe10929801c9af4ad02aceddbfc6da4e1cbcc469f1e5ba73d795e5227c3e4b6e1083dec4e8ae0c4f1c19137851f3d35da7bb8312ad8fe0a6a490badb'
+        '1c7cfc7ed595b154f616e5a3d67e8582c86c96209dd165a7e3e4514a5dae42eaddadc34668f28644349eddb25a7aaf5d119355c18d5e573cf59289df8daf05a8'
         'c7f82a02ce6331de21eef941d9cf2efd9ace6c5f7cede5300d66b663522771a3108da82cc6d1cadef180cc90e0c43281bc377c618f26220b967fbde4e6fb8f11'
         'b283f440cb0f2679ee81d7da4ea1fecdb1e0146ee6183c6271b8e952ffcaebbbb0decf5b18b69534987601b63289a5c9be0397c5a79eff9cc76dca6a439e1cfa'
         '9f336933bfbf1429081581bf02878e91d7fb383ffdca62b523a18266a94c8229b5510e6ccface38256c2967f9387c2c504e49eda9637f36733431cc6e33f200c'
@@ -1222,27 +1252,33 @@ b2sums=('d400c07b3f76f262c51e88bfc34e419883f13ea12dc76975b624acd6712bef193c4bb88
         'e9d464ebf525cd8d93d48f1cbedea0197bd9d0142085da7d83ec3dfda0174483a0fea4077055fd7d1ad9180563dc6dfb77e4f52f9bcb023b7c7d7c9fb5c39ece'
         '9d3e36dbc5c9c5342d2991c4665278ed075073196251e59280bd12f1d6812a37d31db58f5cb978b926e2dcd0a32365960a414b69d10f463bd8f68cedbb4bb6ae'
         '52fe01328f544e023666eab1fd378ae0a0eb47385d495403a55a933f71beedcf295300767c1e43feb46366915fae8bea3b9137f11d16ed194a1fcf71d95aec0d'
-        '3ea764986e02dc58d37171f5e49cdab2e8ec99d9fad8ebaaf74bf8936a63e44189ce1999ce0f59dc600c41a62b6d2a735ffdc0804a5ac15c692845e52aae22ef'
-        'cfb907e17c85a89f0003271bac7768992ba5440fb61338398dda6c5b5c9e07ee71b523c23feeceb06c17e3d012d43479b6de8113e3a32e152be44855bf00ea45'
-        'e5eccc4832282c3ad40ffcb723999f72a2611e000dd6ed3f5e94ff98e704313b589fc2323b6254da6957b3b89e2751011db956503d8b3563626f39f556a0400c'
-        '42228f53223e94a96d664f629212b2943491a182d7d4cc51f174044b8cabe3bbea4bbde25f541b2cfd52ea1a815a27f0be549074b93992666e90af0fd6df1359'
-        '95c40986023d1a384a994402aa3c18a5d18601e245ed8b3c3e530956214e788933592e83aea637c727f2e26aa9a64a838cdea211093e686ebb7ad2af7f2c325a'
-        'b66734e6c46ef239cb1734d883fccb421722c9b38435fc932a12609a7154f2d4dfba17f1c4db4aab91de31406d40c7b31af676dc025c01e931da9e1b9dddd00a'
-        '6c91ea7d3a5bae2f4c27d190d41a78ac9244c7f0b11290657a069da0ab4c0b005e50fe354df049fba8c760fdbc6729aa8c0942d5cd6776c90b41c238348777d0'
-        'cb0476c8954803272578e40499af0f11519d72f6be074ee38b5c8d8164b4d6b770545ad41ab0ad71c37b063514cefcb3c584d28bfaf62700fa278ad48730a09c'
-        'fd70b730dd98b4e10cdcc8c3f327b640029cf93300c249520039d99c1f7821b9d6d786e8ead75f08d40c1408ed25f1a8d849af8e1ca02912f7060b45522a3dd1'
-        '7c1c9e4cecbca6caeb89dc9bd9cba16564e6dfdaf6e0c11e0e2f7986b76b99bdc5977170456a523bbc0208e763430c58401550dea0ad55f7cae35a6801226c1a'
-        '8fd46ad8c2af8dc28ed2f070342421d6114e373e02d2f798f53495ef5d9393197966d9e5403162d2bf7f4cd4a2dbe8f1c2fa9056c1b07cc446b227169094afbb'
-        '9f205faf83e6169a6d6af89cb34ba0b7eced992e88772bac8b790d419ed1865a74b4ddfab1baea27cced41eab550752606d9536bb27e4fcda2aaa1bd23521ca1'
-        'c78cb088d696374981e894e2009a090cf7203b5b010e8b65848bdd8d8e52aa12fb18b27feb7fc9dfb4311b8e82439f9ce2898d81ad77008e1865c16ce0261290'
-        'f88f1996d57d4c5b723bc20027aad755e1fd16f1e3b156aa64d1d039618d26ef321ef12a9f1fa50fc70723c70826fffb848d22021cbd23a139f896dd719742df'
-        'a8bbdbd0e5710a61a48e29ea6de5e962e2a3772c4dfb23611b313c38b126c0f068ca676f6692d43b67c17f61681c5ea8522b65aead05c99e407ffce6c6a96dfa'
+        '7694295f82b48be4f8301615cd9be3fc657e1c05d02f8d2abcab77fb3c2cc4fa9455fdce6720d88ad1ccaca12780ef78b7321cb72f326ac71bc4d4954d7927f8'
+        'eeb78c39fc934820fd52113aae53868d5aa2f40fb8ac0c6c35d72aa6a07bd77eaefc3dc34eca1c60a0de8fdb4e0285746055d6a448726f78be4268d5cb63b98b'
+        '37a425e358f90f539e53551422a70640a725dae97901c75b3ac5bab23c20bb0b92634202e258d91bd56fc1c5b4a9d38d9a1e77a946dafe45fe016275a5a7faa4'
+        'fe4fd61ee1e6bdcae92147920e52a2b6248ff94b3c88f779296846894e95368e986e547d6fa590a6d995020852a21208a23caa527cfb81f37a62a0bbeaa849c4'
+        '59a6acf56d37ce97c569b6b922a6ec0ee5bf8a440c3d7bc40b8ef70193aebdc062f50416f0f39487b1978eadc3330b9f415c82b5141c36809f7d9f9ee7681824'
+        '82578b6c02dd1a345b7f6711626ff8a61e04f9245ba4d726b8a0a55ce5fe3d42b08f330b898077653888f5e86b7aef5734ad3e775b3f69a4fb7f4518adf73366'
+        'a644cf7d214d10983a5e2c099660526af34b95eeef0bc91b87dbdafa1a49dd6e1c8ec3de2e4f452d271a5f539dd578d206a9132f9109969cefce734f3ab100c2'
+        'dd0cb9bf1d8481dd0e342c06ec84f3f75b0bb6ca6fac8e3d4eeb16889de1358c0b974ed820a7ca06284d10f0f26371d8960cd5774d16b2bce7bddf5e43d1bb44'
+        '8e13775d9b3b8c270a898a502d0f699abb89041cf651856d2d6d526c475463fb02f3d98b0b4eb0e648029da11627233fa1102667188e8c9256a89cd116c2c4d4'
+        '755bb185aca1283aba46435f5728a74ee05e36e917343d3b45d6d9345ad0c8bfa0c7af747909c531aa345141b046902cb3abf5dbaafa7e95b1d8f29a614f36d9'
+        '86b3c67ef073593cc29fefef3efe55fcefb2d9cc9f11b3a50c8556dc002b3412e83f74af52c7d6b5bb66b090d4ba251303755e7376c0b39337ef23b31021bf5d'
+        '4a2231c1adde366b465dba14adfec65bbf85eecaf9bf75985e17ddaa839f3112f117f8c862ac10275b9f202de2b7fc5a9ba9ed83bdae1384e71c1fd270ae56e2'
+        'c6f136617a9082e0ebaaa40a1f7ebfcf85909490fc674c05c5d3389fab0e2fa9bf4058a9d4273f4f0a649deb2ac377eb125779a285652e29fb27819e18735a37'
+        'ab9336051a4aacc1e6520ba893845432bdd9f0e7b4505f4764e9aaf9cae0be926147b012d7b3f6abb84f963080ae6bfaf2944480a69c593990ac3b45e8e6e9a7'
+        'a0d75ecc9c5d874f15de95c0d03725a3a823d1b127121ef5d6f67754e9d97efd1bbef6863f3e0f4e69cab05f3e12393ca50daa3322b9af3d675f9e0985432001'
+        'ce3efe6c1ef60ab70aaec16dbc912438bb7ad1f135ddac712687562fd0fed11c997f71ea1fe0018ce83af6ee71dbd2987a9b14826be431dac993d94b505145b0'
+        'f1e3090fce1507debdd267534ec82a867d29f4f5da5fdc83e87efb6780584ed667bd90d383a51c3ce342c4d2b4589c8744358096d9e90cb99c74bff314aa0402'
+        '324a3d30dd0dcc659d243eee4d23903c31d2dfdb44e6893ead6d1e86f0a7b015ac2f4c026961c02abe73aeb0206c4f8faa13623370ea77a93fb3891ea7512e14'
+        '51093143a50ccf285c2718b7e3d25e190515b7bce8fa3dcbfffa65f809ba6cb291b74034e4ec8372f1ac5fca496eabf231eaa68ddb5c3930fa8105b71be8b572'
+        'f71a8a7c711e798987a2b3d3b07c9d79e17f3f51b4a819db6de1b927a688363771a009495cbd4803979439f18a6aa30dddd16e6d0d72f1436faa5ff1d2dfc498'
+        '612cafd72f23d68ee1afa9da8776131b5165e4d6e4439f847d71fc01b4b9c45fa6bafe4d8457581e678f21402ecfd4bc56ee04338d768b8561fa7935d1c7cc76'
         'c20b3b791715d02756742bfa34f4921bcaebeee62edf079fe15c89afdc11451a2656122f4f21335cd116676ff69c3b7eee80c6adfdcbfe838c0f1e9012ce0428'
         'df68cfd344b37cae25fa446c82c5897510de23c55761570969dc5a6f2a5bf4c11b31e50c1670a18bef1065af6597e72e0ed839e8fdbc0328cf2dcf34484e5758'
         '8bff27696075ec53ca042b0c9e0deae345712e652b3b66bab1da82c4deefdf35533d04c00d59de70cbf968380236131bc819e0eeaa8aa40edfd84df3bd0972ef'
         '48c6c8a299d0d5341475936ea8e1974fc933de81fa710c483c0fa54d7d7a70ccb15c56da1b4cf66bc0c4fe486f78f6b74816b38f602ed219e5dd7f679fba2662'
         '2b9bad240296578ddb6a81629263d046b7e2d9ba063faaae38279c98556749b1b1ae6ccc3036a551fabea3d01ce916cffad1f1e56a65b3eab31faaa37de96211'
-        '6106d6d9e9ab91f6f7485c7464ae9eb4384d81efe19c45889ba48cd9166b07857c0874fad23d180d03cea3eebd7c0b4f396d63c6a4ec4e7b0e074bd6c28f9fc2'
+        '4b977cbe9f78bd7bbd2369243b197a8e5da8b2dba49abee893dfaa838ba8e92e15357cc1204f23e412afde205c988c5d93029e5eb6d2c6408b9dd8b08a994e8c'
         'c77a9b5a2bc7196f67a7995b381623a9700f15e22e75471123fdeff715b5d4e07ae1ac278cffd71b81d7b9fa0431a2571820e488e460e47906f7295c3d20f071'
         'ac90d43f24a852a05bd9e820e6dc19c4b62764321d7464f4df08b3f4bc8b73c9caac6dbd1ee80a9abd868bb0c7219dcbf0ebe8dc556b90901cd2aea859f07b5a'
         'acbee18a4d7bd71fd1dcb91d59b774bb523d0cde519c7fe7dcbf634b3f5c3e1585200d7b365fa89273d8eba0cc59db2e2b634beee8a08cc9499686c7f2af4fde'

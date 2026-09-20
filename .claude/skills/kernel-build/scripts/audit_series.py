@@ -36,7 +36,7 @@ FAILURE_MARKERS = ("FAILED", "Skipping patch", "Reversed (or previously applied)
 # The base tag is derived from the PKGBUILD's _srctag so it cannot drift. That
 # variable holds the *tarball* name (e.g. "linux-7.3-rc2" -> tag "v7.3-rc2"),
 # and it is "next-YYYYMMDD" for a linux-next snapshot, which has no tag at all.
-FALLBACK_TAG = "v7.3-rc2"
+FALLBACK_TAG = "v7.3-rc3"
 
 
 class AuditError(RuntimeError):

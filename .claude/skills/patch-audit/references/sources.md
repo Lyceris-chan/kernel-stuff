@@ -172,15 +172,26 @@ rule stands unless separately verified.)
   source diffs.
 
 ### 6. `sirlucjan` NAP governor (NOT firelzrd)
-- **IMPORTANT (learned this session):** the NAP governor source is
-  `repos/sirlucjan-kernel-patches/7.0/nap-patches/`, which contains
-  `0001-7.2-nap-v0.5.0.patch`. firelzrd's repo
-  (`repos/firelzrd-bore-scheduler`) has **NO** `nap-patches/` directory — its
-  `patches/` only contains `additions/`, `legacy/`, `stable/`, `testing/` and is
-  BORE-scheduler only. Do not look for NAP patches there.
-- Fetch: `git -C repos/sirlucjan-kernel-patches pull`
-- Audit: `ls repos/sirlucjan-kernel-patches/7.0/nap-patches/` and compare
-  against the in-tree `2200-7.2-nap-v0.5.0.patch`.
+
+The NAP governor comes from sirlucjan, not firelzrd. **firelzrd's repo has no
+`nap-patches/` directory at all** — its `patches/` holds only `additions/`,
+`legacy/`, `stable/` and `testing/`, and is BORE-scheduler only. Do not look for
+NAP there.
+
+The newest NAP source is **`7.1/nap-patches/0001-7.1-nap-v0.5.0.patch`**; the
+`7.2` and `7.3-rc` branches ship **no** `nap-patches/` directory. The carried
+`2200-7.2-nap-v0.5.0.patch` is therefore at the newest available version — a
+sweep finding no `nap-patches/` under the current branch is reporting the
+normal state, not a missing fetch.
+
+```bash
+git -C repos/sirlucjan-kernel-patches pull
+find repos/sirlucjan-kernel-patches -maxdepth 3 -iname '*nap*' -type d
+ls repos/sirlucjan-kernel-patches/7.1/nap-patches/
+```
+
+Compare the version in the newest filename against the carried
+`2200-7.2-nap-v0.5.0.patch`.
 ---
 
 ## Reaching gitlab.freedesktop.org without git (learned 2026-09-12)
