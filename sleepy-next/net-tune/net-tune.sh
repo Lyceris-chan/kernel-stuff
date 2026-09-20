@@ -23,6 +23,32 @@ CONF="/etc/net-tune.conf"
 : "${RTT:=regional}"
 : "${OVERHEAD:=ethernet}"
 
+# `net-tune.sh eee-off` applies *only* the EEE setting. net-tune-eee.service
+# runs it before NetworkManager brings the link up, because turning EEE off
+# restarts auto-negotiation and drops the link for ~3s — free while the link
+# is down, but expensive afterwards: run at NM activation it took the network
+# out at the exact moment blocky resolves its upstream, leaving DNS dead for
+# ~8s after login (measured 2026-09-20: link down 10:48:05, up 10:48:08,
+# blocky's bootstrap lookups failing until 10:48:12).
+if [ "${1:-}" = "eee-off" ]; then
+    # This runs before NetworkManager, so there is no route yet and no way to
+    # name "the" interface — wait briefly for a NIC to appear, then apply to
+    # every real interface that currently advertises EEE.
+    for _ in $(seq 1 15); do
+        [ -n "$(ls /sys/class/net 2>/dev/null | grep -vx 'lo')" ] && break
+        sleep 0.2
+    done
+    for _dev in /sys/class/net/*; do
+        _i=$(basename "$_dev")
+        [ "$_i" = "lo" ] && continue
+        if ethtool --show-eee "$_i" 2>/dev/null | grep -q "EEE status: enabled"; then
+            ethtool --set-eee "$_i" eee off 2>/dev/null \
+                && echo "net-tune: EEE disabled on $_i (link down, no flap)"
+        fi
+    done
+    exit 0
+fi
+
 if [ -z "$IFACE" ]; then
     # Find the default internet interface. The unit runs after
     # network-online.target, so the route is usually present immediately; the
@@ -45,7 +71,15 @@ if [ "$ENABLE_LATENCY" = "yes" ]; then
     ethtool -C "$IFACE" adaptive-rx off adaptive-tx off \
         rx-usecs 0 tx-usecs 0 rx-frames 1 tx-frames 1 2>/dev/null || true
     # Energy-Efficient Ethernet off (Realtek jitter source).
-    ethtool --set-eee "$IFACE" eee off 2>/dev/null || true
+    #
+    # Only when it is actually on: the toggle restarts auto-negotiation and
+    # drops the link for ~3s. net-tune-eee.service has normally already done
+    # this before the link came up, so this re-apply is a no-op and the link
+    # never flaps. Keep it first so a NIC reset that re-enables EEE is still
+    # corrected on the next activation.
+    if ethtool --show-eee "$IFACE" 2>/dev/null | grep -q "EEE status: enabled"; then
+        ethtool --set-eee "$IFACE" eee off 2>/dev/null || true
+    fi
     # Offloads off: GRO/GSO/TSO/LRO batch packets, adding latency.
     ethtool -K "$IFACE" gro off gso off tso off lro off 2>/dev/null || true
     # Small ring buffers: less queuing delay.
