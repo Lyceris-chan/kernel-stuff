@@ -1043,6 +1043,188 @@ Bingfang Guo, 2026-09-10. Ours was four revisions behind.
   and not a valid kernel sha, and `dc59e4fe…` resolves to the `Linux 7.2-rc1`
   tag.
 
+## Update 2026-09-20 — every carried patch checked against its latest revision
+
+A version sweep ran over all 305 carried patches against the 13 lore mirrors,
+matching on normalised subject **ignoring the `n/m` denominator** (a resized
+series otherwise reads as a different patch — that blind spot is exactly why
+the first pass missed CPPC v7, whose subjects move from `N/15` to `N/20`).
+
+46 higher-version postings were found. Three filters reduced them to a real
+work list: already merged upstream, content-identical, and written against a
+base newer than ours.
+
+### Adopted
+
+| # | Change |
+|---|---|
+| `1210`–`1229` | ACPI CPPC **v6 → v7** (20 patches; was `1210`–`1224`, 15) |
+| `2005` | v1 → **v2** |
+| `1071` | **new** — `drm/amdgpu: More compact VCN IB emission` |
+| `1230` | **new** — `cpufreq/amd-pstate: Skip auto_sel write when it already matches the mode` v3 |
+
+Series is 312 patches. The cumulative audit applies all 312 to `v7.3-rc3`.
+
+### ACPI CPPC v6 → v7
+
+Christian Loehle, `[PATCH v7 0/20]`, 2026-09-16. This is live code:
+`amd-pstate` is built on ACPI CPPC, and this machine is Zen 4 with CPPC.
+
+**v7 drops `1213`** (`Use 64-bit masks for register fields`). The cover letter
+states the reason directly: *"All supported CPPC configurations are already
+64-bit, so this is only a cleanup I'll submit later on."* It is the author's
+own drop, and the removal was approved before this update was made.
+
+**v7 adds six patches:**
+
+- `1224` Keep Performance Limited clearable on NVIDIA T41
+- `1225` Validate FFH register fields before hardware access
+- `1226` Propagate errors from cross-CPU FFH calls
+- `1227` Accept requests to retain immutable autonomous selection
+- `1228` cpufreq: CPPC: Select the frequency-invariance callback per CPU
+- `1229` cpufreq: CPPC: Create the FIE worker before enabling PCC callbacks
+
+v7 patches 4–14 correspond to v6 patches 5–15 with real content changes, so this
+is a renumber as well as a revision.
+
+Verified by substitution against the series-applied tree: all 14 v6 patches
+reverse cleanly, all 20 v7 patches apply, and no later patch is disturbed.
+
+### `1071` — More compact VCN IB emission
+
+Tvrtko Ursulin, `[PATCH 01/18]`, 2026-09-18. Part of the same 18-patch series
+that `1070` came from; see below. This machine enumerates **`vcn_v5_0_0`**, and
+the patch touches the shared `amdgpu_vcn.c`, so it is on-target. It applies
+cleanly to both pristine `v7.3-rc3` and the series-applied tree — no adaptation
+needed, unlike `1070`.
+
+### `1070` is already current — checked, not changed
+
+`1070` is patch **17/18** of that same series. The series' hunk 4 does not apply
+to our base because it expects a `const bool burst_nop = sdma->burst_nop;` hoist
+this tree lacks — which is precisely what `1070`'s own commit message already
+documents. Our adaptation ports that hunk's delta onto the rc3 form. No update
+was needed and none was made.
+
+### Checked and deliberately not changed
+
+- **`2041` v3, `2415` v3, `2158` v3** — real content deltas (14, 10 and 16
+  changed lines), but written against a base **newer than `v7.3-rc3`**: neither
+  `patch` direction is clean against our tree, and the deltas are adaptations to
+  post-rc3 API changes (`gso_segment` signatures, `in_nmi()`-based kfunc
+  guards). Our `v2`/`v1`/`v1` are correct for this base. Revisit at the 7.4 bump.
+- **`2144`, `2168`, `2185`** — reported as higher-version; the newer revision
+  reverse-applies cleanly, meaning our content already matches. Version label
+  only.
+- **`2141`, `2412`, `2506`** — upstream commits that are already merged; the
+  higher mailing-list versions are draft history.
+- **`1151` v4** — dated 2026-02-16, older than what we carry. The sweep's
+  version comparison ignores dates; this one is stale, not newer.
+
+### Also evaluated this round
+
+- **io_uring `[SECURITY]` trio** (Andres Berbescu, 2026-09-16) — three
+  vulnerability reports, **not patches**: the mails carry no diff bodies and
+  Jens Axboe replied to them. Nothing to apply.
+- **amd-staging `memset32 for SDMA padding`** — same author and area as `1070`,
+  but applies only partially and the 18-patch series has no GFX12 member.
+- **`2ac2fe765` MALL hysteresis at high refresh rates** — rejected. It patches
+  `dcn30_apply_idle_power_optimizations()`; DCN 4.0.1 has its own
+  `dcn401_apply_idle_power_optimizations()` (`dcn401_init.c:90`), so the patched
+  code never runs here. It would apply, compile, and do nothing.
+- **`9413959fa` smu 14.0.3 energy accumulator** — rejected. It patches
+  `smu_v14_0_2_ppt.c`; this machine enumerates **`smu_v14_0_0`**.
+
+Hardware IP versions above are read from this machine's own IP discovery, not
+inferred: `psp_v14_0_0` · `smu_v14_0_0` · `gfx_v12_0_0` · `sdma_v7_0_0` ·
+`vcn_v5_0_0` · Display Core on DCN 4.0.1.
+
+### Branch sweep — tips are not enough
+
+The first pass read only each repo's HEAD. Sweeping **every branch** of
+`amd-staging-drm-next`, `agd5f-linux` (129 branches), `drm-next`, `drm-misc`,
+`linux-pm`, `akpm-mm` and `tip` found six additional on-target commits that the
+tip-only pass had missed. Two of those were wrong-chip traps:
+
+- `55765c2ff` `drm/amdkfd: Fix TCP XNACK scoreboard reset race` — touches
+  `gfx_v9_4_2.c` and `kfd_int_process_v9.c`: CDNA/Aldebaran, not GFX 12.0.
+- `79b709bc3` `drm/amdgpu: Fix kfd device lock during partition` — touches
+  `aqua_vanjaram.c` and `soc_v1_0.c`: MI300 and datacenter SoCs.
+
+And one was worth taking:
+
+**`1072`** — `92a1b0734` `drm/amdgpu/atom: bound the VBIOS date, part number,
+version and build getters`, Hari Mishal, 2026-09-15, `Signed-off-by` also from
+Alex Deucher. Four unbounded reads while walking the VBIOS image using offsets
+and counts taken from the image itself. The commit message names each: a
+14-byte read at `OFFSET_TO_VBIOS_DATE` that `check_atom_bios()`'s `0x49`
+minimum does not cover, an image-supplied `u16` string offset dereferenced
+without a bound, a match advanced by a fixed 18 bytes and copied with only a
+length cap, and a config-string walk from an image-supplied offset. All are now
+checked against `ctx->bios_size`. Not in linux-next or torvalds — amd-staging
+only. Applies cleanly to pristine `v7.3-rc3` and to the series tree.
+
+Also evaluated from the branch sweep and not carried:
+
+- `af619209b` `Reuse cached PCIe link device` (Mario Limonciello) — replaces a
+  local `amdgpu_device_get_aspm_pdev()` helper with a cached `adev->link_dev`.
+  A refactor with no fix claimed, in ASPM handling, which this machine disables
+  anyway via `pcie_aspm=off`. Not worth the blast radius.
+- `7710fb929` `Extend logical to device instance lookup to all devices` — a
+  34-file refactor of `amdgpu_ip.c`.
+- `2cae0b425`, `e0e9c2257`, `99c9ca0af` — apply only partially.
+- `159149c51` — touches `dcn42_hwseq.c`. DCN 4.2, not our DCN 4.0.1.
+
+### drm/amd work items, 2026-09-20
+
+Four open issues concern this hardware. **None references a fix**, so there is
+nothing to carry; they are tracked, not merged.
+
+- **`#5868`** (filed 2026-09-20) RX 9070 XT: HDMI disconnect/reconnect loop
+  above 1080p. This machine drives its MAG251RX at 1080p over HDMI, below the
+  reported threshold.
+- **`#5862`** (2026-09-19) Navi 48 / RX 9070 XT: HDMI 2.1 FRL link not trained
+  against an LG OLED sink at 4K.
+- **`#5859`** (2026-09-18) `[RDNA4][DCN 4.0.1]` DDC/CI loss and surface noise on
+  DP-4. The reporter rolled back kernel, Mesa and linux-firmware with no change,
+  and calls it a DCN 4.0.1 reset/recovery issue.
+- **`#5855`** (2026-09-17) VRR refused on DP (`vrr_range 0 0`) but working on
+  HDMI, on an MSI MAG display. A different model from this machine's MAG251RX,
+  but the same vendor and behaviour class as `1164`.
+
+The image reference in `#5859` (`112d2111f50a…`) is an upload path, not a
+commit — the same dead end this ledger already records.
+
+### A test that reported success while testing nothing
+
+The nine amd-staging commits above were first classified as *already carried* —
+all nine, including ones never seen before. The cause: `repos/_audit` had been
+removed before the previous build (which ran `audit_series.py` **without**
+`--keep`), so every `patch -d repos/_audit` invocation failed with
+
+```
+patch: **** Can't change to directory repos/_audit : No such file or directory
+```
+
+That text matches neither `FAILED` nor `ignored`, which was the entire
+classification criterion, so the failure fell through to the "carried" branch.
+**`patch` also returned exit 0 on that fatal error**, so checking `$?` would not
+have caught it either.
+
+Two rules follow. A test that reads a reference tree must assert the tree exists
+before using it, and must treat "no verdict" as an error rather than a result.
+And `audit_series.py --keep` is what leaves the tree behind — a plain run
+consumes it.
+
+### Source health
+
+`repos/torvalds` reported a successful `fetch --all` while sitting two days
+stale (local `c3d85c66`, remote `518e5b79` — 105 commits missed, including
+`amd-drm-fixes-7.3-2026-09-17`). Caught by comparing against `git ls-remote`,
+not by the fetch. All 11 lore mirrors had been pruned from `repos/` and were
+re-cloned (~8 GB); `lore-mirror` and `lore-sched-ext` are **bare** mirrors, so
+a `.git`-directory existence check misreports them as missing.
+
 ## Sweep 2026-09-18 (second round)
 
 Three passes: the accumulated `v7.3-rc3`..`master` window, a fresh pull of the

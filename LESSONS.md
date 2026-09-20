@@ -1017,3 +1017,95 @@ Related: *"A crashed command and an empty result look identical"* above. That
 one is a search that returns nothing because it broke; this one is a search
 that returns nothing because it asked the wrong question. Both read as "no
 candidates".
+
+## Two ways to extract a lore email that silently produce a broken patch (2026-09-20)
+
+Both were hit in one sweep, on the `[PATCH 01/18] More compact VCN IB emission`
+email, and both fail *quietly* — the extractor reports success and the patch is
+unusable.
+
+**1. Not every mailer emits the `diff --git` line.** Anchoring the body search
+on `diff --git` returned "no diff" for four sched_ext patches that each plainly
+contained one. Tejun Heo's `git send-email` output for those starts the hunk at
+`--- a/kernel/sched/ext/ext.c` with no `diff --git` above it. Anchor on the
+earliest of both:
+
+```python
+starts = [m.start() for m in re.finditer(r'^(diff --git |--- a/)', raw, re.M)]
+```
+
+**2. Cutting at the diff start throws away the commit message and every
+trailer.** The obvious "take everything from the first diff line" keeps the
+hunks and drops the prose — including the `Signed-off-by` that Check 4 requires
+and the reasoning a later reader needs. `rg '^Signed-off-by:' patch` returns
+nothing, which reads as "the author didn't sign off". It was there; the
+extractor had discarded it.
+
+Keep the whole body from the end of the mail headers to the `-- ` signature
+separator, and synthesise only the `From nobody …` line and the
+`From:`/`Date:`/`Subject:` triple:
+
+```python
+body = raw[after_mail_headers : signature_separator]
+```
+
+This also preserves the `---`/changelog/`---` block, so a v2's "what changed"
+survives into the carried patch.
+
+Verify an extraction by asserting on it, not by eyeballing the hunks: count
+`Signed-off-by`, count `--- a/`, count `@@`, and dry-run it. A patch with the
+right hunks and no trailer passes `git apply` and fails review.
+
+**Related trap, same session:** `set -- $pair` and `for x in $VAR` do **not**
+word-split in zsh, the login shell here. `for pair in "4ff407a8 cmask"` sets
+`$1` to the entire string, so `git show "4ff407a8 cmask:m"` fails and the
+extractor reports NO DIFF for every input. Pass arguments explicitly, or use
+`${=VAR}`. This has now cost time twice.
+
+## A test against a missing tree reports everything as passing (2026-09-20)
+
+Nine amd-staging commits were classified in one batch. All nine came back
+*already carried* — including four that had never been looked at before, and
+one that had been measured as PARTIAL an hour earlier. That inconsistency is
+the only reason it was caught.
+
+The classifier ran `patch -d repos/_audit -R -p1 ... < cand.patch` and branched
+on the output:
+
+```bash
+if ! echo "$r" | rg -q 'FAILED|ignored|No file'; then st="CARRIED"
+```
+
+`repos/_audit` did not exist. It had been consumed by the previous build, which
+ran `audit_series.py` **without `--keep`** — only `--keep` leaves the tree
+behind. So every invocation produced:
+
+```
+patch: **** Can't change to directory repos/_audit : No such file or directory
+```
+
+which contains none of the three strings the classifier looked for, fell
+through every branch, and landed on "CARRIED". **`patch` also exited 0 on that
+fatal error**, so `if patch ...; then` and `$?` were equally useless.
+
+Three rules:
+
+1. **Assert the fixture exists before testing against it**, and abort loudly if
+   it does not. A test harness that cannot reach its reference tree must not
+   return a verdict at all.
+2. **Structure the classifier so "no verdict" is an error, not a default.**
+   Match positively — set `st="CARRIED"` only inside `if reverse-applied-ok`,
+   never as the fallthrough of a failed match.
+3. **Treat an implausible uniform result as a signal.** Nine of nine passing,
+   including things never before tested, is not a clean sweep; it is a broken
+   instrument. The same shape appeared earlier the same day, when a subject
+   search reported four carried patches as absent.
+
+For this repo specifically: `audit_series.py` without `--keep` removes
+`repos/_audit` at the end of the run. Any later command that patches into
+`repos/_audit` is testing nothing until the tree is rebuilt.
+
+Related: *"A crashed command and an empty result look identical"* above — that
+one is a search returning nothing because it broke. This is a test returning
+*success* because it broke, which is worse: the broken state is indistinguishable
+from the good one.

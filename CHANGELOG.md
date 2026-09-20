@@ -15,6 +15,75 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc3-25-sleepy-next]: 2026-09-20
+
+### Changed
+
+- Replace the ACPI CPPC series with **v7** (`1210`-`1229`, 20 patches; was
+  `1210`-`1224`, 15). This is live code — `amd-pstate` is built on ACPI CPPC and
+  this machine is Zen 4 with CPPC. Beyond the renumber, v7 changes real content
+  in patches 4-14 and adds six: Performance Limited clearing on NVIDIA T41,
+  FFH register-field validation before hardware access, cross-CPU FFH error
+  propagation, immutable autonomous selection requests, per-CPU
+  frequency-invariance callback selection, and FIE worker creation before PCC
+  callbacks are published. Verified by substitution: all 14 v6 patches reverse
+  cleanly, all 20 v7 patches apply, and no later patch is disturbed.
+- Replace `2005` with its **v2**.
+- `pkgrel` 23 -> 25. Series is 313 patches; the cumulative audit applies all of
+  them to `v7.3-rc3`.
+
+### Removed
+
+- `1213` `ACPI: CPPC: Use 64-bit masks for register fields`, dropped by the
+  series author between v6 and v7. The v7 cover letter gives the reason: *"All
+  supported CPPC configurations are already 64-bit, so this is only a cleanup
+  I'll submit later on."* Its removal was approved before this update.
+
+### Added
+
+- `1071` — `drm/amdgpu: More compact VCN IB emission` (Tvrtko Ursulin,
+  2026-09-18). Part of the same 18-patch series `1070` came from, and on-target:
+  this machine enumerates `vcn_v5_0_0` and the patch touches the shared
+  `amdgpu_vcn.c`. Unlike `1070` it needs no adaptation and applies cleanly to
+  both pristine `v7.3-rc3` and the series-applied tree.
+- `1230` — `cpufreq/amd-pstate: Skip auto_sel write when it already matches the
+  mode` v3 (Wentao Guan, 2026-09-18). Avoids a redundant firmware write on a
+  driver this machine depends on.
+- `1072` — `drm/amdgpu/atom: bound the VBIOS date, part number, version and build
+  getters` (Hari Mishal, 2026-09-15; `Signed-off-by` also from Alex Deucher).
+  Closes four out-of-bounds reads in VBIOS string parsing: a 14-byte read at a
+  fixed offset that `check_atom_bios()`'s 0x49 minimum does not cover, an
+  unchecked image-supplied string offset, a fixed 18-byte advance whose copy had
+  no image bound, and a config-string walk from an image-supplied offset. All
+  four are now checked against `ctx->bios_size`. This is the VBIOS of the GPU in
+  this machine, parsed at every driver load. Found by sweeping amd-staging
+  *branches* rather than tips.
+
+### Verified
+
+- A version sweep over all 305 carried patches against 13 lore mirrors found 46
+  higher-version postings. Three were adopted. The rest were rejected on
+  evidence: three are written against a base newer than `v7.3-rc3` and apply in
+  neither direction (`2041` v3, `2415` v3, `2158` v3 — their deltas adapt to
+  post-rc3 API changes), three already match by content despite a higher version
+  label (`2144`, `2168`, `2185`), three are already-merged upstream commits whose
+  higher mailing-list versions are draft history (`2141`, `2412`, `2506`), and
+  one is simply older than what is carried (`1151`).
+- `1070` was checked against its parent series and is already the correct
+  adaptation: the series' hunk 4 expects a `burst_nop` hoist this base lacks,
+  which `1070`'s own commit message documents.
+
+### Not carried
+
+- The io_uring `[SECURITY]` posts of 2026-09-16 are vulnerability **reports**,
+  not patches — the mails carry no diff bodies and the maintainer has replied.
+- `2ac2fe765` "fix MALL hysteresis timer underflow at high refresh rates"
+  patches `dcn30_apply_idle_power_optimizations()`; DCN 4.0.1 has its own
+  `dcn401_apply_idle_power_optimizations()`, so the patched code never executes
+  here. `9413959fa` "report energy accumulator for smu 14.0.3" patches
+  `smu_v14_0_2_ppt.c`; this machine enumerates `smu_v14_0_0`. Both were rejected
+  on the hardware's own IP discovery rather than on inference.
+
 ## [7.3.0-rc3-23-sleepy-next]: 2026-09-18
 
 ### Changed

@@ -1,4 +1,35 @@
-From 2e67ce7e98f7a714a0a14353daf1d21a046c77b2 Mon Sep 17 00:00:00 2001
+From nobody Mon Sep 17 00:00:00 2001
+From: Christian Loehle <christian.loehle@arm.com>
+Subject: [PATCH v7 07/20] ACPI: CPPC: Release PCC data after probe failures
+Date: Wed, 16 Sep 2026 17:27:52 +0100
+
+	by smtp.subspace.kernel.org (Postfix) with ESMTP id E851E559CB7;
+	Wed, 16 Sep 2026 16:29:14 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=217.140.110.172
+ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
+	t=1789576158; cv=none; b=cMwMf9343dXP8Mis17g6Aswgt8dJJt3HOazPbmvm3oSYraWlL9vLY5WiWgHuPatOMFFwUuLiSt4P5KN/Uz/JeoOe3EAl7QDjr/zk3qrgQdvlaVYoYUlPYHoNPN5JzF71a3+mEVzZj0n9kJFsW5IacSHK4LbXWw+cAcnErbWAomo=
+ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
+	s=arc-20240116; t=1789576158; c=relaxed/simple;
+	bh=GLxbFRZsoKKEdIbjhK1WYzHAcpWu8BNe3T+wLAk5T8I=;
+	h=From:To:Cc:Subject:Date:Message-Id:In-Reply-To:References:
+	 MIME-Version; b=BwdUED1nxN+/IJQNp0Uy/gkp0fNO46ogZb4Q37rE2nzS71mZmSf7wpi5uZhwSXUn6QmVKNjgLLA1YJmPok8671lR4Xi8RI11S7CWqoohBI8XNdHwsZb3TXUMHNlfj9kKcH9Um331SVRQAFfX911lSJ3ZG7oGKf+NtZuHOY77co4=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=arm.com; spf=pass smtp.mailfrom=arm.com; dkim=pass (1024-bit key) header.d=arm.com header.i=@arm.com header.b=BYPEZaap; arc=none smtp.client-ip=217.140.110.172
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=arm.com
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=arm.com
+Authentication-Results: smtp.subspace.kernel.org;
+	dkim=pass (1024-bit key) header.d=arm.com header.i=@arm.com header.b="BYPEZaap"
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.121.207.14])
+	by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E53561516;
+	Wed, 16 Sep 2026 09:29:09 -0700 (PDT)
+Received: from e127648.carmbridge.arm.com (unknown [10.0.129.72])
+	by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id E491D3F7B4;
+	Wed, 16 Sep 2026 09:29:10 -0700 (PDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=arm.com; s=foss;
+	t=1789576153; bh=GLxbFRZsoKKEdIbjhK1WYzHAcpWu8BNe3T+wLAk5T8I=;
+	h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+	b=BYPEZaapJj5jtfVK7u11G21yAOaPtMiVQMErSthULYC6MsKk9M649jFIIqMeRJsQO
+	 9fpwYoZjqAHX9OtsfCp0SWj5obA8XHUgEGpT5NWBtPhrtj6LDLSTgWxgw7VxjRHzno
+	 6X8Hu/wEnNGw8ahrfG8hmWjFeugnYEU+jWngJDE8=
 From: Christian Loehle <christian.loehle@arm.com>
 To: "Rafael J . Wysocki" <rafael@kernel.org>,
 	Viresh Kumar <viresh.kumar@linaro.org>
@@ -14,12 +45,12 @@ Cc: linux-pm@vger.kernel.org,
 	Ionela Voinescu <ionela.voinescu@arm.com>,
 	zhongqiu.han@oss.qualcomm.com,
 	Christian Loehle <christian.loehle@arm.com>
-Subject: [PATCH v6 08/15] ACPI: CPPC: Release PCC data after probe failures
-Date: Sun, 30 Aug 2026 12:56:37 +0100
-Message-Id: <20260830115644.2056983-9-christian.loehle@arm.com>
+Subject: [PATCH v7 07/20] ACPI: CPPC: Release PCC data after probe failures
+Date: Wed, 16 Sep 2026 17:27:52 +0100
+Message-Id: <20260916162805.1039247-8-christian.loehle@arm.com>
 X-Mailer: git-send-email 2.34.1
-In-Reply-To: <20260830115644.2056983-1-christian.loehle@arm.com>
-References: <20260830115644.2056983-1-christian.loehle@arm.com>
+In-Reply-To: <20260916162805.1039247-1-christian.loehle@arm.com>
+References: <20260916162805.1039247-1-christian.loehle@arm.com>
 Precedence: bulk
 X-Mailing-List: linux-pm@vger.kernel.org
 List-Id: <linux-pm.vger.kernel.org>
@@ -66,7 +97,7 @@ Signed-off-by: Christian Loehle <christian.loehle@arm.com>
  1 file changed, 101 insertions(+), 52 deletions(-)
 
 diff --git a/drivers/acpi/cppc_acpi.c b/drivers/acpi/cppc_acpi.c
-index 37ff54a048c9..e8ffd5b7094d 100644
+index 0f0cce383007..2ad45725f3e0 100644
 --- a/drivers/acpi/cppc_acpi.c
 +++ b/drivers/acpi/cppc_acpi.c
 @@ -36,6 +36,7 @@
@@ -85,7 +116,7 @@ index 37ff54a048c9..e8ffd5b7094d 100644
  /* The cpu_pcc_subspace_idx contains per CPU subspace ID */
  static DEFINE_PER_CPU(int, cpu_pcc_subspace_idx);
  
-@@ -735,35 +737,51 @@ EXPORT_SYMBOL_GPL(acpi_get_psd_map);
+@@ -760,35 +762,51 @@ EXPORT_SYMBOL_GPL(acpi_get_psd_map);
  
  static int register_pcc_channel(int pcc_ss_idx)
  {
@@ -150,7 +181,7 @@ index 37ff54a048c9..e8ffd5b7094d 100644
 +	init_rwsem(&data->pcc_lock);
 +	init_waitqueue_head(&data->pcc_write_wait_q);
 +
-+	/* Set flag so that we don't come here for each CPU. */
++	/* Reuse this channel when another CPU references the same subspace. */
 +	data->pcc_channel_acquired = true;
 +
 +out_unlock:
@@ -159,7 +190,7 @@ index 37ff54a048c9..e8ffd5b7094d 100644
  }
  
  /**
-@@ -805,19 +823,49 @@ bool __weak cpc_supported_by_cpu(void)
+@@ -830,19 +848,49 @@ bool __weak cpc_supported_by_cpu(void)
   */
  static int pcc_data_alloc(int pcc_ss_id)
  {
@@ -217,7 +248,7 @@ index 37ff54a048c9..e8ffd5b7094d 100644
  }
  
  /*
-@@ -865,11 +913,17 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
+@@ -890,11 +938,17 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
  	acpi_handle handle = pr->handle;
  	unsigned int num_ent, i, cpc_rev;
  	int pcc_subspace_id = -1;
@@ -235,7 +266,7 @@ index 37ff54a048c9..e8ffd5b7094d 100644
  	if (!osc_sb_cppc2_support_acked) {
  		pr_debug("CPPC v2 _OSC not acked\n");
  		if (!cpc_supported_by_cpu()) {
-@@ -1008,6 +1062,7 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
+@@ -1039,6 +1093,7 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
  						ret = err;
  						goto out_free;
  					}
@@ -243,7 +274,7 @@ index 37ff54a048c9..e8ffd5b7094d 100644
  				} else if (pcc_subspace_id != gas_t->access_width) {
  					pr_debug("Mismatched PCC ids in _CPC for CPU:%d\n",
  						 pr->id);
-@@ -1140,13 +1195,10 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
+@@ -1171,13 +1226,10 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
  		goto out_free;
  
  	/* Register PCC channel once for all PCC subspace ID. */
@@ -258,7 +289,7 @@ index 37ff54a048c9..e8ffd5b7094d 100644
  	}
  
  	/* Everything looks okay */
-@@ -1167,7 +1219,7 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
+@@ -1198,7 +1250,7 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
  	if (ret) {
  		per_cpu(cpc_desc_ptr, pr->id) = NULL;
  		kobject_put(&cpc_ptr->kobj);
@@ -267,7 +298,7 @@ index 37ff54a048c9..e8ffd5b7094d 100644
  	}
  
  	kfree(output.pointer);
-@@ -1176,6 +1228,11 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
+@@ -1207,6 +1259,11 @@ int acpi_cppc_processor_probe(struct acpi_processor *pr)
  out_free:
  	cppc_free_desc(cpc_ptr);
  
@@ -279,7 +310,7 @@ index 37ff54a048c9..e8ffd5b7094d 100644
  out_buf_free:
  	if (cpc_present)
  		pr_err("CPU%d: failed to initialize _CPC: %d\n", pr->id, ret);
-@@ -1193,28 +1250,20 @@ EXPORT_SYMBOL_GPL(acpi_cppc_processor_probe);
+@@ -1224,28 +1281,20 @@ EXPORT_SYMBOL_GPL(acpi_cppc_processor_probe);
  void acpi_cppc_processor_exit(struct acpi_processor *pr)
  {
  	struct cpc_desc *cpc_ptr;
