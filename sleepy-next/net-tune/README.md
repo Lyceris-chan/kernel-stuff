@@ -1,7 +1,18 @@
 # net-tune
 
-One systemd service that applies low-latency Ethernet settings and CAKE SQM
-shaping. Each half is independently toggleable in `/etc/net-tune.conf`.
+Two systemd units. `net-tune.service` applies low-latency Ethernet settings and
+CAKE SQM shaping once the link is up; each half is independently toggleable in
+`/etc/net-tune.conf`.
+
+`net-tune-eee.service` is a small oneshot ordered `Before=NetworkManager.service`
+that runs `net-tune.sh eee-off`, i.e. turns EEE off while the link is still
+down. It exists because **switching EEE restarts auto-negotiation and drops the
+link for ~3s**: done from the NetworkManager dispatcher (after activation) that
+outage landed exactly when blocky resolves its DoQ upstream, leaving DNS broken
+for ~11s after login on every boot (measured 2026-09-20; the flap is visible on
+09-19 boots too). While the link is down the same call is free. The re-apply in
+the main service therefore only touches EEE when `ethtool --show-eee` reports it
+*enabled*, so `up`/`dhcp4-change` events can never flap the link again.
 
 `linux-sleepy-next` owns this service: a build installs it, enables it through
 `network-online.target.wants`, and marks `/etc/net-tune.conf` as a pacman backup
