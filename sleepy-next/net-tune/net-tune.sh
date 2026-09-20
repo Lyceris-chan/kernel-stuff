@@ -38,12 +38,19 @@ if [ "${1:-}" = "eee-off" ]; then
         [ -n "$(ls /sys/class/net 2>/dev/null | grep -vx 'lo')" ] && break
         sleep 0.2
     done
+    # Unconditional: with the link down there is nothing to renegotiate, so
+    # this is free whatever the current setting is — and unlike the dispatcher
+    # path it must not depend on reading a status that would tell us whether
+    # EEE is *negotiated* rather than *configured*. Interfaces without EEE
+    # support simply fail here and are skipped.
     for _dev in /sys/class/net/*; do
         _i=$(basename "$_dev")
         [ "$_i" = "lo" ] && continue
-        if ethtool --show-eee "$_i" 2>/dev/null | grep -q "EEE status: enabled"; then
-            ethtool --set-eee "$_i" eee off 2>/dev/null \
-                && echo "net-tune: EEE disabled on $_i (link down, no flap)"
+        [ -e "/sys/class/net/$_i/device" ] || continue
+        if ethtool --set-eee "$_i" eee off 2>/dev/null; then
+            echo "net-tune: EEE disabled on $_i before link-up (free)"
+        else
+            echo "net-tune: EEE not applicable on $_i (no EEE support, or the driver needs a link)"
         fi
     done
     exit 0
