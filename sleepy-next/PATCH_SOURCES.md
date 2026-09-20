@@ -1123,6 +1123,54 @@ a crash fix should carry.
   guard to write to that new backend.
 - `linux-mm/linux-mm` PRs `#4867` (the RFC) and `#4774` (v3) track both.
 
+### Exhaustive upstream sweep, 2026-09-20
+
+A multi-channel sweep (mailing-list trees, akpm's branches, patchwork, GitHub,
+the crash signature, and `sio_pool`'s design history) with independent
+re-verification of every candidate. Result: **nothing upstream fixes or
+mitigates this**, and nothing can — **`do_swapout()` does not exist upstream at
+all.** Zero hits across all 13 lore mirrors; absent from torvalds, akpm and
+linux-next. It is MARIE's invention, so the bypass is ours to close.
+
+- **akpm has no xswap at all.** `mm-everything-2026-09-20` (`62310f16ff3f`)
+  contains zero `SWP_XSWAP` / `xswap_create` / `nr_real_swapfiles`.
+- **The RFC cannot help here.** Beyond being a feature, it is a no-op on this
+  machine: `xswap_alloc_phys_slot()` skips `SWP_XSWAP` devices, `/proc/swaps`
+  has one row, so `xswap_backend_alloc()` returns empty and patch 06 performs
+  exactly the guard already carried. Patch 06 also edits `swap_writeout()`,
+  which `do_swapout()` never enters.
+- **Independent prior art.** `RAMDRAGONS/jcachy` `6c82211cd` (2026-09-20T00:57Z,
+  ~16 h before `2199`) carries the same fix in `do_swapout()`, differing only by
+  a `data_race()` wrapper. Not adopted: `CONFIG_KCSAN` is off so it compiles
+  away, and upstream's own guard in `2155` omits it.
+
+### Do not add `sio_pool_init()` to the xswap path
+
+It is the obvious belt-and-braces move and it is **harmful**, as is adding a
+real disk swap device. Both make `mempool_alloc()` succeed, after which the
+write reaches code that cannot work for xswap: `si->bdev` is NULL and
+`swap_extent_root` is empty (`add_swap_extent()` is unreachable from
+`xswap_create()`). `swap_bdev_can_merge()` calls `swap_folio_sector()` during
+the merge test — BUG before any submit with two or more batched folios — and
+otherwise `offset_to_swap_extent()` ends in `BUG(); /* It *must* be present */`.
+That trades a conditional NULL-deref for a deterministic kernel BUG.
+
+### Guard inventory (rebase-sensitive)
+
+Exactly **three** callers of `__swap_writepage()`: `swap_writeout()` (`2155`),
+`zswap_writeback_entry()` in `mm/zswap.c` (`2155`), `do_swapout()` (`2199`).
+`swap_add_folio()` is reached only from `__swap_writepage()` (WRITE) and
+`swap_read_folio()` (READ, guarded). The RFC renames the callee to
+`__swap_writeout()` and adds an argument, and Nhat Pham's vswap series adds call
+sites, so re-derive this count after every bump.
+
+### Unexplained: why the store was refused
+
+The OOM snapshot 21 s before the oopses shows `zspages` at ~86.6% of the 20%
+ceiling, below the 90% accept threshold — so pool-full may not be the trigger.
+A failure inside `zswap_store_page()` (zsmalloc allocation, entry cache, xarray)
+is at least as likely. This widens the set of refusals nothing upstream handles.
+
 `2199` is therefore ours alone. **Drop it when upstream lands a fix for the
 bypass**, rather than merging it forward — the correct long-term shape is a
 guard the shared callee cannot be reached around.

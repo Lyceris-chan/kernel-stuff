@@ -1,0 +1,120 @@
+diff --git a/mm/memory.c b/mm/memory.c
+index 926276d41920..c08ef143b8f1 100644
+--- a/mm/memory.c
++++ b/mm/memory.c
+@@ -4772,15 +4772,18 @@ static unsigned long thp_swapin_suitable_orders(struct vm_fault *vmf)
+ 	if (unlikely(userfaultfd_armed(vma)))
+ 		return 0;
+ 
++	entry = softleaf_from_pte(vmf->orig_pte);
++
+ 	/*
+ 	 * A large swapped out folio could be partially or fully in zswap. We
+ 	 * lack handling for such cases, so fallback to swapping in order-0
+ 	 * folio.
++	 * An xswap entry is deferred to __swap_cache_add_check() instead.
+ 	 */
+-	if (!zswap_never_enabled())
++	if (!(__swap_entry_to_info(entry)->flags & SWP_XSWAP) &&
++	    !zswap_never_enabled())
+ 		return 0;
+ 
+-	entry = softleaf_from_pte(vmf->orig_pte);
+ 	/*
+ 	 * Get a list of all the (large) orders below PMD_ORDER that are enabled
+ 	 * and suitable for swapping THP.
+diff --git a/mm/swap.h b/mm/swap.h
+index 4fcbb21a583d..990accefd3b6 100644
+--- a/mm/swap.h
++++ b/mm/swap.h
+@@ -477,6 +477,8 @@ int shmem_writeout(struct swap_io_ctx *ctx, struct folio *folio,
+ swp_entry_t xswap_slot_backend(struct swap_cluster_info *ci, unsigned int slot);
+ swp_entry_t xswap_backend_alloc(swp_entry_t entry, unsigned int order);
+ void xswap_backend_free(swp_entry_t entry, swp_entry_t phys, unsigned int order);
++int xswap_check_backing(struct swap_cluster_info *ci, unsigned int off,
++			unsigned int nr);
+ #else
+ static inline swp_entry_t xswap_slot_backend(struct swap_cluster_info *ci,
+ 					     unsigned int slot)
+@@ -492,6 +494,12 @@ static inline swp_entry_t xswap_backend_alloc(swp_entry_t entry, unsigned int or
+ static inline void xswap_backend_free(swp_entry_t entry, swp_entry_t phys, unsigned int order)
+ {
+ }
++
++static inline int xswap_check_backing(struct swap_cluster_info *ci,
++				      unsigned int off, unsigned int nr)
++{
++	return nr;
++}
+ #endif /* CONFIG_XSWAP */
+ 
+ #endif /* _MM_SWAP_H */
+diff --git a/mm/swap_state.c b/mm/swap_state.c
+index 135d9573a9dc..112ab952fa0c 100644
+--- a/mm/swap_state.c
++++ b/mm/swap_state.c
+@@ -194,6 +194,12 @@ static int __swap_cache_add_check(struct swap_cluster_info *ci,
+ 	if (nr == 1)
+ 		return 0;
+ 
++	/* A zswap-backed or mixed batch falls back to a smaller order. */
++	if (__swap_entry_to_info(targ_entry)->flags & SWP_XSWAP) {
++		if (xswap_check_backing(ci, round_down(ci_off, nr), nr) != nr)
++			return -EBUSY;
++	}
++
+ 	is_zero = __swap_table_test_zero(ci, ci_off);
+ 	ci_off = round_down(ci_off, nr);
+ 	ci_end = ci_off + nr;
+diff --git a/mm/swapfile.c b/mm/swapfile.c
+index 4d72c854c7b3..852f10642b99 100644
+--- a/mm/swapfile.c
++++ b/mm/swapfile.c
+@@ -4164,6 +4164,34 @@ swp_entry_t xswap_slot_backend(struct swap_cluster_info *ci, unsigned int slot)
+ 	return (swp_entry_t){ .val = xs[slot] };
+ }
+ 
++/*
++ * A large xswap folio is read back as one IO only when the whole range is
++ * backed by one device, contiguously. Returns how many leading slots are.
++ */
++int xswap_check_backing(struct swap_cluster_info *ci, unsigned int off,
++			unsigned int nr)
++{
++	swp_entry_t first;
++	unsigned int i;
++
++	lockdep_assert_held(&ci->lock);
++
++	/* In zswap, which cannot load a large folio. */
++	if (!ci->xs_table || !ci->xs_table[off])
++		return 1;
++
++	first.val = ci->xs_table[off];
++	for (i = 1; i < nr; i++) {
++		swp_entry_t cur = { .val = ci->xs_table[off + i] };
++
++		if (swp_type(cur) != swp_type(first) ||
++		    swp_offset(cur) != swp_offset(first) + i)
++			break;
++	}
++
++	return i;
++}
++
+ /* Cluster lock held. xswap never unmaps a cluster below the mapped prefix. */
+ static unsigned long *xswap_xs_table_locked(struct swap_cluster_info *ci,
+ 					    gfp_t gfp)
+@@ -5066,7 +5094,11 @@ static int xswap_create(int prio)
+ 	nr_clusters = DIV_ROUND_UP(ram, SWAPFILE_CLUSTER);
+ 
+ 	si->bdev = NULL;
+-	si->flags |= SWP_XSWAP | SWP_SOLIDSTATE;
++	/*
++	 * Reads are served from zswap, so no readahead. Only a synchronous
++	 * device can swap a large folio back in as a unit.
++	 */
++	si->flags |= SWP_XSWAP | SWP_SOLIDSTATE | SWP_SYNCHRONOUS_IO;
+ 	si->max = maxpages;
+ 	si->pages = min_t(unsigned long, nr_clusters * SWAPFILE_CLUSTER,
+ 			  si->max) - 1;

@@ -1139,7 +1139,84 @@ does.** They differ whenever a later patch edits the same region, a hunk is
 context rather than change, or ordering matters. Any claim about kernel
 behaviour has to come from the tree.
 
+### Do NOT "fix" this by initialising the pool
+
+The obvious belt-and-braces move — also call `sio_pool_init()` from
+`xswap_create()` — is **harmful**, and so is adding a real disk swap device.
+
+Both make `mempool_alloc()` succeed, and then the write proceeds into code that
+cannot work for an xswap device. `xswap_create()` sets `si->bdev = NULL` and
+never populates `swap_extent_root` (`add_swap_extent()` is reachable only from
+the block-device swapon path, `generic_swapfile_activate` and
+`swap_fs_activate`). So:
+
+- `swap_bdev_can_merge()` calls `swap_folio_sector()` during
+  `swap_add_folio()`'s merge test — with two or more folios batched, the BUG
+  fires *before* any submit.
+- Otherwise `swap_bdev_submit_write()` reaches `offset_to_swap_extent()`, which
+  ends in `BUG(); /* It *must* be present */`.
+
+You would trade a conditional NULL-deref on one task for a **deterministic
+`kernel BUG`** on the same trigger — strictly worse, and harder to diagnose.
+
+**Adding a real swap device is the same trap one step sideways**: it initialises
+the pool through `setup_swap_extents()` and buys the identical BUG. The pool
+being NULL is what currently keeps the bug confined to a guard we can place; the
+guard is the only viable shape short of a physical backend.
+
+### The refusal has more causes than "pool full"
+
+The OOM snapshot 21 s before the oopses shows `zspages` at ~86.6% of the 20%
+ceiling — below the 90% accept threshold. So the trigger was probably not the
+pool being full but a failure inside `zswap_store_page()` (zsmalloc allocation,
+entry cache, xarray). This widens the set of refusals nothing upstream handles,
+and it means "the pool will drain" is not a reason to relax.
+
 ### Upstream status
+
+Checked 2026-09-20 by an exhaustive multi-channel sweep (mailing-list trees,
+akpm's branches, patchwork, GitHub, the crash signature, and the design history),
+with each candidate independently re-verified. **Upstream has not fixed this,
+and cannot have**: `do_swapout()` does not exist upstream at all — it has zero
+hits across all 13 lore mirrors and is absent from torvalds, akpm and
+linux-next. It is MARIE's. Upstream cannot fix a bypass it does not have.
+
+Two further facts from that sweep:
+
+- **akpm's tree has no xswap code at all.** `mm-everything-2026-09-20`
+  (`62310f16ff3f`) contains zero occurrences of `SWP_XSWAP`, `xswap_create` or
+  `nr_real_swapfiles`; every other akpm branch is an ancestor of it.
+- **The RFC is a no-op on this machine.** Patch 04's `xswap_alloc_phys_slot()`
+  walks `swap_avail_head` skipping `SWP_XSWAP` devices; `/proc/swaps` has one
+  row, `xswap0`, so `nr == 0`, `xswap_backend_alloc()` returns an empty entry,
+  and patch 06 executes exactly the guard already carried. And patch 06 edits
+  `swap_writeout()`, which `do_swapout()` never enters.
+
+**Independent prior art.** `RAMDRAGONS/jcachy` commit `6c82211cd`
+(Judas Drekonym, 2026-09-20T00:57:58Z, ~16 h before `2199`) carries the same
+fix in `do_swapout()`, differing only by a `data_race()` wrapper. Two people
+converging on the same three lines is the strongest available evidence the
+diagnosis is right. `data_race()` is not adopted here because `CONFIG_KCSAN` is
+off (so it compiles away) and because upstream's own guard in `2155` does not
+use it — ours matches upstream's style, theirs matches MARIE's.
+
+### Guarding a shared callee: keep the count honest
+
+There are exactly **three** callers of `__swap_writepage()` in the series tree —
+`swap_writeout()` (guarded by `2155`), `zswap_writeback_entry()` in
+`mm/zswap.c` (also guarded by `2155`, a site easy to miss), and `do_swapout()`
+(guarded by `2199`). `swap_add_folio()` is reached only from
+`__swap_writepage()` (WRITE) and `swap_read_folio()` (READ, guarded).
+
+That count is **rebase-sensitive**: the RFC renames the callee to
+`__swap_writeout()` and adds a third argument, and Nhat Pham's vswap series adds
+call sites. Re-derive it after every bump rather than trusting this paragraph:
+
+```bash
+git -C repos/_audit grep -n '^\s*__swap_writepage(' -- mm/ | wc -l   # expect 3
+```
+
+### Earlier upstream status
 
 Checked 2026-09-20, and **upstream has not fixed this**:
 
