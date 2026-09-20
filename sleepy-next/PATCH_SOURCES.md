@@ -1043,6 +1043,90 @@ Bingfang Guo, 2026-09-10. Ours was four revisions behind.
   and not a valid kernel sha, and `dc59e4fe…` resolves to the `Linux 7.2-rc1`
   tag.
 
+## `2199` — the xswap writeout guard, for the path MARIE added
+
+**Our patch.** Author `Sleepy <sleepy@localhost>`, `Assisted-by: Claude`.
+It fixes a NULL-mempool panic reachable from two kernel threads; there is no
+upstream patch for it (see below).
+
+### The panic
+
+Two oopses on 2026-09-20, `kcompressd0` and `kswapd0`, identical faulting
+instruction: `mempool_alloc_noprof+0x9a`, both from `swap_add_folio()`. Registers
+agree on a NULL pool — `R14`/`RDI` = 0, `CR2` = 0x18 (`pool_data`), `RSI` =
+`0xc00` (`GFP_NOIO`). Afterwards the machine had **no `kswapd` at all**.
+
+### Why the pool is NULL
+
+`sio_pool` is initialised by `sio_pool_init()`, which has exactly **one caller
+in the tree**: `setup_swap_extents()` in `mm/swapfile.c`, reachable only from
+the file/block `swapon()` path. xswap devices are created through
+`/sys/kernel/mm/xswap/create` — `2159` explains why: *"xswap devices have no
+backing storage, so there is no file to swapon."* `xswap_create()` builds the
+`swap_info_struct` by hand and never calls `sio_pool_init()`. On a machine whose
+only swap is xswap, `sio_pool` is NULL for the whole uptime.
+
+### Why the existing guard does not cover it
+
+`2155` does guard the write path — in `swap_writeout()`:
+
+```c
+	if (unlikely(__swap_entry_to_info(folio->swap)->flags & SWP_XSWAP)) {
+		folio_mark_dirty(folio);
+		return AOP_WRITEPAGE_ACTIVATE;
+	}
+	__swap_writepage(ctx, folio);
+```
+
+That covers stock reclaim. It does not cover `do_swapout()`, which `2101`
+(LRU-MARIE) adds and which calls `__swap_writepage()` **directly**:
+
+```c
+	} else
+		__swap_writepage(ctx, folio); /* straight past the guard */
+```
+
+`do_swapout()` has two callers, both from kswapd: `do_swapout_batch()` (the
+kcompressd drain) and `kcompressd_store()`'s synchronous fallback. The latter
+is `static` and inlines into `swap_writeout()`, which is why the `kswapd0` oops
+named `swap_writeout` for what is really MARIE's frame.
+
+`2101` applies before `2155`, so neither patch's author could see the other's
+entry point. **A guard placed in one caller of a shared callee protects only
+that caller.**
+
+### The fix
+
+The same guard in `do_swapout()`, honouring *its* contract: `do_swapout()` owns
+the unlock on every branch, so the guard unlocks before the trailing
+`folio_put()`, where `swap_writeout()` leaves the folio locked for an
+`AOP_WRITEPAGE_ACTIVATE` retry.
+
+A guard at the shared choke point, `__swap_writepage()`, would be more robust —
+no future caller could bypass it. It is not done here because the two callers
+have different locking contracts, and reconciling them is a larger change than
+a crash fix should carry.
+
+### Upstream status, checked 2026-09-20
+
+**Upstream has not fixed this.**
+
+- **v3** of the xswap series (2026-09-16, the newest posting) is byte-identical
+  to the carried v2 in every affected file — `mm/page_io.c`, `mm/swapfile.c`,
+  `mm/swap_state.c`, `include/linux/swap.h`, `mm/zswap.c`.
+- A new **RFC** (patchwork series `1169641`, 2026-09-20, 17 patches) touches the
+  same guard — patch 06, *"fall back to disk when zswap refuses an xswap page"* —
+  and its commit message describes this exact condition: *"zswap_store() can
+  refuse a page if the pool may be at its limit... Under memory pressure that
+  turns into a livelock."* But it is a feature adding a physical backend for
+  xswap, not a fix: it never mentions `sio_pool`, and its patch 06 rewrites the
+  guard to write to that new backend.
+- `linux-mm/linux-mm` PRs `#4867` (the RFC) and `#4774` (v3) track both.
+
+`2199` is therefore ours alone. **Drop it when upstream lands a fix for the
+bypass**, rather than merging it forward — the correct long-term shape is a
+guard the shared callee cannot be reached around.
+
 ## Update 2026-09-20 — every carried patch checked against its latest revision
 
 A version sweep ran over all 305 carried patches against the 13 lore mirrors,

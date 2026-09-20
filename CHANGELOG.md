@@ -15,6 +15,33 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc3-26-sleepy-next]: 2026-09-20
+
+### Fixed
+
+- **A NULL-mempool panic in the swap-out path that killed `kswapd0` and
+  `kcompressd0`.** `do_swapout()`, added by the LRU-MARIE patch (`2101`), calls
+  `__swap_writepage()` directly. The `SWP_XSWAP` guard that keeps an xswap folio
+  in memory lives in `swap_writeout()`, one level above, so that path walked
+  around it. It matters because an xswap device is created through
+  `/sys/kernel/mm/xswap/create` rather than `swapon()`, so `setup_swap_extents()`
+  never runs and `sio_pool` — whose only initialiser lives there — is never
+  allocated. On a machine whose only swap is xswap, `swap_add_folio()` then
+  reached `mempool_alloc(NULL, GFP_NOIO)`. `2101` applies before `2155`, so
+  neither patch's author could see the other's entry point.
+  Carried as `2199`; see `PATCH_SOURCES.md` for the full analysis and for why
+  the guard belongs at the shared choke point in the long run.
+
+### Verified
+
+- Upstream has **not** fixed this, checked the same day. The newest xswap
+  posting (v3, 2026-09-16) is byte-identical to the carried v2 in every affected
+  file. A new RFC (patchwork series `1169641`, 2026-09-20) does touch the same
+  guard and its commit message describes the identical condition, but it is a
+  feature adding a physical backend for xswap, not a fix.
+
+`pkgrel` 25 -> 26. Series is 314 patches.
+
 ## [7.3.0-rc3-25-sleepy-next]: 2026-09-20
 
 ### Changed

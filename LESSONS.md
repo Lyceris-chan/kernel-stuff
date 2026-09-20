@@ -1017,6 +1017,142 @@ Related: *"A crashed command and an empty result look identical"* above. That
 one is a search that returns nothing because it broke; this one is a search
 that returns nothing because it asked the wrong question. Both read as "no
 candidates".
+## A guard one level too high: `do_swapout()` walks around it (2026-09-20)
+
+Two kernel threads — `kcompressd0` and `kswapd0` — died of the same NULL
+dereference at `mempool_alloc_noprof+0x9a`, both from `swap_add_folio()`. After
+it the machine had **no `kswapd` at all**; reclaim ran direct-only until reboot.
+
+### The two halves that don't meet
+
+**Half one: `sio_pool` is never allocated on an xswap-only machine.**
+`swap_add_folio()` allocates its batching context from a global pool:
+
+```c
+	ctx->sio = sio = mempool_alloc(sio_pool, GFP_NOIO);
+```
+
+`sio_pool` is initialised by `sio_pool_init()`, which has **exactly one caller
+in the entire tree** — `setup_swap_extents()` in `mm/swapfile.c`, reachable only
+from the file/block `swapon()` path.
+
+xswap devices are created through `/sys/kernel/mm/xswap/create`, which the patch
+explains: *"xswap devices have no backing storage, so there is no file to
+swapon."* `xswap_create()` builds the `swap_info_struct` by hand and never calls
+`sio_pool_init()`. So on a machine whose only swap is xswap, `sio_pool` is NULL
+for the whole uptime.
+
+**Half two: the guard that would keep xswap out of that code sits too high.**
+The xswap patch does add a guard — in `swap_writeout()`:
+
+```c
+	if (unlikely(__swap_entry_to_info(folio->swap)->flags & SWP_XSWAP)) {
+		folio_mark_dirty(folio);
+		return AOP_WRITEPAGE_ACTIVATE;
+	}
+	__swap_writepage(ctx, folio);
+```
+
+That covers stock reclaim, which reaches the write path through
+`swap_writeout()`. It does **not** cover MARIE's `do_swapout()`:
+
+```c
+static inline void do_swapout(struct swap_io_ctx *ctx, struct folio *folio)
+{
+	if (zswap_store(folio)) {
+		...
+	} else
+		__swap_writepage(ctx, folio);   /* straight past the guard */
+	folio_put(folio);
+}
+```
+
+`do_swapout()` calls `__swap_writepage()` directly. The guard is one level
+above, in a function this path never enters.
+
+### Why both oopses look like different callers
+
+`do_swapout()` has two callers, both reaching it from kswapd:
+
+| Oops | Reported caller | Actual path |
+|---|---|---|
+| #1 `kcompressd0` | `kcompressd` | kthread → `do_swapout_batch()` → `do_swapout()` |
+| #2 `kswapd0` | `swap_writeout` | `swap_writeout()` → **inlined** `kcompressd_store()` → `do_swapout()` |
+
+`kcompressd_store()` is `static` and gets inlined into `swap_writeout()`, so the
+unwinder names `swap_writeout` for a frame that is really MARIE's code. Both
+oopses are one bug reached by two routes, which is why they share a faulting
+instruction and register set (`R14`/`RDI` = 0, `CR2` = 0x18, `RSI` = `0xc00`).
+
+The trigger is zswap refusing a page — pool at its limit, or incompressible
+content. `zswap_store()` returns false, and the fall-through lands on
+`__swap_writepage()` → `swap_add_folio()` → `mempool_alloc(NULL, GFP_NOIO)`.
+
+### The fix
+
+Apply the same guard in `do_swapout()`, respecting *its* locking contract —
+`do_swapout()` owns the unlock on every branch, so the guard unlocks before the
+`folio_put()` that follows, where `swap_writeout()` leaves the folio locked for
+an `AOP_WRITEPAGE_ACTIVATE` retry.
+
+Carried as `2199`. The deeper shape of the problem is that the guard lives in a
+*caller* rather than at the choke point: `__swap_writepage()` is what both paths
+share, and a guard there could not be bypassed by any future caller.
+
+### The rule
+
+**A guard placed in one caller of a shared callee protects only that caller.**
+The xswap patch guarded `swap_writeout()` because that was the write path it
+knew about. MARIE had added a second one, in a patch that applies *before* it,
+so neither patch's author saw the other's entry point.
+
+Two patches touching one subsystem is normal here — 2100-2199 alone has MARIE,
+xswap, zstd and gup. When one adds a guard, the question is not "does this cover
+the path I know" but "how many ways is this function reached":
+
+```bash
+rg -n 'the_function_being_guarded\(' mm/ | grep -v '^\./mm/.*:\s*\*'
+```
+
+### Correction: read the applied tree, not the patch text
+
+An earlier pass at this concluded the series was *missing* the guard — that v2
+had dropped what v1 had. That was **wrong**; the guard is present and
+byte-identical to upstream v3.
+
+The error came from grepping *patch files* and reading hunks in isolation:
+
+- `rg -c 'sio_pool_init' <patch>` matched a **context line** in v1's
+  `setup_swap_extents()` hunk, not a call the patch added. "v1 has it, v2
+  doesn't" was an artefact of where a context line landed when the code was
+  relocated to a different file.
+- The guard was read from a hunk of `2155` without checking it survives to the
+  end of the series.
+
+```bash
+python3 .claude/skills/kernel-build/scripts/audit_series.py --keep
+sed -n '224,235p' repos/_audit/mm/page_io.c
+```
+
+A patch file shows what one patch does. **The series tree shows what the kernel
+does.** They differ whenever a later patch edits the same region, a hunk is
+context rather than change, or ordering matters. Any claim about kernel
+behaviour has to come from the tree.
+
+### Upstream status
+
+Checked 2026-09-20, and **upstream has not fixed this**:
+
+- **v3** (2026-09-16, the newest of the series carried) is byte-identical to our
+  v2 in every affected file.
+- A new **RFC** (patchwork series 1169641, 2026-09-20) does touch the same
+  guard — patch 06/17, *"fall back to disk when zswap refuses an xswap page"* —
+  and its commit message describes our exact condition. But it is a feature
+  adding a physical backend for xswap, not a fix: it never mentions `sio_pool`.
+- `linux-mm/linux-mm` PRs #4867 (that RFC) and #4774 (v3) track both.
+
+So `2199` is ours alone, and it should be dropped when upstream lands a fix for
+the bypass rather than merged forward.
 
 ## Two ways to extract a lore email that silently produce a broken patch (2026-09-20)
 

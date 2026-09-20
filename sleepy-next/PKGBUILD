@@ -182,7 +182,7 @@ _rcver=rc3
 
 pkgver=7.3.0_rc3
 _tagrel=1
-pkgrel=25
+pkgrel=26
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -449,6 +449,7 @@ source=(
   "patches/2100-2199/2196-memcg-avoid-charging-root-memcg-obj-cgroup.patch"
   "patches/2100-2199/2197-mm-mremap-account-locked_vm-mremap-dontunmap.patch"
   "patches/2100-2199/2198-mm-filemap-move-lruvec-accounting-outside-the-xarray-lock.patch"
+  "patches/2100-2199/2199-mm-swap-apply-the-xswap-guard-in-do_swapout.patch"
   "patches/2200-2299/2200-7.2-nap-v0.5.0.patch"
   "patches/2300-2399/2302-kbuild-do-not-allocate-modinfo-in-vmlinux.patch"
   "patches/2300-2399/2303-kallsyms-index-symbols-by-token-to-speed-up.patch"
@@ -1396,6 +1397,7 @@ b2sums=('d400c07b3f76f262c51e88bfc34e419883f13ea12dc76975b624acd6712bef193c4bb88
         'ff3709c07c4745a502f479820f2694f85098c580199236a1747b83c3fa86f822853355586df7d4ff6413da762dafa8e742e073c31d37b7039312f0adb3bd3a31'
         'f8a1430b6eb1855d67d9a1f3e9be450fcb579186fb7b5e80972e156ca767d7b1c346d405a200dd2c007232eb2c17d65e1e9b5007768fffce20e89ef4bb6166e4'
         '076ee3f72c6bff1038dbc6689587af14e74bdf9ec1d1780fd29d0287ee238df6acdc1136ca1654bd9a423d0e72e1ab177b8a68625b7793b8650e959cbec41bb1'
+        '2e5d3543de2b6e4b383159e46da67c404b8a5362f3602add0639e9b2ad9aff6a9d56fde2c8f4bb36975118828e7a174d154a1b1d208edb5ccf5e9e907f8e7830'
         'dc4e862e8f9fa7e8ead895908459757afd1027c24b960ae3d289a7212e29575bce3ce4627d5fd73edf211ee162dfa545e1642c5b16e8156f3dce50af8ef3c256'
         'c57ef0e2d57de6064359a6132ed03138e2b6e65c10699e304901cf4d37f67b25a24fd20553d1b7b99b414d75ddb1f49bbe74cfa694315671026cbdfcb5b19f3c'
         'cf71c48fc7fe12a32f4fe7dd6505df11c4a74ed20abc91ee5bb4cf3688bfd766349fc698a55efd4c2fa6eab7502ec96febf06ee27a823ab13fabd8f148cb3a27'
