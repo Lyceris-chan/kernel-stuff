@@ -1051,11 +1051,12 @@ diff --git a/mm/folio.c b/mm/folio.c
 index c02dcea9c0..bd763dd22a 100644
 --- a/mm/folio.c
 +++ b/mm/folio.c
-@@ -33,6 +33,7 @@
+@@ -33,7 +33,8 @@
  #include <linux/page_idle.h>
  #include <linux/local_lock.h>
  #include <linux/buffer_head.h>
 +#include <linux/lru_marie.h>
+ #include <linux/kvm_types.h>
  
  #include "internal.h"
  #include "page_alloc.h"
