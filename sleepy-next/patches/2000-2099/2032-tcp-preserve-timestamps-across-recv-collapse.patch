@@ -1,4 +1,66 @@
-From 795c2ac2c9f2db6d2a12a90b6475c69b5a6dd451 Mon Sep 17 00:00:00 2001
+From nobody Mon Sep 17 00:00:00 2001
+From: Jason Xing <kerneljasonxing@gmail.com>
+Subject: [PATCH net v2] tcp: preserve timestamps across receive queue collapse
+Date: Thu, 17 Sep 2026 21:27:42 +0800
+
+	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+	(No client certificate requested)
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id C8AC9524AF8
+	for <netdev@vger.kernel.org>; Thu, 17 Sep 2026 13:27:53 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=74.125.227.141
+ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
+	t=1789651679; cv=none; b=FfcsMZNIvmuFwM47goW+TGYFBNTes74Vqr1EzofRsMNFnrKsVCTgKTjteZ7aRCuGQByvSsMjBJ7B++yx+p6J62S7u9GrFFEDDr/azRzmrQ+sjwX+AwJD7/c3sPtVj7FhSa60suP/T6/J9k6eD3MFrH/tBSDVxn8kqv+0d2WXmzk=
+ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
+	s=arc-20240116; t=1789651679; c=relaxed/simple;
+	bh=Eob4RWArHDo+PHxn0aEMYjCuHAJp1sOmVwhY0bAQdJc=;
+	h=From:To:Cc:Subject:Date:Message-Id:MIME-Version; b=S+E2BErS70Xumv93UAcyb9m9T8pr2JeoycxP4uZOZfH28lUEv66aMRj1pMoH2CrUq4+2ocqT+z7wpMnY3oLQlCyWYlUh6W2WewgPW061cq5tIkiFrxvHhU0XxMZpUd1J0NWwNbuNiHHWZE4aYjU+kKMcIG6bO1BGurGdqRyX15o=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=KAnRN1me; arc=none smtp.client-ip=74.125.227.141
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=gmail.com
+Authentication-Results: smtp.subspace.kernel.org;
+	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="KAnRN1me"
+Received: by mail-pj2-f13.google.com with SMTP id d9443c01a7336-2d747f05ffcso5856555ad.0
+        for <netdev@vger.kernel.org>; Thu, 17 Sep 2026 06:27:53 -0700 (PDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=gmail.com; s=20251104; t=1789651671; x=1790256471; darn=vger.kernel.org;
+        h=content-transfer-encoding:mime-version:message-id:date:subject:cc
+         :to:from:from:to:cc:subject:date:message-id:reply-to:content-type;
+        bh=KjHh8s+2p8mSvr65TwmkHMyg1/3Jw00nb+l12vdUW04=;
+        b=KAnRN1meSh9zyXJ2NeCxry4baRUOEa5hqIdtd6zXXdq9rs5KdB7+ezk3+gD1OeQmaZ
+         0KhTnZldHfv88diBp9azOJwGjhuFeg9N2RO4LQ1Wb0xylXO7yTv90egf52ytgzM9x9pZ
+         GmsdweWtTII+SSh4UuWvNpkjBUcqIbw+B9/HlhoMgW99r7gHVSuyeIBzDuCTNiTY2du2
+         4fg6JwshJLPDFfVRYH2wu0YkzYOkDijoiHEfvjVOpVsT17fZRuWgzEoqM6jx3nYwM4jL
+         YejJ+T1BIET8FT2KgmzjeD/sxlwaaU14DK2rqaRiwLFuzQQpygGhWw2vXY5RtQv0wGup
+         p/0Q==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=1e100.net; s=20260707; t=1789651671; x=1790256471;
+        h=content-transfer-encoding:mime-version:message-id:date:subject:cc
+         :to:from:x-gm-gg:x-gm-message-state:from:to:cc:subject:date
+         :message-id:reply-to:content-type;
+        bh=KjHh8s+2p8mSvr65TwmkHMyg1/3Jw00nb+l12vdUW04=;
+        b=WivnWExo3GMDsEyYzoFyYEz2+GKR0GYaTR1vw1sREyVkZgT47Z03+iNtxHaB52UlQ5
+         sRr316zUZz6AsS70lFgKlj4hwB3SZlZaswsBCVKOrBjSnepkFmMl3fye7wnS10S//1o0
+         NinAtUtGQB6HUk3Sx/4fJRPy5W2y1RrMN9uRq3lU6zYeNhRNvlV2Wf+FiKNnC2Upyd5f
+         cWXNhXFSSt0vMtiqWcWL6jckX7ebbOdo2Q9J5NnEwKWLHn+HgnUpeq5Cv0oTPZaPLKGj
+         svjo5mUp6BP+QQfxMaGA98XyFZDF7Mg8J+DFddC357zCPCMP3BhNLxBePi2GSS/pV47u
+         WZvQ==
+X-Gm-Message-State: AFuF++nJLbZoeXKouF7OT7A5UMI9v+y0I9jLb6RnxX3DHLCgtJphGmwn
+	oJnsve4CIh3HyYm5HNvmw13/7PJ2OTOSA1PAu0N4OemnOucbUFfvUs9e
+X-Gm-Gg: AYBFou3ZTX+/IMvIsuChAkBw03pOKAFMl4jOUwXvYNla2daIy+2cJCS6no3ubWFaS98
+	Ya3epDF0iUJhFG9PbWohUKAh5aEFhjMVNGpX6Zwx2DIy2wE5EOf8Q3A64dNff7CbJ6AAIwwHf04
+	WLD5kPcmRg3FH7C6fAQg2nWWVk8yP9z/PzqB9WmUilDPQnbhd57+YmDkypGP3HClrJ7gSRuJLbZ
+	xwsZ1OctM/AhzQK1GjfLqBlloiA2HE6rgSB4fnrSn90BI7cdtoh8mnNwnV2wTycSY26ecn2NbHr
+	Jd3U+j8Zg6DXCuUlS2zWkB+/3JPNqXZpOQccO6cjUoOoFd58Ilv80BtJkCNKcPJGCTQzZfxHJL7
+	oMI70YVMoboiTPQ2pfThWmZ3RAmfkndX/+ZyWa8dc0K6azdnHCo3Gdtbko3Bff1NXtbYo9uc/OG
+	/ZyZGLapJ4YYG5K+xdK9/4CfMvYs7ELM7NagsUP/ZhZCnfBa4m0PZKOwhb+XBwKk1EOg7t2TQg+
+	vGAB0POFmEBMf9emS+lQ+AS9S+SiVZMK98dwvykfqFzaa6xWfwQt28k2Vn2BiSe8hsKaVgU+Zqp
+	6nim/N+Dx7awzo7RMe6PL6pWZBhI+O7tgUBA7iTp8/SZuYCkyfms/T5u9dNasQ==
+X-Received: by 2002:a17:902:da85:b0:2d9:1dee:43e3 with SMTP id d9443c01a7336-2dd8e6373e1mr137519945ad.18.1789651670872;
+        Thu, 17 Sep 2026 06:27:50 -0700 (PDT)
+Received: from KERNELXING-MB0.tencent.com ([114.253.38.195])
+        by smtp.gmail.com with ESMTPSA id d9443c01a7336-2dd89f34921sm26873345ad.84.2026.09.17.06.27.47
+        (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
+        Thu, 17 Sep 2026 06:27:49 -0700 (PDT)
 From: Jason Xing <kerneljasonxing@gmail.com>
 To: davem@davemloft.net,
 	edumazet@google.com,
@@ -9,9 +71,9 @@ To: davem@davemloft.net,
 	kuniyu@google.com
 Cc: netdev@vger.kernel.org,
 	Jason Xing <kerneljasonxing@gmail.com>
-Subject: [PATCH net] tcp: preserve timestamps across receive queue collapse
-Date: Wed, 16 Sep 2026 20:41:53 +0800
-Message-Id: <20260916124153.43457-1-kerneljasonxing@gmail.com>
+Subject: [PATCH net v2] tcp: preserve timestamps across receive queue collapse
+Date: Thu, 17 Sep 2026 21:27:42 +0800
+Message-Id: <20260917132742.87117-1-kerneljasonxing@gmail.com>
 X-Mailer: git-send-email 2.33.0
 Precedence: bulk
 X-Mailing-List: netdev@vger.kernel.org
@@ -23,7 +85,9 @@ Content-Transfer-Encoding: 8bit
 
 When tcp_collapse() rebuilds skbs under memory pressure, the copy
 process doesn't include the right tstamp and hwtstamp from the
-old skb.
+old skb. And memcpy(nskb->cb, skb->cb, ...) copies has_rxtstamp,
+but nskb->tstamp and hwtstamps are left at zero, so
+tcp_recv_timestamp() ends up emitting no cmsg at all.
 
 In net timestamping case, if such an skb happens to be the last
 one consumed in a recvmsg() call, the application receives no RX
@@ -35,19 +99,29 @@ after the initialization.
 Fixes: 98aaa913b4ed ("tcp: Extend SOF_TIMESTAMPING_RX_SOFTWARE to TCP recvmsg")
 Signed-off-by: Jason Xing <kerneljasonxing@gmail.com>
 ---
- net/ipv4/tcp_input.c | 2 ++
- 1 file changed, 2 insertions(+)
+V2
+Link: https://lore.kernel.org/all/20260916124153.43457-1-kerneljasonxing@gmail.com/
+1. add one sentence in commit log from Eric's reply
+2. use the same semantic as tcp_add_backlog which is to sync the
+   last skb (Eric)
+---
+ net/ipv4/tcp_input.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/net/ipv4/tcp_input.c b/net/ipv4/tcp_input.c
-index 0f60a1dbf927..c5756db892f2 100644
+index 0f60a1dbf927..81d587654d3d 100644
 --- a/net/ipv4/tcp_input.c
 +++ b/net/ipv4/tcp_input.c
-@@ -5835,6 +5835,8 @@ tcp_collapse(struct sock *sk, struct sk_buff_head *list, struct rb_root *root,
- 
- 		memcpy(nskb->cb, skb->cb, sizeof(skb->cb));
- 		skb_copy_decrypted(nskb, skb);
-+		nskb->tstamp = skb->tstamp;
-+		skb_hwtstamps(nskb)->hwtstamp = skb_hwtstamps(skb)->hwtstamp;
- 		TCP_SKB_CB(nskb)->seq = TCP_SKB_CB(nskb)->end_seq = start;
- 		if (list)
- 			__skb_queue_before(list, skb, nskb);
+@@ -5854,6 +5854,12 @@ tcp_collapse(struct sock *sk, struct sk_buff_head *list, struct rb_root *root,
+ 				if (skb_copy_bits(skb, offset, skb_put(nskb, size), size))
+ 					BUG();
+ 				TCP_SKB_CB(nskb)->end_seq += size;
++				if (TCP_SKB_CB(skb)->has_rxtstamp) {
++					TCP_SKB_CB(nskb)->has_rxtstamp = true;
++					nskb->tstamp = skb->tstamp;
++					skb_hwtstamps(nskb)->hwtstamp =
++						skb_hwtstamps(skb)->hwtstamp;
++				}
+ 				copy -= size;
+ 				start += size;
+ 			}
