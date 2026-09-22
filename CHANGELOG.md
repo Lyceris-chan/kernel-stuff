@@ -15,6 +15,47 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc4-6-sleepy-next]: 2026-09-22
+
+### Added
+
+Four fixes, all targeting code this machine runs, all verified to apply in
+series order against the fully-applied tree.
+
+- **`2045` — CAKE shaper corruption and stall.** CAKE *is* this machine's SQM
+  (`net-tune` runs it on the RTL8125B path), and `cake_overhead()` carried three
+  real defects: `hdr_len` was `unsigned int`, so a negative transport offset
+  wrapped; the `segs == 1` test missed `segs == 0`, underflowing the shaper
+  interval; and an unset transport header returned the `~0U` sentinel, inflating
+  the computed length to ~66 KB. `sch_cake.c` is otherwise untouched by the
+  series, so this is purely additive.
+- **`1231` — amd-pstate could be left with no driver at all.**
+  `amd_pstate_change_driver_mode()` unregisters the active driver *before*
+  registering the requested one, so a failed registration returned the error and
+  left the system with **no cpufreq scaling driver** until a mode was manually
+  re-selected. It now re-registers the previous mode and still reports the
+  original failure.
+- **`1232` — silent auto_sel failures.** `amd_pstate_change_mode_without_dvr_change()`
+  discarded `cppc_set_auto_sel()`'s return value, so a firmware rejection was
+  recorded as a successful transition while the hardware stayed in its previous
+  state — software and hardware disagreeing about autonomous selection.
+- **`9076` — amdgpu IP discovery table validation.** Missing `&& table_size` /
+  `&& size` guards in `check_table`, `get_mall_info` and `get_vcn_info` —
+  the tables Navi 48 walks to enumerate every IP block. Carries
+  `Reviewed-by: Frank Min` and `Signed-off-by: Alex Deucher`.
+
+### Verified
+
+- Cumulative audit after all four: **275/275 clean, exit 0**. Each passes both
+  `git apply --check` and `patch -p1 --dry-run -N` against pristine `v7.3-rc4`,
+  and each applies cleanly **in series order** — the check that caught the
+  earlier `1231` redundancy.
+- Evaluated and not carried: two io_uring fixes (unreviewed, or with a
+  reviewer-requested change pending) and a `page_alloc` reserve pair still under
+  active review.
+
+`pkgrel` 5 -> 6. Series is 275 patches.
+
 ## [7.3.0-rc4-5-sleepy-next]: 2026-09-22
 
 ### Changed

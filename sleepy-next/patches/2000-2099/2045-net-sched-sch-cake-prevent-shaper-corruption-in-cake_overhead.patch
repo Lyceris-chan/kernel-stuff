@@ -1,0 +1,106 @@
+From 5f4a05830202fe343b1ccb1a45c50b3bf62e7490 Mon Sep 17 00:00:00 2001
+From: Yuchao Zhang <ndaugoing@gmail.com>
+To: netdev-bot+sashiko@kernel.org
+Cc: davem@davemloft.net,
+	edumazet@google.com,
+	kuba@kernel.org,
+	pabeni@redhat.com,
+	horms@kernel.org,
+	toke@redhat.com,
+	jhs@mojatatu.com,
+	jiri@resnulli.us,
+	netdev@vger.kernel.org,
+	linux-kernel@vger.kernel.org,
+	stable@vger.kernel.org,
+	Yuchao Zhang <ndaugoing@gmail.com>
+Date: Tue, 22 Sep 2026 16:41:24 +0800
+Subject: [PATCH v2] net/sched: sch_cake: prevent shaper corruption and stall in cake_overhead()
+
+In cake_overhead(), the header length up to the transport layer is
+computed using logic borrowed from qdisc_pkt_len_segs_init():
+
+        /* borrowed from qdisc_pkt_len_segs_init() */
+        if (!skb->encapsulation)
+                hdr_len = skb_transport_offset(skb);
+        else
+                hdr_len = skb_inner_transport_offset(skb);
+
+However, cake_overhead() suffers from several issues:
+
+1. When segs == 0 (e.g. from dodgy GSO packets where gso_segs is not
+   recomputed), the multi-segment arithmetic underflows: (segs - 1) wraps
+   to 4294967295, causing cake_calc_overhead() * (segs - 1) to produce
+   an enormous length. When charged in cake_advance_shaper(),
+   time_next_packet is pushed decades into the future, permanently
+   stalling the CAKE dequeue queue.
+   Fix this by returning cake_calc_overhead(q, len, off) for segs <= 1.
+
+2. When the transport header was never set, skb->transport_header holds
+   the sentinel value ~0U. skb_transport_offset() returns ~65535, which
+   is not caught by a negative offset check. skb_header_pointer() fails,
+   and hdr_len stays ~65535, charging ~66 KB per segment to the shaper.
+   Fix this by mirroring qdisc_pkt_len_segs_init() and checking
+   unlikely(!skb_transport_header_was_set(skb)).
+
+3. Both skb_transport_offset() and skb_inner_transport_offset() return
+   signed int, but hdr_len is declared as unsigned int. If post-enqueue
+   mangling (such as BPF packet trimming via bpf_skb_net_shrink())
+   produces a negative offset, hdr_len wraps to near UINT_MAX, causing
+   corrupted header length accounting.
+   Fix this by declaring hdr_len as int and falling back to
+   cake_calc_overhead(q, len, off) if hdr_len is negative.
+
+Fixes: a41851bea7bf ("net: account for encap headers in qdisc pkt len")
+Cc: stable@vger.kernel.org
+Signed-off-by: Yuchao Zhang <ndaugoing@gmail.com>
+---
+v2:
+ - Accurately describe the impact as shaper accounting corruption / stall
+   rather than OOB read past the allocation per Sashiko review.
+ - Fix pre-existing high-severity integer underflow when segs == 0 by
+   checking segs <= 1.
+ - Import companion check !skb_transport_header_was_set(skb) from
+   qdisc_pkt_len_segs_init() to prevent unset transport header sentinel
+   (~0U) from inflating packet length to ~66 KB.
+
+ net/sched/sch_cake.c | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
+---
+
+diff --git a/net/sched/sch_cake.c b/net/sched/sch_cake.c
+index dc93267029e7..45969c1b95fc 100644
+--- a/net/sched/sch_cake.c
++++ b/net/sched/sch_cake.c
+@@ -1413,21 +1413,28 @@ static u32 cake_calc_overhead(struct cake_sched_data *qd, u32 len, u32 off)
+ static u32 cake_overhead(struct cake_sched_data *q, const struct sk_buff *skb)
+ {
+ 	const struct skb_shared_info *shinfo = skb_shinfo(skb);
+-	unsigned int hdr_len, last_len = 0;
++	unsigned int last_len = 0;
+ 	u32 off = skb_network_offset(skb);
+ 	u16 segs = qdisc_pkt_segs(skb);
+ 	u32 len = qdisc_pkt_len(skb);
++	int hdr_len;
+ 
+ 	WRITE_ONCE(q->avg_netoff, cake_ewma(q->avg_netoff, off << 16, 8));
+ 
+-	if (segs == 1)
++	if (segs <= 1)
+ 		return cake_calc_overhead(q, len, off);
+ 
+ 	/* borrowed from qdisc_pkt_len_segs_init() */
+-	if (!skb->encapsulation)
++	if (!skb->encapsulation) {
++		if (unlikely(!skb_transport_header_was_set(skb)))
++			return cake_calc_overhead(q, len, off);
+ 		hdr_len = skb_transport_offset(skb);
+-	else
++	} else {
+ 		hdr_len = skb_inner_transport_offset(skb);
++	}
++
++	if (unlikely(hdr_len < 0))
++		return cake_calc_overhead(q, len, off);
+ 
+ 	/* + transport layer */
+ 	if (likely(shinfo->gso_type & (SKB_GSO_TCPV4 |

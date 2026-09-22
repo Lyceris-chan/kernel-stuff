@@ -1885,6 +1885,58 @@ upstream *and byte-identical to the merged commit* (`9072`–`9075`, `9019`,
 aligning them with upstream is a no-op, because our copy *is* upstream's. They
 belong on the 7.4 drop list, not on a swap list.
 
+### Adopted 2026-09-22 (second pass) — four fixes, all verified in series order
+
+The 2026-09-22 tree/branch sweep surfaced six on-target candidates. Four were
+carried; every one was tested **in series order** against the fully-applied
+271-patch tree, which is the test that caught `1231`'s earlier redundancy.
+
+| # | patch | why it is on-target |
+|---|---|---|
+| `1231` | `cpufreq: amd-pstate: Restore previous mode when changing driver mode fails` | amd-pstate is this machine's cpufreq driver |
+| `1232` | `cpufreq: amd-pstate: Propagate cppc_set_auto_sel() errors on mode change` | same driver |
+| `2045` | `net/sched: sch_cake: prevent shaper corruption and stall in cake_overhead()` | **CAKE is our SQM** — `sleepy-next/net-tune/` runs it on the RTL8125B path |
+| `9076` | `drm/amdgpu: fix ip discovery table validation` | `amdgpu_discovery.c` is how Navi 48 enumerates every IP block |
+
+**`2045` — three real defects in CAKE's shaper, live in rc4.** Confirmed against
+rc4's `cake_overhead()`: `unsigned int hdr_len` lets a negative offset wrap; the
+`segs == 1` test misses `segs == 0`, underflowing the shaper interval; and an
+unset transport header returns the `~0U` sentinel, inflating the computed length
+to ~66 KB. Carries `Fixes: a41851bea7bf`, `Cc: stable`, and `Signed-off-by`
+(Yuchao Zhang, v2). **`sch_cake.c` is otherwise untouched by our whole series**,
+so this is purely additive. `2045` sits with the other `net-sched-*` patches
+(`2039`, `2040`).
+
+**`1231`/`1232` — the amd-pstate pair.** `amd_pstate_change_driver_mode()`
+unregisters the active driver *before* registering the requested mode, so a
+failed registration returned the error leaving **no scaling driver at all**;
+`1231` re-registers the previous mode and still reports the original error.
+`1232` stops discarding `cppc_set_auto_sel()`'s return value, which previously
+let a firmware rejection be recorded as a successful transition. Both are Mario
+Limonciello's, both Sashiko-reported with `Closes:`/`Fixes:` trailers.
+
+**They carry upstream's `[PATCH 1/4]` and `[PATCH 2/4]` subjects deliberately.**
+They are 2 of that series' 4 parts: part 3 (`3bd87e32b2e4`, the TOCTOU) is
+**redundant with our carried `1227`** and was rejected as `1231` earlier in the
+day; part 4 is a `amd-pstate-ut` unit test. Keeping upstream's numbering intact
+is what CLAUDE.md rule 4 requires, and `verify.py` states it explicitly.
+
+**`9076` — the strongest provenance of any AMD candidate this sweep**:
+`Reviewed-by: Frank Min` and `Signed-off-by: Alex Deucher`. It adds missing
+`&& table_size` / `&& size` guards in `check_table`, `get_mall_info` and
+`get_vcn_info` — the tables this GPU's IP discovery walks.
+
+All four: `git apply --check` rc=0 **and** `patch -p1 --dry-run -N` rc=0 against
+pristine `v7.3-rc4`; reverse-apply fails (genuinely new); each applies cleanly
+**in series order** against the applied tree. Cumulative audit after adding all
+four: **275/275 clean, exit 0.**
+
+**Two candidates from the same sweep were NOT carried:** the io_uring trio (two
+are unreviewed and the third has a reviewer-requested change pending) and the
+`page_alloc` reserve pair from Johannes Weiner, which Babka and Wilcox were both
+still reviewing on 2026-09-22 — expect a v2. Also noted: `b959ffd01324` (shmem
+swapin marker) is now in `mm-unstable` and will arrive on its own.
+
 ### Ledger corrections (2026-09-22)
 
 - **`1056` belongs on the 7.4 drop list.** It is already merged upstream: applied
