@@ -1758,3 +1758,42 @@ now this. In all three the probe could not fail informatively — it had a
 branch that silently produced a confident-looking wrong answer. When a probe
 returns "absent"/"fine"/"nothing found", ask what its *other* failure modes
 would have printed, and whether they are distinguishable from success.
+
+## "The logs disprove it" beats "the mechanism fits" (2026-09-22)
+
+Clearing LRU-MARIE's swappiness clamp was diagnosed, verified in source, and
+reported as *"that, not the backend change, is the fix"*. The mechanism was
+real: `low_swappiness_mode` does clamp the effective swappiness to 1, and
+`pgsteal_file` was running 3.55x `pgsteal_anon`.
+
+**The logs disprove the conclusion.** Three more thrash-watchdog kills landed
+after the clamp was cleared (22:35:44, 22:44:46, 22:46:00), and every one of
+them fell inside a kernel-build window:
+
+| Time | Killed | Running |
+|---|---|---|
+| 21:14:27 | `electron` | ordinary use — *before* the fix |
+| 22:35:44 | `xdg-desktop-por` | build 1 (22:29:56 → ~22:36) |
+| 22:44:46 | `xdg-desktop-por` | build 2 (22:40:27 → 22:46:32) |
+| 22:46:00 | `xdg-desktop-por` | build 2 |
+
+At the 22:35 firing, `inactive_anon` was **477,511 pages (1.87 GB)** against
+`inactive_file` **6,324,700 pages (24.7 GB)** with 211 MB free. There was
+almost no anonymous memory in play. The pressure was file-side — and
+swappiness, which only shifts the anon:file *ratio*, had nothing to shift. A
+kernel build's working set is object files and source, so it thrashes page
+cache regardless of how the split is configured.
+
+**The transferable rule.** A verified mechanism is a hypothesis about the
+cause; only the logs are evidence about it. "The code does what I said" and
+"the system behaves as I predicted" are different claims, and the first does
+not imply the second. Before writing *"this is the fix"* — as opposed to
+*"this is a real bug, now fixed"* — check the events that followed the change,
+not just the code that motivated it. The two sentences look similar and are
+very far apart.
+
+**Also worth carrying:** the honest form of this finding names its own
+weakness. The normal-use evidence is a single event either side of the change,
+so "the clamp contributed to the Discord kill" is plausible, not proven; and
+the watchdog may be *correct* that a `-j16` kernel build does not fit a 32 GB
+machine. `MAKEFLAGS="-j$(nproc)"` is the likely real trigger.

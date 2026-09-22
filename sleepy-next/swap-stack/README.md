@@ -155,7 +155,42 @@ after 8 consecutive two-second windows of refault:steal at or above 1:2 it
 invoked the OOM killer against `electron` (Discord).
 
 `marie-low-swappiness-mode.conf` clears the knob so the configured 180 reaches
-the pick driver. **That, not the backend change, is the fix.**
+the pick driver.
+
+### This is NOT a complete fix — measured the same evening
+
+An earlier revision of this file claimed clearing the clamp "is the fix". **That
+was too strong and the logs disprove it.** After the clamp was cleared at
+~22:31, MARIE's watchdog fired **three more times**:
+
+| Time | Killed | Running |
+|---|---|---|
+| 21:14:27 | `electron` | ordinary use — *before* the fix |
+| 22:35:44 | `xdg-desktop-por` | kernel build 1 (22:29:56 → ~22:36) |
+| 22:44:46 | `xdg-desktop-por` | kernel build 2 (22:40:27 → 22:46:32) |
+| 22:46:00 | `xdg-desktop-por` | kernel build 2 |
+
+All three post-fix firings fall inside kernel-build windows; the pre-fix one
+did not. The likely trigger is `MAKEFLAGS="-j$(nproc)"` — **`-j16`** on 16
+threads, which is a large peak-memory build on a 32 GB machine.
+
+**Why the clamp was not decisive.** At the 22:35:44 firing the memory state
+was `inactive_anon:477511` (1.87 GB) against `inactive_file:6324700`
+(**24.7 GB**) with 211 MB free. There was almost no anonymous memory in play —
+the pressure was entirely file-side, where swappiness has nothing to shift. A
+kernel build's working set *is* object files and source, so it thrashes page
+cache no matter how the anon:file split is configured.
+
+So the clamp is a real, verified misconfiguration worth fixing, and fixing it
+is right — but it is **not** the whole story, and the watchdog remains armed
+and will fire under genuine thrash. Two honest caveats on the table: the
+normal-use sample is a single event either side of the change, so "the clamp
+fixes normal use" is plausible rather than proven; and the watchdog may simply
+be correct that a `-j16` kernel build does not fit this machine's memory.
+
+Knobs, if it fires again: `/proc/sys/vm/thrash_wd_mode` (0 disables the
+watchdog — it is a safety net, so prefer fixing the pressure), and lowering
+kernel-build parallelism.
 
 ## Install
 
@@ -174,7 +209,7 @@ without it nothing ever drains the pool.
 ```bash
 swapon --show                             # /swapfile, priority 100
 cat /proc/sys/vm/swappiness               # 180
-cat /sys/kernel/mm/lru_marie/low_swappiness_mode   # 0   <- the OOM fix
+cat /sys/kernel/mm/lru_marie/low_swappiness_mode   # 0   <- clamp cleared
 cat /sys/module/zswap/parameters/enabled           # Y
 cat /sys/module/zswap/parameters/shrinker_enabled  # Y
 sudo cat /sys/kernel/debug/zswap/stored_pages      # grows under pressure
@@ -205,7 +240,8 @@ existing; that mistake was made once here already.
 
 ## What changed on 2026-09-22
 
-- **MARIE's swappiness clamp cleared** — the actual OOM fix.
+- **MARIE's swappiness clamp cleared** — a real misconfiguration, but see the
+  correction above: it is not a complete fix for the watchdog.
 - **Swap backend: xswap -> zswap + a 16 GiB swapfile.** The xswap series
   (`2155`-`2168`, `2199`; 15 patches) was removed; patch `2196`, a standalone
   zswap fix salvaged from that series, was added.

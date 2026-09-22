@@ -36,9 +36,20 @@ full entries remain in git history.
   reclaim has been running **file-dominant: `pgsteal_file` was 3.55x
   `pgsteal_anon`.** On a machine whose swap is compressed RAM that is the
   wrong direction — an evicted file page costs an NVMe re-read, while an
-  anonymous page is only compressed. The fix clears the clamp so the
+  anonymous page is only compressed. The clamp is therefore cleared so the
   configured 180 reaches the reclaim picker
-  (`swap-stack/marie-low-swappiness-mode.conf`).
+  (`swap-stack/marie-low-swappiness-mode.conf`) — a verified misconfiguration
+  that is worth fixing on its own merits.
+
+  **It is not a complete fix, and an earlier draft of this entry said it was.**
+  After the clamp was cleared, MARIE's watchdog fired three more times
+  (22:35:44, 22:44:46, 22:46:00) — all three inside kernel-build windows, at
+  `-j16` on 16 threads. At the 22:35 firing there was 1.87 GB of inactive anon
+  against 24.7 GB of inactive file, so the pressure was entirely file-side
+  where swappiness has nothing to shift. A kernel build's working set is
+  object files and source, so it thrashes page cache regardless. The original
+  kill (21:14, ordinary use) remains the one the clamp plausibly contributed
+  to, and that is a single event either side of the change.
 
 ### Changed
 
