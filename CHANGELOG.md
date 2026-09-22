@@ -15,6 +15,151 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc4-5-sleepy-next]: 2026-09-22
+
+### Changed
+
+- **`2041` (net GSO IP-in-IP) swapped from our v2 to upstream's v4** — and it is
+  a strict simplification. v2 drove the limit through a `gso_header_len_add()`
+  helper plus a `skb_gso_segment_cb()` wrapper with checks at ~14 call sites
+  (10 files, 83 added lines). v4 replaces all of it with
+  `#define GSO_MAX_HEADER 256` and a `gso_header_len_exceeded()` inline checked
+  only at the two IP GSO entry points — **3 files, 15 added lines**. Same fix,
+  far less surface. Verified: both mandated checks pass against pristine rc4,
+  the cumulative audit is 271/271 clean after the swap, and the old helper API
+  appears **zero** times in the resulting tree.
+  The earlier deferral of this patch to the 7.4 bump was based on v3, which
+  predated rc4; v4 is written against rc4 and applies directly.
+
+### Verified
+
+- Full-source sweep for 2026-09-22: every kernel tree, all lore mailing-list
+  mirrors, the drm/amd work-items tracker (all 49 issues updated since 09-20),
+  and every carried patch against its latest revision. **`2041` was the only
+  carried patch with a genuinely newer revision.**
+- **Nothing else was carried, and several candidates were rejected on
+  evidence:** the six `sched/cache` fixes on `tip`'s `sched/urgent` are inert
+  here (single L3 domain disables the static branch; `CONFIG_NUMA` is off so the
+  `exit.c` path is an empty stub; sched-ext full-switch means `fair.c` balancing
+  never runs); a blk-mq **kyber token-leak** fix and an io_uring NULL-deref fix
+  both have reviewer-requested revisions pending; an amd-pstate TOCTOU fix was
+  admitted and then **removed again** because our own `1227` already makes the
+  same fix — caught by the cumulative audit, not by the standalone checks.
+- Confirmed the sched-ext hashtable-comparison patches recommended on 09-21 are
+  **now merged upstream**, so they are not carried and will arrive by
+  themselves; our CPPC series is landing likewise.
+
+### Known for the next bump
+
+- Upstream renames `__swap_writepage()` → `__swap_writeout()`; **three carried
+  patches use the old name** (`2199`, `2155`, `2101`) and will need it applied.
+- r8169 will **enable EEE by default** at probe. This machine deliberately
+  disables EEE (toggling it restarts auto-negotiation and drops the link ~3 s,
+  which broke DNS ~11 s after login), so our `net-tune-eee.service` needs a
+  measurement then.
+- `1056`/`1060` are already upstream and belong on the 7.4 drop list alongside
+  `2005`/`2413`/`2414`/`2415`.
+
+`pkgrel` 4 -> 5. Series is 271 patches.
+
+## [7.3.0-rc4-4-sleepy-next]: 2026-09-21
+
+### Removed
+
+- **`1027` (`force complete the MES scheduler ring fence on reset`) — the second
+  dead carry, and a different kind from `9007`.** Here the added code was *not*
+  in rc4 verbatim; instead rc4 carries a **superseding** implementation. Its
+  `AMDGPU_MAX_MES_INST_PIPES` loop realigns the polling fence on **every** MES
+  instance pipe (one per XCC), plus an equivalent KIQ loop. Our patch realigned
+  only `mes.ring[0]`, so it was redundant work on top of a loop that already
+  covered that ring. `mes.ring[0]` read **0** in rc4 and **3** in our tree.
+  Five checks were run before removal — standalone failure, cumulative apply,
+  superseding code present, count comparison, and function preserved after
+  removal — all passed.
+
+### Verified
+
+- A systematic sweep for the first kind (`9007`'s: a patch whose added code is
+  already in rc4 verbatim) found **five candidates, all cleared**. Three
+  (`1136`, `2033`, `2307`) apply cleanly to pristine rc4, so their content is
+  *not* in rc4; `1219` fails only because its series predecessor `1218` also
+  fails, which is series dependency rather than duplication. **No further
+  literal duplicates remain.**
+- The detector used for that sweep was validated against the known positive
+  (reconstructed `9007`) rather than trusted blind — an earlier version failed
+  to find it and was discarded.
+
+`pkgrel` 3 -> 4. Series is 271 patches.
+
+## [7.3.0-rc4-3-sleepy-next]: 2026-09-21
+
+### Removed
+
+- **`9007` (`drm/gfx12: Program DB_RING_CONTROL`) — a carry that was installing
+  a duplicate.** The `v7.3-rc4` rebase absorbed this change upstream, so the
+  patch was no longer doing anything. It did not fail, though: its hunk context
+  is the lines *before* the block, which rc4 still has, so `git apply` found a
+  valid anchor and inserted a **second** byte-identical copy. The series tree
+  programmed `DB_RING_CONTROL` twice (`gfx_v12_0.c:1836-1844` and `1851-1859`),
+  against once in rc4. This is the one failure mode the cumulative audit cannot
+  see — it reports `ok`, because it measures whether a hunk lands, not whether
+  the change is wanted.
+- **`0112` (`cachy: avoid evicting resources at S5`) — reverted by CachyOS, and
+  redundant.** CachyOS reverted its own change (`bd3b950c5b0f`, 2026-08-17,
+  reverting the whole `7.2/s5-power` branch merge), and the revert removes
+  exactly our four-line hunk. This one was checked carefully before removal
+  because, unlike `9007`, it changes behaviour: neither rc4 **nor upstream
+  `linux-next`** carries a `SYSTEM_HALT` term here — both have only the
+  `SYSTEM_POWER_OFF` early return — so our patch added a case upstream
+  deliberately does not have.
+
+### Verified
+
+- Cumulative audit after both removals: **272/272 apply cleanly, exit 0**, no
+  skips, reversals or fuzz. The verification suite's fast tier passes.
+- `DB_RING_CONTROL` now appears **once** in the series tree (it read twice
+  before), and `SYSTEM_HALT` is absent from `amdgpu_device.c`.
+
+`pkgrel` 2 -> 3. Series is 272 patches.
+
+## [7.3.0-rc4-2-sleepy-next]: 2026-09-21
+
+### Removed
+
+- **`1140` (`clamp force_min_dcfclk to dcn42b range`) — inert on this
+  hardware.** It patched a single file, `dc/clk_mgr/dcn42b/dcn42b_clk_mgr.c`,
+  and the series is gated on `ctx->dce_version == DCN_VERSION_4_2B`
+  (`clk_mgr.c:343`, `:454`). This machine reports **DCN 4.0.1**. The Makefile
+  compiles the file unconditionally, so it built — it never ran. It was also
+  already merged upstream, making it doubly redundant.
+
+`pkgrel` 1 -> 2. Series is 274 patches.
+
+## [7.3.0-rc4-1-sleepy-next]: 2026-09-21
+
+### Changed
+
+- **Rebased the series onto `v7.3-rc4`** (was `v7.3-rc3`). The rc3..rc4 window is
+  1038 commits (916 non-merge), and **39 carried patches were absorbed
+  upstream** and dropped — every one a merged commit rather than a rejection.
+  See `PATCH_SOURCES.md` for the full list and for the three (`1159`, `2408`,
+  `2503`) that failed a strict reverse-check while being genuinely upstream.
+- **`2101` (LRU-MARIE)** needed one real rebase: rc4 added
+  `#include <linux/kvm_types.h>` to `mm/folio.c`, so the include hunk lost its
+  context and was regenerated.
+- **`2032` (TCP timestamp preservation)** replaced with the upstream v2.
+
+### Fixed
+
+- **The display "box" fix is in this base.** `63e19ef3ddab` ("Atomize IRQ
+  register read/modify/write ops", Leo Li) closes the `VUPDATE_NO_LOCK`
+  read-modify-write race. AMD's Mario Limonciello directs users to that exact
+  commit for RX 9070 XT pageflip-timeout reports in drm/amd `#5872`, `#5843`
+  and `#5846`. We had carried it as `1159`; rc4 absorbed it, so it is now
+  native to the base.
+
+`pkgrel` resets to 1. Series is 275 patches.
+
 ## [7.3.0-rc3-26-sleepy-next]: 2026-09-20
 
 ### Fixed

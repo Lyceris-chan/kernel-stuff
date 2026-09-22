@@ -182,7 +182,7 @@ _rcver=rc4
 
 pkgver=7.3.0_rc4
 _tagrel=1
-pkgrel=1
+pkgrel=5
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -247,7 +247,6 @@ source=(
   "patches/0101-0113/0103-cachy-cpu-isa.patch"
   "patches/0101-0113/0110-cachy-config-hooks.patch"
   "patches/0101-0113/0111-cachy-acpi-disable-bus-master-check-for-AMD.patch"
-  "patches/0101-0113/0112-cachy-amdgpu-avoid-evicting-resources-at-S5.patch"
   "patches/1000-1099/1004-drm-amdgpu-gmc9-disallow-gfxoff-around-TLB-flushes.patch"
   "patches/1000-1099/1005-drm-amdgpu-gmc10-disallow-gfxoff-around-TLB-flushes.patch"
   "patches/1000-1099/1006-drm-amdgpu-gmc11-disallow-gfxoff-around-TLB-flushes.patch"
@@ -263,7 +262,6 @@ source=(
   "patches/1000-1099/1016-drm-amdgpu-gmc11-switch-to-new-gmc-tlb-inv-helpers.patch"
   "patches/1000-1099/1017-drm-amdgpu-gmc12-switch-to-new-gmc-tlb-inv-helpers.patch"
   "patches/1000-1099/1018-drm-amdgpu-Switch-order-of-GC-and-Display-IP-blocks.patch"
-  "patches/1000-1099/1027-drm-amdgpu-force-complete-the-MES-scheduler-ring-fence-on-reset.patch"
   "patches/1000-1099/1055-drm-amd-pm-fix-incorrect-avg-vcn-utilization-in-gpu_metrics.patch"
   "patches/1000-1099/1056-drm-sched-lock-drm_sched_entity_is_idle.patch"
   "patches/1000-1099/1058-drm-amdgpu-track-suboptimal-always-valid-bos.patch"
@@ -278,7 +276,6 @@ source=(
   "patches/1100-1199/1135-drm-amd-display-fix-HPD-program-filter-programming.patch"
   "patches/1100-1199/1136-drm-amd-display-update-and-revert-FRL-LT-timeout.patch"
   "patches/1100-1199/1138-drm-amd-display-pull-colorops-into-state-when-recreating-a-plane.patch"
-  "patches/1100-1199/1140-drm-amd-display-clamp-force_min_dcfclk-to-dcn42b-range.patch"
   "patches/1100-1199/1141-drm-amd-display-skip-receiver-power-control-without-AUX.patch"
   "patches/1100-1199/1142-drm-amd-display-close-DDC-on-I2C-engine-setup-failure.patch"
   "patches/1100-1199/1143-drm-amd-display-fall-back-to-software-I2C-on-hardware-engine-failure.patch"
@@ -457,7 +454,6 @@ source=(
   "patches/2400-2499/2414-sched_ext-scx_locked_rq-return-null-from-nmi.patch"
   "patches/2400-2499/2415-sched_ext-reject-nmi-calls-lock-taking-kfuncs.patch"
   "patches/2500-2599/2505-x86-pat-fix-effective-RW-in-lookup_address.patch"
-  "patches/9000-9099/9007-drm-gfx12-Program-DB_RING_CONTROL.patch"
   "patches/9000-9099/9011-drm-amdgpu-Respect-noretry-flag-for-retry-faults-on-GFX12.1.patch"
   "patches/9000-9099/9012-drm-amdgpu-gfxhub-Enable-retry-fault-interrupts-when-needed.patch"
   "patches/9000-9099/9013-drm-amdgpu-ih-Dont-perturb-HW-registers-when-accessing-soft-IH.patch"
@@ -1157,7 +1153,6 @@ b2sums=('a9812f8fb24a34af014c1f1f5b556e76bbeb03c557db0d929b4dbad9f082956fcefb75b
         'fdc7fc1d942be4fe8dadcb228b7f9c02273eaec91631ff609a07722b74b1db64828e144856e01a8ffd039762d1970a7ec511a3d240481544c570592914573b69'
         '9e09ebb057ad702b03c3caaaa30660d6f4b1b475002e95f7c1f3fe757980ac3e75a2cead66b01f5ba85bfa2c42bb18b672c316edc3fa645801efee0dfc894e8b'
         '0070a22fe00e90fb691ba892496d9239c81a0bd1242dba1a843a001ae5ee11c81ce3848b763db0d868dba7d366b333cc9ee99f1e29e1963123cb9e49751784e0'
-        '2782b795c66d9dd50e04f89f87feb313c0f42f4e64eb4286edcf8a8820eb6157cf88687b64d115a684b38de20b5358ef9a831b645323c1f635357929ec6ca4da'
         '17c7eefbe32074fc2aca66f27513684d35cc2822c0f855d385f7313a099e1b08907fed86fae60ad479cc01679f4f27c24985586c77882193f4ac8e544e57b877'
         'fc807006b62fecaf65da70e5e69d4b49a4d99ff40eec4b841d9701f3ed4e6e1e2470a838cce3fab382f7f79825e8c1aa75b4bed0aa82d12b7d8a495ac1171e3c'
         '7e0b43bb417f1de1308691800cdd5c803bced08d8b30e489646e537103a704354f29370c8b1ac906c7b3132236fa8979675e8e5543e32f8bba33d81a7a984bee'
@@ -1173,7 +1168,6 @@ b2sums=('a9812f8fb24a34af014c1f1f5b556e76bbeb03c557db0d929b4dbad9f082956fcefb75b
         'dc8f77cc001b2b78696ebd967f14ef2117a10067b30ca4d199809f8057616669aa9ca12a1b14e35ebfe7c33b27152a5c22ef2fc6e7a853e174def0d9a4fbac91'
         '7d10158ac24ec34febf7153b9880592ad46e035c702c91cda424e11722074a5c7590172400d321f1b69f74494591a2fada799a486d5d159e6e8ae57869925379'
         'a47c00f575dc689566a58d4e511f29cc40d642a11aa66b806ffbc5de4659c09ee6a486fdca237c3322336d716d15eb78f794bde7148885b51dfee24a0ad65edd'
-        'b77921293fed15d20c7c2908ca2fbd44a46d052454d5f3ccd769be41dc239b71f3d59187e45fb0b7c9a306108433013f09b1ffc225fb160df2f4f686b449bdc3'
         'f3c33e0d0f3a6aecacd915bcb5500a1c96cbf8352c75204d666589e867735caa77fc882cf558719742b2190f953cf4977fe78edbd8545bd782997223e0d5dd3e'
         'c2f5bb96636f1a471ec1899249b198335fdd7f19cfb53ec95f4f743e758cfd8f558e83a36536aad6e3f0a3a641a5ac5053998587c898ae26cbde3ce819d5b75f'
         '498ac5d39faa626f9e55902e7b2eb7993937893c2d1a20c9532001983a296cee648460a547c7b57142c9010995b34bfc49d3050e6eac69a6c55a137ce6424fff'
@@ -1188,7 +1182,6 @@ b2sums=('a9812f8fb24a34af014c1f1f5b556e76bbeb03c557db0d929b4dbad9f082956fcefb75b
         'c7f82a02ce6331de21eef941d9cf2efd9ace6c5f7cede5300d66b663522771a3108da82cc6d1cadef180cc90e0c43281bc377c618f26220b967fbde4e6fb8f11'
         'b283f440cb0f2679ee81d7da4ea1fecdb1e0146ee6183c6271b8e952ffcaebbbb0decf5b18b69534987601b63289a5c9be0397c5a79eff9cc76dca6a439e1cfa'
         '9f336933bfbf1429081581bf02878e91d7fb383ffdca62b523a18266a94c8229b5510e6ccface38256c2967f9387c2c504e49eda9637f36733431cc6e33f200c'
-        'fa40e8b06e0aaa0b2a27d1acf93dd6a9024728ee395a85878bafa05ad736950de70a20aed0033e76c26e12360f018d5ae58d647b055d8deb35f874da4ed69dcd'
         '0fb08f727791630b6101b8263b23ce433a8b65f895ff757a4d79b282815be449e7b1932a752635e848b3b3ba8235a775a3bf618cfb933bb80d69f3a38f5e5ead'
         '8b3a99b10483d883adcf7d8b2f9daacedd5be8e5cd6a9064a659c73cff5c657c47c4a21d5eaedc139baf906036326a06833ff22a055fe707cac33bac3bfb57a2'
         '05f7335d35933033edcdbdd436dcf8c9fb1f6326cf4cefc34bbc48a1a91d7030536b0e69e48d8ffd4b0a20592f22b5a96895fbd277b776ad860bb2853025d532'
@@ -1265,7 +1258,7 @@ b2sums=('a9812f8fb24a34af014c1f1f5b556e76bbeb03c557db0d929b4dbad9f082956fcefb75b
         '24d41ac0d4bb436b460345b0dd830b18eb426ca1d0a4dcf72c10f7321353b776abd49dd73a13b3e4f52bf08fc1d29998db893bcd44bb262a69f52b1f4d38d38a'
         'd5575f9767adddc21c86617365b96784debeb00ac3ae50f9ac26ecbca653d781c7e714941f932f1b28ba181dc8440b4a2848c1d55b3ead39506d1922bcf39bd4'
         '454ec25372361ff53b1e53c4f0b2731f9628e64913c936339b3b7c42d0749e47ceec614824c0fb944d2f22031213d97a76e47b195b6ec3dff56f2a75176a59ef'
-        '881b7c07a3dcf88bce19b0606848d9bc433aa872b67552b949e269258a62752aa195ab43b797c9e256bc17b105224418eee88aa51718597ee68e5ea5621af20c'
+        '92962c75eeef4f159c9cf3dc0fa26d270f058dcb58fd89479c8150fdee2e591bbac49d8ff102038e0b5171aab71738951b52cc2ae1b2da3482f6718a59a6976e'
         '89d43dc2a9bc9039c99a9a9372f1b3f3c7addc0555209b9392e32070fc5751275fd4339efe20c14fe2439470b2d85b5e83b544bf9c0d92b9af0a8be16df0a666'
         '7248382887e05269fb762231c77769718955ae07050e818b7c14f93ed4d8bc2a33a038a256c14b9cfddd3d194681fefd16592df54b08fa5252916a828753992e'
         '04fe6270d9e54b974ee745261575fd710e3af252c6e2b2788a082455c6eeccfd2ea944245f5f58a9f4de418eca3058aaae8a27f90173b254aac15036c7a95c49'
@@ -1366,7 +1359,6 @@ b2sums=('a9812f8fb24a34af014c1f1f5b556e76bbeb03c557db0d929b4dbad9f082956fcefb75b
         '9fabdcf4ba00bb3d71d7c27421473ac9f4689aca8ccc6498a80121f27162ba0438527306651137c22de82931588ab8809306aa8b8de422781315a995b6b1e213'
         '25db1718fda8abe5a3a8cb9b93f2e143702a7a6611cb752461249d18940a1be14d16d4db3a4b6767998ab66f45d9fe810420b71bc14d3539b895fad33c8ba2cf'
         'c0fa0cef861fa3d0748f805430f41b7c8918554588d05d2a6eae502981ec3b74e6cbec8bc72641b190b7c123c67bb3c8732f1859fc80c620a79dfa1e34bdb6fc'
-        'bdc839d1629f22095c5907e62b7a1a4edfcedebe0cf7e430897ae87aa331cbad28e28cef106ae38c05cafa585fa19ddc019579f1b73fcfaa69d8a8bd40ba8111'
         '39ade2a62477babf59b762e07e4a08213716b1c952de5df2ff290b4dc58a5202c7131b709fef253e7864cbaa280d66083984041b541531241a164bb5c82af89b'
         '0d75eae660d1cdf8a4d9272560aa5639f17221cedca66164fe6456b8a920d994904ec3cafec982fcb1caa29cb7468ffc98a48797ccc5794310acb80e75fd5573'
         '4350f0fec14d2560240efd36937214f7279b2348a1a61e3ffbc1fcdb80a89413f8e5a5fd949bafe41f5d12ac97fd4a805f8dfd315902a1a014ef0c35766ccc21'

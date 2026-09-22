@@ -1043,6 +1043,934 @@ Bingfang Guo, 2026-09-10. Ours was four revisions behind.
   and not a valid kernel sha, and `dc59e4fe…` resolves to the `Linux 7.2-rc1`
   tag.
 
+## Bump notes from the 2026-09-21 sweep (for the 7.4 bump)
+
+### The SDMA refactor that retires `1070`'s local adaptation
+
+`1070` (SDMA 7.0 compact IB emission, Tvrtko Ursulin) is carried **locally
+adapted** because upstream hunk 4 expects `const bool burst_nop =
+sdma->burst_nop;` hoisted out of the loop and the `sdma &&` NULL check dropped,
+where this base still reads `sdma && sdma->burst_nop && (i == 0)`.
+
+A five-commit series by the **same author** does exactly that refactor, and
+**`e0e9c2257911`** deletes precisely those lines:
+
+```c
+-	const bool burst_nop = sdma->burst_nop;
+-		if (i == 0 && burst_nop)
++	if (count && sdma->burst_nop) {
+```
+
+| sha | subject |
+|---|---|
+| `61a68bbfd5ac` | Add `amdgpu_sdma_types.h` header (creates the file) |
+| `f315ca00f903` | Convert SDMA instance and index to direct lookup |
+| `99c9ca0af04d` | Cache the SDMA CSA address |
+| `35ac2639df55` | Add SDMA ring init helper |
+| `e0e9c2257911` | Use memset32 for SDMA padding |
+
+All five are absent from `torvalds` and `linux-next` — they sit only on
+`amd-staging-drm-next` @ `e0e9c2257` (and rebased onto `agd5f-linux`
+`origin/drm-next` @ `cf48bd0a` under different shas). **They are 7.4-queue
+material.**
+
+**They do not apply to `v7.3-rc4`:** 4 of the 5 fail at hunk #1 (`61a68bbfd5ac`,
+`99c9ca0af04d`, `35ac2639df55`, `e0e9c2257911`), only `f315ca00f903` applies,
+and they are interdependent — the first creates the header the rest consume. So
+taking them now means rebasing five interdependent commits across
+`sdma_v2_4.c` … `sdma_v7_0.c`, in the driver this GPU depends on, to replace a
+`1070` that is already verified and building.
+
+**Do this at the 7.4 bump, not before.** At that point the series arrives with
+the merge, `1070` has to be refreshed anyway, and the adapted hunk can be
+swapped for the clean upstream one. Ordering matters: `61a68bbfd5ac` first,
+`e0e9c2257911` before any `1070` refresh.
+
+### HDMI interface churn arriving at the 7.4 bump
+
+`drm-misc-next` landed a 30+ commit HDMI 2.0 scrambling / SCDC /
+`bridge_connector` series on 2026-09-19: `f27fb7e31` (scrambler
+infrastructure), `d65381832` (scrambling management helpers), `245e321b6`
+(renames `drmm_connector_hdmi_init()` → `*_ini2()`), `400c9ede1` (new-signature
+version). Generic `drm/display` + `drm/connector`, not amdgpu — but it is
+interface churn directly under our `0055`/`0058`/`0059`/`1136` HDMI/FRL patches.
+Expect it alongside the already-recorded `DC_FRL_MASK` /
+`parse_hdmi_amd_vsdb()` conflicts.
+
+### The GPU trees were frozen on 2026-09-21
+
+Verified against the remotes with `ls-remote`, not just locally: `drm-next`,
+**all 132** `agd5f-linux` refs (including `drm-fixes-7.3`, `drm-next`,
+`tlb_inv_rework`, `ualink`) and `amd-staging-drm-next` contained **zero**
+commits with committer date ≥ 2026-09-17. The newest AMD work anywhere was
+`e0e9c2257` (09-14/16). Nothing post-rc4 in `torvalds` is on-target either —
+one xfs-fixes merge, a `net: qrtr` MHI patch and four i2c DMA-cleanup commits.
+
+### Re-triage trap: the dropbehind re-post
+
+`c8107330f4b5` and `4e31aa026794` (Alexandre Ghiti) appear "new" in `akpm-mm`
+with committer dates of 2026-09-20, but they are the **same series already
+rejected** as `2b09efabae8f`/`e42fa88021a8`/`f9abcb602ef3` — same author, same
+`Link:` base (`20260911121341.178028-3-alex@ghiti.fr`). The rejection stands for
+the same reason: xswap has no backing store, so the writeback-completion paths
+they fix are unreachable here. **Re-verify only if xswap gains a physical
+backend** (which is what RFC 1169641 proposes).
+
+### sirlucjan `hdmi-patches-v2` — a rebundle of work we already carry, not an upgrade
+
+sirlucjan added `7.3-rc/hdmi-patches-v2/` and `7.3-rc/hdmi-patches-v2-sep/` on
+**2026-09-21** (`fabe84aa`, 7 patches). It is the **same 7 patches as CachyOS's
+`7.3/hdmi` branch** (`a2f9247a396c` … `454b328c28ee`, merged into `7.3/base` at
+`2e790384a738`). All 7 apply cleanly to pristine `v7.3-rc4`.
+
+Mapped against our carries — five of the seven are already ours, some
+byte-identical:
+
+| sirlucjan v2 | ours | result |
+|---|---|---|
+| `0001` Add 2.1 FreeSync support for AMD VSDB | `0059` | identical file content |
+| `0004` Enable HDMI ALLM for Gaming-VRR | `0061` | identical file content |
+| `0005` Add passive_vrr properties | `1150` | identical file content |
+| `0006` Use passive_vrr properties in amdgpu | `1151` | **byte-identical** |
+| `0007` Keep FreeSync for HF-VSDB VRR sinks | `1163` | functionally identical |
+
+`0007` matching is worth recording on its own: `1163` is a *reconstruction*
+(the patch note records it was dropped at the rc3 rebase and rebuilt by hand).
+The upstream author's own v2 carries the same guard in the same place, so the
+rebuild is independently confirmed correct. CachyOS's `7.3/hdmi` HEAD
+(`454b328c28ee`) is the same change, which is the "CachyOS's flicker-free kernel
+demonstrably carries the guarded version" claim in that patch note, now verified
+against the branch itself rather than inferred.
+
+**Where the two differ, we are ahead, not behind.** Verified against pristine
+rc4, which carries only the "VSDB version 3" struct:
+
+- Their `0002` is the V3-only AMD VSDB parse. Our `0050` is Alex Huang's
+  `[PATCH v3 1/4]` (2026-08-04) adding FreeSync refresh-range fields
+  (`freesync_supported`, `min_frame_rate`, `max_frame_rate`,
+  `freesync_vcp_code`) — rc4 has none of them, so this is ours alone.
+- Their VTEM emission is FRL-only (`new_stream->sink->sink_signal ==
+  SIGNAL_TYPE_HDMI_FRL`). Ours (`1152`) also emits on TMDS when the sink
+  advertises HF-VSDB VRR.
+- Decisively, our `0055` is a deliberate **struct-only strip** of the HF-VSDB
+  parse — "without enabling the parse" — which sirlucjan enables in full. That
+  divergence is the whole reason `1164` exists (the MAG251RX must not be
+  advertised VRR-capable). Adopting v2 would re-enable the parse our series
+  deliberately withholds and undo the rc3-9 flicker fix.
+
+**No action. Do not adopt.** Re-check at the 7.4 bump, where the same set
+arrives under the `drm-misc-next` HDMI 2.0 scrambling/SCDC churn already
+recorded above.
+
+### drm/amd work-items tracker, 2026-09-21
+
+100 open issues; 34 created since 09-14. Plain `curl`, no User-Agent; comments
+via GraphQL. On-target threads (Navi 48 / RX 9070 XT / DCN 4.0.1):
+`#5872` USB4 pageflip timeout, `#5869` gfx1201 ring reset → MODE1, `#5870`
+`amdgpu_sync_add_later` UAF, `#5868` HDMI disconnect loop (already recorded —
+this machine is at 1080p, below the threshold), `#5862` Navi 48 FRL, `#5859`
+DCN 4.0.1 DDC/CI, `#5852` HDMI audio stutter, `#5831` panic, `#5843`/`#5846`
+9070xt pageflip.
+
+**The display "box" root cause is now externally confirmed.** `63e19ef3ddab`
+("drm/amd/display: Atomize IRQ register read/modify/write ops", Leo Li,
+2026-08-25) is the VUPDATE_NO_LOCK read/modify/write race fix. AMD's Mario
+Limonciello (`superm1`) tells users "Please apply this patch" with that exact
+sha in `#5872`, `#5843` and `#5846` — all RX 9070 XT pageflip-timeout reports.
+It is **contained in `v7.3-rc4`**, so `7.3.0_rc4-1` carries it natively. We
+used to carry this as `1159` and dropped it at the rc4 rebase as absorbed —
+that drop is now validated from the vendor side, not just by reverse-apply.
+
+**Candidate — unreviewed, verified, applies clean:** Donggeun Yoo,
+*drm/amdgpu: don't release the fence reference consumed by the scheduler*,
+2026-09-10, `<20260910035531.559908-1-donggeunyoo.kernel@gmail.com>`
+(mirror sha `1acff2c440eb600154fb909b9dcf496353a0303d` in `lore-dri-devel`).
+Reported in `#5870` against an RX 9070 XT. Three call sites
+(`amdgpu_cs_submit()`, `amdgpu_sync_push_to_job()`, `amdgpu_vm_sdma_update()`)
+take a reference for `drm_sched_job_add_dependency()` and then put it again on
+the error path.
+
+**The ownership claim is verified independently in our tree**, not taken on the
+author's word: `sched_main.c` line 694 puts the fence on the dedup path and
+line 701 (`if (ret != 0) dma_fence_put(fence);`) puts it when `xa_alloc()`
+fails — so the callee consumes the reference in both the success and the error
+case. The caller's extra put is therefore a double-put, a refcount underflow,
+and a UAF on an unrelated thread. Applies cleanly to `v7.3-rc4` under both
+`git apply --check` and `patch -p1 --dry-run -N`. Trigger is `xa_alloc()`
+failing, i.e. memory pressure during command submission or a VM update.
+
+Status: **no replies, no revision, no acked-by** — 11 days with zero list
+traffic. AI-assisted (`Assisted-by: Claude`), human author with
+`Signed-off-by`, which this project permits. Not currently carried; flagged to
+the user as a decision.
+
+Two classifier traps hit while reading the tracker, both worth keeping:
+`curl … | head && echo OK` reports OK regardless, because the exit status is
+`head`'s — it printed "APPLIES CLEANLY" over `corrupt patch`. And
+`git merge-base --is-ancestor` reported three 2022–23 commits as *not* in rc4
+when they plainly are: the shallow-clone lie already recorded in `LESSONS.md`.
+Use `git cat-file` and read the code.
+
+`112d2111f50a85276245fa9fd5b64981` (cited in `#5859`) is confirmed **not a
+commit** in any tree — the image-upload path the skill warns about.
+
+#### Deep pass — every description and comment on all 100 issues
+
+31 real commits are referenced across the tracker (301 further hex tokens were
+image paths, blob ids and other non-commits). Triage by the authoritative test,
+forward-applies ⇒ absent, reverse-applies ⇒ already present:
+
+| sha | subject | verdict |
+|---|---|---|
+| `c953b39f9487` | Reintroduce "Force validation link training on all ASICs" | **rev-OK — already in rc4** |
+| `db7e8108809a` | Fix VFCT bus number matching with soft filter | **rev-OK — already in rc4** |
+| `2ee9836545e6` | Fix VCE 3 ring align_mask | rev-OK, and VCE 3 is not this ASIC |
+| `482b6542a862` | restore FRL cap on non-destructive HDMI link verify | fwd-OK — **is our `0058`**, absent from pristine rc4 as expected |
+| `c22f9a61e288` | Remove gfxoff calls in **GC v12.1** | fwd-OK but **wrong chip** — this is GC 12.0 (`gfx_v12_0.c`); `smu_v14` gfxoff is not v12.1's |
+| `0b0ff65d3ca1` | Refactor stream validation | 315 lines rewritten in `amdgpu_dm_connector.c` — the file `0059`/`1152`/`1163`/`1164` live in. A refactor, not a fix. Not worth the conflict surface |
+| `7e5760f084d0` | add HDMI 2.1 Compliance Support | **absent from rc4, from our tree, and from amd-staging** |
+
+The only genuine include-candidate is `7e5760f084d0`: it adds the
+`force_yuv422_output` / `force_yuv444_output` debugfs knobs AMD points HDMI 2.1
+compliance reporters at (`#5760`, `#5789`, `#5796`). It sits on `agd5f-linux`'s
+`drm-fixes-7.2` and `drm-fixes-7.3`, so it is stable material that will reach
+mainline on its own schedule. It is a **debugging aid with no runtime effect
+when unused** — worth taking only because this machine's display work is
+HDMI-heavy and these are the knobs AMD triages with. Low priority; not taken.
+
+`63e19ef3ddab` is referenced in **five** issues (`#5747`, `#5795`, `#5843`,
+`#5846`, `#5872`) — more than any other commit in the tracker.
+
+#### `0b0ff65d3ca1` (Refactor stream validation) — already in rc4, nothing to gain
+
+I first dismissed this on its file list as "a refactor, not a fix". **That was
+wrong, and the commit message says so.** It fixes a genuine modeset hang:
+`amdgpu_dm_create_validate_stream_for_sink()` drove its RGB → YUV422 → YUV420
+chroma fallback by *recursing* while toggling the shared, **unlocked**
+`aconnector->force_yuv420_output` / `force_yuv422_output` and resetting them
+after each recursive call. The function runs concurrently on one connector from
+two paths — the connector probe worker (`->mode_valid`) and a compositor atomic
+check (`dm_update_crtc_state`) — so one thread can clear the override just
+before the other tests its exit condition, the exit is missed, and **validation
+loops indefinitely, hanging the modeset path**. It carries
+`Reviewed-by: Jerry Zuo` (the author of our HDMI patches) and sits on
+`drm-fixes-7.3`.
+
+**Verdict: rc4 already has it.** Commit dated 2026-07-21, rc4 dated 2026-09-20 —
+merged in between. Every identifier the commit introduces is present in rc4
+(`encoding_order`, `bpc_order`, `encoding_mask` ×13, `bpc_mask`, `is_hdmi_ep`),
+the shared `force_yuv420_output`/`force_yuv422_output` fields are **gone** from
+`amdgpu_dm_connector.c`, only the unrelated older debugfs knob
+`force_yuv_pixel_format` remains, and the function **no longer recurses** —
+only its definition line matches, no self-call. Our series tree is byte-identical
+to rc4 across that function.
+
+The reverse-apply test fails at `:2279`, which would normally read as "absent".
+It is context drift from unrelated display commits between 07-21 and rc4, not
+absence — **so reverse-apply is not authoritative for older commits**; grep for
+the introduced identifiers instead. This is the third distinct way in one sweep
+that a mechanical test gave the wrong answer.
+
+#### Broad optimization sweep — the one clear win
+
+Three patches, ~33 lines, one file, absent from our tree, applying cleanly to
+`v7.3-rc4` with zero fuzz, **applied by Tejun Heo to `sched_ext/for-7.4`**:
+
+| sha | date | author | subject |
+|---|---|---|---|
+| `b65f0cbb5` | 2026-09-21 | Usama Arif | sched_ext: Specialize the DSQ hashtable compare |
+| `8ad4dc5f3` | 2026-09-21 | Usama Arif | sched_ext: Specialize the TID hashtable compare |
+| `290cf02bb` | 2026-09-21 | Usama Arif | sched_ext: Specialize the scheduler hashtable compare |
+
+The three rhashtable params structs supply no `obj_cmpfn`, so rhashtable falls
+back to `rhashtable_compare()`, which reads `key_offset`/`key_len` out of
+`ht->p` at runtime and emits an out-of-line `memcmp()` per element. Each patch
+adds an `__always_inline` cmpfn so the compare folds to a single `cmp`. Our tree
+has exactly the three structs and **zero** `obj_cmpfn`. `find_user_dsq()` is on
+the `__schedule()` path. Author's in-kernel A/B on `scx_layered` DSQ ids:
+**lookup 2.9× faster**. `Suggested-by: Tejun Heo`; Tejun applied all three.
+
+Two more worth knowing:
+
+- **`7b60a55e`** (Lijo Lazar, 2026-09-16, `lore-amdgfx`) — *drm/amd/pm: Fix
+  SMUv14/15 power context allocation*. Our `smu_v14_0.c` does
+  `kzalloc_obj(struct smu_14_0_dpm_context)` where `struct
+  smu_14_0_power_context` is required — a **wrong-size allocation** on the DPM
+  path, in a MUST-match file for this GPU. Verified present, applies cleanly.
+  Unreviewed (author self-reply only).
+- **Rebase hazard for the 7.4 bump:** upstream `cb145191e9d3` replaces
+  `min_tso_segs()` with a `tso_segs()` CC callback. **Our `0101-cachy-bbr3.patch`
+  performs that same rename itself** — so `0101` needs regeneration at the bump.
+  Nothing to do at rc4.
+
+#### mm deep-read — one clean candidate
+
+**`b6cf1d1c5`** | David Carlier | 2026-09-20 | *mm/shmem: don't release a
+swapin-error marker as a swap entry* | `lore-linux-mm`. A failed shmem swapin
+frees the swap slot but leaves a `PTE_MARKER_POISONED` entry in the page cache;
+on truncate or eviction `shmem_free_swap()` handed that marker to
+`swap_put_entries_direct()`, which warns because it is not a swap entry.
+Four lines, one file:
+
+```c
++	const softleaf_t swp = radix_to_swp_entry(radswap);
+...
++	if (nr_pages && softleaf_is_swap(swp))
+ 		swap_put_entries_direct(swp, nr_pages);
+```
+
+Provenance is complete: `Reported-by: syzbot+23b25ba3c6bf…`, a `Closes:`
+link, `Fixes: ac2d3268284b`. No replies, no objections in any mirror.
+
+Verified independently: the unguarded form is **live in our tree**
+(`mm/shmem.c:995-996` in `_audit`), `softleaf_is_swap()` is reachable
+(`mm/shmem.c:70` includes `<linux/leafops.h>`, which defines it at line 208),
+and the patch passes `git apply --check` (exit 0) and `patch -p1 --dry-run -N`
+against **both** pristine `v7.3-rc4` and our full series tree.
+
+Ruled out from the same pass: the **xswap writeback RFC** (`e2b62953b`,
+Baoquan He, 2026-09-20) is the next layer over the xswap v3 foundation we carry
+verbatim as `2155`–`2168`, but it is RFC-only, has zero replies, depends on an
+unmerged base still carrying Johannes Weiner's two stipulations, two of its 17
+patches are acknowledged-incomplete, and **none of the 17 contains
+`do_swapout`** — so it would not supersede local `2199`. Ridong Chen's
+`94526fefe` (vmscan LRU-tail rotation) drew a serious objection from Barry Song
+in v1 (un-reclaimable clean folios re-isolated forever → kswapd spin at 100%),
+fixed in v2 by a refcount check, but its only `do_rotate=true` call site is the
+traditional-LRU `shrink_inactive_list()` — **inert here**, where
+`CONFIG_LRU_GEN_ENABLED=y` and LRU-MARIE 0.11.1r2 own reclaim. Also inert or
+off-target: Zhang Peng's `shrink_folio_list()` refactor (prep only, no
+functional change), `bpf_proactive_reclaim` v12 (bpf-next, Alexei objected to
+selftest size), Julian Sun's foreign-bdev writeback v7 (off-target, and it
+touches `mm/page_io.c`, which our swap-writeout patches also touch — rebase
+risk, not a carry), `CONFIG_SPARSEMEM_CLASSIC` (we use `SPARSEMEM_VMEMMAP`, so
+the new symbol is off), Yu Kuai's blk-cgroup v4 (off-target, same
+`mm/page_io.c` overlap).
+
+#### `2140` — we carry an ABANDONED revision (v5); upstream restored v4
+
+The 2100–2199 revision audit (72 files) found exactly one row where our carried
+content diverges from what upstream actually took, and it is a real divergence,
+not a rebase.
+
+- **We carry v5** (2026-09-11, `60adb47f4fa3`): a `costly_noretry` predicate that
+  keeps `__GFP_DIRECT_RECLAIM` in `gfp_mask` and exempts
+  `__GFP_THISNODE | __GFP_NOFAIL`. Our patch carries a comment explaining why it
+  deliberately does *not* clear `__GFP_DIRECT_RECLAIM`.
+- **Upstream carries v4** — linux-next `a0259b922845` and akpm-mm
+  `98f58cbfaaaf`, both 2026-09-04, same subject; posted as
+  `[PATCH v4]` (`lore-mirror 30646c127278`). Its shape:
+
+```c
+	if (costly_order && (gfp_mask & __GFP_NORETRY) &&
+	    !(gfp_mask & __GFP_THISNODE))
+		gfp_mask &= ~__GFP_DIRECT_RECLAIM;   /* exempts THISNODE only */
+```
+
+Verified against `linux-next origin/master` directly, not from the audit's
+summary: no `costly_noretry` variable exists there, `__GFP_NOFAIL` is **not**
+exempt, and `__GFP_DIRECT_RECLAIM` **is** cleared. These are different
+behaviours, so our kernel currently diverges from upstream on this path.
+
+**akpm dropped v5 and restored v4** in mm-unstable, and v4 is now in
+mm-hotfixes-stable (Vlastimil Babka, 2026-09-18). Salvatore Dipietro, the
+author, is preparing **v6 = v4 plus a further change**, which is the revision
+to target once it lands.
+
+Scope is clean: `2140` is the **only** patch in our series touching this region,
+and the v4 content passes both `git apply --check` and `patch -p1 --dry-run -N`
+against pristine `v7.3-rc4`. So this is a straight content swap of one file, not
+a rebase. **Not done — needs your call**, since replacing a carried patch is a
+removal under this project's rules. Options: swap to v4 now (matches upstream,
+lands in mm-hotfixes-stable), or wait for v6.
+
+Everything else in the range is healthy: 52 of 72 patches are already merged
+upstream with identical or rebase-only payloads, and 16 have no newer revision
+at all. `2101` LRU-MARIE is current (0.11.1r2, firelzrd `a05089b`), our only
+delta being the local `#include <linux/kvm_types.h>` in `mm/folio.c`. `2100`
+zstd is md5-identical to sirlucjan's newest v5. `2120`–`2127` (Rik van Riel gup
+batching) is at the newest revision — RFC v3 — and is still unmerged, so nothing
+newer exists to take.
+
+#### `9007` — a dead carry that is silently DUPLICATING code
+
+`9007-drm-gfx12-Program-DB_RING_CONTROL.patch` fails standalone against pristine
+`v7.3-rc4` (`error: patch failed: gfx_v12_0.c:1827`) because **rc4 already has
+it** — the identical block is at `gfx_v12_0.c:1842-1850`.
+
+But the cumulative audit reports it `ok`, and that is the problem. Our patch's
+hunk context is the lines *preceding* the block
+(`gfx_v12_0_get_tcc_info()`, `pa_sc_tile_steering_override = 0`), which rc4
+still has. So `git apply` finds a valid anchor and **inserts a second copy**
+instead of failing. Confirmed in the series tree: `DB_RING_CONTROL` appears
+**twice** (`_audit` `gfx_v12_0.c:1836-1844` and `1851-1859`, byte-identical),
+against once in rc4.
+
+**`audit_series.py` cannot distinguish "applied" from "applied as a
+duplicate"** — a patch whose content upstream already absorbed still reports
+`ok` as long as its context anchor survives. Reverse-applicability is the test
+that catches this, and the audit does not run it per-patch.
+
+**Removal candidate.** Needs explicit approval per CLAUDE.md.
+
+#### The retry-fault carry (9011–9024) is a superseded design
+
+Ours is the **v1** posting (2026-07-01, 14 patches). Upstream took **v4**
+(2026-08-28, `[PATCH 00/11]`, merged 2026-09-02) — eleven patches, not fourteen.
+v4 **silently dropped three of ours**: `9014`, `9021`, `9022` (the
+`retry_cam_ack` / MMIO-ACK approach was abandoned upstream; `git log --grep
+retry_cam_ack` is empty in linux-next). v4 replaces the MMIO ACK with a
+**doorbell** design in `9023`/`9024` (`ih_v6_0_setup_retry_doorbell()`,
+`IH_DOORBELL_RETRY_CAM`, plus an `nbif_v6_3_1.c` change). Three further real
+content differences: `9011` retargeted from `ENABLE_RETRY_FAULT_INTERRUPT` to
+`RETRY_PERMISSION_OR_INVALID_PAGE_FAULT` (two hunks dropped, and its remaining
+hunks are GFX12.1/MMHUB4.2 — **inert on this machine**), `9012` hard-codes `1`
+where ours programs `!adev->gmc.noretry` (8 sites; differs only under
+`amdgpu.noretry=1`), and `9020` **drops our local `AMDGPU_PTE_NOALLOC` (MALL)
+hunk**, which upstream deliberately left out. All eleven v4 patches apply clean
+to rc4. Either adopt v4 or consciously keep the MMIO-ACK variant — but the
+current split (v1 minus nothing, upstream at v4) is not a state to leave.
+
+#### Two more removals / flags in 1100–1199
+
+- **`1140` is inert on this machine.** It references `dcn42b` 23 times and
+  `dcn42` 10, with **zero** `dcn401`/`dcn4` — it is the DCN 4.2B /
+  `AMDGPU_FAMILY_GC_11_5_0` Strix path, exactly the class CLAUDE.md's critical
+  trap describes ("applies and compiles, and does nothing here"). Also already
+  merged upstream (linux-next `50eed169c`), so it is doubly redundant. Removal
+  candidate, needs approval. (Already on the unapproved-removal list from the
+  earlier boot sweep — this is the evidence for it.)
+- **`1158`'s provenance is untraceable.** Our patch header claims
+  `dfd0e5aa6aadcd477ccca12dcc1433a76aa8d543` (Sultan Alsawaf, 2025-08-25), and
+  the ledger repeats that sha — but it **exists in no tree and no mirror** we
+  hold (`linux-next`, `torvalds`, `drm-next`, `amd-staging-drm-next`,
+  `agd5f-linux`, `lore-mirror`, `lore-dri-devel`, `lore-amdgfx`). Sultan
+  Alsawaf is an out-of-tree contributor (kerneltoast), so the commit plausibly
+  lives in a GitHub repo we do not clone — meaning **unverifiable from our
+  sources**, not necessarily fabricated. Per CLAUDE.md's spirit, re-derive it
+  or drop it rather than carry an unverifiable sha.
+
+**Validated as correct, keep:** `1164` (our MCCS revert) — upstream has **not**
+reverted it; the target content was re-applied as `ac3aea794fb4`, so the revert
+is still live and still needed. And `1165` + `1167` together equal upstream's
+split pair (`fb1b272db` + `532823d7b`) exactly.
+
+#### `1140` — REMOVED 2026-09-21 (inert on this hardware)
+
+`1140-drm-amd-display-clamp-force_min_dcfclk-to-dcn42b-range.patch` patched
+exactly one file, `dc/clk_mgr/dcn42b/dcn42b_clk_mgr.c`, and the series is
+gated on `ctx->dce_version == DCN_VERSION_4_2B` (`clk_mgr.c:343`, `:454`). The
+running kernel reports **DCN 4.0.1**. The Makefile compiles the file
+unconditionally, so it *builds* — it is never *executed* here. That is
+CLAUDE.md's critical trap verbatim.
+
+Removed with the user's explicit approval: dropped from `source=()`, file
+deleted, `updpkgsums` re-run (arrays realign at 278/278), series now **274**
+patches. Cumulative audit re-run on a separate worktree: **274/274 clean, exit
+0, zero skips/reversals/fuzz**.
+
+#### `1158` — provenance RESOLVED, and it stays
+
+Previously flagged as untraceable: the header claims
+`dfd0e5aa6aadcd477ccca12dcc1433a76aa8d543` (Sultan Alsawaf, 2025-08-25) but no
+kernel tree or lore mirror holds it. **It is real** — GitHub commit search
+resolves it to `kerneltoast/kernel_x86_laptop`, the author's own repo, which is
+simply not a source we clone. Fetched the commit from GitHub's plain patch
+endpoint and compared change-lines: **23 vs 23, identical set**. Our copy
+reproduces it faithfully.
+
+Still needed, verified against rc4's source: `dmub_srv_wait_for_idle()` still
+has `udelay(polling_interval_us)` with `polling_interval_us = 1` in a loop up to
+100 ms, and the fix is not upstream. Applies standalone to pristine rc4. Our
+copy is correctly based — it *removes* the `polling_interval_us` constant, which
+is present in rc4. Developed on Strix Halo, but `dmub_srv_wait_for_idle()` is
+generic DMUB code that every DCN generation uses, this one included.
+
+**Lesson for the ledger: "exists in no tree or mirror" must not be recorded as
+"fabricated".** Two of the three untraceable-provenance flags raised this sweep
+were personal GitHub repos (see also the CRIU case in `LESSONS.md`). Check
+GitHub before concluding a sha is invented.
+
+#### Removals and drop-list from the revision sweep
+
+- **`0112` (cachy-amdgpu-avoid-evicting-resources-at-S5) — drop candidate.**
+  CachyOS reverted its own change (`bd3b950c5b0f`, 2026-08-17, *"Revert 'Merge
+  branch '7.2/s5-power'…'"*), and the revert deletes **exactly our 4-line
+  hunk**. It exists in no current CachyOS branch. Needs explicit approval.
+- **Drop at the 7.4 bump — already merged in linux-next, absent from rc4:**
+  `2005` (`92344fad5b54`), `2413` (`8b9b3698796a`), `2414` (`8848333264b7`),
+  `2415` (`c659e506f9a7`). All byte-identical to the merged commits. Note `2415`
+  is *newer in effect* than the v3 mail: Tejun took the function form
+  `__scx_kf_allowed_ctx()` over the statement-expression macro, and our carry
+  already matches the merged shape.
+- **Watch, not settled:** `2014` — the author withdrew it in favour of Keith
+  Busch's `blk_op_bypass_sched()` refactor, which has not been posted as a patch
+  yet. Keep it for now; do not treat it as final.
+- **`0101` (bbr3) rebase hazard confirmed for 7.4:** upstream `cb145191e9d3`
+  changes the `tso_segs` shape (prototype `u32 (*tso_segs)(struct sock *sk, u32
+  mss_now)`, `READ_ONCE`, `clamp_t`) whereas ours matches CachyOS's (`unsigned
+  int mss_now`, no `READ_ONCE`, `min_t`). Nothing to do at rc4.
+
+Verified current, no action: `0001`–`0007`, `0031`–`0034` (local, author/
+`Signed-off-by`/`Assisted-by` correct); `0010` (upstream AMD post; content
+confirmed still absent from rc4); `0102`, `0103`, `0111` (still carried by
+CachyOS on the 7.3 line); `2000`–`2004` (byte-identical to sirlucjan's newest
+7.3-rc carry, not merged); `2006`–`2013`, `2015`, `2016`; `2200` NAP (v0.5.0 is
+the newest that exists, byte-identical, and there is no `7.2/` or `7.3-rc/` NAP
+directory); `2302`–`2321` (v3 is latest, all 20 diff-bodies identical, no v4);
+`2400` (not merged); `2505`.
+
+**`2600`–`2699` is an empty range** — no patches. Worth noting so no future
+sweep goes looking.
+
+#### `1065`/`1066` — NOT superseded. The maintainer defended them.
+
+A sweep pass reported these as "genuinely superseded" by a three-part series
+posted 2026-09-17 (cover `17f8c1fa50b4`: reverts `c091c58ee996` +
+`9e785a48cb21`, replacement `bf951301d32f`). **That framing is wrong, and acting
+on it would have replaced working code with a rejected design.**
+
+Christian König's reply, `5de2a7d1` (2026-09-17, `lore-amdgfx`), on the
+replacement hunk:
+
+> That doesn't work like this.
+>
+> The problem is that dma_resv_reserve_fences() allocates memory and that in
+> turn can invalidate the eviction fence we just created again.
+>
+> **The patches you want to revert actually look correct to me.** The fence
+> slots usually needs to be reserved directly after we locked the BOs.
+
+The revert series exists but is **rejected, not accepted**; it is in no tree
+(amd-staging tip is 09-14, the series was posted 09-17). Our carries are
+byte-identical to the amd-staging copies (`118037152820`, `00af92666f29`).
+**Keep them.** This is the second time a sweep has read "a newer posting
+exists" as "ours is superseded" — a *revert* of a carried patch is the opposite
+of a supersession, and must be checked for maintainer objection before any
+conclusion is drawn.
+
+#### `1158` — one more fact: CachyOS dropped it (no reason given)
+
+Provenance is settled (kerneltoast repo, verified identical, see above). But the
+same content also lived in CachyOS `7.1/cachy` as `fe0c46c5a03b`/`bb8ee041e40e`
+and was **reverted on 2026-05-01** by Eric Naim (`dd5e72df5d64`,
+`5aecdca15236`, `0bb166ba01aa` — three branches, same day). The revert carries
+**no reason**: just *"This reverts commit bb8ee041e40e."* plus a `Signed-off-by`.
+Three same-day reverts across branches is the signature of a rebase that dropped
+the patch, not a technical objection. `7.3/base` does not carry it.
+
+Verdict: **keep** — rc4 still has the 1 µs busy-wait loop the patch removes, the
+fix is not upstream, and it applies standalone. But it is a
+carry-at-discretion item: one downstream dropped it without documenting why.
+
+#### Remaining ranges — 1000–1099 and 1200–1299
+
+- **`1200`–`1299` (24 patches): nothing newer, nothing to take.** No CPPC v8
+  exists; `1230` is at v3 (newest); `1201`–`1203` were never posted to any list
+  or mirror we hold.
+- **`1027` has a v2** (`5db5edb876849cac1c22fc6f08a622f96fdf7ef2`): the
+  force-completion loop walks `i < AMDGPU_MAX_MES_INST_PIPES` instead of only
+  `ring[0]`. Ours is the narrow form. Small robustness fix; applies with fuzz 1.
+- **`1063` has a v2** (`0242f8ca0d705eba63567d924df2365168ad1c91`) — comment
+  reword only, 4 lines → 5. Cosmetic.
+- **TLB V3 parts 17–20** (`43ca6cc668e7`, `eec49884e9f4`, `4bc39facf85b`,
+  `d2f5a60edde`, cover `abee57dc9a9a`) would supersede our `1013`–`1017` with
+  `enum amdgpu_tlb_inv_method` + `adev->gmc.gart_inv_method` in place of our
+  function-pointer helpers. **Still at review stage** — `AMDGPU_TLB_INV_METHOD`
+  appears in no tree. A coordinated 23-patch swap, not a drop-in; revisit at the
+  7.4 bump. `1004`–`1012` are rebase-only.
+- `1056`/`1060` are byte-identical to their merged tree copies; `1058` is
+  unchanged at its pixelcluster origin.
+
+#### Correction: the fence patch was ALREADY carried as `1064`
+
+I earlier listed Donggeun Yoo's *"drm/amdgpu: don't release the fence reference
+consumed by the scheduler"* (from drm/amd `#5870`) as a candidate to **add**.
+That was wrong — it is already in the series as **`1064`** (ledger row 91, same
+author, msgid `20260910054551.634054-1-donggeunyoo.kernel@gmail.com`). Compared
+added-line sets: identical. Nothing to add.
+
+It is also still doing work: rc4 still has the double-put at
+`amdgpu_cs.c:1306-1308` (`dma_fence_put(fence)` on the error path after
+`drm_sched_job_add_dependency()` has already consumed the reference), and
+`sched_main.c:701` puts the fence when `xa_alloc()` fails. So `1064` is a live
+carry, not a candidate.
+
+**Lesson: before proposing a patch, grep the series for its subject and author.**
+A candidate surfaced from an issue tracker looks "new" even when we have carried
+it for days. Two separate agents and I all missed this.
+
+#### Automated duplicate detection does NOT work — do not retry these
+
+Four approaches were tried to find `9007`-class dead carries programmatically.
+All failed; record them so no future sweep burns time:
+
+| approach | failure mode |
+|---|---|
+| reverse-apply each patch to pristine rc4 | **false negatives** — `9007` forward-fails, so it cannot reverse-apply either. Reported "none" while a known duplicate existed. |
+| added-block present contiguously in rc4 | **both** — `9007` missed because `*/` is a *context* line inside its added block, breaking contiguity; `1064` falsely flagged because its addition (`if (r)` / `return r;`) is generic and matches elsewhere. |
+| count of a distinctive added line > rc4_count + 1 | **false positives** — a patch legitimately adding the same line in two functions trips it. 84 KB of suspects, nearly all valid. |
+| sliding 5-line window: once in rc4, twice+ in series | **false positives** — every legitimately *inserted* block whose lines also occur elsewhere (zstd merge, xswap series) is flagged, and one insertion produces W overlapping windows. |
+
+The reliable methods remain **reading the code** and the cumulative audit.
+`9007` was found by grepping the series tree for the register it programs and
+seeing it twice. A cheap targeted variant that does work: after a rebase, grep
+the series tree for the *distinctive symbol or register* each patch is named
+after and confirm it appears the expected number of times.
+
+#### REMOVED 2026-09-21: `9007` and `0112` (user-approved)
+
+Two patches removed with explicit approval; series **275 → 272**.
+
+**`9007-drm-gfx12-Program-DB_RING_CONTROL.patch` — a duplicate.**
+rc4 already had the change; our copy's context anchor survived, so it inserted a
+second byte-identical `DB_RING_CONTROL` block. Verified fixed:
+`_audit272`'s `gfx_v12_0.c` now contains the block **once** (it read twice
+before). This is the failure mode `audit_series.py` cannot see — it reported
+`ok` throughout. Full write-up in `LESSONS.md`.
+
+**`0112-cachy-amdgpu-avoid-evicting-resources-at-S5.patch` — reverted
+upstream, and behaviourally redundant.** CachyOS reverted its own change
+(`bd3b950c5b0f`, Peter Jung, 2026-08-17, reverting the whole `7.2/s5-power`
+branch merge), and the revert deletes exactly our 4-line hunk. Checked before
+removing, because unlike the others this one changes behaviour: neither rc4
+**nor upstream `linux-next`** (the 7.4 queue) has a `SYSTEM_HALT` term — both
+carry only
+
+```c
+	/* No need to evict when going to S5 through S4 callbacks */
+	if (system_state == SYSTEM_POWER_OFF)
+		return 0;
+```
+
+so ours added a case upstream deliberately does not have. Removing it aligns us
+with both upstream and CachyOS. Verified: `SYSTEM_HALT` is now absent from
+`_audit272`'s `amdgpu_device.c`.
+
+Both removals followed the full sequence — `source=()` entry, patch file, root
+symlink, `updpkgsums` (arrays realign), then a fresh cumulative audit:
+**272/272 clean, exit 0**, and `verify.py` fast tier passes.
+
+**Still open, needing a decision:** `2140` (we carry the abandoned v5; upstream
+restored v4 and a v6 is pending) and the retry-fault v4 swap. Neither was
+approved for this pass.
+
+#### `1027` — a SECOND dead carry of the same class, NOT yet removed
+
+Found while evaluating the sweep's "1027 v2 is worth taking" recommendation. That
+recommendation was based on comparing v1 against v2 — but **rc4 already has v2's
+code**, and more:
+
+```c
+	/*
+	 * MES scheduler rings have no drm scheduler, so they are missed by the
+	 * loop above. Realign their polling fence too (one per XCC), otherwise the
+	 * first post-reset submission polls forever on a stale seq. …
+	 */
+	for (i = 0; i < AMDGPU_MAX_MES_INST_PIPES; i++) {
+		struct amdgpu_ring *mes_ring = &adev->mes.ring[i];
+		if (mes_ring->fence_drv.initialized && mes_ring->sched.ready)
+			amdgpu_fence_driver_force_completion(mes_ring, fence);
+	}
+```
+
+rc4 carries that loop **plus** an equivalent KIQ loop. Our `1027` (v1) adds a
+`mes.ring[0]`-only force-completion that the loop now supersedes:
+
+| | rc4 | our series tree |
+|---|---|---|
+| `AMDGPU_MAX_MES_INST_PIPES` loop | 1 | 1 |
+| `mes.ring[0]` | **0** | **3** (our v1's block) |
+
+So `1027` is the same defect as `9007` — a carry whose purpose upstream has
+absorbed, adding redundant work on top. It also fails standalone against
+pristine rc4 (`patch does not apply` at `amdgpu_device.c:4988`), which is the
+signal.
+
+Attribution checked: `1016` and `1017` contain `mes.ring[0]` only as *context*
+`-` lines (0 added); `1027` is the only patch that adds it.
+
+**REMOVED 2026-09-21**, under the user's standing authorisation to remove any
+patch that passes verification. Five checks, all passed:
+
+1. fails standalone against pristine rc4 (`patch does not apply` at
+   `amdgpu_device.c:4988`) — the signal for a carry whose content upstream has;
+2. applies cumulatively (the series audit reaches it);
+3. rc4 carries superseding code — the `AMDGPU_MAX_MES_INST_PIPES` loop **and** an
+   equivalent KIQ loop;
+4. count check: `mes.ring[0]` is **0** in rc4, **3** in our tree;
+5. removal preserves function — rc4's loop already covers `ring[0]`, verified by
+   `mes.ring[0]` reading **0** in the post-removal series tree while the MES loop
+   is still present.
+
+Series **272 → 271**; `pkgrel` 3 → 4. Cumulative audit re-run: **271/271 clean**,
+and `verify.py`'s fast tier passes.
+
+Worth noting how it was found: not by the revision audit, which compared v1 to
+v2, but by grepping the series tree for the symbol the patch is named after —
+the targeted check recorded in `LESSONS.md` as the one method that works.
+
+### drm/amd tracker, 2026-09-22 — nothing to carry, one confirmation
+
+**No new on-target fix, no candidate absent from our base, and no revert of
+carried work.** All 49 issues updated since 2026-09-20 were pulled in full.
+Every real on-target commit cited is either already in `v7.3-rc4` or already
+carried (`1064`). Grepping all 49 for our carried patches' identifiers (MCCS
+FreeSync cap, `passive_vrr`, `DB_RING_CONTROL`, `9051`/`9052`, `dmub_srv_wait_for_idle`,
+`mqd_prop`, HUBP plane-addr) returned **zero hits** — no maintainer objection and
+no upstream revert touching the series.
+
+**The display fix confirmation is now much stronger.** `63e19ef3ddab`
+("Atomize IRQ register read/modify/write ops") is cited in **24 issues**, not
+the five previously recorded. Mario Limonciello posted a blanket reply across
+the whole `flip_done`/pageflip family on 2026-09-21: *"Could you please retest
+this on kernel 7.3-rc4 or later? There is a fix that may address this issue"* —
+pointing at the **merged** commit. In `#5843` the reporter found the posted
+patch **would not apply** ("some lines could not be applied") and Limonciello
+replied that CachyOS may backport it early. Our base sidesteps that entirely,
+and **the `1159` drop at the rc4 rebase is confirmed correct from the vendor
+side**.
+
+New on-target threads, all additional reports of that same family: `#5718`
+(Navi 48 dual-DP `flip_done timed out`), `#5647` (pageflip, one display
+freezes), `#5511` (9070xt pageflip), plus `#5762` — a **Navi 48** 4-GPU box
+where wrong VFCT selection causes a black screen. None carries a fix.
+
+`29393ab0e49f` ("Promote DC to 3.2.397") is real but exists only on
+`amd-staging-drm-next`/`agd5f-linux`; it is a Krackan reporter's custom-kernel
+pin, not a candidate. The `#5663` DCC/Navi-4x SDMA workaround still has no
+upstream commit — König attributes it to a **hardware** bug — so that verdict
+stands unchanged.
+
+**Method gap found and fixed in the skill:** the documented query
+`?state=opened&per_page=100` returns only **page 1** — the newest 100 by
+*creation* date — while the project holds **1808** open issues. An old issue
+updated recently is invisible to it. `updated_after=2026-09-20` returned 49
+issues; only 24 were on page 1, and the missing 25 included the three on-target
+threads above, missed for several passes. The skill now filters by update time.
+
+### `next-20260922` — three findings, none carried
+
+**1. The sched-ext hashtable trio is MERGED — do not carry it.** The three
+Usama Arif patches recommended as "the one clear win" on 2026-09-21 are now in
+`next-20260922`: `e4c5ba819d3c` (DSQ), `daaab0f42e2e` (TID), `b9e602f30bea`
+(scheduler). They arrive at the 7.4 bump on their own; carrying them now would
+mean maintaining a patch that upstream already has. **Supersedes the earlier
+"worth carrying" note.**
+
+**2. Our `1227` is now upstream.** `4bcc60d326c5` — *"ACPI: CPPC: Accept requests
+to retain immutable autonomous selection"* — is byte-for-byte our `1227`'s
+subject in `next-20260922`, alongside Christian Loehle's other CPPC commits
+(`995e7d468070`, `21e018235d99`). **The CPPC v7 series (`1210`–`1229`) is
+landing; drop it at the 7.4 bump.** Note this is also the patch that already
+fixed the amd-pstate TOCTOU we rejected `1231` for.
+
+**3. r8169 will enable EEE by default — and that cuts against our policy.**
+`5f22f5fb9051` (Javen Xu, **Realsil** — the chip vendor), 2026-09-16, in
+`next-20260922`:
+
+```c
+	tp->phylink_config.lpi_capabilities = rtl8169_get_lpi_caps(tp);
++	tp->phylink_config.eee_enabled_default = !!tp->phylink_config.lpi_capabilities;
+```
+
+`eee_enabled_default` exists in rc4 (`include/linux/phylink.h:179`) but
+`r8169_main.c` does **not** set it — so the patch turns EEE on at probe for any
+EEE-capable part, and **this machine's RTL8125B is one** (`ethtool --show-eee`
+reports 100/1000/2500baseT supported, currently disabled).
+
+We disable EEE **deliberately**: `sleepy-next/net-tune/README.md` records that
+switching EEE restarts auto-negotiation and drops the link for ~3 s, which from
+the NetworkManager dispatcher landed exactly when blocky resolves its DoQ
+upstream and left DNS broken ~11 s after login. `net-tune-eee.service` turns EEE
+off *before* NetworkManager for that reason.
+
+**Not carried — it does the opposite of what we want.** At the 7.4 bump it
+arrives whether we want it or not, so **verify then that `net-tune-eee.service`
+still turns EEE off cleanly with no boot flap**; the service runs while the link
+is down, which is why it has been flap-free, but the driver's default changing
+underneath it is worth one measurement.
+
+### `2041` — SWAPPED v2 → v4 (2026-09-22)
+
+*net: gso: limit recursive IP-in-IP segmentation.* The only carried patch in the
+whole 271 that had a genuinely newer revision this sweep, and the upgrade is a
+strict simplification.
+
+| | our v2 | upstream v4 |
+|---|---|---|
+| mechanism | `gso_header_len_add()` + a `skb_gso_segment_cb()` wrapper, with ~14 call-site checks | `#define GSO_MAX_HEADER 256` + `gso_header_len_exceeded()`, checked only at the two IP GSO entry points |
+| added lines | 83 | **15** |
+| files | 10 | 3 (`include/net/gso.h`, `net/ipv4/af_inet.c`, `net/ipv6/ip6_offload.c`) |
+
+Zihan Xi, `[PATCH net v4 1/1]`, 2026-09-22, `02ede8ffda7c` (`lore-mirror`) /
+`5ab3aa25815c` (`lore-netdev-new`), cover `7bb4b593a3b3`.
+
+**The 2026-09-21 deferral to the 7.4 bump is obsolete** — it was based on v3
+predating rc4. v4 is written against rc4 and applies to it directly.
+
+**v4 is the version the reviewer asked for.** Willem de Bruijn, reviewing v3:
+
+> This is a lot of code change compared to v1, a simple recursion counter. Wang
+> already suggested a simplification. **If the previous approach could be tested
+> at only the two network header callbacks, then this likely can too.** By just
+> bounding `skb_network_header - skb_mac_header`? Or `skb->data`.
+
+v4 bounds the header length at exactly those two callbacks. So this is not
+merely a newer revision — it is the shape the maintainer requested, which is a
+stronger reason to take it than the version number alone.
+
+Trailers: `Fixes: 3347c9602955`, `Reported-by: Vega`, and two `Signed-off-by`
+(Luxing Yin, Zihan Xi).
+
+Verified: `git apply --check` rc=0 and `patch -p1 --dry-run -N` rc=0 against
+pristine `v7.3-rc4`; cumulative audit **271/271 clean, exit 0** after the swap;
+in the resulting series tree `gso_header_len_exceeded` appears once in each of
+the three files and `gso_header_len_add`/`skb_gso_segment_cb` appear **zero**
+times — the old API is fully gone. Applied over our v2 it fails loudly on all
+three files, so there is no silent double-apply risk.
+
+Same number, filename and series position kept, per the `patch-audit` skill.
+`pkgrel` 4 → 5.
+
+*Coverage caveat from this sweep, for the record:* `drm-next` and `drm-misc`
+re-fetches failed with git protocol errors (`fatal: expected
+'acknowledgments'`). Their recorded tips (drm-next `2446a767f` 09-17,
+drm-misc-next 09-21) are at or before the window, and all postings were still
+covered through the lore mirrors, so the conclusion holds — but a working
+re-clone is worth doing before acting on any GPU patch from those trees.
+
+### Alignment with upstream-merged versions — what was taken and what was not
+
+Asked to align carried patches with the versions upstream actually merged,
+**safely**. Surveyed every carry where ours differs from the merged commit:
+
+| ours | merged upstream | decision |
+|---|---|---|
+| `2041` v2 | **v4** | **TAKEN** — strict simplification, reviewer-requested shape, 83→15 added lines |
+| retry-fault `9011`–`9024` v1 (14) | **v4** (11) | **not taken** — see below |
+| `2140` v5 (abandoned) | **v4** | **not taken** — v4 is *contested*, not settled |
+
+**Retry-fault v4 — deliberately not swapped, and the reason is coupling.**
+It looked like a clean alignment, but the pieces are not separable:
+
+- v4 replaces the MMIO-ACK approach with a **doorbell**, allocating
+  `adev->irq.retry_cam_doorbell_index = (adev->doorbell_index.ih + 2) << 1`.
+- To make room, it **must** widen the IH doorbell range —
+  `nbif_v6_3_1.c`, `S2A_DOORBELL_PORT1_RANGE_SIZE` **2 → 8**.
+- That branch runs when `use_doorbell` is true, and our IH reaches it through
+  `ih_v7_0.c:350` → `adev->nbio.funcs->ih_doorbell_range()`. So it is **live
+  code for this machine**, not dormant.
+
+A partial swap would leave the doorbell allocated without the wider range; a
+full swap rewrites live interrupt handling on this GPU — retry-CAM enablement,
+the IH doorbell range, and it drops our local `AMDGPU_PTE_NOALLOC` (MALL) hunk
+in `9020`. Our v1 works today.
+
+**And the benefit is temporary.** At the 7.4 bump the base itself carries the
+merged v4, so any alignment gained now evaporates while the risk is taken now.
+**Defer to the bump**, which is exactly what the earlier sweep recommended.
+
+**`2140` likewise stays.** Upstream restored v4, but v4 was pulled *back out* of
+mm-hotfixes-stable into mm-hotfixes-unstable — Vlastimil Babka now says to
+target 7.4 rather than treat it as an urgent 7.3 fix — and a real objection
+stands on MIGRATE_HIGHATOMIC grounds (v4 lets
+`__GFP_DIRECT_RECLAIM|__GFP_NORETRY` costly-order attempts eat the highatomic
+reserves). Matthew Wilcox: *"still piling hack on hack."* Contested, not
+settled; keep waiting.
+
+**The one thing worth stating plainly:** every carry that is already merged
+upstream *and byte-identical to the merged commit* (`9072`–`9075`, `9019`,
+`9050`, `1056`, `1060`, `2005`, `2413`–`2415`) needs **no action at all** —
+aligning them with upstream is a no-op, because our copy *is* upstream's. They
+belong on the 7.4 drop list, not on a swap list.
+
+### Ledger corrections (2026-09-22)
+
+- **`1056` belongs on the 7.4 drop list.** It is already merged upstream: applied
+  to drm-misc-next 2026-08-18 per the author's own reply, and `next-20260922`
+  carries the locked `drm_sched_entity_is_idle()` at `sched_entity.c:208`.
+  `1060` likewise. The drop list at the top of this file named only `2005`,
+  `2413`, `2414`, `2415`.
+- **`1026` was dropped at the rc4 rebase** (`8e1d5fa` — "its upstream fix landed
+  as a null guard rather than the reconstruction we carried") but the ledger
+  still lists it in the table and describes it in the present tense. The 39 rc4
+  drops exist only in the commit message; the rc3 round has a "Dropped" section
+  and rc4 does not.
+
+### Evaluated 2026-09-22 — not carried, awaiting v2
+
+**`blk-mq: set RQF_USE_SCHED when the operation is known`** — Keith Busch,
+`[PATCH]`, 2026-09-21, `2a907b7cf18ca64913fd5a026a32e435fa3adef1` on
+`lore-linux-block`. **Directly on-target: kyber is this machine's io
+scheduler.**
+
+A cached request is allocated for one operation but can be handed out for
+another. A passthrough command has `RQF_USE_SCHED` cleared, so using those
+flags for a subsequent read/write bio inserts it into the scheduler without
+`->prepare_request()` and frees it without `->finish_request()`. The author's
+words: *"For kyber, this leaks the domain token acquired at dispatch and
+**stalls the queue**."* Carries `Cc: stable`, `Reported-by: Henry Hu`, and
+`Fixes: 4b6a5d9cea91` — which is Jens Axboe's **2022-09-21** commit, present in
+rc4, so the bug is live here. rc4 has the buggy `data->rq_flags |=
+RQF_USE_SCHED;` at `blk-mq.c:526`.
+
+**Why not carried: the reviewer asked for restructuring.** Christoph Hellwig:
+*"This looks generally good, but also a bit hard to follow"*, then three
+requests — update/remove the `blk_mq_rq_ctx_init` comment in mq-deadline,
+consider combining `blk_mq_rq_time_init` with `blk_mq_set_rq_sched`, and move
+the `op_is_flush` check removal to a documented follow-on patch. A v2 that
+differs materially is therefore coming, and carrying this revision would mean
+churning it next sweep. The bug is four years old and needs a passthrough
+command's cached request to be reused for a bio, so it is rare in practice.
+
+**Re-check at the next sweep for the v2.**
+
+*Extraction note:* this mail is `Content-Transfer-Encoding: quoted-printable`.
+Extracted raw it looks malformed; QP-decoded it is 10 clean hunks and
+`git apply --check` exits 0. See `LESSONS.md` — this is the third distinct way
+a lore mail has silently produced a broken patch.
+
+### 7.4 bump hazards found in the 2026-09-22 sweep
+
+**The `__swap_writepage()` → `__swap_writeout()` rename will break three of our
+patches.** linux-next carries `a310a5fb79b3` (Tal Zussman, 2026-08-29) —
+*"mm/swap: rename `__swap_writepage()` to `__swap_writeout()`"* — across
+`mm/page_io.c`, `mm/swap.h`, `mm/swapfile.c` and `mm/zswap.c`. It is **not** in
+`v7.3-rc4`, so it lands at 7.4.
+
+Three carried patches reference the old name and will fail to apply when the
+rename arrives:
+
+- `2199` (our xswap `do_swapout()` guard — the fix for the NULL-mempool panic)
+- `2155` (the xswap foundation series)
+- `2101` (LRU-MARIE)
+
+**Action at the 7.4 bump: rename the symbol in those three patches** (and check
+`PATCH_SOURCES.md`'s `2199` analysis section, which quotes
+`__swap_writepage()` in prose). This is a mechanical rename, but it is easy to
+miss because the patches apply cleanly to rc4 right now.
+
+**The shmem swapin-marker fix has merged upstream.** `b959ffd01324` (David
+Carlier) — *"mm/shmem: don't release a swapin-error marker as a swap entry"* —
+is now in `linux-next origin/master`. We evaluated it as a candidate on
+2026-09-21 (`b6cf1d1c5` on `lore-linux-mm`, verified applicable and clean) but
+did not carry it. **It will arrive on its own**; do not re-evaluate it as new.
+
+#### Method notes (both cost real time here)
+
+The GraphQL endpoint enforces a **query complexity cap of 200**. Asking for
+`title description notes { nodes { author { username } body } }` on 15 issues
+needs complexity 211 and returns a single error object with **no partial
+data** — 90 of 100 issues came back empty and the script still reported
+success. Batch at 10. `notes.nodes.author` is what pushes it over.
+
+**Every clone in `repos/` is shallow** (`rev-parse --is-shallow-repository`
+returns true for `linux-next`, `torvalds`, `amd-staging-drm-next`,
+`agd5f-linux` and `drm-next`). So `merge-base --is-ancestor` is unreliable in
+all of them, not just some — it reported three 2022–23 commits as absent from
+rc4. Use forward/reverse applicability, or read the code.
+
 ## `2199` — the xswap writeout guard, for the path MARIE added
 
 **Our patch.** Author `Sleepy <sleepy@localhost>`, `Assisted-by: Claude`.
@@ -1194,6 +2122,90 @@ base newer than ours.
 | `2005` | v1 → **v2** |
 | `1071` | **new** — `drm/amdgpu: More compact VCN IB emission` |
 | `1230` | **new** — `cpufreq/amd-pstate: Skip auto_sel write when it already matches the mode` v3 |
+| `1231` | **evaluated, REJECTED as redundant** — `cpufreq/amd-pstate: Fix TOCTOU when changing driver mode via sysfs` |
+
+### `1231` — amd-pstate TOCTOU: evaluated and REJECTED (already fixed by our `1227`)
+
+Found in the 2026-09-22 sweep and initially admitted — then the **cumulative
+audit caught it** and it was backed out. Worth recording in full, because the
+whole sequence is the lesson.
+
+Mario Limonciello (AMD, amd-pstate maintainer), `[PATCH]`, 2026-09-21,
+`<3bd87e32b2e42c9f938d9f7b65a82cfb54bbbefd>` on `lore-linux-pm`. Real bug:
+`amd_pstate_update_status()` resolved `mode_state_machine[cppc_state][mode_idx]`
+before taking `amd_pstate_driver_lock` and again after, so concurrent writes to
+`/sys/devices/system/cpu/amd_pstate/status` could re-read a changed `cppc_state`
+and hit either a self-transition (NULL deref) or a second
+`amd_pstate_driver_cleanup()` (double-free of `current_pstate_driver->attr`).
+
+It passed **both** mandated checks standalone against pristine `v7.3-rc4`
+(`git apply --check` and `patch -p1 --dry-run -N`, hunks settling at offset
+−107), the reverse check failed (genuinely new), it was absent from every tree,
+and the author is the maintainer. On that evidence it was admitted as `1231`.
+
+**Then the cumulative audit failed it:** `Hunk #1 FAILED at 1901`, `Hunk #2
+FAILED at 1910`. The reason is the point —
+
+**our `1227` already makes exactly this fix.** Its hunk rewrites the same
+function:
+
+```c
+-	if (mode_state_machine[cppc_state][mode_idx]) {
+-		guard(mutex)(&amd_pstate_driver_lock);
+-		return mode_state_machine[cppc_state][mode_idx](mode_idx);
++	guard(mutex)(&amd_pstate_driver_lock);
++
++	if (!mode_state_machine[cppc_state][mode_idx])
++		return 0;
+```
+
+The lock is taken **before** the read and the transition resolved **under** it,
+so `cppc_state` is stable and the race is gone — and ours additionally guards
+the immutable-autonomous-`auto_sel` case. Functionally the same fix, already
+carried.
+
+**Two lessons, both already in `LESSONS.md` and now demonstrated together:**
+
+1. **Standalone applicability is not admission.** The patch applied cleanly to
+   pristine rc4; only the in-order cumulative apply exposed the conflict, and
+   the conflict *was* the information.
+2. **Grep our own series for the function before proposing a fix.** `1227`
+   touches `amd_pstate_update_status`, and one `rg` over `sleepy-next/patches/`
+   would have shown it before the patch was ever admitted.
+
+The offset is the tell: standalone the hunks landed at **−107**, meaning the
+patch was authored against a tree ~107 lines ahead of rc4. Our CPPC v7 series
+(`1210`–`1230`) is what moved that region — and it is also what already fixed
+the bug.
+
+### Superseded entry retained below for the record
+
+Mario Limonciello (AMD, amd-pstate maintainer), `[PATCH]`, 2026-09-21,
+`<3bd87e32b2e42c9f938d9f7b65a82cfb54bbbefd>` on `lore-linux-pm`. No replies, no
+`Reviewed-by`/`Acked-by` — but it is the maintainer's own patch for the driver
+he maintains.
+
+`amd_pstate_update_status()` resolved `mode_state_machine[cppc_state][mode_idx]`
+**before** taking `amd_pstate_driver_lock`, then resolved it **again** once the
+lock was held. `cppc_state` is global and only stable under the lock, so two
+concurrent writes to `/sys/devices/system/cpu/amd_pstate/status` can have the
+second one re-read a *different* state — resolving to a self-transition
+(`NULL`, immediate **NULL dereference**) or to an unexpected transition that
+runs `amd_pstate_driver_cleanup()` a second time, **double-freeing**
+`current_pstate_driver->attr`.
+
+The fix takes the lock first and resolves the transition exactly once into a
+local before calling it.
+
+On-target: `amd-pstate` is this machine's CPU driver, and the file is live
+(`CONFIG_X86_AMD_PSTATE`). Trigger is narrow — concurrent sysfs mode writes —
+but the failure is a crash, and the fix is five lines.
+
+Verified before admission: the buggy pattern is present in rc4
+(`amd-pstate.c:1806-1809`); `git apply --check` and `patch -p1 --dry-run -N`
+both pass against pristine `v7.3-rc4` (hunks settle at offset −107); the
+reverse check **fails**, confirming it is genuinely new. Not present in
+`linux-next`, `torvalds` or `linux-pm` at the time of the sweep.
 
 Series is 312 patches. The cumulative audit applies all 312 to `v7.3-rc3`.
 
