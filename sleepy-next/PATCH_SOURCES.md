@@ -2230,6 +2230,25 @@ patch was authored against a tree ~107 lines ahead of rc4. Our CPPC v7 series
 (`1210`–`1230`) is what moved that region — and it is also what already fixed
 the bug.
 
+**Re-derived and re-rejected — 2026-09-22, later pass.** The same candidate came
+back out of the live LKML mirror (`8f502e90b`, `lore-mirror`) and was admitted
+again on standalone evidence *before* this ledger was consulted; the patch was
+assembled, dry-run clean at offset −107, and only the next step — reading the
+ledger — stopped it. It is the same patch, with the same verdict.
+
+The cumulative condition was re-tested against the series tree rather than
+argued: `Hunk #1 FAILED at 1901`, `Hunk #2 FAILED at 1910`, `2 out of 2 hunks
+FAILED`, and `git apply --check` agrees. The −107 offset that made it look
+applicably-new is exactly the region `1227` had already rewritten — the offset
+is the tell, every time.
+
+**The sharper lesson.** The function-name grep *did* run this time
+(`rg -l 'mode_state_machine|amd_pstate_update_status' sleepy-next/patches/`)
+and *did* surface `1227` — but only the patch whose **subject** matched
+(`1231`) was inspected; `1227` was set aside as unrelated to mode changes. A
+name grep that returns several patches has to be read for **all** of them: the
+carried patch that already fixes your bug is rarely the one named after it.
+
 ### Superseded entry retained below for the record
 
 Mario Limonciello (AMD, amd-pstate maintainer), `[PATCH]`, 2026-09-21,
@@ -2747,3 +2766,324 @@ introduces that classification — so every `folio_alloc_swap()` failure took th
 when splitting might actually help (`-E2BIG`), skip the pointless split when
 swap is exhausted (`-ENOSPC`) or would not help (`-ENOMEM`). Patch 4/4 (shmem)
 is not carried and not needed for correctness here.
+
+## Pass 2026-09-22 — `lkml.org/hot.xml`, and everything on-target it led to
+
+Asked to check `https://lkml.org/hot.xml` for includable material.
+
+### The feed itself is dead — do not use it as a source
+
+`hot.xml` returns HTTP 200 with a full-looking 57 KB payload, but it is a
+**frozen snapshot from May 2026**. Two fetches returned byte-identical bodies
+(56,969 B), the newest `/lkml/2026/5/…` entry carries `Linux 7.1-rc4`, and
+there is no live `/hot` page at all (404). lkml.org itself is *not* stale — its
+front page serves Sep 22–23, 2026 — so only the hot-thread generator has
+stopped. A 200 with a plausible body is not evidence of freshness; check the
+**newest date in the payload**. `lkml.org` is not a source this project uses
+anywhere; LKML is reached through `repos/lore-mirror`.
+
+The live portion of the page is only the last ~15 messages, which is a sliver
+of LKML's daily volume and strictly worse than the mirror. Nothing was
+includable from either slice.
+
+### What the real source did have
+
+Scanning `repos/lore-mirror` (current through 2026-09-22) for on-target traffic
+from 09-20 onward produced ten threads. All ten were resolved, **none adopted**:
+
+| Thread | Verdict |
+|---|---|
+| `[PATCH v2] sch_cake: prevent shaper corruption` | **Already carried as `2045`** — same author, same timestamp (2026-09-22 16:41:24 +0800), same changelog, same `11 insertions(+), 4 deletions(-)`; diffs byte-identical apart from the mail signature |
+| `[PATCH] cpufreq/amd-pstate: Fix TOCTOU…` | **Redundant — already fixed by `1227`**; see above |
+| `[PATCH 1/4]`, `[2/4]` amd-pstate mode-change | **Already carried as `1231`/`1232`** (Mario's series) |
+| `[PATCH 3/4]`, `[4/4]` amd-pstate-**ut** | **Inert** — unit-test module only; `CONFIG_X86_AMD_PSTATE_UT` is not set |
+| `[PATCH] io_uring: initialize task context before the BPF loop` | **Awaiting v2** — still pending since the last sweep |
+| `[PATCH] drm/amdgpu: unmap GART dma pages before free` | **Inert** — targets `amdgpu_gart_table_ram_alloc()`, reached only under `if (!adev->gmc.real_vram_size)` (the "Put GART in system memory for APU" branch in `gmc_v9_0.c`). A dGPU takes `amdgpu_gart_table_vram_alloc()` in `gmc_v12_0.c:798`, so the code never executes here |
+| `[PATCH 0/3] drm/amd/display: NULL derefs on MST HPD` | **Off-target** — MST is DisplayPort-only; live connectors are `HDMI-A-1` and `HDMI-A-2`, no DP. Also unreviewed (the cover letter still reads `*** BLURB HERE ***`) |
+| `[PATCH net-next v14 0/7] r8169 RSS / multi-queue` | **Inert + wrong tree** — RSS is gated `mac_version == RTL_GIGA_MAC_VER_80` (**RTL8127**); this NIC is RTL8125B. `net-next`, so 7.4 anyway |
+| `[PATCH v2 0/3] mm: bypass swap readahead for zswap` | **Skip** — under review since 2026-08-19; on 09-22 the author offered to "revert to the simpler version", so the shape is not settled |
+| `[PATCH v5 0/3] cpufreq: cppc: Handle Highest Performance changes` | **Skip** — a feature, still in review (Wysocki commenting); not a fix for anything we hit |
+
+### Confirmed still-open
+
+- The io_uring BPF-loop NULL deref remains **pending a v2** — unchanged from the
+  previous sweep.
+- `CONFIG_X86_AMD_PSTATE_UT=n` here, which is why both `amd-pstate-ut` patches
+  in Mario's series are skipped rather than carried; if that config is ever
+  enabled they become live again.
+
+## The 2026-09-22 Discord OOM — MARIE's thrash watchdog, not memory exhaustion
+
+`electron` (PID 2606) was killed at `Sep 22 21:14:27` on boot 0 (rc4-6, so
+`2199` was already in). The kill did **not** come from the kernel's OOM path
+and not from systemd-oomd:
+
+```
+thrash livelock: net-progress 131141 refault / 192089 steal, free 175450, invoking OOM
+Workqueue: events thrash_wd_fn
+ out_of_memory+0x26b/0x340
+ thrash_wd_fn+0x4c8/0x600
+```
+
+`thrash_wd_fn` is MARIE-only (0 hits in `v7.3-rc4`, 3 in our `2101`). MARIE's
+livelock watchdog *chose* to invoke the OOM killer.
+
+**Its premise was false.** The watchdog fires when, in its own words, "the
+working set provably does not fit in RAM". At the fire moment:
+
+| At OOM | |
+|---|---|
+| Free swap | 27,235,488 kB of 32,432,124 kB — **84% free** |
+| `inactive_file` | 21,599,852 kB, of which dirty only 3,468 kB |
+| `inactive_anon` | 6,069,172 kB — resident, never swapped |
+| `free` | 175,450 pages = 685 MB |
+
+The escape gate is `free > high`; the zone highs sum to 219,589 pages
+(857 MB), so 685 MB < 857 MB → the gate never trips, the watchdog stays armed,
+scores `w = 1` per 2s window (`dr < ds`, so no `+2`; `free > min`, so no `+1`),
+and fires at 8 windows = **16 seconds**.
+
+Reclaim was running **file-dominant**, backwards from intent:
+
+- `pgsteal_file` **31,181,709** vs `pgsteal_anon` **8,779,224** → 3.55× file
+- `workingset_refault_file` 6,809,943 ≈ `workingset_refault_anon` 6,741,786
+
+**Cause: `low_swappiness_mode=1`.** MARIE's own docs in `2101` state it:
+
+> *"Marie clamps its effective swappiness to at most 1 in-kernel by default via
+> `low_swappiness_mode` … so the higher values udev rules, tuning daemons, or
+> distro defaults install in `vm.swappiness` are **ignored** by the reclaim
+> pick driver."*
+
+`vm.swappiness = 180` has therefore never been in effect on this machine. The
+~6 GB anon working set is never moved into 27 GB of idle swap, MARIE grinds
+file cache instead, the refault ratio stays ≥1:2 for 16s, and its own watchdog
+kills the biggest process. `low_swappiness_mode_store()` calls
+`lru_marie_swappiness_changed()`, so it is a live, reversible knob.
+
+**Not xswap, and not swappiness-as-a-value.** swappiness is only the lever an
+operator would use — MARIE overrides it. And zswap was **not** full:
+`NR_ZSPAGES` 497,747 pages against a `max_pool_percent = 20` cap of 1,655,956
+pages (20% of 8,279,784) = **30.1%**, so `zswap_check_limits()` was returning
+false. `pswpout`/`pswpin` are both **0** for the whole boot because MARIE's
+`kcompressd` writes through its own path.
+
+## `[RFC PATCH 00/17] mm, swap: xswap writeback to a physical backend` (2026-09-20)
+
+Baoquan He, `lore-linux-mm`, no replies as of 2026-09-22. The base series
+(`[PATCH v3 00/14] extendable swap devices`) is what we carry — `2155`–`2168`
+are v3, already current; there is no v4.
+
+**What it adds.** A physical backend for xswap slots: when zswap refuses a
+page, take a slot on the real swap device with the highest priority and write
+it there rather than bouncing the folio back to the LRU. Plus THP swapin for
+xswap entries, contiguous backing runs for large folios, xswap swapoff,
+reclaim of slots backing cache-only entries, and charging changes (charge only
+once an entry gets physical backing).
+
+**Would it have prevented the OOM? No.** Patch `06/17` triggers on "zswap
+refused this page", and zswap was at 30% of its cap (see above). Its commit
+message describes a real livelock — *"reclaim keeps picking the same page and
+the pool keeps refusing it"* — but that is not the livelock we hit. The
+remaining refusal path, `reject_alloc_fail` / `reject_compress_poor`
+(zsmalloc failing to allocate), is a *symptom* of pressure rather than a
+cause, and `/sys/kernel/debug/zswap` is absent on this kernel
+(`zswap_debugfs_init` compiles to a no-op), so those counters could not be
+read to fully exclude a contribution late in the storm.
+
+**Would it help after the MARIE fix? Yes, materially.** Today the pool never
+fills, so the fallback is never exercised. Clear `low_swappiness_mode` and
+anon starts flowing into xswap and the pool climbs toward its cap; at that
+point base v3 (what we carry) bounces refused pages to the LRU — *exactly* the
+livelock `06/17` describes. Raising `max_pool_percent` buys the same headroom
+more cheaply in the meantime.
+
+**Two blockers before it is carryable:**
+
+1. **It is an RFC.** Zero replies. The author: *"Since the charging of xswap is
+   still under discussion, I didn't merge them into commits. Will squash them
+   or take them off once decision is made"* — `13/17`–`17/17` are explicitly
+   provisional.
+2. **It needs a real swap device.** The fallback writes to "the real swap
+   device with the highest priority"; this machine has none (only `xswap0`).
+   Adopting it means adding a swapfile or partition first.
+
+**7.4 hazard — `2199` collides semantically.** RFC `06/17` *replaces* the
+`SWP_XSWAP` guard inside `swap_writeout()`; our `2199` mirrors that same guard
+into `do_swapout()` (MARIE's path). Different functions, so no textual
+conflict, but once the RFC lands `2199`'s "keep the folio" becomes the **wrong**
+behaviour on MARIE's path — it must become the same backend fallback, not the
+guard. The RFC is also written against the `__swap_writepage()` →
+`__swap_writeout()` rename, i.e. 7.4-era, so it cannot be carried on rc4 as-is.
+
+## REMOVED 2026-09-22: the xswap series (`2155`–`2168`, `2199`) — 15 patches
+
+This machine moved its swap device from xswap to zram, with explicit user
+approval to remove patches that are verified no longer needed. Series 275 → 260.
+
+**Removed:** `2155`–`2168` contiguous, plus `2199`.
+
+**Deliberately NOT removed:** `2173`, `2174`, `2177`, `2190`–`2193`. Those are
+*upstream zswap* fixes, not xswap patches. They are dormant while zswap is off
+but `CONFIG_ZSWAP` has to stay compiled because LRU-MARIE calls
+`zswap_store()` and `zswap_is_enabled()`. They are a separate question from
+this one and were not part of the approval.
+
+### The five verification passes
+
+1. **MARIE is independent of xswap.** `rg -c 'SWP_XSWAP|xswap'` against `2101`
+   returns **0**. MARIE neither defines nor consumes any xswap symbol.
+2. **`2199` is xswap-conditional and its bug is xswap-specific.** Its guard is
+   `else if (unlikely(...->flags & SWP_XSWAP))`, and the NULL deref it fixes
+   was caused by xswap's creation path: `/sys/kernel/mm/xswap/create` never
+   runs `setup_swap_extents()`, so `sio_pool` stays NULL and
+   `swap_add_folio()`'s `mempool_alloc(sio_pool, ...)` dereferences it. zram
+   goes through `swapon()`, so `sio_pool` **is** allocated and the bug cannot
+   occur. `2199` exists only because of xswap, and goes with it.
+3. **Nothing else in the tree references xswap.** `rg -l 'SWP_XSWAP|CONFIG_XSWAP|xswap' sleepy-next/` outside the 15 names only `PKGBUILD` (the
+   `source=()` entries), `config` (the `CONFIG_XSWAP=y` line) and docs — all
+   edited in the same change.
+4. **No non-series patch in `2100`–`2199` mentions xswap.** Scanned every file
+   in the range excluding the 15; zero hits.
+5. **Cumulative audit after removal: `OK: all 260 patches applied cleanly to
+   v7.3-rc4.`** This is the one that actually proves it — a patch left behind
+   that depended on `2157`'s cluster-info refactor, for instance, would have
+   failed here. It did not.
+
+Plus the build, which is the sixth check in practice.
+
+### Why they were removed rather than left dormant
+
+They were not merely unused, they were the implementation of the device being
+abandoned, and the series had three properties this repo actively fights:
+a capacity `/proc/swaps` advertises that the device cannot hold (the real
+ceiling was zswap's `max_pool_percent` — 6.4 GB against a claimed 32 GB); a
+deliberate block on its own drain (`2155` inserts `-EINVAL` for `SWP_XSWAP`
+into `zswap_writeback_entry()`, and gates the shrinker on
+`nr_real_swapfiles`, which is zero with no real swap device); and an extra
+15-patch rebase surface at every version bump.
+
+### What replaces it
+
+`CONFIG_ZSWAP_DEFAULT_ON` is now off and `swap-stack/` carries the zram
+configuration. `CONFIG_XSWAP` is gone from `config`. If the swap backend is
+ever revisited, the v3 base series is `[PATCH v3 00/14] mm, swap: extendable
+swap devices`, and the writeback RFC above is what would make a tiered
+xswap-to-disk setup work — neither is carried now.
+
+**Reversing this is one command** if it was the wrong call:
+`git revert` the removing commit restores all 15 files and the `source=()`
+entries, and `CONFIG_XSWAP=y` is a one-line re-add.
+
+## Sweep 2026-09-22 (later) — zswap optimisation sweep
+
+Run after the switch to zswap + swapfile, over `lore-linux-mm`, `lore-mirror`,
+`torvalds`, `linux-next` and `akpm-mm`. Everything touching `mm/zswap.c` now
+touches code this machine actually runs, so the filter is different from the
+xswap era.
+
+### Already carried (verified present, not re-added)
+
+`2173` publish initial pool with `list_add_rcu`, `2174` `zswap_ever_enabled`
+in `zswap_pool_create`, `2177` large-folio swapin not in zswap, `2190` release
+retired pools via `queue_rcu_work`, `2191` `zswap_invalidate` takes a range,
+`2192` skip the xarray walk when unused, `2193` reuse `zswap_invalidate` in
+`zswap_store`. All seven match `cabbf6b3a4f5`, `8cbdd90a659a`, `220d8dddd52c`,
+`3d41ebf7fb75`, `0bdbe1ccedd9`, `50eb352dcd30`, `81a798cf85e9` in
+`linux-next`/`akpm-mm`. Plus the zstd-side work: `2130` BMI2 probe, `2148`/
+`2149` crypto zstd stream init.
+
+### Adopted — `2196`
+
+`mm: zswap: return -ENOENT when the swap device is gone`, Baoquan He,
+2026-09-13, `<20260913063031.1689420-1-hebaoquan@kylinos.cn>`, `Acked-by: Nhat
+Pham`, in `akpm-mm` as `b1cfb5ba373f`.
+
+`zswap_writeback_entry()` returned `-EEXIST` when `get_swap_device()` found no
+device — but `-EEXIST` is the shrinker's *"page already in swap cache"*
+signal, which makes `zswap_shrinker_scan()` **stop shrinking entirely**. A
+missing device instead means it is being swapped off, so the entry is merely
+stale. Returning `-ENOENT` lets the scan skip it and continue.
+
+On-target because the shrinker *is* this machine's drain path now, and because
+the trigger — a swap device going away while zswap holds entries for it — is
+exactly what happens on a swapoff, which this machine has just done by hand.
+The original submission uses `if (!si)`, matching rc4 verbatim (`git apply
+--check` and `patch -p1 --dry-run -F2` both pass on pristine `v7.3-rc4` with
+no fuzz); the queued `akpm-mm` form differs only in carrying an earlier
+`IS_ERR_OR_NULL()` conversion from that series, so the original was used.
+
+Provenance worth recording: the commit message says *"This is taken from xswap
+patchset. Nhat suggested this is a fix, should be sent out independently."*
+It is the one part of the xswap work that survives as a standalone zswap fix —
+which is why removing the series did not lose it.
+
+Numbered `2196`, not `2199`: `2199` is now a **vacated** number from this
+change, and a gap is the evidence that something was tried.
+
+### Evaluated and REJECTED
+
+| Candidate | Why not |
+|---|---|
+| `mm: zswap: mark the zswap shrinker SHRINKER_NONSLAB` (`e0f869c71622`) | **Inert here.** The commit's own scope is `cgroup.memory=nokmem`: without it the shrinker keeps its memcg awareness and is never demoted to slab. This machine sets no `cgroup.memory=`, so the bug cannot fire. Correct and cheap, but it would do nothing — the trap this repo keeps re-learning |
+| `mm: zswap: drop cold writeback folios via swap dropbehind` (`349d75f4907c`) | One day old and self-describing as a **workaround**: it clears `PG_active` by hand so `bad_page()` does not trip under `CONFIG_DEBUG_VM`, with the comment *"That is a workaround: the refault should not be evaluated on a writeback buffer at all. A fix for that is on the mailing list."* Re-visit once that fix lands |
+| `mm/zswap: reference the pool by id to shrink struct zswap_entry` (`98955a1ebf14`) + `mm/zswap: replace the zswap_pools list with an allocating xarray` (`487b92ae1f10`) | Real optimisation (56→48 byte entry, ~2 MiB metadata per GiB held) but the xarray patch is a **122-line replacement of the `zswap_pools` list** — the exact structure our `2173` and `2190` operate on. Adopting means dropping and reworking both, for a ~14% metadata saving. A 7.4-bump decision, not a mid-cycle one |
+| `mm/zswap: use folio_swap_entry() in zswap_store_page()` (`cb0b6eaa6df1`), `mm/zswap: convert zswap_store_page()/zswap_compress() to take a folio` (`3b50b6850f92`), `mm: memcontrol: constify the zswap and socket pressure helpers` (`7e2d0e0a4761`) | Pure refactors/cleanups with no functional or measurable benefit. The folio conversions are prerequisites for the pool work above and should come with it |
+| `mm/zswap: flush dcache in the compressed decompression path` | Cache-coherency for non-coherent DMA. x86-64 is coherent; nothing to flush |
+| `selftests/cgroup: *zswap*` (`8c7fdc0b4`, `abfacab3e2a5`) | Test-only, and the test tree is not built here |
+| `mm: swap: move LRU insertion out of the swap cache allocator` (`5b0fec7c8786`) | Broad swap-core change that exists to support the dropbehind work above; take it with that, if ever |
+
+### Correction owed from this sweep
+
+An earlier entry in this ledger stated that `/sys/kernel/debug/zswap` is
+"absent on this kernel (`zswap_debugfs_init` compiles to a no-op)". **That is
+wrong.** The directory exists; the check behind that claim was
+`if [ -d /sys/kernel/debug/zswap ]`, which fails with `EACCES` for an
+unprivileged user and so reports "absent" for a directory that is merely
+mode-restricted. It reads fine under `sudo`:
+
+```
+pool_limit_hit 0   pool_total_size 0   stored_pages 0
+reject_reclaim_fail 720488   written_back_pages 0
+```
+
+Same failure shape as `ls ... | head` masking an error — a probe that cannot
+distinguish "missing" from "denied" is not a probe.
+
+### Second correction, and a method fix: probe the code, not the commit message
+
+Hao Jia's two-patch zswap shrinker series — `mm/zswap: fix global shrinker
+when memory cgroup is disabled` and `mm/zswap: support batch writeback in
+shrink_memcg()` — looked like strong candidates. The batch patch's message
+describes a failure mode that maps directly onto this machine's new
+architecture:
+
+> "shrink_memcg() writes back at most one entry per-node during its traversal
+> ... **Under high memory pressure, this can cause the writeback speed to be
+> too slow to keep up with refaults, leading to zswap store failures and
+> forcing pages to skip zswap and go directly to disk, which results in an LRU
+> inversion.**"
+
+A content probe appeared to confirm they were missing:
+`rg -c 'shrink_memcg_batch|batch writeback'` against rc4 returned **0**.
+
+**Both are already in `v7.3-rc4`.** Reading the functions settled it:
+`shrink_memcg()` already carries `unsigned long nr_to_walk = SWAP_CLUSTER_MAX`
+with the patch's own `/* Nothing was scanned: every LRU under @memcg was
+empty. */` comment, and `shrink_worker()` already carries the patch-1 comment
+verbatim plus `if (!memcg && !mem_cgroup_disabled())`. The whole v4 series
+landed before rc4.
+
+**The probe was searching for the wrong thing.** `batch writeback` is phrasing
+from the commit *message*; it appears nowhere in the resulting code. A
+content probe has to grep for an identifier or a line the patch **introduces**,
+not a phrase that describes it. Combined with the `/sys/kernel/debug/zswap`
+correction above, this sweep produced two false "absent" verdicts from probes
+that could not fail informatively — the same shape as the
+`repos/_audit`-missing incident, in a third costume.
+
+**Residual candidates, all resolved:** `dropbehind` (v6 now, still
+self-described as a workaround pending a proper refault fix — re-visit when
+that lands), `SHRINKER_NONSLAB` (inert, `nokmem` only), the pool xarray rework
+(deferred to 7.4, conflicts with `2173`/`2190`), and `-ENOENT` (adopted as
+`2196`).

@@ -1483,6 +1483,67 @@ cleanly to pristine rc4 (so their content is not there), and one fails only
 because its series predecessor fails too — which is series dependency, not
 duplication.
 
+## Dead carries, kind 3: the fix is already carried inside an unrelated patch (2026-09-22)
+
+Kinds 1 and 2 above both compare a candidate against the **base**. This one
+never touches the base: the work is already done, by one of **our own carried
+patches**, whose subject names something else entirely.
+
+Mario Limonciello's `[PATCH] cpufreq/amd-pstate: Fix TOCTOU when changing
+driver mode via sysfs` (2026-09-21) takes `amd_pstate_driver_lock` *before*
+reading `mode_state_machine[cppc_state][mode_idx]`, so a concurrent sysfs write
+cannot make the second read resolve against a changed `cppc_state` (NULL
+deref, or a second `amd_pstate_driver_cleanup()` double-freeing
+`current_pstate_driver->attr`).
+
+Our `1227` — carried as *"ACPI: CPPC: Accept requests to retain immutable
+autonomous selection"* — rewrites that same function for its own reason, and
+in doing so opens with:
+
+```c
+	guard(mutex)(&amd_pstate_driver_lock);
+
+	if (!mode_state_machine[cppc_state][mode_idx])
+		return 0;
+	...
+	return mode_state_machine[cppc_state][mode_idx](mode_idx);
+```
+
+Lock first, both reads under it, `cppc_state` stable across them. The race is
+already gone, and `1227` additionally guards the immutable-autonomous case.
+Nothing to add.
+
+**Detection.** Grep the series for the **function** the candidate modifies, and
+read **every** hit — not just the one whose subject looks related:
+
+```bash
+rg -l 'mode_state_machine|amd_pstate_update_status' sleepy-next/patches/
+# -> 1231 (subject matches: "restore previous mode on failure")
+# -> 1227 (subject does NOT match: "retain immutable autonomous selection")
+```
+
+**This is exactly how it was missed.** That grep *did* run and *did* return
+both. Only `1231` was read, because only `1231`'s subject was about mode
+changes; `1227` was set aside as unrelated. The patch that already fixes your
+bug is rarely the one named after it.
+
+**The tell, again, is the offset.** The candidate applied cleanly to pristine
+`v7.3-rc4` at offset **−107** — it was authored ~107 lines ahead of our base,
+and the region that moved is precisely what `1227` rewrote. Standalone
+applicability is not admission (see "A patch that applies cleanly can be
+installing a duplicate"); the cumulative apply against the series tree is what
+decides:
+
+```bash
+python3 .claude/skills/kernel-build/scripts/audit_series.py --keep
+patch -d repos/_audit -p1 --forward --batch -F2 --dry-run < candidate.patch
+# -> Hunk #1 FAILED at 1901 / Hunk #2 FAILED at 1910 / 2 out of 2 hunks FAILED
+```
+
+A clean standalone dry-run plus a −107 offset against a base we have heavily
+patched in that subsystem should be read as *"one of our own patches is in
+here"* until proven otherwise.
+
 ## A third way a lore mail yields a broken patch: quoted-printable (2026-09-22)
 
 Two failure modes were already recorded — `git show <sha>` diffs the *email*
@@ -1554,3 +1615,146 @@ narrower question than the one asked. It appeared before as `--all` being
 overridden by a ref filter, and as a shallow clone making `merge-base` answer
 confidently about history it cannot see. **Whenever a query has a default
 limit, assert the size of what came back against the size of what exists.**
+
+## A tunable you set can be silently overridden by a patch you carry (2026-09-22)
+
+`vm.swappiness = 180` had been configured on this machine, documented at length
+in `swap-stack/99-xswap-swappiness.conf`, and had **never once taken effect**.
+LRU-MARIE's reclaim driver clamps the effective value before it picks between
+the anon and file lists:
+
+```c
+u8 configured = (u8)mem_cgroup_swappiness(memcg);
+u8 swappiness = (READ_ONCE(marie_low_swappiness_mode) && configured > 1) ?
+                1 : configured;
+```
+
+`marie_low_swappiness_mode` defaults to 1, and MARIE's own header says the
+clamp applies *"regardless of the higher values vm.swappiness /
+memory.swappiness udev rules, tuning daemons, or distro defaults have
+installed."* A console `cat /proc/sys/vm/swappiness` still reads 180 — the
+knob is set, it is simply not consulted.
+
+**The cost.** swappiness = 1 makes reclaim file-dominant. On this machine
+`pgsteal_file` ran **3.55x** `pgsteal_anon` over one boot, with both lists
+refaulting at ~6.8M — reclaim evicting page cache that was immediately read
+back from the NVMe, which is the expensive direction when swap is compressed
+RAM. That sustained refault:steal ratio is what MARIE's own thrash-livelock
+watchdog (`thrash_wd_fn`) exists to detect, and on 2026-09-22 at 21:14:27 it
+fired and invoked the OOM killer against `electron` (Discord) — at a moment
+when **84% of swap was free** and **21.6 GB of clean page cache was still
+resident**. The watchdog's own premise is "the working set provably does not
+fit in RAM"; it did not hold.
+
+**The general rule.** When a patch series installs a policy knob, grep the
+series for the sysctl it overrides before trusting a sysctl value that looks
+set. `rg -n 'swappiness' sleepy-next/patches/` would have found the clamp on
+day one. The knob read back correctly at every step, which is exactly why this
+survived so long — **a readable sysctl is not evidence that the value is
+used.**
+
+Also worth carrying: the fix was *not* a kernel change. Clearing the clamp is
+a sysfs write, and it went in as a tmpfiles.d entry.
+
+## A README claim is not evidence, even in this repo (2026-09-22)
+
+`swap-stack/README.md` justified this machine's swap design with:
+
+> "zram creates a block device with a fixed size ... and never returns that
+> memory when the workload shrinks."
+
+**That is false**, and it had been load-bearing in a decision. Checked against
+the source: zram allocates on demand (the only preallocation is a 16
+byte-per-page metadata table, ~0.39% of `disksize`), and memory comes back
+three ways — `zs_shrinker_scan()` compacts a pool and frees empty zspages,
+`zs_free()` frees a zspage the moment it empties, and the swap layer calls
+`zram_slot_free_notify()` on slot release (swapin of the last reference,
+discard/TRIM, swapoff). Only the device *size* is fixed, and that is a far
+weaker objection than the one written.
+
+The claim was ours, it was confident, and it was wrong. Treat this file and
+the READMEs as prior observations, not as verified facts — the same standard
+this document applies to everything else.
+
+## Corollary: the same claim, checked five ways, was still partly wrong
+
+The zram-vs-zswap comparison that replaced it went through five independent
+passes (kernel source, kernel docs, upstream ML, distro udev rules, plus
+community and bug-tracker research). Three of the six claims as originally
+stated came back **REFUTED or corrected**:
+
+- "zram never returns memory" — refuted, above.
+- "zram gets a drain path if a backing device is configured" — overstated.
+  Writeback is **never automatic**: the kernel has no heuristic for when to
+  move data out, it runs only on an explicit
+  `echo <policy> > /sys/block/zramX/writeback`, and it needs a dedicated
+  unformatted block device (`backing_dev_store()` rejects non-`S_ISBLK`).
+  zram-generator's `writeback-device=` configures the target and does not
+  drive it — upstream issue `systemd/zram-generator#164` is that RFE, with
+  `bd_stat` staying zero until the sysfs writes are made by hand.
+- "zswap-on-zram is redundant" — true in effect but **not a kernel claim**.
+  No kernel document says it; the Arch Wiki *Zram* page does ("it will prevent
+  zram from being used effectively ... recommended to permanently disable
+  zswap"). Do not attribute it to the kernel.
+
+The last one matters for method: a claim can be *correct* and still be
+mis-sourced, and repeating it with the wrong authority is how it becomes
+unfalsifiable later.
+
+## Oversizing a compressed swap device is the dangerous direction (2026-09-22)
+
+Both zram and xswap expose an **uncompressed** capacity while consuming RAM
+proportional to the *compressed* size, so both advertise more than they can
+hold. For xswap that was structural; for zram it is a sizing choice, and the
+failure mode is not the obvious one.
+
+sizing too large inflates the reclaimable estimate. Matt Fleming's RFC *"mm:
+Reduce direct reclaim stalls with RAM-backed swap"*: *"Systems with zram-only
+swap can spin in direct reclaim for 20-30 minutes without ever invoking the
+OOM killer"* — a 377 GiB zram at 10% used reports ~340 GiB of free slots that
+no physical RAM backs, and `should_reclaim_retry()` believes it. The Fedora
+trackers (`atomic-desktops#130`, `kde#728`) carry the user-visible version:
+RAM ~94%, zram ~100%, desktop unresponsive for ~30 minutes, and *neither* the
+kernel OOM killer nor systemd-oomd fired.
+
+So the intuitive "make swap big so we never run out" is backwards here.
+Practice: Fedora `min(ram, 8192)`, Arch Wiki "half of the total system
+memory", zram-generator `min(ram/2, 4096)`, kernel doc an outer bound of
+~2x RAM. This machine took `ram / 2`, which is the Arch Wiki figure and well
+inside the kernel bound.
+
+## A content probe must grep for code, not for the commit message (2026-09-22)
+
+Hao Jia's zswap shrinker series looked like a strong carry. Its message
+describes a failure mode that maps onto this machine's architecture exactly:
+
+> "shrink_memcg() writes back at most one entry per-node during its traversal
+> ... under high memory pressure, this can cause the writeback speed to be too
+> slow to keep up with refaults, leading to zswap store failures and forcing
+> pages to skip zswap and go directly to disk, which results in an LRU
+> inversion."
+
+A probe said they were missing:
+
+```bash
+git -C repos/torvalds show v7.3-rc4:mm/zswap.c | rg -c 'shrink_memcg_batch|batch writeback'
+# -> 0
+```
+
+**Both patches were already in rc4.** `shrink_memcg()` already had
+`unsigned long nr_to_walk = SWAP_CLUSTER_MAX`, and `shrink_worker()` already
+had the patch-1 comment verbatim plus `if (!memcg && !mem_cgroup_disabled())`.
+
+`batch writeback` is a phrase from the commit **message**. It appears nowhere
+in the resulting code, so a zero from it meant nothing. **Probe for an
+identifier or a line the patch introduces** — a renamed variable, a new
+function, a distinctive comment that ships with the change — never a phrase
+that merely describes it.
+
+This is the third instance of one shape in a single day: the
+`ls ... | head` that printed "APPLIES CLEANLY" over a corrupt patch, the
+`[ -d /sys/kernel/debug/zswap ]` that reported "absent" for an EACCES, and
+now this. In all three the probe could not fail informatively — it had a
+branch that silently produced a confident-looking wrong answer. When a probe
+returns "absent"/"fine"/"nothing found", ask what its *other* failure modes
+would have printed, and whether they are distinguishable from success.

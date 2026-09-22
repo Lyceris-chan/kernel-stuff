@@ -15,6 +15,102 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc4-7-sleepy-next]: 2026-09-22
+
+### Fixed
+
+- **Processes were being OOM-killed by the kernel's own memory policy, not by
+  running out of memory.** On 2026-09-22 at 21:14:27, `electron` (Discord) was
+  killed — not by the kernel's normal OOM path and not by `systemd-oomd`, but
+  by LRU-MARIE's thrash-livelock watchdog (`thrash_wd_fn`) choosing to invoke
+  the OOM killer. At that moment **84% of swap was free**
+  (27,235,488 kB of 32,432,124 kB) and **21.6 GB of clean page cache was still
+  resident**; only 685 MB was free. The watchdog's escape gate is
+  `free > high`, and 685 MB sat just below the 857 MB sum of the zone highs,
+  so the gate never tripped and it fired after 16 s of sustained refaulting.
+
+  The root cause is a MARIE default. Its reclaim driver clamps the effective
+  `swappiness` to at most 1 (`low_swappiness_mode`, on by default) —
+  *"regardless of the higher values vm.swappiness ... have installed"*, in its
+  own words. So `vm.swappiness = 180` has never had any effect here, and
+  reclaim has been running **file-dominant: `pgsteal_file` was 3.55x
+  `pgsteal_anon`.** On a machine whose swap is compressed RAM that is the
+  wrong direction — an evicted file page costs an NVMe re-read, while an
+  anonymous page is only compressed. The fix clears the clamp so the
+  configured 180 reaches the reclaim picker
+  (`swap-stack/marie-low-swappiness-mode.conf`).
+
+### Changed
+
+- **Swap is now zswap in front of a 16 GiB swapfile**, replacing the xswap
+  device. The deciding property is that **zswap's drain works automatically**:
+  the shrinker calls `zswap_writeback_entry()`, which writes back to the
+  entry's *own* swap device, so a real file behind the pool means the pool can
+  always be emptied and anonymous pages stay reclaimable. Everything involved
+  is upstream — no local patch series.
+
+  The alternatives were evaluated and rejected on that same point. **zram**
+  never drains itself: writeback runs only on an explicit
+  `echo <policy> > /sys/block/zramX/writeback` (`systemd/zram-generator#164`),
+  and its `backing_dev` requires a raw block device (`S_ISBLK`), so a swapfile
+  would not have worked and there is no spare partition here. **xswap** blocked
+  its own drain by construction — `2155` inserted an explicit `-EINVAL` for
+  `SWP_XSWAP` into `zswap_writeback_entry()` and gated the shrinker on
+  `nr_real_swapfiles`, which is zero with no real swap device.
+
+  `CONFIG_ZSWAP_DEFAULT_ON` stays on, and
+  `CONFIG_ZSWAP_SHRINKER_DEFAULT_ON` is **load-bearing**, not an optimisation:
+  without the shrinker nothing ever drains the pool.
+
+  This does **not** by itself fix the OOM above — that was MARIE, and it
+  applied to every backend equally.
+
+- **LRU-MARIE's async writeout path works unchanged.** MARIE's `kcompressd`
+  requires zswap *or* a `SWP_SYNCHRONOUS_IO` device, and zswap is now enabled,
+  so the condition is met; `do_swapout()`'s `zswap_store()` succeeds, and on
+  the pool-full path `__swap_writepage()` reaches a swap device whose
+  `sio_pool` is properly allocated (the swapfile goes through `swapon()`).
+
+### Added
+
+- **`2196` — `mm: zswap: return -ENOENT when the swap device is gone`**
+  (Baoquan He, `Acked-by: Nhat Pham`). `zswap_writeback_entry()` returned
+  `-EEXIST` when the device lookup failed, but `-EEXIST` is the shrinker's
+  *"page already in swap cache"* signal — it made `zswap_shrinker_scan()` stop
+  shrinking entirely. A missing device means the entry is merely stale, so the
+  scan can skip it and continue. Adopted because the shrinker is now this
+  machine's drain path, and because a device disappearing under live zswap
+  entries is exactly what a `swapoff` does.
+
+  It was salvaged from the xswap series — its own commit message notes *"This
+  is taken from xswap patchset. Nhat suggested this is a fix, should be sent
+  out independently."*
+
+### Removed
+
+- **The xswap series: `2155`–`2168` and `2199`, 15 patches.** Verified no
+  longer needed across five passes — LRU-MARIE never references xswap (0
+  matches), `2199`'s NULL-deref guard is xswap-conditional and its bug came
+  from xswap's `swapon()` bypass, nothing else in the tree references it, no
+  other patch in the range mentions it, and the cumulative audit reports all
+  261 remaining patches applying cleanly to `v7.3-rc4`. `CONFIG_XSWAP` is gone.
+  Reverting is a single `git revert`.
+
+### Notes
+
+- This revision also corrects a false claim that had been in
+  `swap-stack/README.md` and was load-bearing in an earlier decision: zram
+  *does* return memory to the kernel when a workload shrinks — zsmalloc has a
+  shrinker, and a zspage is freed as soon as it empties. Only the device
+  *size* is fixed (`disksize` cannot change after init). The claim did not
+  survive checking against the source.
+- A zswap optimisation sweep ran over the mm list, `linux-next` and `akpm-mm`.
+  Besides `2196`, it rejected `SHRINKER_NONSLAB` (inert — its scope is
+  `cgroup.memory=nokmem`, which is not set here), the swap-dropbehind
+  writeback optimisation (one day old and self-describing as a workaround),
+  and the zswap pool xarray rework (a 122-line replacement of the structure
+  our `2173`/`2190` operate on). Full reasoning in `PATCH_SOURCES.md`.
+
 ## [7.3.0-rc4-6-sleepy-next]: 2026-09-22
 
 ### Added

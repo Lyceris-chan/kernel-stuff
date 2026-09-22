@@ -3,11 +3,11 @@
 `linux-sleepy-next` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
 built from **mainline Linux 7.3-rc4** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 275 targeted
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 261 targeted
 upstream/local patches. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0_rc4-6` · **Artifact:**
-`linux-sleepy-next-7.3.0_rc4-6-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0_rc4-7` · **Artifact:**
+`linux-sleepy-next-7.3.0_rc4-7-x86_64.pkg.tar.zst`
 
 ## Target hardware
 
@@ -38,8 +38,17 @@ upstream/local patches. It is not a general-purpose kernel.
   before the scheduler finished enabling left it running but undisableable) and
   a NULL sub-sched dereference in the compat kfuncs. Those landed upstream in
   `v7.3-rc4` and are no longer carried as patches.
-- **xswap** — extendable compressed swap backed by zswap (`2155`–`2168`, v2); it
-  replaces the fixed-size zram device on this machine.
+- **zswap + swapfile** — a zstd-compressed pool in RAM in front of a 16 GiB
+  swapfile on the NVMe. Chosen because its drain is automatic: the shrinker
+  writes pool entries back to the entry's own swap device, so a real file
+  behind the pool keeps anonymous pages reclaimable. zram's writeback never
+  runs on its own, and `backing_dev` rejects a file outright.
+  `swap-stack/` carries the userspace side. It replaced an xswap device on
+  2026-09-22 (series removed, 15 patches).
+- **LRU-MARIE `low_swappiness_mode` is cleared** so `vm.swappiness = 180`
+  actually reaches the reclaim picker. MARIE otherwise clamps the effective
+  value to 1, which made reclaim file-dominant and OOM-killed a process on
+  2026-09-22. See `../swap-stack/README.md`.
 
 ## Build and install
 
@@ -95,7 +104,7 @@ fix lands.
 
 ## Patch series
 
-275 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+261 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 
 | Range | Category |
 |---|---|
@@ -106,7 +115,7 @@ fix lands.
 | `1100–1199` | AMD Display (DCN4, colorops) |
 | `1200–1299` | AMD PM (amd-pstate, ACPI CPPC) |
 | `2000–2099` | Block / I/O (bfq, mq-deadline, zram, io_uring) |
-| `2100–2199` | Memory and swap (zstd, LRU-MARIE, MGLRU, gup, xswap) |
+| `2100–2199` | Memory and swap (zstd, LRU-MARIE, MGLRU, gup, zswap) |
 | `2200–2299` | CPU idle (NAP) |
 | `2300–2399` | Build system / kbuild |
 | `2400–2499` | Core scheduler (non-CachyOS) |
@@ -118,5 +127,5 @@ fix lands.
 
 `GUIDE.md` (this directory) covers toolchain, PROFILE_PEAK, troubleshooting, and
 net-tune. `../net-tune/README.md` documents the SQM service, and
-`../swap-stack/README.md` the zswap + xswap swap setup.
+`../swap-stack/README.md` the zswap + swapfile stack and the MARIE swappiness fix.
 `../../CLAUDE.md` holds the maintenance rules; `../PATCH_SOURCES.md` the ledger.

@@ -184,9 +184,27 @@ The short version:
 - **`… | head && echo OK` always reports OK** — the exit status is `head`'s.
   It printed "APPLIES CLEANLY" over a `corrupt patch`. Capture exit codes
   directly, never through a pipe.
-- **Before proposing a patch as new, grep the series for its subject and
-  author.** `1064` was already carried while three separate passes called it a
-  candidate.
+- **Before proposing a patch as new, grep the series for its subject, its
+  author, and the function it changes — then read every hit.** `1064` was
+  already carried while three passes called it a candidate. And the fix itself
+  can already be carried inside a patch whose *subject* says something else:
+  `1227` ("retain immutable autonomous selection") already takes the lock
+  before reading `mode_state_machine[][]`, which **is** the amd-pstate TOCTOU
+  fix a later candidate proposed. The name grep returned both `1227` and
+  `1231`; only the subject match was read, and `1227` was set aside as
+  unrelated. A clean standalone dry-run at a large offset, in a subsystem we
+  patch heavily, means one of our own patches is in there.
+- **A tunable can be set, readable, and still not used.** A patch we carry may
+  override it in-kernel. `vm.swappiness = 180` was configured here and had
+  never taken effect: LRU-MARIE clamps the effective value to 1
+  (`low_swappiness_mode`, default on) *"regardless of the higher values
+  vm.swappiness ... have installed"*. `/proc/sys/vm/swappiness` still read 180.
+  Grep the series for the sysctl name before trusting any tuning value —
+  a readable sysctl is not evidence that it is consulted.
+- **A README claim is not evidence, including ours.** `swap-stack/README.md`
+  justified the swap design with "zram never returns that memory when the
+  workload shrinks"; zsmalloc has a shrinker and frees a zspage as soon as it
+  empties. That claim was load-bearing and false. Verify against source.
 - **Build time is ~8 min** — prefer rebuilding over guessing.
 
 ## Configuration and packaging reference

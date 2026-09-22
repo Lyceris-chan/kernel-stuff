@@ -1095,6 +1095,14 @@ CONFIG_COREDUMP=y
 #
 CONFIG_SWAP=y
 CONFIG_ZSWAP=y
+# ZSWAP_DEFAULT_ON stays ON: since 2026-09-22 this machine is zswap in front of
+# a swapfile, which is the configuration whose drain actually works. The
+# shrinker writes pool entries back to the entry's own device
+# (zswap_writeback_entry -> get_swap_device(swpentry)), so a real swap device
+# behind it means the pool can always be emptied. zram had no automatic drain
+# at all, and the xswap series blocked its own. SHRINKER_DEFAULT_ON below is
+# load-bearing for that drain, not an optimization. See
+# sleepy-next/swap-stack/README.md.
 CONFIG_ZSWAP_DEFAULT_ON=y
 CONFIG_ZSWAP_SHRINKER_DEFAULT_ON=y
 # CONFIG_ZSWAP_COMPRESSOR_DEFAULT_DEFLATE is not set
@@ -1104,7 +1112,9 @@ CONFIG_ZSWAP_SHRINKER_DEFAULT_ON=y
 # CONFIG_ZSWAP_COMPRESSOR_DEFAULT_LZ4HC is not set
 CONFIG_ZSWAP_COMPRESSOR_DEFAULT_ZSTD=y
 CONFIG_ZSWAP_COMPRESSOR_DEFAULT="zstd"
-CONFIG_XSWAP=y
+# CONFIG_XSWAP removed 2026-09-22 with patches 2155-2168/2199: this machine
+# swaps to zram now. CONFIG_ZSWAP stays because LRU-MARIE calls zswap_store()
+# and zswap_is_enabled().
 CONFIG_ZSMALLOC=y
 
 #
