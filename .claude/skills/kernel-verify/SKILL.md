@@ -4,11 +4,9 @@ description: >
   Runs the sleepy-kernel verification suite — patch hygiene, checksums, provenance, documented claims, skill-spec compliance, the cumulative apply, plus checkpatch and sparse in the deep tier. Use before committing or releasing, when asked to verify the series or the packaging, or when a change to patches, PKGBUILD, or docs needs checking.
 ---
 
-> **Package location (2026-09-12).** The repo is single-package: everything this
-> skill touches lives in `sleepy-next/`. Unless a step says otherwise, `cd
-> sleepy-next` first so paths like `PKGBUILD`, `patches/...`, `config`,
-> `net-tune/` and `PATCH_SOURCES.md` resolve. From the repo root, prefix them
-> with `sleepy-next/`.
+> Repo is single-package: everything here lives in `sleepy-next/`. Unless a step
+> says otherwise, `cd sleepy-next` first. From the repo root, prefix paths with
+> `sleepy-next/`.
 
 # Verify the series and the packaging
 

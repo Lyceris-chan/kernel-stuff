@@ -178,6 +178,10 @@ Message-ID.
 Plain `curl` with **no User-Agent** — a browser UA triggers Anubis.
 
 ```bash
+# CORRECT way to find what MOVED — filter by update time, not by page:
+curl -s "https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/issues?state=opened&updated_after=2026-09-20T00:00:00Z&per_page=100"
+
+# The obvious query — kept only to show why it is wrong:
 curl -s "https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/issues?state=opened&per_page=100"
 ```
 
@@ -190,6 +194,36 @@ Comments are 401-gated over REST but public over GraphQL:
 curl -s "https://gitlab.freedesktop.org/api/graphql" -H "Content-Type: application/json" \
   --data '{"query":"query { project(fullPath: \"drm/amd\") { issue(iid: \"5868\") { title notes { nodes { createdAt author { username } body } } } } }"}'
 ```
+
+**Page 1 is not the tracker — it is the newest 100 by CREATION date.** The
+project holds **1808** open issues (19 pages), and a plain
+`?state=opened&per_page=100` returns only page 1. An issue created months ago
+and *updated* yesterday is invisible to it. Measured on 2026-09-22:
+`updated_after=2026-09-20` returned **49** issues, of which only **24** were on
+page 1 — the other 25 included on-target RX 9070 XT threads (#5718, #5647,
+#5511) that a page-1-only sweep had silently missed for several passes.
+
+**Always filter by time, never by page:**
+
+```
+?state=opened&updated_after=YYYY-MM-DDT00:00:00Z&per_page=100
+```
+
+Check `x-total` against the rows returned; if they differ, you are reading a
+page, not the set.
+
+**The GraphQL endpoint caps query complexity at 200.** Asking for
+`title description notes { nodes { author { username } body } }` on **15** issues
+needs complexity 211 and returns a single error object with **no partial data** —
+90 of 100 issues came back empty while the script still reported success. Batch
+at **10** with that field set. `notes.nodes.author` is what pushes it over.
+Check `d['errors']` and the count of non-null results; never treat an empty
+result as "no data".
+
+Enumerating all ~100 issues is worth doing once per sweep rather than trusting a
+hand-picked set: it is how `63e19ef3ddab` was found referenced in five separate
+issues. Verify each extracted sha with `git cat-file -t` — of 332 hex-looking
+tokens across the tracker, 301 were image paths, blob ids and other non-commits.
 
 The tracker is **mostly bug reports**. Most open issues have no referenced fix.
 Extract commit shas from comment bodies, but confirm a candidate sha is a commit

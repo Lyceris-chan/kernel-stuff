@@ -4,11 +4,9 @@ description: >
   Refreshes the CachyOS per-branch squashes (0101–0109) from sirlucjan's separated patch directories. Use when the kernel version bumps, when sirlucjan ships updated branch patches, or when a CachyOS branch patch conflicts.
 ---
 
-> **Package location (2026-09-12).** The repo is single-package: everything this
-> skill touches lives in `sleepy-next/`. Unless a step says otherwise, `cd
-> sleepy-next` first so paths like `PKGBUILD`, `patches/...`, `config`,
-> `net-tune/` and `PATCH_SOURCES.md` resolve. From the repo root, prefix them
-> with `sleepy-next/`.
+> Repo is single-package: everything here lives in `sleepy-next/`. Unless a step
+> says otherwise, `cd sleepy-next` first. From the repo root, prefix paths with
+> `sleepy-next/`.
 
 # CachyOS Per-Branch Patch Refresh
 

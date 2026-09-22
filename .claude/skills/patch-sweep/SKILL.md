@@ -43,6 +43,16 @@ Four traps, each of which has produced a wrong "nothing to do" conclusion:
   `fatal: error processing shallow info: 4`. Use `--depth=N` for those.
 - **`linux-next`'s `master` ref is stale** while its `next-YYYYMMDD` tags are
   current. Scan the newest tag, not `master`.
+- **Local branches are stale even after a fetch.** `sirlucjan-kernel-patches`
+  had local `master` three days behind `origin/master`; the new content was
+  invisible until read from the remote ref. **Always scan `origin/<branch>`, and
+  check freshness before trusting any result.**
+- **Every clone in `repos/` is shallow** (`rev-parse --is-shallow-repository`
+  returns true for `linux-next`, `torvalds`, `amd-staging-drm-next`,
+  `agd5f-linux`, `drm-next`). So `git merge-base --is-ancestor` is unreliable in
+  *all* of them — it reported three 2022–23 commits as absent from rc4. Confirm
+  membership with `git cat-file -e` plus a content probe, never with
+  `merge-base`.
 
 ## Step 2 — scan the trees, every branch
 
@@ -93,7 +103,12 @@ Assert on the result rather than eyeballing hunks: count `Signed-off-by`, count
 ## Step 4 — drm/amd work items
 
 ```bash
-curl -s "https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/issues?state=opened&per_page=100"
+# Filter by UPDATE time. The project holds ~1800 open issues and a plain
+# per_page=100 fetch returns only page 1 — the newest 100 by CREATION date, so
+# an old issue updated yesterday is invisible to it. Measured: updated_after
+# returned 49 issues where page 1 held only 24, and the missing 25 included
+# on-target RX 9070 XT threads missed for several passes.
+curl -s "https://gitlab.freedesktop.org/api/v4/projects/drm%2Famd/issues?state=opened&updated_after=YYYY-MM-DDT00:00:00Z&per_page=100"
 ```
 
 Plain `curl`, **no User-Agent**. Comments are 401-gated over REST but public
@@ -139,13 +154,31 @@ f=$(patch -d repos/_audit -p1 --batch --forward -F2 --dry-run < "$cand" 2>&1)
 A forward failure alone cannot distinguish "not carried, context shifted" from
 "already carried"; those need opposite responses.
 
+**But reverse-applicability is only authoritative for recent commits.** A patch
+older than a few weeks can reverse-fail purely from context drift while its
+content is plainly present — `0b0ff65d3ca1` (the stream-validation modeset-hang
+fix) reverse-failed on rc4 although every identifier it introduces
+(`encoding_order`, `bpc_mask`, `is_hdmi_ep`) was already there. For anything
+non-recent, grep the base for **the identifiers the patch introduces** and treat
+that as the verdict.
+
+**Before calling a candidate new, grep our own series for its subject and
+author.** `1064` was already carried while three separate passes proposed it as
+an addition; the giveaway was one `rg` in `sleepy-next/patches/`.
+
 ## Step 6 — triage every candidate
 
 All four checks, in order. The trap catalogue — wrong-chip, inert-under-config,
 upstream reverts — and the authoritative IP list are in `references/triage.md`.
 
 **Check 0 — reverts and wrong chip.** Grep for `Revert "…"` of anything already
-carried. Then confirm the target file belongs to *this* machine's silicon:
+carried. **A revert of carried work is NOT a supersession — it is the opposite,
+and it needs a maintainer's blessing before you act.** In one sweep a revert
+series was reported as "genuinely superseded"; the maintainer's reply said the
+opposite — *"The patches you want to revert actually look correct to me"* — so
+adopting it would have swapped working code for a rejected design. Always read
+the thread for an objection before concluding. Then confirm the target file
+belongs to *this* machine's silicon:
 `gfx_v12_0` not `gfx_v12_1`, `dcn401` not `dcn42`/`dcn50`/`dcn60`, `smu_v14_0_0`
 not `smu_v14_0_2`, `sdma_v7_0` not `sdma_v7_1`, `vcn_v5_0`. Verify against the
 running kernel, not inference:

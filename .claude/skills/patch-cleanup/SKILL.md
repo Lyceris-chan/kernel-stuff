@@ -4,11 +4,9 @@ description: >
   Reconciles the on-disk patch tree with the PKGBUILD source=() array, then removes orphaned patch files and build artifacts. Use when asked to clean up the workspace, remove leftover patch files, or check the series against source=().
 ---
 
-> **Package location (2026-09-12).** The repo is single-package: everything this
-> skill touches lives in `sleepy-next/`. Unless a step says otherwise, `cd
-> sleepy-next` first so paths like `PKGBUILD`, `patches/...`, `config`,
-> `net-tune/` and `PATCH_SOURCES.md` resolve. From the repo root, prefix them
-> with `sleepy-next/`.
+> Repo is single-package: everything here lives in `sleepy-next/`. Unless a step
+> says otherwise, `cd sleepy-next` first. From the repo root, prefix paths with
+> `sleepy-next/`.
 
 # Patch Cleanup (post-maintenance-session workspace hygiene)
 

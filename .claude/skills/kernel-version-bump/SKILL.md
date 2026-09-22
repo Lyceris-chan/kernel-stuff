@@ -4,11 +4,9 @@ description: >
   Bumps sleepy-kernel to a new Linux RC or release and refreshes the CachyOS 01xx squashes that no longer apply. Use when asked to move to a new -rcN or release, or to regenerate the CachyOS branch squashes.
 ---
 
-> **Package location (2026-09-12).** The repo is single-package: everything this
-> skill touches lives in `sleepy-next/`. Unless a step says otherwise, `cd
-> sleepy-next` first so paths like `PKGBUILD`, `patches/...`, `config`,
-> `net-tune/` and `PATCH_SOURCES.md` resolve. From the repo root, prefix them
-> with `sleepy-next/`.
+> Repo is single-package: everything here lives in `sleepy-next/`. Unless a step
+> says otherwise, `cd sleepy-next` first. From the repo root, prefix paths with
+> `sleepy-next/`.
 
 # Kernel version bump
 

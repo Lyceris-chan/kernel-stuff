@@ -1322,3 +1322,235 @@ Related: *"A crashed command and an empty result look identical"* above — that
 one is a search returning nothing because it broke. This is a test returning
 *success* because it broke, which is worse: the broken state is indistinguishable
 from the good one.
+
+## A patch that applies cleanly can be installing a duplicate (2026-09-21)
+
+`9007-drm-gfx12-Program-DB_RING_CONTROL.patch` was a dead carry: rc4 had
+already absorbed the upstream change, and the same block sits at
+`gfx_v12_0.c:1842-1850`. Standalone, the patch does not apply — which is the
+signal. **But the cumulative audit reports it `ok`.**
+
+The reason is the anchor. Our patch's hunk context is the lines *preceding* the
+block (`gfx_v12_0_get_tcc_info()`, `pa_sc_tile_steering_override = 0`), and
+those are still present in rc4. So `git apply` finds a valid anchor and
+**inserts a second copy** rather than failing. The series tree ended up with
+`DB_RING_CONTROL` programmed twice, byte-identical blocks at `1836-1844` and
+`1851-1859` against once in rc4.
+
+**`audit_series.py` cannot distinguish "applied" from "applied as a
+duplicate."** It measures whether the hunk lands, not whether the change is
+wanted. Reverse-applicability is the test that catches this, and the audit does
+not run it per patch.
+
+Found by grepping the series tree for the register the patch is named after and
+seeing it twice. That targeted check works; the general one does not — see the
+next section.
+
+## Four ways to detect dead carries automatically, all of which fail (2026-09-21)
+
+Each was tried against the full series. All four produce wrong answers, and each
+fails differently:
+
+| approach | failure mode |
+|---|---|
+| reverse-apply each patch to pristine rc4 | **false negative** — `9007` forward-fails, so it cannot reverse-apply either. Reported "none" while a known duplicate sat in the tree. |
+| added block present contiguously in rc4 | **both** — missed `9007` because `*/` is a *context* line inside its added block, breaking contiguity; falsely flagged `1064` because its addition (`if (r)` / `return r;`) is generic and matches elsewhere. |
+| count of a distinctive added line > rc4_count + 1 | **false positive** — a patch legitimately adding the same line in two functions trips it. 84 KB of suspects, nearly all valid. |
+| sliding 5-line window, once in rc4 and twice+ in series | **false positive** — every legitimately *inserted* block whose lines also occur elsewhere is flagged, and one insertion produces W overlapping windows. |
+
+The last one looks convincing and is not: consecutive hits overlap by four
+lines, which is the tell that a single insertion is sliding through the window.
+
+**Do not retry these.** The reliable method is reading the code, plus the
+targeted variant above: after a rebase, grep the series tree for the
+distinctive symbol or register each patch is named after and confirm the
+expected count.
+
+## A revert is not a supersession — read the thread (2026-09-21)
+
+A sweep reported `1065`/`1066` as "genuinely superseded" by a three-part series
+posted 2026-09-17 whose first two patches revert them. The framing was wrong in
+the way that matters: a revert of carried work is the **opposite** of
+superseding it, and it needs a maintainer's blessing before anything is
+touched.
+
+Christian König's reply (`5de2a7d1`, `lore-amdgfx`):
+
+> That doesn't work like this. […] **The patches you want to revert actually
+> look correct to me.** The fence slots usually needs to be reserved directly
+> after we locked the BOs.
+
+Acting on the summary alone would have swapped working code for a rejected
+design. The rule: when a candidate *removes* something we carry, read the
+thread for an objection before concluding — "a newer posting exists" is not a
+verdict.
+
+## "No tree or mirror has it" is not "it was fabricated" (2026-09-21)
+
+`1158`'s header claims `dfd0e5aa6aadcd477ccca12dcc1433a76aa8d543`, and that sha
+exists in **none** of our trees or lore mirrors. It was flagged untraceable,
+with fabrication implied.
+
+It is real. GitHub's commit search resolves it to
+`kerneltoast/kernel_x86_laptop` — the author's own repository, which we simply
+do not clone. Fetching `https://github.com/<owner>/<repo>/commit/<sha>.patch`
+(plain, no API quota) and comparing change-lines gave an identical set, 23 vs
+23.
+
+Out-of-tree contributors keep their work on GitHub, not on lore. This is the
+second time this has come up (see the CRIU case). **Check GitHub before
+recording a sha as invented** — and never record "unverifiable from our sources"
+as "fabricated".
+
+## Exit codes disappear through a pipe, and through an `&&` chain (2026-09-21)
+
+Two forms, both hit in one session.
+
+**Through a pipe.** `git apply --check x.patch 2>&1 | head -10 && echo
+"APPLIES CLEANLY"` printed *APPLIES CLEANLY* directly below `error: corrupt
+patch`. The exit status is `head`'s, which is always 0. The same shape hid a
+broken query that returned 90 of 100 issues empty while reporting success.
+
+**Through `&&`.** A verification chain
+`echo … && rg -c … repos/_audit272/… && cd sleepy-next && makepkg …` never
+reached makepkg: `repos/_audit272` had been removed by the audit (no `--keep`),
+so `rg` exited 2 and `&&` short-circuited. The task was reported as **exit code
+0** because the final `echo` succeeded.
+
+Capture exit codes on their own line, never through a pipe or an `&&` chain:
+
+```bash
+git apply --check x.patch; rc=$?     # then branch on $rc
+```
+
+## Reverse-apply is not authoritative for older commits (2026-09-21)
+
+`0b0ff65d3ca1` (the stream-validation modeset-hang fix) reverse-fails against
+rc4, which normally reads as "absent". Its content is plainly present: every
+identifier it introduces is there — `encoding_order`, `bpc_order`,
+`encoding_mask` ×13, `bpc_mask`, `is_hdmi_ep` — the shared
+`force_yuv420_output`/`force_yuv422_output` fields are gone, and the function no
+longer recurses.
+
+The reverse check failed on **context drift** from unrelated display changes
+between the patch's date (2026-07-21) and rc4 (2026-09-20), not on absence.
+
+Reverse-applicability is authoritative for recent patches and unreliable for
+older ones. Past a few weeks, grep the base for the identifiers the patch
+introduces and treat that as the verdict.
+
+## Dead carries come in two kinds, and only one is detectable by text (2026-09-21)
+
+`9007` and `1027` were both dead carries, and they look nothing alike under a
+text search.
+
+**Kind 1 — literal duplicate.** The patch's added lines already exist in the
+base *verbatim*, so applying it inserts a **second copy**. `9007` put a second
+`DB_RING_CONTROL` block into `gfx_v12_0.c` (rc4 had it at `1842-1850`; ours
+added `1836-1844` and `1851-1859`). Detectable by text.
+
+**Kind 2 — superseded implementation.** The added lines are **not** in the base
+at all; the base has *different* code doing the same job, and often doing it
+better. `1027` realigned only `mes.ring[0]`'s polling fence on reset; rc4 had
+since grown a loop over `AMDGPU_MAX_MES_INST_PIPES` covering **every** MES
+instance pipe, plus an equivalent KIQ loop. Our patch was therefore redundant
+work on top of a strict superset. **No text search finds this** — the detector
+correctly reported no match, because the strings genuinely differ.
+
+Kind 2 needs a semantic question per patch: *does the base already do this job?*
+The cheap proxy that works: if a patch **fails to apply standalone** to pristine
+base, ask whether the base's current code at that site already achieves the
+patch's stated purpose. That is how `1027` was caught — by reading the comment
+the patch itself carried ("force complete the MES scheduler ring fence on
+reset") and comparing it against what rc4's loop does.
+
+### Validate a detector against a known positive before trusting it
+
+A detector for Kind 1 was built three times. Version 3 — matching the hunk's
+**post-image** (context + added lines) against the base — reported **zero**
+candidates across all 271 patches, which looked like a clean bill of health.
+
+It was broken. Run against the reconstructed `9007` it also reported zero,
+failing at the third post-image line. Only version 2, matching the added lines
+as an **ordered subsequence**, found the known positive at all.
+
+**A detector that reports "nothing found" must be run against a case you know
+it should find.** Otherwise "clean" and "blind" are the same output. This is the
+same failure the `repos/_audit`-missing incident produced, in a new costume.
+
+Version 2 was then used, and its five hits were all cleared by hand: three apply
+cleanly to pristine rc4 (so their content is not there), and one fails only
+because its series predecessor fails too — which is series dependency, not
+duplication.
+
+## A third way a lore mail yields a broken patch: quoted-printable (2026-09-22)
+
+Two failure modes were already recorded — `git show <sha>` diffs the *email*
+rather than the code (the patch is in blob `m`), and cutting at the `-- `
+signature separator strips the trailing newline so `git apply` reports
+`corrupt patch` while `patch -p1` accepts it.
+
+Here is the third. Keith Busch's blk-mq patch arrived with:
+
+```
+Content-Transfer-Encoding: quoted-printable
+```
+
+and 17 `=` soft line breaks. Extracted raw, it died at line 6 with
+
+```
+corrupt patch at /tmp/kyber.patch:6
+patch: **** malformed patch at line 6: _mq_alloc_data *data,
+```
+
+which is a *wrapped* `struct blk_mq_alloc_data *data,`. The `Fixes:` trailer
+gave it away too — `blk_mq_alloc_r=` / `equest()")` split across two lines.
+
+**Decode before extracting:**
+
+```python
+import quopri
+hdrs, _, body = open(path,'rb').read().partition(b'\n\n')
+dec = quopri.decodestring(body).decode('utf-8', errors='replace')
+```
+
+Measured after decoding: 10 hunks, and `git apply --check` exits 0. Before
+decoding, both `git apply` and `patch` rejected it — and a naive reading would
+have concluded the patch was malformed and moved on.
+
+**Check `Content-Transfer-Encoding` on any lore mail before trusting an
+extraction.** Three different encodings or cuts have now produced three
+different silent breakages.
+
+## Page 1 is not the tracker: an API default that hid 25 issues (2026-09-22)
+
+The documented way to sweep the drm/amd work items was:
+
+```bash
+curl -s ".../projects/drm%2Famd/issues?state=opened&per_page=100"
+```
+
+It returns exactly 100 rows and looks complete. It is not. The project holds
+**1808** open issues across 19 pages, and this returns **page 1 — the newest
+100 by *creation* date**. An issue created months ago and *updated* yesterday
+never appears.
+
+Measured: `updated_after=2026-09-20T00:00:00Z` returned **49** issues for the
+window. Only **24** of them were on page 1. The other 25 included three
+on-target RX 9070 XT threads (`#5718`, `#5647`, `#5511`) that had been missed
+by every previous sweep.
+
+**Filter by time, never by page:**
+
+```
+?state=opened&updated_after=YYYY-MM-DDT00:00:00Z&per_page=100
+```
+
+and compare the returned row count against `x-total`; if they differ you are
+reading a page, not the set.
+
+The general shape is already on record here — a default that silently answers a
+narrower question than the one asked. It appeared before as `--all` being
+overridden by a ref filter, and as a shallow clone making `merge-base` answer
+confidently about history it cannot see. **Whenever a query has a default
+limit, assert the size of what came back against the size of what exists.**

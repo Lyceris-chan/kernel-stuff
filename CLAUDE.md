@@ -4,9 +4,10 @@ Custom Arch Linux kernel for a single AMD Zen 4 + RDNA 4 desktop, built from a
 sanitized CachyOS patchset plus upstream and local patches filtered to this
 hardware.
 
-One package: `sleepy-next/PKGBUILD` (`linux-sleepy-next`, currently **Linux
-7.3-rc3**). Track mainline RCs; linux-next snapshots are a preview base only
-when the RC line is unusable.
+One package: `sleepy-next/PKGBUILD` (`linux-sleepy-next`). Track mainline RCs —
+`_major`/`_minor`/`_rcver` in the PKGBUILD are the authoritative version, so
+read them rather than trusting a copy here. linux-next snapshots are a preview
+base only when the RC line is unusable.
 
 ## Target hardware
 
@@ -161,9 +162,31 @@ The short version:
   `--set-str` on a symbol that no longer exists, MGLRU under LRU-MARIE, and
   `fair.c` under scx full-switch mode are all inert. Confirm the subsystem is
   actually owned by the code you are patching.
-- **Verify clones are fresh before trusting a sweep**, and **never `git
-  format-patch` a lore mirror** (it diffs email headers, not code). Each has
-  produced a confidently wrong "nothing to do" conclusion.
+- **A patch that applies can still be a duplicate.** When upstream absorbs a
+  patch we carry, the cumulative audit still reports `ok`: the hunk's context
+  anchor survives, so instead of failing it inserts a **second copy**. `9007`
+  made `gfx_v12_0.c` program `DB_RING_CONTROL` twice this way. After a rebase,
+  grep the series tree for the register or symbol each patch is named after and
+  confirm it appears the expected number of times.
+- **Reverse-apply is not authoritative for older commits.** A patch can
+  reverse-fail on context drift while its content is plainly present
+  (`0b0ff65d3ca1`). Grep for the *identifiers the patch introduces* instead.
+- **"Exists in no tree or mirror" ≠ fabricated.** Real patches live in personal
+  repos (`kerneltoast/kernel_x86_laptop` held `1158`'s sha). Check GitHub's
+  commit search before calling a sha invented.
+- **A newer posting is not a supersession.** A *revert* of a carried patch is
+  the opposite of superseding it — check for a maintainer objection before
+  concluding anything. König defended `1065`/`1066` against exactly such a
+  series.
+- **Every clone in `repos/` is shallow**, so `git merge-base --is-ancestor`
+  lies. Use `git cat-file -e` and content probes. Also **never `git
+  format-patch` a lore mirror** (it diffs email headers, not code).
+- **`… | head && echo OK` always reports OK** — the exit status is `head`'s.
+  It printed "APPLIES CLEANLY" over a `corrupt patch`. Capture exit codes
+  directly, never through a pipe.
+- **Before proposing a patch as new, grep the series for its subject and
+  author.** `1064` was already carried while three separate passes called it a
+  candidate.
 - **Build time is ~8 min** — prefer rebuilding over guessing.
 
 ## Configuration and packaging reference

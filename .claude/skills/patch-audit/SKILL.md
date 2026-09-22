@@ -4,11 +4,9 @@ description: >
   Ingests or upgrades one named kernel patch — adds a commit or series, swaps a revision, and verifies provenance, symbol existence, and that it applies cleanly. Use when given a specific patch, commit, or series to bring into the tree, or to audit an existing entry. For the periodic all-source sweep, use patch-sweep instead.
 ---
 
-> **Package location (2026-09-12).** The repo is single-package: everything this
-> skill touches lives in `sleepy-next/`. Unless a step says otherwise, `cd
-> sleepy-next` first so paths like `PKGBUILD`, `patches/...`, `config`,
-> `net-tune/` and `PATCH_SOURCES.md` resolve. From the repo root, prefix them
-> with `sleepy-next/`.
+> Repo is single-package: everything here lives in `sleepy-next/`. Unless a step
+> says otherwise, `cd sleepy-next` first. From the repo root, prefix paths with
+> `sleepy-next/`.
 
 # Patch Audit & Ingestion
 
@@ -153,8 +151,49 @@ flag both `FAILED` and `Skipping patch`/`Reversed`.
   patch is inert, not a success).
 - **`FAILED`** = needs rebasing or dropping; check whether the base superseded
   it.
+- **`ok` does not mean the patch is wanted.** See "Dead carries" below.
 
 The script creates and removes its own worktree, so it leaves nothing behind.
+Pass `--worktree repos/<name>` to use a separate tree when another agent (or a
+parallel run) is already using `repos/_audit`; a stale `_audit` makes the script
+exit **2**, which is an environment problem, not a clean run.
+
+### Dead carries — the failure mode the audit cannot see
+
+When upstream absorbs a patch we still carry, the audit reports **`ok`**. It is
+not measuring whether the patch does anything — only whether the hunk applies.
+If the hunk's *context anchor* survives (the lines preceding the change are
+still there), `git apply` finds a valid anchor and inserts a **second copy**
+instead of failing.
+
+`9007` did exactly this: rc4 already had the `DB_RING_CONTROL` block, and our
+copy re-inserted it, so `gfx_v12_0_gfx_init()` programmed the register twice.
+
+**Detect it by counting, not by applying.** After a rebase, for each patch take
+the distinctive symbol or register it is named after and count its occurrences
+in the series tree against the base. The expected count is `base + 1`; a
+duplicate reads `base + 2`. Automated detection was attempted four ways and
+**all four failed** (reverse-apply: false negatives; content-presence: false
+negatives from context lines inside the added block *and* false positives from
+generic lines; count-based: false positives when a patch legitimately adds the
+same line twice; sliding-window: false positives on every inserted block).
+Grep for the distinctive symbol and read it.
+
+### Provenance: absence from our mirrors is not evidence of fabrication
+
+Before recording a patch as untraceable, check **GitHub**. `1158`'s sha
+(`dfd0e5aa6aad…`) exists in no kernel tree and no lore mirror, but GitHub's
+commit search resolves it to `kerneltoast/kernel_x86_laptop` — the author's own
+repo. Fetch it with `https://github.com/<owner>/<repo>/commit/<sha>.patch`
+(no API quota) and compare change-lines.
+
+Two traps when extracting a patch from a lore mirror:
+
+- `git show <sha>` diffs the **email file**, not code. The patch is in blob
+  `m`: `git show <sha>:m`.
+- Cutting at the `-- ` signature separator drops the **trailing newline**,
+  which `git apply` reports as `corrupt patch` while `patch -p1` accepts it
+  cleanly. Normalise the newline before trusting either verdict.
 
 **Rebasing a large patch (LRU-MARIE)**: see
 [`references/marie-rebase.md`](references/marie-rebase.md) — never hand-edit

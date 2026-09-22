@@ -10,10 +10,20 @@
       "Bash(git -C repos/* show *)",
       "Bash(git -C repos/* rev-parse *)",
       "Bash(git -C repos/* describe *)",
+      "Bash(git -C repos/* cat-file *)",
+      "Bash(git -C repos/* ls-tree *)",
+      "Bash(git -C repos/* ls-remote *)",
+      "Bash(git -C repos/* rev-list *)",
+      "Bash(git -C repos/* grep *)",
+      "Bash(git -C repos/* for-each-ref *)",
+      "Bash(git -C repos/* branch *)",
+      "Bash(git -C repos/* branch)",
+      "Bash(git -C repos/* tag *)",
+      "Bash(git -C repos/* tag)",
       "Bash(git -C repos/* worktree list *)",
       "Bash(git -C repos/* worktree list)",
-      "Bash(git -C repos/* apply --check *)",
-      "Bash(git -C repos/* merge-base *)"
+      "Bash(git -C repos/* merge-base *)",
+      "Bash(git -C repos/* apply --check *)"
     ]
   },
   "hooks": {
