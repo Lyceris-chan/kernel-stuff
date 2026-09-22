@@ -3087,3 +3087,60 @@ self-described as a workaround pending a proper refault fix — re-visit when
 that lands), `SHRINKER_NONSLAB` (inert, `nokmem` only), the pool xarray rework
 (deferred to 7.4, conflicts with `2173`/`2190`), and `-ENOENT` (adopted as
 `2196`).
+
+### Web-sweep findings worth carrying (2026-09-22)
+
+Sources: kernel.org docs and source, Arch Wiki, Fedora/Ubuntu/CachyOS configs,
+LKML archives, and Chris Down's "Debunking zswap and zram myths" (2026-03-24).
+
+**A bug in exactly this configuration, unfixed.** Alexandre Ghiti's
+`[PATCH v3/v4 0/3] mm: fix workingset refaults in the zswap writeback path`
+(v4 2026-09-11) targets anon refault accounting in the zswap writeback path:
+the shrinker's buffer folio is counted as a refault, and adding it to the swap
+cache overwrites the slot's eviction cookie. Measured on sysbench with
+**shrinker on and NVMe swap** — this machine's configuration exactly —
+`workingset_refault_anon` −48% with comparable writeback volume. Unmerged;
+track for the 7.4 window. It is an *accounting* bug (inflated counters driving
+reclaim decisions), not a throughput one.
+
+**mTHP swap-in is likely disabled while zswap is on.** `alloc_swap_folio()`
+falls back to order-0 in the anonymous synchronous swap-in path whenever
+`zswap_never_enabled()` — the range can mix zswap and non-zswap entries.
+Fujunjie's `[RFC PATCH 0/5] mm: support zswap-backed anonymous large folio
+swapin` (2026-05) addresses it; pending. A quiet cost of enabling zswap, worth
+knowing given this series also carries mTHP/gup batching work.
+
+**No knob writes back early.** `accept_threshold_percent` is *hysteresis only*
+— `zswap_check_limits()` latches a full flag at `max_pool_percent` and
+unlatches it below the threshold. It cannot start draining earlier. The
+mechanism that drains early is the **dynamic shrinker**, which is exactly what
+`CONFIG_ZSWAP_SHRINKER_DEFAULT_ON=y` gives us, and it is confirmed working
+here: `written_back_pages` reached 91,874 with `pool_limit_hit` still 0.
+
+**`same_filled_pages_enabled` no longer exists** (removed 2024 by Yosry Ahmed,
+`c074e1467f85`). The full module-parameter set is: `enabled`, `compressor`,
+`max_pool_percent`, `accept_threshold_percent`, `shrinker_enabled`. `zpool`,
+`z3fold` and `zbud` are gone from upstream too. Do not tune knobs that are not
+there.
+
+**No primary sizing rule relates `max_pool_percent` to swapfile size.** Kernel
+docs contain no guidance at all. The honest arithmetic for this box: 32 GB RAM
++ 16 GiB swapfile + ~19 GB of anon held compressed in the 6.4 GB pool. The
+swapfile is the binding constraint, not the pool.
+
+**Down's article is unambiguous and it is *for* this configuration**:
+*"If you are in doubt, I strongly recommend you use zswap with disk-backed
+swap."* and *"Do not run zram alongside disk swap wherever possible."* He gives
+no `page-cluster`, `max_pool_percent`, or swappiness value — anyone citing him
+for one is inventing it. The strongest organized dissent is CachyOS, and it is
+about *defaults*, not facts: their config is zram-only with no disk swap, which
+is self-consistent.
+
+**`vm.page-cluster=0` — evidence is weak, left alone.** It was chosen from the
+Arch *zram* page, where it is redundant (the kernel already bypasses readahead
+for `SWP_SYNCHRONOUS_IO`). With zswap, readahead *does* apply, so it now has an
+effect. One RFC benchmark (kernel build in a small memcg, shrinker **off**)
+favours bypassing readahead for pool-resident pages but *keeps* it for
+disk-resident ones — so 0 is a blunt version of a nuanced result. CachyOS's own
+comment names `1` for physical SSD swap, with no measurement. No published
+comparison exists for zswap-over-NVMe on a desktop. Left at 0, documented.
