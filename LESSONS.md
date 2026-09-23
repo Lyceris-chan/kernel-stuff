@@ -1925,6 +1925,11 @@ This matters: the cumulative `workingset_refault_*` counters never reset, so
 of that total. Reading the cumulative figure makes the fix look like it did
 nothing. Measure deltas over a window, or the correction is invisible.
 
+Re-measured 2026-09-23 over a 90s window with reclaim active: ratio **0.151**,
+**6.62** steals per refault — the figures above hold. The split is the point:
+`steal_file` 1,500,435 against `steal_anon` 542,127, i.e. reclaim is now
+file-first, which is what swappiness=1 with the clamp on is supposed to do.
+
 The condition no longer holds, so the safety net is back on
 (`/etc/tmpfiles.d/99-marie-thrash-watchdog.conf` now sets it to **1**).
 
