@@ -164,6 +164,11 @@ The short version:
   under scx full-switch mode are all inert. Confirm the subsystem is actually
   owned by the code you are patching — `lru_gen_enabled()` returns false while
   `lru_marie_enabled()` is true, so the whole MGLRU path is dead here.
+  **Note the difference between inert and removable:** `0110`'s `fair.c` hunk
+  (base slice 0.4 ms instead of 0.7 ms) is inert because `switch_all=1` puts
+  everything on scx, but `0110` also carries live `mm/vmscan.c`,
+  `mm/page_alloc.c` and `bus_lock.c` changes — so it stays. An inert *hunk* is
+  not an inert *patch*.
 - **A patch that applies can still be a duplicate.** When upstream absorbs a
   patch we carry, the cumulative audit still reports `ok`: the hunk's context
   anchor survives, so instead of failing it inserts a **second copy**. `9007`
