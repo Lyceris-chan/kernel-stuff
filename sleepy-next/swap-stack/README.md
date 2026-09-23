@@ -170,13 +170,24 @@ pgsteal_anon             201545880 -> 201546000   (+120 pages: stopped)
 pgsteal_file             resuming at ~2M/minute
 ```
 
-### And it was not the OOM fix either
+### And it was not the OOM fix either — it was a cause of the OOMs
 
-The kills it was credited with fixing came from a different mechanism entirely:
-MARIE's thrash watchdog, which is a separate detector in `mm/oom_kill.c`
-(`marie-thrash-watchdog.conf`). That watchdog is armed and correct — see that
-file for the numbers. Two symptoms, two causes, and the clamp was never one
-of them.
+The kills were MARIE's thrash watchdog firing, not the normal OOM path
+(`marie-thrash-watchdog.conf`). The watchdog was **right**: the machine really
+was thrashing, and its counter (`WORKINGSET_REFAULT_ANON + REFAULT_FILE`) was
+being driven by the 192M anon refaults this very change produced. Clearing the
+clamp was credited with fixing the kills while actually feeding them.
+
+Two things drove the thrash, and both are now fixed:
+
+| Driver | Fix |
+|---|---|
+| `-j16` builds peaking at 20-25 GB of compiler RSS on 32 GB | `_jobs=8` in the PKGBUILD |
+| clamp cleared, so reclaim went anon-first against a live anon working set | clamp restored (this file) |
+
+The first kill (21:14, ordinary use) predates the clamp change and was the
+build over-commit. The three that followed — 22:35, 22:44, 22:46 — were all
+inside build windows *with* the clamp cleared, which is why they clustered.
 
 ### `vm.swappiness` is set to 1, not 180
 

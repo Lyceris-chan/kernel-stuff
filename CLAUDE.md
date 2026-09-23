@@ -206,6 +206,19 @@ The short version:
   justified the swap design with "zram never returns that memory when the
   workload shrinks"; zsmalloc has a shrinker and frees a zspage as soon as it
   empties. That claim was load-bearing and false. Verify against source.
+- **Disabling a detector is a claim about the detector.** Prove it by showing
+  its *inputs* are misread — not by showing that a metric you chose yourself
+  looks fine. MARIE's thrash watchdog was switched off as a "false positive" on
+  the strength of `MemAvailable: 28.8 GB`, which the watchdog never reads. It
+  was right: the machine *was* thrashing, driven by a swappiness change of
+  mine, and muting the alarm hid the cause. Re-arm it and measure its own
+  inputs instead.
+- **A change that makes things worse can be mistaken for the fix.** Clearing
+  MARIE's swappiness clamp was credited with fixing the OOM kills while
+  actually *creating* the livelock the watchdog was reporting. Both changes
+  landed in one window, so credit went to the one that was written down. When
+  two changes ship together, attribute by measurement rather than narrative —
+  and check whether the "fix" coincides with the symptom getting worse.
 - **Build time is ~8 min at `-j16`, longer at the PKGBUILD's capped
   `_jobs=8`** — prefer rebuilding over guessing. The cap exists because 16
   parallel clang jobs peaked at 20-25 GB and froze the desktop; do not raise it
