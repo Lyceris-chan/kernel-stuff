@@ -1998,18 +1998,18 @@ a lore mail has silently produced a broken patch.
 
 ### 7.4 bump hazards found in the 2026-09-22 sweep
 
-**The `__swap_writepage()` → `__swap_writeout()` rename will break three of our
-patches.** linux-next carries `a310a5fb79b3` (Tal Zussman, 2026-08-29) —
-*"mm/swap: rename `__swap_writepage()` to `__swap_writeout()`"* — across
-`mm/page_io.c`, `mm/swap.h`, `mm/swapfile.c` and `mm/zswap.c`. It is **not** in
-`v7.3-rc4`, so it lands at 7.4.
+**The `__swap_writepage()` → `__swap_writeout()` rename will break `2101`.**
+linux-next carries `a310a5fb79b3` (Tal Zussman, 2026-08-29) — *"mm/swap: rename
+`__swap_writepage()` to `__swap_writeout()`"* — across `mm/page_io.c`,
+`mm/swap.h`, `mm/swapfile.c` and `mm/zswap.c`. It is **not** in `v7.3-rc4`, so
+it lands at 7.4.
 
-Three carried patches reference the old name and will fail to apply when the
-rename arrives:
+This originally listed three patches. **Two of them are gone** — `2199` and the
+`2155` xswap foundation series were removed on 2026-09-22 when the backend
+moved to zswap + a swapfile, so the exposure is now a single patch:
 
-- `2199` (our xswap `do_swapout()` guard — the fix for the NULL-mempool panic)
-- `2155` (the xswap foundation series)
-- `2101` (LRU-MARIE)
+- `2101` (LRU-MARIE) — the only carried patch still referencing the old name;
+  verify with `rg -l '__swap_writepage' sleepy-next/patches/` at the bump.
 
 **Action at the 7.4 bump: rename the symbol in those three patches** (and check
 `PATCH_SOURCES.md`'s `2199` analysis section, which quotes

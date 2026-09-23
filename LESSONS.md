@@ -1918,6 +1918,13 @@ happened:
 | refault:steal ratio | **~0.95** | **0.155** |
 | steals per refault | ~1 (thrashing) | **6.5 (reclaim working)** |
 
+**Both columns are window deltas over a build window, not cumulative readings.**
+This matters: the cumulative `workingset_refault_*` counters never reset, so
+49 minutes after the fix `/proc/vmstat` still yields a cumulative ratio of
+**0.889** — the 192M anon refaults from the bad window are permanent residents
+of that total. Reading the cumulative figure makes the fix look like it did
+nothing. Measure deltas over a window, or the correction is invisible.
+
 The condition no longer holds, so the safety net is back on
 (`/etc/tmpfiles.d/99-marie-thrash-watchdog.conf` now sets it to **1**).
 
