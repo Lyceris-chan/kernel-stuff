@@ -159,9 +159,11 @@ The short version:
   no-op, not a success). Single-patch dry-runs and `git apply --check` give
   false negatives. Exit 0 = clean, 1 = failures, 2 = environment problem.
 - **A patch that applies can still do nothing.** `select`ed config symbols,
-  `--set-str` on a symbol that no longer exists, MGLRU under LRU-MARIE, and
-  `fair.c` under scx full-switch mode are all inert. Confirm the subsystem is
-  actually owned by the code you are patching.
+  `--set-str` on a symbol that no longer exists, MGLRU under LRU-MARIE (the
+  `2131`-`2137` batch, carried for weeks and removed 2026-09-23), and `fair.c`
+  under scx full-switch mode are all inert. Confirm the subsystem is actually
+  owned by the code you are patching — `lru_gen_enabled()` returns false while
+  `lru_marie_enabled()` is true, so the whole MGLRU path is dead here.
 - **A patch that applies can still be a duplicate.** When upstream absorbs a
   patch we carry, the cumulative audit still reports `ok`: the hunk's context
   anchor survives, so instead of failing it inserts a **second copy**. `9007`

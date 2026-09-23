@@ -389,13 +389,6 @@ source=(
   "patches/2100-2199/2127-mm-gup-mm-gup-batch-contiguous-same-folio-PTEs-into-one.patch"
   "patches/2100-2199/2129-zstd-skip-BMI2-probe-when-dynamic-BMI2-dispatch-disabled.patch"
   "patches/2100-2199/2130-zstd-probe-CPU-for-BMI2-support-only-once.patch"
-  "patches/2100-2199/2131-mm-mglru-separate-folio-generation-update-from-LRU-accounting.patch"
-  "patches/2100-2199/2132-mm-mglru-batch-update-lrugen-nr-pages-in-inc-min-seq.patch"
-  "patches/2100-2199/2133-mm-mglru-enhance-cold-hot-inversion-handling-in-inc-min-seq.patch"
-  "patches/2100-2199/2134-mm-mglru-exclude-folios-promoted-by-aging-from-protected-in-inc-min-seq.patch"
-  "patches/2100-2199/2135-mm-mglru-make-LRU-folio-prefetch-helper-an-inline-function.patch"
-  "patches/2100-2199/2136-mm-mglru-move-folios-from-oldest-gen-to-second-oldest-gen-from-head-to-t.patch"
-  "patches/2100-2199/2137-mm-mglru-batch-move-folios-to-the-second-oldest-gen-s-LRU.patch"
   "patches/2100-2199/2138-mm-memcg-trim-the-per-cpu-charge-stock-instead-of-draining-it.patch"
   "patches/2100-2199/2139-mm-vmscan-avoid-anon-scanning-for-GFP_NOIO-with-low-swapcache.patch"
   "patches/2100-2199/2140-mm-page_alloc-avoid-direct-compaction-for-costly-NORETRY-allocations.patch"
@@ -1285,13 +1278,6 @@ b2sums=('a9812f8fb24a34af014c1f1f5b556e76bbeb03c557db0d929b4dbad9f082956fcefb75b
         'c91351632390e03d5b874ce5180e07c54c892592180c7d9bf14175e3874762cad385e60f5f77aae24a58bcd1c1a380e40598a52d0dc085fe04f5c63805c68048'
         'eb5b6994b1341e7c05c49ba79336febc87dffe40e5008a81a9afdf931c8d2c00fb69fcf4d70923ba999993dd2e8e9ebf768d5809ee219a22e94f632944553539'
         '5626968774bad1795494928621f43e19945a1ecbd26c4dccd432a329277c26f04fc4ae02fde5560c503aed0fcd9bfda219de5c47e29a226149723fa5a7dbb721'
-        'cba1e7420661569cef5f2f60191c4d81be9b8c990ed848f789f389622878ab8dbe8c36c0c490bfdfe7b9c812f12f8c8c4158ec71337cddd821fddf770f84d69b'
-        'a2a0a299c9211a8cb6c98f1bf06bae38933286ca79610e2a952f754b755af8ff6e586234a6b91f1b1ebfe29ed6bf983033b156b01e6ca8b9d7a2847f9de2efc7'
-        'c275f203cdd186828f12d859cc8c0ba90a98104df04fe8d82126cce7f1aa3a6b880adec403502aa6ecfc67c2dcba72141275fe466ead3af33a066815863815a5'
-        '0d167c3da91ff7878c36fcd7a079e919d371b94415e4b1d2fcaa63e871cf4c355c8c76b70680a485427b1fd18a4e1172d83f38fae7acf9cc13968f59a1e03e4d'
-        '6633adfa2ee52e96105a220d265cc2dc12b85027ea066c95124f0befbacdb04482e2d5df29843e5c4ecc07d1b1da1aebd4ffd93cc4977e24ae9083605eab6c1b'
-        '1de4a0b5f2c7c12d30e2bb409186b53c90931dd511918725bd8cbeed74a659c6962fe98d984e23f928efaddc3aa42c50c05488af76e89b9fa94fdca43ce00f95'
-        'e5470ff289048d20cdc063c39a9009e3337a07c156ca8b854c415d3c0e194f7fc64b613d96e4f63091f467f5373d6bcc492b02f67e95777d29d772d085556329'
         '79fb23d7d9f025ceec614b397fa18e25457d1937d69ea4a7dd5ffded1ed4e80d7cc38a21fcf43e47bd6167af6b6ed695d5bea13873bfaf74333b99e4135b1cf0'
         '8d8504a5060b1fca595d3b892f3709f712e46c67594304d6e63fddacad4aeffed24fa1e843f0390e946eb792fb0dcafbf3b0970a75fc5a68970ec2a7ff69b1d2'
         '0e78ba14e22246ea53e7db445233ab50783dba533cf3bb90b3f387a44147c282d6e856aee34e8f43dd854e8a5a6a792bcda56a70cbc5589451bf91627efffab1'

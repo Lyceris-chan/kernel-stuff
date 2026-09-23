@@ -20,18 +20,18 @@ are supplied by the generator instead, so every row below has a source.
 |---|---|---|
 | `0001–0049` | Handmade local | 12 |
 | `0050–0099` | EDID and display mailing-list patches | 5 |
-| `0101–0113` | CachyOS branch squashes | 6 |
-| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 30 |
-| `1100–1199` | AMD display (DCN4, colorops) | 20 |
-| `1200–1299` | AMD power management (amd-pstate, CPPC) | 18 |
-| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 45 |
-| `2100–2199` | Memory management and swap (zstd, LRU-MARIE, MGLRU, gup, xswap) | 76 |
+| `0101–0113` | CachyOS branch squashes | 5 |
+| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 26 |
+| `1100–1199` | AMD display (DCN4, colorops) | 19 |
+| `1200–1299` | AMD power management (amd-pstate, CPPC) | 26 |
+| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 41 |
+| `2100–2199` | Memory management and swap (zstd, LRU-MARIE, gup, zswap) | 51 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
-| `2300–2399` | Build system and kbuild | 21 |
-| `2400–2499` | Core scheduler and sched-ext | 14 |
-| `2500–2599` | x86 and arch core | 7 |
-| `2600–2699` | Time and timers | 3 |
-| `9000–9099` | agd5f staging + userq lifecycle backports | 45 |
+| `2300–2399` | Build system and kbuild | 20 |
+| `2400–2499` | Core scheduler and sched-ext | 4 |
+| `2500–2599` | x86 and arch core | 1 |
+| `2600–2699` | Time and timers | 0 |
+| `9000–9099` | agd5f staging + userq lifecycle backports | 44 |
 
 **A resolved numbering collision:** two patches used to share the number
 `1140` — Tom Chung's clamp of `force_min_dcfclk` to the dcn42b range (still
@@ -166,13 +166,13 @@ renumbered to `1165` in the rc3-9 cycle (2026-09-15).
 | `2127` | mm/gup: batch contiguous same-folio PTEs into one refcount grab | Rik van Riel | 2026-08-10 | `6c2092bc8448` |
 | `2129` | zstd: skip the BMI2 probe when dynamic BMI2 dispatch is disabled | Usama Arif | 2026-08-26 | `20260826122558.2662013-3-usama.arif@linux.dev` |
 | `2130` | zstd: probe the CPU for BMI2 support only once | Usama Arif | 2026-08-26 | `20260826122558.2662013-4-usama.arif@linux.dev` |
-| `2131` | mm/mglru: separate folio generation update from LRU accounting | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-09-02 | `54e9345e4563` |
-| `2132` | mm/mglru: batch update lrugen->nr_pages in inc_min_seq() | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-09-02 | `521a7c952c89` |
-| `2133` | mm/mglru: enhance cold/hot inversion handling in inc_min_seq() | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-09-02 | `3384a49a865e` |
-| `2134` | mm/mglru: exclude folios promoted by aging from protected in inc_min_seq() | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-09-02 | `e25d6c041ca0` |
-| `2135` | mm/mglru: make LRU folio prefetch helper an inline function | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-09-02 | `efac6d51d1d6` |
-| `2136` | mm/mglru: move folios from oldest gen to second-oldest gen from head to tail | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-09-02 | `81cb06a097b3` |
-| `2137` | mm/mglru: batch move folios to the second-oldest gen's LRU | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-09-02 | `64fff1e3d929` |
+| `2131` | mm/mglru: separate folio generation update from LRU accounting | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-09-02 | `54e9345e4563` — **REMOVED 2026-09-23** |
+| `2132` | mm/mglru: batch update lrugen->nr_pages in inc_min_seq() | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-09-02 | `521a7c952c89` — **REMOVED 2026-09-23** |
+| `2133` | mm/mglru: enhance cold/hot inversion handling in inc_min_seq() | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-09-02 | `3384a49a865e` — **REMOVED 2026-09-23** |
+| `2134` | mm/mglru: exclude folios promoted by aging from protected in inc_min_seq() | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-09-02 | `e25d6c041ca0` — **REMOVED 2026-09-23** |
+| `2135` | mm/mglru: make LRU folio prefetch helper an inline function | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-09-02 | `efac6d51d1d6` — **REMOVED 2026-09-23** |
+| `2136` | mm/mglru: move folios from oldest gen to second-oldest gen from head to tail | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-09-02 | `81cb06a097b3` — **REMOVED 2026-09-23** |
+| `2137` | mm/mglru: batch move folios to the second-oldest gen's LRU | "Barry Song (Xiaomi)" <baohua@kernel.org> | 2026-09-02 | `64fff1e3d929` — **REMOVED 2026-09-23** |
 | `2138` | memcg: trim the per-cpu charge stock instead of draining it | Shakeel Butt | 2026-08-19 | `20260820012010.2016086-1-shakeel.butt@linux.dev` |
 | `2139` | mm: vmscan: avoid anon scanning for GFP_NOIO with low swapcache | Bo Zhang | 2026-09-08 | `09c1d29a3d1e` |
 | `2140` | mm/page_alloc: avoid direct compaction for costly __GFP_NORETRY allocations | Salvatore Dipietro | 2026-09-11 | `60adb47f4fa3` |
@@ -519,11 +519,24 @@ adapts MARIE to the native `swap_ops.h` and `swap_io_ctx` path instead. Two
 build-artifact sections the patch bundled (`localversion`,
 `scripts/setlocalversion`) were stripped.
 
-**A trap that affects most of this range:** `lru_gen_enabled()` returns false
-while `lru_marie_enabled()` is true, so **every MGLRU patch (`2131`–`2137`) is
-inert here**. `CONFIG_LRU_GEN=y` and `LRU_GEN_ENABLED=y` are set, but MARIE owns
-reclaim, so the MGLRU aging path never runs. Confirm which of the two owns the
-subsystem before crediting either with a result.
+**`2131`–`2137` (the MGLRU batch) were REMOVED 2026-09-23** — they were
+inert, and this note is why. `lru_gen_enabled()` returns false while
+`lru_marie_enabled()` is true, so every MGLRU patch was dead weight here.
+`CONFIG_LRU_GEN=y` and `LRU_GEN_ENABLED=y` remain set, but MARIE owns reclaim,
+so the MGLRU aging path never runs. Confirm which of the two owns the subsystem
+before crediting either with a result.
+
+Verified 6 ways before removal: (1) `2101` masks `lru_gen_enabled()` to false
+when MARIE owns aging, stated in its own comment; (2) runtime
+`lru_marie/enabled=1`, `CONFIG_LRU_MARIE_DEFAULT_ON=y`, and the boot log prints
+"lru_marie: currently enabled"; (3) the functions they change
+(`folio_update_gen`, `folio_inc_gen`, `inc_min_seq`) appear **zero** times in
+`2101`, so MARIE neither uses nor modifies them — they are pure MGLRU internals;
+(4) every reference to those functions in the whole series lives inside the
+`2131`–`2137` set itself, so no other carried patch depends on them; (5) `2135`
+is a semantic no-op (macro to `static inline`, same `flags` field); (6) this
+note, written 2026-09-02, had independently reached the same conclusion.
+Confirmed by cumulative apply after removal.
 
 `2120`–`2127` are Rik van Riel's `mm/gup` batching series, RFC v3 at the time of
 carrying, worth up to 12.8× in `gup_test` on mTHP paths. Marked RFC, so expect
