@@ -21,8 +21,8 @@ are supplied by the generator instead, so every row below has a source.
 | `0001–0049` | Handmade local | 12 |
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 5 |
-| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 26 |
-| `1100–1199` | AMD display (DCN4, colorops) | 19 |
+| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 18 |
+| `1100–1199` | AMD display (DCN4, colorops) | 18 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 26 |
 | `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 41 |
 | `2100–2199` | Memory management and swap (zstd, LRU-MARIE, gup, zswap) | 51 |
@@ -31,7 +31,7 @@ are supplied by the generator instead, so every row below has a source.
 | `2400–2499` | Core scheduler and sched-ext | 4 |
 | `2500–2599` | x86 and arch core | 1 |
 | `2600–2699` | Time and timers | 0 |
-| `9000–9099` | agd5f staging + userq lifecycle backports | 44 |
+| `9000–9099` | agd5f staging + userq lifecycle backports | 41 |
 
 **A resolved numbering collision:** two patches used to share the number
 `1140` — Tom Chung's clamp of `force_min_dcfclk` to the dcn42b range (still
@@ -64,19 +64,19 @@ renumbered to `1165` in the rc3-9 cycle (2026-09-15).
 | `0110` | cachy: CONFIG_CACHY config hooks (curated backport) | Eric Naim | 2026-03-25 | `16cd15654cc6` |
 | `0111` | ACPI: processor: Disable bus master check for AMD | Sultan Alsawaf | 2025-08-26 | `14f3669dd743` |
 | `0112` | drm/amd: Avoid evicting resources at S5 | "Mario Limonciello (AMD)" <superm1@kernel.org> | 2025-09-09 | `575943925bac` |
-| `1004` | drm/amdgpu/gmc9: disallow gfxoff around TLB flushes | Alex Deucher | 2026-07-13 | `043453a07452` |
-| `1005` | drm/amdgpu/gmc10: disallow gfxoff around TLB flushes | Alex Deucher | 2026-07-13 | `ebfc4cbbb580` |
-| `1006` | drm/amdgpu/gmc11: disallow gfxoff around TLB flushes | Alex Deucher | 2026-07-13 | `a1efda0bc2ee` |
+| `1004` | drm/amdgpu/gmc9: disallow gfxoff around TLB flushes | Alex Deucher | 2026-07-13 | `043453a07452` — **REMOVED 2026-09-23** |
+| `1005` | drm/amdgpu/gmc10: disallow gfxoff around TLB flushes | Alex Deucher | 2026-07-13 | `ebfc4cbbb580` — **REMOVED 2026-09-23** |
+| `1006` | drm/amdgpu/gmc11: disallow gfxoff around TLB flushes | Alex Deucher | 2026-07-13 | `a1efda0bc2ee` — **REMOVED 2026-09-23** |
 | `1007` | drm/amdgpu/gmc12: disallow gfxoff around TLB flushes | Alex Deucher | 2026-07-13 | `48026ef6756e` |
 | `1008` | drm/amdgpu: add an buffer funcs callback for TLB invalidation | Alex Deucher | 2026-07-13 | `7b5120c066ad` |
-| `1009` | drm/amdgpu/sdma5.0: add tlb invalidation buffer func callback | Alex Deucher | 2026-07-13 | `c7a9aad03f6c` |
-| `1010` | drm/amdgpu/sdma5.2: add tlb invalidation buffer func callback | Alex Deucher | 2026-07-13 | `a461b17a3fec` |
-| `1011` | drm/amdgpu/sdma6: add tlb invalidation buffer func callback | Alex Deucher | 2026-07-13 | `748c1927ec4e` |
+| `1009` | drm/amdgpu/sdma5.0: add tlb invalidation buffer func callback | Alex Deucher | 2026-07-13 | `c7a9aad03f6c` — **REMOVED 2026-09-23** |
+| `1010` | drm/amdgpu/sdma5.2: add tlb invalidation buffer func callback | Alex Deucher | 2026-07-13 | `a461b17a3fec` — **REMOVED 2026-09-23** |
+| `1011` | drm/amdgpu/sdma6: add tlb invalidation buffer func callback | Alex Deucher | 2026-07-13 | `748c1927ec4e` — **REMOVED 2026-09-23** |
 | `1012` | drm/amdgpu/sdma7: add tlb invalidation buffer func callback | Alex Deucher | 2026-07-13 | `4481ee06e2a3` |
 | `1013` | drm/amdgpu: add core helper to do TLB invalidation via SDMA | Alex Deucher | 2026-07-13 | `1d5a9fb3dc8c` |
 | `1014` | drm/amdgpu/gmc: add more gmc tlb inv helpers | Alex Deucher | 2026-07-13 | `14a0ecfb5c9d` |
-| `1015` | drm/amdgpu/gmc10: switch to new gmc tlb inv helpers | Alex Deucher | 2026-07-13 | `497621ee93de` |
-| `1016` | drm/amdgpu/gmc11: switch to new gmc tlb inv helpers | Alex Deucher | 2026-07-13 | `2ba771d6669d` |
+| `1015` | drm/amdgpu/gmc10: switch to new gmc tlb inv helpers | Alex Deucher | 2026-07-13 | `497621ee93de` — **REMOVED 2026-09-23** |
+| `1016` | drm/amdgpu/gmc11: switch to new gmc tlb inv helpers | Alex Deucher | 2026-07-13 | `2ba771d6669d` — **REMOVED 2026-09-23** |
 | `1017` | drm/amdgpu/gmc12: switch to new gmc tlb inv helpers | Alex Deucher | 2026-07-13 | `929f98010c17` |
 | `1018` | drm/amdgpu: Switch order of GC and Display IP blocks | Matthew Stewart | 2026-07-16 | `efc5353500f1` |
 | `1026` | drm/amdkfd: fix NULL pointer dereference in GFX12 CRIU queue restore | Vladimir Marioukhine | 2026-08-04 | `SA1PR12MB8600E8B1821FA7D76923FC259FD42@SA1PR12MB8600.namprd12.prod.outlook.com` |
@@ -91,7 +91,7 @@ renumbered to `1165` in the rc3-9 cycle (2026-09-15).
 | `1064` | drm/amdgpu: don't release the fence reference consumed by the scheduler | Donggeun Yoo | 2026-09-10 | `20260910054551.634054-1-donggeunyoo.kernel@gmail.com` |
 | `9062` | drm/amdgpu: introduce amdgpu_lookup_queue_by_doorbell | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-2-lingshan.zhu@amd.com` |
 | `9063` | drm/amdgpu: keep the userq manager alive as long as its queues | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-3-lingshan.zhu@amd.com` |
-| `9064` | drm/amdgpu/gfx11: hold userq refs in private fault worker | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-4-lingshan.zhu@amd.com` |
+| `9064` | drm/amdgpu/gfx11: hold userq refs in private fault worker | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-4-lingshan.zhu@amd.com` — **REMOVED 2026-09-23** |
 | `9065` | drm/amdgpu/gfx12: hold userq refs in private fault worker | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-5-lingshan.zhu@amd.com` |
 | `9066` | drm/amdgpu: implement asynchronous userq destruction routine | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-6-lingshan.zhu@amd.com` |
 | `9067` | drm/amdgpu: hold userq kref in MES reset | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-7-lingshan.zhu@amd.com` |
@@ -100,10 +100,10 @@ renumbered to `1165` in the rc3-9 cycle (2026-09-15).
 | `9070` | drm/amdgpu: free userq by kref_put when fails to create | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-10-lingshan.zhu@amd.com` |
 | `9071` | drm/amdgpu: take queue kref in userq_create to avoid UAF | Zhu Lingshan | 2026-09-14 | `20260914130724.130794-11-lingshan.zhu@amd.com` |
 | `9072` | drm/amdgpu/sdma: add detect_hung_queue callback | Jesse Zhang | 2026-09-03 | `972a8cd8fba1` |
-| `9073` | drm/amdgpu/sdma6: implement detect_hung_queue | Jesse Zhang | 2026-09-03 | `994dea375802` |
+| `9073` | drm/amdgpu/sdma6: implement detect_hung_queue | Jesse Zhang | 2026-09-03 | `994dea375802` — **REMOVED 2026-09-23** |
 | `9074` | drm/amdgpu/sdma7: implement detect_hung_queue | Jesse Zhang | 2026-09-03 | `ba07df579939` |
 | `9075` | drm/amdgpu/userq: reset a hung SDMA user queue over MMIO | Jesse Zhang | 2026-09-03 | `10a6760a1a64` |
-| `1135` | drm/amd/display: fix HPD program filter programming | Charlene Liu | 2026-08-05 | `20260805063937.2145774-13-chiahsuan.chung@amd.com` |
+| `1135` | drm/amd/display: fix HPD program filter programming | Charlene Liu | 2026-08-05 | `20260805063937.2145774-13-chiahsuan.chung@amd.com` — **REMOVED 2026-09-23** |
 | `1136` | drm/amd/display: Update and revert FRL LT Timeout | Relja Vojvodic | 2026-08-05 | `20260805063937.2145774-21-chiahsuan.chung@amd.com` |
 | `1138` | drm/amd/display: pull colorops into state when recreating a plane | Harry Wentland | — | `20260825153539.213495-1-harry.wentland@amd.com` |
 | `1140` | drm/amd/display: clamp force_min_dcfclk to dcn42b range | Tom Chung | 2026-08-05 | `20260805063937.2145774-11-chiahsuan.chung@amd.com` |
@@ -259,7 +259,7 @@ renumbered to `1165` in the rc3-9 cycle (2026-09-15).
 | `9014` | drm/amdgpu/ih: Add retry_cam_ack IH function pointer | Timur Kristóf | 2026-07-01 | `20260701161721.85681-5-timur.kristof@gmail.com` |
 | `9015` | drm/amdgpu/ih6.1: Use IH_SW_RING_SIZE for soft IH ring instead of PAGE_SIZE | Timur Kristóf | 2026-07-01 | `20260701161721.85681-6-timur.kristof@gmail.com` |
 | `9016` | drm/amdgpu/ih7.0: Use IH_SW_RING_SIZE for soft IH ring instead of PAGE_SIZE | Timur Kristóf | 2026-07-01 | `20260701161721.85681-7-timur.kristof@gmail.com` |
-| `9017` | drm/amdgpu/gmc11: Pass cam_index to retry fault handler | Timur Kristóf | 2026-07-01 | `20260701161721.85681-8-timur.kristof@gmail.com` |
+| `9017` | drm/amdgpu/gmc11: Pass cam_index to retry fault handler | Timur Kristóf | 2026-07-01 | `20260701161721.85681-8-timur.kristof@gmail.com` — **REMOVED 2026-09-23** |
 | `9018` | drm/amdgpu/gmc12: Pass cam_index to retry fault handler | Timur Kristóf | 2026-07-01 | `20260701161721.85681-9-timur.kristof@gmail.com` |
 | `9019` | drm/amdgpu/gmc12: Use AMDGPU_PTE_IS_PTE flag for init_pte_flags on GFX12.0 | Timur Kristóf | 2026-07-01 | `20260701161721.85681-10-timur.kristof@gmail.com` |
 | `9020` | drm/amdgpu/vm: Use init PTE flags and NOALLOC in amdgpu_vm_handle_fault() | Timur Kristóf | 2026-07-01 | `20260701161721.85681-11-timur.kristof@gmail.com` |
@@ -1897,6 +1897,51 @@ upstream *and byte-identical to the merged commit* (`9072`–`9075`, `9019`,
 `9050`, `1056`, `1060`, `2005`, `2413`–`2415`) needs **no action at all** —
 aligning them with upstream is a no-op, because our copy *is* upstream's. They
 belong on the 7.4 drop list, not on a swap list.
+
+### Removed 2026-09-23 — 12 patches for IP blocks this machine never instantiates
+
+A scan for patches whose **every** touched file belongs to another chip's code
+found 14; two were false positives and were kept (below). The other 12 modify
+code in IP blocks that are never constructed on this GPU.
+
+The kernel states its own versions at boot:
+
+```
+amdgpu: detected ip block number 1 <gmc_v12_0_0> (gmc_v12_0)
+amdgpu: detected ip block number 5 <gfx_v12_0_0> (gfx_v12_0)
+amdgpu: detected ip block number 7 <sdma_v7_0_0> (sdma_v7_0)
+[drm] Display Core v3.2.392 initialized on DCN 4.0.1
+```
+
+`lspci` shows exactly one display device (Navi 48, `1002:7550`); the Ryzen 7
+7700 exposes no integrated GPU here, so there is no second amdgpu instance that
+could reach gfx11/gmc11 code. Every removed patch touches **only** files for a
+block in neither list:
+
+| Removed | Target | This machine |
+|---|---|---|
+| `1004` `1005` `1006` | gmc_v9_0 / gmc_v10_0 / gmc_v11_0 | `gmc_v12_0` |
+| `1015` `1016` | gmc_v10_0 / gmc_v11_0 (tlb inv helpers) | `gmc_v12_0` |
+| `1009` `1010` `1011` | sdma_v5_0 / sdma_v5_2 / sdma_v6_0 | `sdma_v7_0` |
+| `9073` | sdma_v6_0 (detect_hung_queue) | `sdma_v7_0` |
+| `9017` | gmc_v11_0 (cam_index) | `gmc_v12_0` |
+| `9064` | gfx_v11_0 (userq refs) | `gfx_v12_0` |
+| `1135` | `dcn42/dcn42_dio_link_encoder.c` | DCN 4.0.1 |
+
+Each is the unused sibling of a per-chip series whose ours-chip member stays:
+`1007` (gmc12), `1012` (sdma7), `1017` (gmc12), `9018` (gmc12), `9065` (gfx12),
+`9074` (sdma7). Verified before removal that no shared symbol is orphaned —
+`1008` and `9072` only add struct **function pointers**, so the unused slots
+stay NULL rather than undefined, and `1014` *re-adds*
+`amdgpu_gmc_flush_gpu_tlb_helper` (a move, not a deletion) so the `.flush_gpu_tlb`
+assignment every GMC file still carries keeps resolving.
+
+**Two were kept as false positives.** `1142` and `1143` touch `dcn/dce/dce_i2c*`,
+which the name suggests is legacy pre-DCN code — but `dcn401_resource.c` includes
+`dce/dce_i2c.h` and builds `dcn401_i2c_hw_create()` on it. `dce_i2c` is shared
+by every DCN generation including DCN 4.0.1, so both are **live**. This is the
+"confirm the subsystem is actually owned by the code you are patching" trap, and
+a filename is not evidence of ownership.
 
 ### Adopted 2026-09-22 (second pass) — four fixes, all verified in series order
 
