@@ -31,10 +31,14 @@ upstream/local patches. It is not a general-purpose kernel.
   boost for `amd-pstate`.
 - **DCN4 display work**: HDMI FreeSync/VRR/ALLM, colorops, and the upstream
   HF-VSDB MCCS fix.
-- **kbuild build-speedup series**, with build parallelism capped at `_jobs=8`
-  in the PKGBUILD. `-j$(nproc)` was 16 here and peaked around 20-25 GB of
-  compiler memory, which over-committed RAM and froze the desktop; see the
-  PKGBUILD comment. The cap costs wall-clock and buys a usable machine.
+- **kbuild build-speedup series**. Build parallelism is `_jobs=16` in the
+  PKGBUILD. It was briefly capped at 8 after an rc4-7 build thrashed — but that
+  measurement was taken with MARIE's swappiness clamp cleared, so the machine
+  was already thrashing before the build started, and the kills blamed on
+  parallelism were in the patch phase, before any compilation. Re-measured
+  against the fixed policy, `MemAvailable` never fell below 19 GB at `-j16`.
+  Note the build is dominated by its serial stages: `-j8` takes 6m22s and
+  `-j16` 6m03s, so the job count is not a meaningful speed lever.
 - **userq hardening** — Zhu Lingshan's kref lifecycle series closes use-after-free
   races in the user-queue submission path (`9062`–`9071`).
 - **sched-ext fixes** — the batch that closed a use-after-free (an error raised

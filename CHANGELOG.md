@@ -19,18 +19,41 @@ full entries remain in git history.
 
 ### Fixed
 
-- **Kernel builds froze the desktop.** A `-j16` kernel build (the PKGBUILD
-  hardcoded `-j"$(nproc)"`) peaks around 20-25 GB of compiler memory on this
-  32 GB machine, and with COSMIC, Steam, Discord and a browser also resident it
-  over-committed RAM outright. The result was global reclaim thrash: on rc4-7
-  that produced **6 watchdog firings and 114 reclaim-retry firings in ~10
-  minutes**, and the OOM killer repeatedly took desktop processes
-  (`steamwebhelper`, `electron`). The machine was unusable while building.
+- **Kernel builds froze the desktop.** On rc4-7 a build window produced **6
+  watchdog firings and 114 reclaim-retry firings in ~10 minutes**, with the OOM
+  killer repeatedly taking desktop processes (`steamwebhelper`, `electron`),
+  and the machine was unusable. This entry originally blamed the build's
+  parallelism; **that was wrong** — see below.
 
-  Build parallelism is now `_jobs=8` in the PKGBUILD (both make call sites),
-  halving the peak to roughly 10-12 GB. This costs build wall-clock, which is
-  the right trade — a slow build is recoverable, a frozen desktop is not. The
-  reasoning is in the PKGBUILD next to the variable.
+  **This entry originally claimed `-j16` was the cause. That was wrong, and it
+  was corrected the same day.** Two problems with the attribution:
+
+  1. The measurement was taken on `rc4-7` — the release that had MARIE's
+     swappiness clamp *cleared*. That alone produced 192M anon refaults and PSI
+     `memory full` at 16%, so the machine was already thrashing before the build
+     started. Any job count would have looked catastrophic on top of it.
+  2. The three OOM kills originally blamed on build parallelism were in the
+     **patch phase** (`prepare()`), before a single `.o` was compiled.
+     Compilation parallelism cannot cause a kill there.
+
+  Re-measured against the fixed reclaim policy, at `-j16`, with a watcher that
+  would kill the build if `MemAvailable` fell below 2 GB: **minimum 19 GB
+  available** on a 30 GB machine, never aborted. Had 16 clang jobs really held
+  the 20-25 GB the old note claimed, availability would have fallen near 5 GB.
+  That figure most likely counted `buff/cache` growth, which is reclaimable and
+  was never memory pressure.
+
+  So `_jobs` is **16**, not 8 — but not because it is faster. Build wall-clock
+  is dominated by the serial stages (extract, patch, vmlinux link, BTF,
+  kallsyms, packaging), and the measured difference is small:
+
+  | | wall clock |
+  |---|---|
+  | `-j8` | 6m22s |
+  | `-j16` | 6m03s |
+
+  About 20 seconds. The cap is gone because its rationale was refuted, not
+  because raising it buys much.
 
   Note on the diagnosis: the console loglevel here is 3, *below* WARNING(4), so
   the `pr_warn` messages never reached the console. The volume of logging was

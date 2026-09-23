@@ -232,10 +232,15 @@ The short version:
   landed in one window, so credit went to the one that was written down. When
   two changes ship together, attribute by measurement rather than narrative —
   and check whether the "fix" coincides with the symptom getting worse.
-- **Build time is ~8 min at `-j16`, longer at the PKGBUILD's capped
-  `_jobs=8`** — prefer rebuilding over guessing. The cap exists because 16
-  parallel clang jobs peaked at 20-25 GB and froze the desktop; do not raise it
-  without checking free RAM with the desktop running.
+- **Build time is ~6 min either way** — `-j8` 6m22s, `-j16` 6m03s, measured
+  2026-09-23. The build is dominated by its *serial* stages (extract, patch,
+  vmlinux link, BTF, kallsyms, packaging), so `_jobs` is a poor lever; prefer
+  rebuilding over guessing, and do not expect a job-count change to buy much.
+  `_jobs=16` is the current setting. It was capped at 8 for a while on the
+  theory that 16 clang jobs peaked at 20-25 GB and froze the desktop — that
+  measurement was taken on rc4-7 with MARIE's swappiness clamp cleared, i.e. on
+  a machine already thrashing, and at `-j16` against the fixed policy
+  `MemAvailable` never fell below **19 GB**.
 
 ## Configuration and packaging reference
 

@@ -189,23 +189,42 @@ _stable=${_major}.${_minor}
 # linux-next snapshot (the 7.3 merge-window content) for the wannabe 7.3 preview
 _srctag=linux-7.3-rc4
 _srcname=${_srctag}
-# Build parallelism. DELIBERATELY capped below $(nproc), not tuning noise.
+# Build parallelism. Previously capped at 8 on a diagnosis that did not hold up.
 #
-# The build previously used -j$(nproc) = 16 on this 16-thread machine. A kernel
-# build is the most memory-hungry thing run here — each clang job holds roughly
-# 1-1.5 GB, with larger outliers on the big AMD display units — so 16 jobs peaks
-# around 20-25 GB, and with the desktop (COSMIC, browser, Steam, Discord) also
-# resident that over-commits 32 GB. The result is global reclaim thrash, during
-# which LRU-MARIE's two livelock detectors fire in bulk (measured on rc4-7:
-# 6 watchdog firings and 114 reclaim-retry firings in ~10 minutes of build) and
-# the OOM killer repeatedly takes desktop processes — steamwebhelper and
-# electron among them — making the machine unusable while the build runs.
+# The cap was added after an rc4-7 build thrashed badly — 6 watchdog firings and
+# 114 reclaim-retry firings in ~10 minutes, with the OOM killer taking desktop
+# processes. Attributing that to -j16 was wrong twice over:
 #
-# 8 halves the compiler peak to roughly 10-12 GB and leaves ample headroom for
-# the desktop. It costs build wall-clock, which is the right trade: a slower
-# build is recoverable, a frozen desktop is not. Raise it if the desktop is not
-# running, or lower it further if build-time thrash returns.
-_jobs=8
+#   1. The measurement was taken on rc4-7, the release that had MARIE's
+#      swappiness clamp CLEARED. That alone produced 192M anon refaults and PSI
+#      `memory full` at 16%; the machine was already thrashing before the build
+#      began, so any job count would have looked catastrophic on top of it.
+#   2. The OOM kills originally blamed on build parallelism were in the PATCH
+#      phase (prepare()), before a single .o was compiled. Compilation
+#      parallelism cannot cause a kill there.
+#
+# Re-measured 2026-09-23 with the clamp restored, at -j16, with a watcher that
+# killed the build if MemAvailable fell below 2 GB:
+#
+#   min MemAvailable ....... 19 GB on a 30 GB machine   (never got close)
+#   aborted ................ no
+#
+# MemAvailable is kernel-measured and is the number that matters. Had 16 clang
+# jobs really held 20-25 GB, availability would have fallen near 5 GB. The old
+# figure most likely counted buff/cache growth, which is reclaimable and was
+# never memory pressure.
+#
+# The honest reason this is not a big lever is that build wall-clock is
+# dominated by the serial stages — extract, patch, vmlinux link, BTF, kallsyms,
+# packaging — not by compilation:
+#
+#   -j8   6m22s
+#   -j16  6m03s
+#
+# So 16 buys about 20 seconds. It is kept because the cap's rationale is gone
+# and the machine measured comfortable, not because it is meaningfully faster.
+# Lower it if build-time interactivity suffers while the desktop is busy.
+_jobs=16
 pkgdesc='Sleepy-next kernel: Linux 7.3-rc4 + sleepy hardware merges (CachyOS optimizations included)'
 _kernver="$pkgver-$pkgrel"
 _kernuname="${pkgver}-${_pkgsuffix}"

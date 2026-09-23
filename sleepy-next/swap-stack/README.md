@@ -182,7 +182,7 @@ Two things drove the thrash, and both are now fixed:
 
 | Driver | Fix |
 |---|---|
-| `-j16` builds peaking at 20-25 GB of compiler RSS on 32 GB | `_jobs=8` in the PKGBUILD |
+| ~~`-j16` builds peaking at 20-25 GB on 32 GB~~ **refuted** — `MemAvailable` stayed at 19 GB | `_jobs=16`; the cap was removed |
 | clamp cleared, so reclaim went anon-first against a live anon working set | clamp restored (this file) |
 
 The first kill (21:14, ordinary use) predates the clamp change and was the

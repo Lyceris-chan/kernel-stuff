@@ -27,9 +27,12 @@ makepkg -f -s -c
 sudo pacman -U linux-sleepy-next-*.pkg.tar.zst linux-sleepy-next-headers-*.pkg.tar.zst
 ```
 
-A full build runs at the PKGBUILD's `_jobs=8` (kbuild speedup series plus a
-parallelism cap — see the comment on that variable; `-j$(nproc)` over-committed
-this machine's RAM and froze the desktop). Expect kernel ~22 MB,
+A full build runs at the PKGBUILD's `_jobs=16`. Build wall-clock is dominated
+by the serial stages (extract, patch, vmlinux link, BTF, kallsyms, packaging)
+rather than by compilation: `-j8` measures 6m22s and `-j16` 6m03s, so the job
+count is not a meaningful speed lever. It was capped at 8 briefly, after an
+rc4-7 thrash that was later attributed to MARIE's swappiness clamp instead —
+see the PKGBUILD comment. Expect kernel ~22 MB,
 headers ~34 MB.
 
 ## PROFILE_PEAK (patches `0003` / `0004`)

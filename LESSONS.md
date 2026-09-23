@@ -1800,14 +1800,19 @@ machine. `MAKEFLAGS="-j$(nproc)"` is the likely real trigger.
 
 ## The build itself was the bug, and I caused the freeze (2026-09-23)
 
+> **RETRACTED 2026-09-23.** The claim below — that `-j16` was the cause — is
+> **wrong**. See "CORRECTION: the build was not the bug" at the end of this
+> section. It is kept because the reasoning error is the lesson.
 The kernel build ran `-j"$(nproc)"` — hardcoded in the PKGBUILD at two call
 sites, *not* inherited from `makepkg.conf`'s `MAKEFLAGS` as I had assumed when
 I first went looking. On this 16-thread machine that is **16 concurrent clang
 jobs**, each holding roughly 1-1.5 GB (more on the large AMD display units).
 
-Measured consequence: a `-j16` build peaks around 20-25 GB of compiler memory.
-With COSMIC, Steam, Discord and a browser also resident, that over-commits
-32 GB, and the machine goes into global reclaim thrash. On rc4-7 that produced
+~~Measured consequence: a `-j16` build peaks around 20-25 GB of compiler
+memory.~~ **Retracted — no such peak was ever measured.** Under a watcher at
+`-j16`, `MemAvailable` never fell below **19 GB** on this 30 GB machine. The
+figure appears to have counted `buff/cache` growth, which is reclaimable and
+was never memory pressure. On rc4-7 that produced
 **6 watchdog firings and 114 reclaim-retry firings in ~10 minutes**, with the
 OOM killer repeatedly taking desktop processes (`steamwebhelper`, `electron`).
 The desktop became unusable and had to be powered off.
@@ -1824,17 +1829,42 @@ The desktop became unusable and had to be powered off.
    the PKGBUILD sets its own. `rg` for the flag in the thing that runs it, not
    in the thing you expect to own it.
 
-**The fix** is `_jobs=8` in the PKGBUILD, with the reasoning written next to the
-variable so the next person does not "optimise" it back. Halving the job count
-halves the compiler peak to ~10-12 GB and leaves room for the desktop. The cost
-is build wall-clock, and that is the correct trade: a slow build is recoverable,
-a frozen desktop is not.
+~~**The fix** is `_jobs=8` in the PKGBUILD.~~ **Reversed:** `_jobs` is **16**.
+
+The cap was in place for part of one day. Removing it cost nothing measurable —
+`-j8` builds in 6m22s, `-j16` in 6m03s — because wall-clock is dominated by the
+build's *serial* stages (extract, patch, vmlinux link, BTF, kallsyms,
+packaging), not by compilation. That is the part of this entry still worth
+keeping: `_jobs` is a poor speed lever here, which is exactly why it was never
+the thing to fight over.
 
 **Generalisable rule:** on a machine that is also someone's desktop, a build's
 peak memory is a correctness constraint, not a performance knob. `-j$(nproc)`
 is right for a build server and wrong for a workstation whose RAM is already
 spoken for. Size the job count against *free* RAM with the desktop running, not
 against the core count.
+
+**The rule survives; its application here did not.** Applied properly — a
+watcher on `MemAvailable` with the desktop up — it reports 19 GB free at
+`-j16`, so there was no conflict to resolve. The rule is still the right check;
+the mistake was asserting its conclusion without running it.
+
+## `open(path, 'w')` truncates on open, and I emptied a doc with it (2026-09-23)
+
+Editing these docs with a Python one-liner, I wrote
+`open(p, 'w').write(head + new + tail, 1)` — the `1` belonged to `str.replace`,
+not to `write`. `write()` raised `TypeError` before writing anything, but
+`open(p, 'w')` had **already truncated the file**, so `GUIDE.md` came back as
+zero bytes and 78 lines were gone.
+
+Caught by a routine `wc -l` check and restored with `git checkout --`, so the
+cost was nil. It would not have been on `PATCH_SOURCES.md`, which is the
+authoritative per-patch ledger and is not reconstructible from anywhere else.
+
+**Rule: when a script rewrites a load-bearing file, write to a temp file and
+`os.replace()` it.** Never open the real path in `'w'` mode mid-computation.
+Also: `open(p, 'w').write(x, 1)` is a typo that fails *after* the damage —
+the exception is not the safety net it looks like.
 
 ## MARIE's watchdog measured the wrong thing, and killed on it repeatedly (2026-09-23)
 
