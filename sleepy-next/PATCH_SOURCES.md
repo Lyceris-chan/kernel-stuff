@@ -3144,3 +3144,61 @@ favours bypassing readahead for pool-resident pages but *keeps* it for
 disk-resident ones — so 0 is a blunt version of a nuanced result. CachyOS's own
 comment names `1` for physical SSD swap, with no measurement. No published
 comparison exists for zswap-over-NVMe on a desktop. Left at 0, documented.
+
+## ADOPTED 2026-09-23: `1168` — HDMI FRL link-training budget to 300 ms at every rate
+
+`drm/amd/display: Allow 300 ms for HDMI FRL link training at every rate`,
+David Janice `<djanice1980@gmail.com>`, 2026-09-19,
+`lore-amdgfx` blob `f00dff3b`. Found by the 2026-09-23 mail sweep.
+
+**It builds directly on our `1136`.** The patch's diff context *is* 1136's
+post-image — its `-` lines are 1136's added lines verbatim, and its base blob
+(`7f93009`) matches 1136's post-image sha. So this is not a competing patch;
+it is the next step in the same change.
+
+### What it does
+
+`hdmi_frl_perform_link_training()` runs one poll budget for LTS:3 that starts
+at the FRL_Rate write and is **not restarted** when the sink raises its first
+`FLT_update` with the LTP request. Our `1136` raised that budget to 155 polls
+(~300 ms) only for `frl_link_rate >= HDMI_FRL_LINK_RATE_16GBPS`; every slower
+rate kept the 105-poll (~210 ms) default. This patch makes the 300 ms
+unconditional.
+
+### Why it is on-target here, not merely applicable
+
+This machine drives the MSI MAG251RX at 1920x1080@240Hz over **HDMI, on FRL**.
+1080p240 8bpc is ~14 Gbps, which lands on **FRL6 — below the 16 Gbps
+threshold** — so `1136` does *not* currently give this link the larger budget.
+The patch therefore changes real behaviour here rather than being a no-op, which
+is the test this repo applies to every candidate.
+
+Second reason to take it now rather than later: `1136` is the only thing in the
+series holding this timeout, and both patches touch the *same hunk* at
+`link_hdmi_frl.c:528`. A future rebase of `1136` would silently lose this if it
+were not carried alongside it.
+
+### Verification
+
+- `git apply --check` — exit 0 against a tree with `1136` applied.
+- `patch -p1 --forward -F2 --dry-run` — **succeeds with no fuzz**.
+- Provenance: named human author, `Signed-off-by`, traceable to a mailing-list
+  posting with a Message-ID on `lore-amdgfx`.
+
+### Recorded uncertainty
+
+The reporter's evidence is an **LG C2 at 4K120 on a DP-HDMI FRL PCON** — a
+different sink and a different topology from this machine's direct HDMI. **No
+FRL link-training failure has been observed in this machine's logs** (the only
+FRL line in a boot is `DP-HDMI FRL PCON supported`), so the failure mode being
+fixed has not been reproduced here. What justifies carrying it is that it is a
+strict widening on the path we use, at a rate class our existing fix misses,
+with a downside measured in ~100 ms on a link that is already failing. It is
+not carried because a failure was observed.
+
+An extractor trap is worth recording with it: the hunk is 10 old / 18 new lines
+and its final context line is the *second* blank-before-`while`, not the first.
+Cutting the mail body one line short produced a patch that `patch` accepted
+**with fuzz 1** while `git apply` correctly rejected it as corrupt — the exact
+"cut at the wrong line, and only one of the two checkers notices" failure mode
+already on record here.

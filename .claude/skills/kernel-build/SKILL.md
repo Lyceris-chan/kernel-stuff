@@ -26,7 +26,8 @@ during `prepare()`. The NIC uses the in-kernel `r8169` (no `r8125` package);
 webcams use `uvcvideo`; the build ships the `net-tune` service (CAKE SQM +
 latency tuning).
 
-**Full build is ~8 minutes** since the kbuild build-speedup series
+**Full build runs at the PKGBUILD's `_jobs=8`** (tunable at the top of the
+PKGBUILD; `-j$(nproc)` was 16 and froze the desktop by over-committing RAM).
 (`2300`–`2322`, `pkgrel 3`+). Rebuilds are cheap — prefer rebuilding over
 guessing. Run it in the background and watch for `Finished making` / `ERROR:`.
 

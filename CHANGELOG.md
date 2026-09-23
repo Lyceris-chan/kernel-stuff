@@ -15,6 +15,45 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [Unreleased]
+
+### Fixed
+
+- **Kernel builds froze the desktop.** A `-j16` kernel build (the PKGBUILD
+  hardcoded `-j"$(nproc)"`) peaks around 20-25 GB of compiler memory on this
+  32 GB machine, and with COSMIC, Steam, Discord and a browser also resident it
+  over-committed RAM outright. The result was global reclaim thrash: on rc4-7
+  that produced **6 watchdog firings and 114 reclaim-retry firings in ~10
+  minutes**, and the OOM killer repeatedly took desktop processes
+  (`steamwebhelper`, `electron`). The machine was unusable while building.
+
+  Build parallelism is now `_jobs=8` in the PKGBUILD (both make call sites),
+  halving the peak to roughly 10-12 GB. This costs build wall-clock, which is
+  the right trade — a slow build is recoverable, a frozen desktop is not. The
+  reasoning is in the PKGBUILD next to the variable.
+
+  Note on the diagnosis: the console loglevel here is 3, *below* WARNING(4), so
+  the `pr_warn` messages never reached the console. The volume of logging was
+  not the problem; the thrash was.
+
+### Added
+
+- **`1168` — `drm/amd/display: Allow 300 ms for HDMI FRL link training at every
+  rate`** (David Janice, 2026-09-19). It builds directly on our `1136` — the
+  patch's diff context *is* 1136's post-image — and makes the 300 ms budget
+  unconditional rather than applying it only above 16 Gbps.
+
+  On-target here for a specific reason: this machine drives the MAG251RX at
+  1920x1080@240Hz over HDMI on **FRL6 (~14 Gbps), which is below 1136's
+  16 Gbps threshold**, so our link never received the larger budget. Carried
+  alongside `1136` also protects it, since both touch the same hunk at
+  `link_hdmi_frl.c:528` and a future rebase of 1136 alone would drop it.
+
+  Recorded uncertainty: the reporter's evidence is an LG C2 on a DP-HDMI PCON,
+  and no FRL link-training failure has been observed in this machine's logs.
+  It is carried because it is a strict widening on the path we use, at a rate
+  class our existing fix misses — not because a failure was reproduced here.
+
 ## [7.3.0-rc4-7-sleepy-next]: 2026-09-22
 
 ### Fixed

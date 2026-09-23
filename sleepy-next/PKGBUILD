@@ -189,6 +189,23 @@ _stable=${_major}.${_minor}
 # linux-next snapshot (the 7.3 merge-window content) for the wannabe 7.3 preview
 _srctag=linux-7.3-rc4
 _srcname=${_srctag}
+# Build parallelism. DELIBERATELY capped below $(nproc), not tuning noise.
+#
+# The build previously used -j$(nproc) = 16 on this 16-thread machine. A kernel
+# build is the most memory-hungry thing run here — each clang job holds roughly
+# 1-1.5 GB, with larger outliers on the big AMD display units — so 16 jobs peaks
+# around 20-25 GB, and with the desktop (COSMIC, browser, Steam, Discord) also
+# resident that over-commits 32 GB. The result is global reclaim thrash, during
+# which LRU-MARIE's two livelock detectors fire in bulk (measured on rc4-7:
+# 6 watchdog firings and 114 reclaim-retry firings in ~10 minutes of build) and
+# the OOM killer repeatedly takes desktop processes — steamwebhelper and
+# electron among them — making the machine unusable while the build runs.
+#
+# 8 halves the compiler peak to roughly 10-12 GB and leaves ample headroom for
+# the desktop. It costs build wall-clock, which is the right trade: a slower
+# build is recoverable, a frozen desktop is not. Raise it if the desktop is not
+# running, or lower it further if build-time thrash returns.
+_jobs=8
 pkgdesc='Sleepy-next kernel: Linux 7.3-rc4 + sleepy hardware merges (CachyOS optimizations included)'
 _kernver="$pkgver-$pkgrel"
 _kernuname="${pkgver}-${_pkgsuffix}"
@@ -291,6 +308,7 @@ source=(
   "patches/1100-1199/1165-drm-amd-display-fall-back-to-overlay-cursor-on-dcn4x.patch"
   "patches/1100-1199/1166-drm-amd-display-return-success-status-from-check_mode_supported.patch"
   "patches/1100-1199/1167-dm-restore-native-cursor-early-return-disabled-crtc.patch"
+  "patches/1100-1199/1168-drm-amd-display-allow-300ms-for-hdmi-frl-link-training.patch"
   "patches/1200-1299/1201-cpufreq-amd-pstate-Update-cppc_req_cached-before-w.patch"
   "patches/1200-1299/1202-cpufreq-amd-pstate-Add-per-core-EPP-boost-for-rec.patch"
   "patches/1200-1299/1203-Documentation-amd-pstate-Document-the-epp_boost-pa.patch"
@@ -814,7 +832,7 @@ _sign_modules() {
 build() {
     _set_build_flags
     cd "$_srcname"
-    make "${BUILD_FLAGS[@]}" -j"$(nproc)" all
+    make "${BUILD_FLAGS[@]}" -j"$_jobs" all
 
     if ! _is_ci_build; then
         #make -C tools/bpf/bpftool vmlinux.h feature-clang-bpf-co-re=1
@@ -831,7 +849,7 @@ build() {
     if [ "$_build_nvidia_open" = "yes" ]; then
         cd "${srcdir}/${_nv_open_pkg}"
         MODULE_FLAGS+=(IGNORE_CC_MISMATCH=yes)
-        CFLAGS= CXXFLAGS= LDFLAGS= make "${BUILD_FLAGS[@]}" "${MODULE_FLAGS[@]}" -j"$(nproc)" modules
+        CFLAGS= CXXFLAGS= LDFLAGS= make "${BUILD_FLAGS[@]}" "${MODULE_FLAGS[@]}" -j"$_jobs" modules
     fi
 
     if [ "$_build_zfs" = "yes" ]; then
@@ -1187,6 +1205,7 @@ b2sums=('a9812f8fb24a34af014c1f1f5b556e76bbeb03c557db0d929b4dbad9f082956fcefb75b
         'bdf5097165ed183abddde7b1b63b1001c428bf953187fc169d7b4e77a5b6a77f5a04eac8220f0467fa7d30c0b858e9f6d26a0a477205432ede746f1c03ef8f91'
         '158a3b2603ddbe02ed09247a914c906693c464ad7202b7384236ce22cd06843d9e8606223a90b3845d53f74b00ae3816b2d1330da87bbff049211c20cc2f5f0f'
         'd10be2ac8956f986f3cbfa9a1def8decc708d61d201230e20b64b914e9fa167939089c35850b3cc85ea8d1987541a1cbeae57f8b476a33611c3a31088671e4ca'
+        'c54918fc8336226d0dde81d46bb5788da4743afc1d313e5837242e880bbd4aec4247335fe39f5c42773ffc23c62891cbd2f9eb25ad4f60a44d14b902b1fac799'
         'e9d464ebf525cd8d93d48f1cbedea0197bd9d0142085da7d83ec3dfda0174483a0fea4077055fd7d1ad9180563dc6dfb77e4f52f9bcb023b7c7d7c9fb5c39ece'
         '9d3e36dbc5c9c5342d2991c4665278ed075073196251e59280bd12f1d6812a37d31db58f5cb978b926e2dcd0a32365960a414b69d10f463bd8f68cedbb4bb6ae'
         '52fe01328f544e023666eab1fd378ae0a0eb47385d495403a55a933f71beedcf295300767c1e43feb46366915fae8bea3b9137f11d16ed194a1fcf71d95aec0d'

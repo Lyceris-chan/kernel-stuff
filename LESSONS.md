@@ -1797,3 +1797,88 @@ weakness. The normal-use evidence is a single event either side of the change,
 so "the clamp contributed to the Discord kill" is plausible, not proven; and
 the watchdog may be *correct* that a `-j16` kernel build does not fit a 32 GB
 machine. `MAKEFLAGS="-j$(nproc)"` is the likely real trigger.
+
+## The build itself was the bug, and I caused the freeze (2026-09-23)
+
+The kernel build ran `-j"$(nproc)"` — hardcoded in the PKGBUILD at two call
+sites, *not* inherited from `makepkg.conf`'s `MAKEFLAGS` as I had assumed when
+I first went looking. On this 16-thread machine that is **16 concurrent clang
+jobs**, each holding roughly 1-1.5 GB (more on the large AMD display units).
+
+Measured consequence: a `-j16` build peaks around 20-25 GB of compiler memory.
+With COSMIC, Steam, Discord and a browser also resident, that over-commits
+32 GB, and the machine goes into global reclaim thrash. On rc4-7 that produced
+**6 watchdog firings and 114 reclaim-retry firings in ~10 minutes**, with the
+OOM killer repeatedly taking desktop processes (`steamwebhelper`, `electron`).
+The desktop became unusable and had to be powered off.
+
+**Two corrections to my own first diagnosis, both worth carrying:**
+
+1. **The log spam was not the mechanism.** `kernel.printk` is `3 3 3 3` here —
+   console loglevel 3, *below* WARNING(4) — so `pr_warn_ratelimited()` never
+   reached the console at all. The messages were a *symptom* of the thrash, and
+   I came close to prescribing a logging fix for a memory problem. Check where
+   a message actually goes before treating its volume as the cause.
+2. **Find where a value actually comes from.** I assumed the job count came
+   from `MAKEFLAGS` in `/etc/makepkg.conf` and went looking there. It did not;
+   the PKGBUILD sets its own. `rg` for the flag in the thing that runs it, not
+   in the thing you expect to own it.
+
+**The fix** is `_jobs=8` in the PKGBUILD, with the reasoning written next to the
+variable so the next person does not "optimise" it back. Halving the job count
+halves the compiler peak to ~10-12 GB and leaves room for the desktop. The cost
+is build wall-clock, and that is the correct trade: a slow build is recoverable,
+a frozen desktop is not.
+
+**Generalisable rule:** on a machine that is also someone's desktop, a build's
+peak memory is a correctness constraint, not a performance knob. `-j$(nproc)`
+is right for a build server and wrong for a workstation whose RAM is already
+spoken for. Size the job count against *free* RAM with the desktop running, not
+against the core count.
+
+## MARIE's watchdog measured the wrong thing, and killed on it repeatedly (2026-09-23)
+
+`thrash_wd_fn()` fires by choice — it calls `out_of_memory()` itself — once
+free memory sits below the zone high watermark **and** the refault:steal ratio
+stays at or above ~1:2 for 8 consecutive 2-second windows. Its stated premise
+is that *"the working set provably does not fit in RAM"*.
+
+**At the moment of a kill on this machine, that premise was obviously false:**
+
+```
+AnonPages       76,760 kB   (75 MB - almost no anonymous memory at all)
+Cached      29,633,720 kB   (28.2 GB page cache)
+MemAvailable 28,873,680 kB  (28.8 GB available)
+free            50,030 pages (195 MB)   <- below high, so the gate is armed
+net-progress   651269 refault / 675247 steal   (~96%)
+```
+
+28.8 GB available. Nothing about that is exhaustion. What the watchdog actually
+measured is a **ratio**, and that ratio is also high during ordinary
+page-cache churn on a machine holding 28 GB of cache — reclaim evicts a cold
+file page, something reads it again, and the counter pair ticks. The heuristic
+cannot distinguish that from a genuine RAM-backed-swap treadmill.
+
+**The rate is what makes it expensive.** With `THRASH_WD_BACKOFF = 60` (60 s
+hold-off) plus 8 × 2 s windows, it re-arms and fires roughly **every 80
+seconds** for as long as the condition holds — and on a cache-heavy desktop the
+condition holds more or less permanently. Measured: three kills at 12:44:45,
+12:46:05 and 12:47:20, all of `xdg-desktop-por`. Not a one-off misfire; a
+standing kill loop.
+
+**And the trigger was not the build.** All three landed during the **patch
+phase**, before a single line was compiled, so compiler memory was not
+involved. That also means the `-j8` cap — correct in itself — could not have
+prevented them, and I should not have expected it to.
+
+Disabled via `/proc/sys/vm/thrash_wd_mode = 0`, persisted with a tmpfiles.d
+entry carrying the numbers above. This is a safety net being switched off, so
+the justification has to be the evidence, not convenience. Re-enable if a real
+livelock is ever suspected; the counters worth checking first are
+`workingset_refault_*` against `pgsteal_*` **together with** whether free
+memory is actually exhausted.
+
+**Transferable rule:** a detector that fires on a *ratio* needs its denominator
+checked against a case where the underlying resource is demonstrably fine.
+"Refaults track steals" is a livelock on a small box and normal behaviour on a
+big one, and the watchdog had no term that told the two apart.

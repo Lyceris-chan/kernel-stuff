@@ -205,7 +205,10 @@ The short version:
   justified the swap design with "zram never returns that memory when the
   workload shrinks"; zsmalloc has a shrinker and frees a zspage as soon as it
   empties. That claim was load-bearing and false. Verify against source.
-- **Build time is ~8 min** — prefer rebuilding over guessing.
+- **Build time is ~8 min at `-j16`, longer at the PKGBUILD's capped
+  `_jobs=8`** — prefer rebuilding over guessing. The cap exists because 16
+  parallel clang jobs peaked at 20-25 GB and froze the desktop; do not raise it
+  without checking free RAM with the desktop running.
 
 ## Configuration and packaging reference
 

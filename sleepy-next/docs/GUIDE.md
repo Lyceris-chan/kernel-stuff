@@ -27,7 +27,9 @@ makepkg -f -s -c
 sudo pacman -U linux-sleepy-next-*.pkg.tar.zst linux-sleepy-next-headers-*.pkg.tar.zst
 ```
 
-A full build is ~8 minutes (kbuild speedup series). Expect kernel ~22 MB,
+A full build runs at the PKGBUILD's `_jobs=8` (kbuild speedup series plus a
+parallelism cap — see the comment on that variable; `-j$(nproc)` over-committed
+this machine's RAM and froze the desktop). Expect kernel ~22 MB,
 headers ~34 MB.
 
 ## PROFILE_PEAK (patches `0003` / `0004`)
