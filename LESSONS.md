@@ -1930,6 +1930,13 @@ Re-measured 2026-09-23 over a 90s window with reclaim active: ratio **0.151**,
 `steal_file` 1,500,435 against `steal_anon` 542,127, i.e. reclaim is now
 file-first, which is what swappiness=1 with the clamp on is supposed to do.
 
+**Measured again across a full kernel compile** (the load that used to trigger
+the watchdog), 2026-09-23: ratio **0.303**, **3.30** steals per refault, and
+**0 firings**. The split is file-first as intended — `steal_file` 6,327,232
+against `steal_anon` 1,592,606. The watchdog fires on a sustained ratio near
+1:2, so 0.303 is comfortably clear even under the heaviest load this machine
+produces.
+
 The condition no longer holds, so the safety net is back on
 (`/etc/tmpfiles.d/99-marie-thrash-watchdog.conf` now sets it to **1**).
 
