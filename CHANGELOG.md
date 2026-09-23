@@ -15,7 +15,7 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
-## [Unreleased]
+## [7.3.0-rc4-8-sleepy-next]: 2026-09-23
 
 ### Fixed
 
@@ -35,6 +35,42 @@ full entries remain in git history.
   Note on the diagnosis: the console loglevel here is 3, *below* WARNING(4), so
   the `pr_warn` messages never reached the console. The volume of logging was
   not the problem; the thrash was.
+
+- **MARIE's swappiness clamp is restored, and its thrash watchdog re-armed.**
+  `rc4-7` cleared the clamp so the configured `vm.swappiness = 180` would reach
+  the reclaim picker. That was backwards: the clamp is what made reclaim
+  file-first, which is correct for this workload (~27 GB of largely-cold page
+  cache against ~2.3 GB of live desktop working set). Clearing it made MARIE
+  reclaim anon almost exclusively — 201M anon steals against 3.5M file, with
+  192M anon refaults — and drove PSI `memory full` to 16%, meaning every task
+  was stalled on memory a sixth of the time. That was the sluggishness.
+
+  The OOM kills credited to the clamp were MARIE's thrash watchdog correctly
+  detecting the livelock the clamp change had *created*. It was briefly
+  disabled on the false theory that it was spurious; re-armed and measured
+  across a full kernel compile it now reports a refault:steal ratio of **0.303**
+  with **0 firings**, against ~0.95 and three kills in three minutes before.
+
+  `vm.swappiness` is now **1**, matching the clamped value, so the sysctl
+  reports what the machine actually does. See `swap-stack/README.md`.
+
+### Removed
+
+- **The 7 MGLRU patches (`2131`-`2137`).** They sit behind `lru_gen_enabled()`,
+  which LRU-MARIE masks to false while `lru_marie_enabled()` is true, so the
+  whole MGLRU aging path is unreachable here. `CONFIG_LRU_GEN=y` and
+  `LRU_GEN_ENABLED=y` stay set — MARIE owns reclaim regardless. Verified seven
+  ways, including that the functions they change (`folio_update_gen`,
+  `folio_inc_gen`, `inc_min_seq`) appear zero times in MARIE's own patch.
+
+- **12 patches for IP blocks this machine never instantiates.** The kernel
+  reports `<gmc_v12_0_0>`, `<gfx_v12_0_0>`, `<sdma_v7_0_0>` and DCN 4.0.1 at
+  boot, and `lspci` shows a single display device, so gmc_v9/10/11, gfx_v11,
+  sdma_v5/6 and dcn42 code cannot run here. Each removed patch is the unused
+  sibling of a per-chip series whose ours-chip member stays. Two candidates
+  were kept after checking: `1142`/`1143` touch `dce_i2c`, which `dcn401` uses.
+
+  Patch count: **262 -> 243**.
 
 ### Added
 
