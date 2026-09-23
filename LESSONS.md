@@ -1882,3 +1882,55 @@ memory is actually exhausted.
 checked against a case where the underlying resource is demonstrably fine.
 "Refaults track steals" is a livelock on a small box and normal behaviour on a
 big one, and the watchdog had no term that told the two apart.
+
+## CORRECTION: the watchdog was right, and I disabled it for the wrong reason (2026-09-23)
+
+The entry above says MARIE's thrash watchdog "measured the wrong thing". **That
+conclusion was wrong**, and the way it was wrong is the interesting part.
+
+The watchdog's counter is
+
+```c
+refaults = WORKINGSET_REFAULT_ANON + WORKINGSET_REFAULT_FILE;
+```
+
+An earlier change of mine had cleared `low_swappiness_mode` so `vm.swappiness
+= 180` would reach the reclaim picker. That made MARIE reclaim **anon**
+almost exclusively, and produced **192 million anon refaults against 201M anon
+steals** — a reclaim loop making no net progress. That is exactly the livelock
+the watchdog exists to detect. It fired because the machine *was* thrashing.
+
+So the watchdog was not measuring the wrong thing; I was. I looked at
+`MemAvailable: 28.8 GB` and `AnonPages: 75 MB`, concluded "the premise is false,
+this is a false positive", and switched the alarm off. But the working set
+having plenty of RAM and reclaim *making no progress* are not the same claim,
+and only the second one is what the watchdog tests. **A single memory reading
+cannot disprove a livelock.**
+
+**What settles it is re-arming the detector and measuring its own inputs.** With
+the watchdog armed and a build running — in the patch phase, where the kills had
+happened:
+
+| | swappiness=180 | swappiness=1 (fixed) |
+|---|---|---|
+| watchdog firings | 3 in 3 min | **0** |
+| kills | 3 | **0** |
+| refault:steal ratio | **~0.95** | **0.155** |
+| steals per refault | ~1 (thrashing) | **6.5 (reclaim working)** |
+
+The condition no longer holds, so the safety net is back on
+(`/etc/tmpfiles.d/99-marie-thrash-watchdog.conf` now sets it to **1**).
+
+**Two rules worth keeping:**
+
+1. **Disabling a detector is a claim about the detector.** Proving it wrong
+   means showing its *inputs* are misread — not showing that a metric you chose
+   yourself looks fine. I "verified" the false positive with `MemAvailable`,
+   which the watchdog never looks at.
+2. **A symptom and its cause can be in different subsystems.** The kill was the
+   symptom; the reclaim policy was the cause. Treating the symptom first
+   (disable) and the cause second (revert) is the right order — but it is not
+   evidence that the symptom was spurious, and I reported it as if it were.
+
+The `-j8` build cap from the same session is unaffected and still correct: 16
+clang jobs genuinely over-commit this machine, independently of any of the above.
