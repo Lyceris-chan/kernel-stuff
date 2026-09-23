@@ -175,9 +175,15 @@ The short version:
   made `gfx_v12_0.c` program `DB_RING_CONTROL` twice this way. After a rebase,
   grep the series tree for the register or symbol each patch is named after and
   confirm it appears the expected number of times.
-- **Reverse-apply is not authoritative for older commits.** A patch can
+- **Reverse-apply is not authoritative — it fails both ways.** A patch can
   reverse-fail on context drift while its content is plainly present
-  (`0b0ff65d3ca1`). Grep for the *identifiers the patch introduces* instead.
+  (`0b0ff65d3ca1`). It also reverse-**succeeds** on a false positive when two
+  functions share the surrounding lines: `1166` changes `return true;` after
+  `DML_LOG_TOP_IF_EXIT();` in `check_mode_supported`, and rc4 already had
+  `return status == DML2_STATUS_OK;` after the *same two context lines* in
+  `build_mode_programming`, so reverse-apply matched the wrong function and
+  called a live fix a duplicate. Test by **counting the identifier** the patch
+  introduces before and after a real apply (1 → 2 here), not by reverse-applying.
 - **"Exists in no tree or mirror" ≠ fabricated.** Real patches live in personal
   repos (`kerneltoast/kernel_x86_laptop` held `1158`'s sha). Check GitHub's
   commit search before calling a sha invented.
