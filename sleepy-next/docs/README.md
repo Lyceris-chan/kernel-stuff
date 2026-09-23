@@ -48,10 +48,15 @@ upstream/local patches. It is not a general-purpose kernel.
   runs on its own, and `backing_dev` rejects a file outright.
   `swap-stack/` carries the userspace side. It replaced an xswap device on
   2026-09-22 (series removed, 15 patches).
-- **LRU-MARIE `low_swappiness_mode` is cleared** so `vm.swappiness = 180`
-  actually reaches the reclaim picker. MARIE otherwise clamps the effective
-  value to 1, which made reclaim file-dominant and OOM-killed a process on
-  2026-09-22. See `../swap-stack/README.md`.
+- **LRU-MARIE governs reclaim policy, and `vm.swappiness` is set to match.**
+  MARIE's `low_swappiness_mode` (on by default) clamps the effective swappiness
+  to 1, so reclaim is file-first: it targets the ~27 GB of largely-cold page
+  cache rather than the ~2.3 GB of live anonymous working set. Clearing that
+  clamp to let `swappiness=180` apply was tried on 2026-09-22 and reverted — it
+  made MARIE reclaim anon almost exclusively, producing 201M anon steals and
+  192M anon refaults, and stalled every task on memory 16% of the time.
+  `vm.swappiness` is now **1** so the sysctl agrees with what MARIE actually
+  uses. See `../swap-stack/README.md`.
 
 ## Build and install
 

@@ -112,10 +112,14 @@ livelock"*. The discussions run through reclaim-efficiency counters and
 `no_progress_loops` instead. That specific chain belongs to the xswap patch
 set's own `SWP_XSWAP` guard, which was removed with it.
 
-## The MARIE swappiness clamp — the OOM this does NOT fix
+## The MARIE swappiness clamp — correct, and clearing it was a mistake
 
-**Switching backends did not fix the 2026-09-22 OOM, and would not have.** The
-cause was LRU-MARIE, and it applied to every backend equally.
+**This section previously argued the opposite.** It said the clamp was a
+misconfiguration and that clearing it was "the fix" for the 2026-09-22 OOM.
+It was neither. Clearing it made the machine slow, and the kills had a
+different cause entirely (`marie-thrash-watchdog.conf`).
+
+The clamp is the intended interaction. MARIE's reclaim driver applies it:
 
 MARIE's reclaim driver clamps the effective swappiness before choosing between
 the anon and file lists:
