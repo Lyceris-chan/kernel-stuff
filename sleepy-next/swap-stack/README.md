@@ -114,12 +114,10 @@ set's own `SWP_XSWAP` guard, which was removed with it.
 
 ## The MARIE swappiness clamp — correct, and clearing it was a mistake
 
-**This section previously argued the opposite.** It said the clamp was a
-misconfiguration and that clearing it was "the fix" for the 2026-09-22 OOM.
-It was neither. Clearing it made the machine slow, and the kills had a
-different cause entirely (`marie-thrash-watchdog.conf`).
-
-The clamp is the intended interaction. MARIE's reclaim driver applies it:
+**This section previously argued the opposite**, at length. It called the clamp
+a misconfiguration and clearing it "the fix" for the 2026-09-22 OOM. It was
+neither, and the reversal is worth reading because the wrong version was
+confident and well-argued.
 
 MARIE's reclaim driver clamps the effective swappiness before choosing between
 the anon and file lists:
@@ -130,71 +128,62 @@ u8 swappiness = (READ_ONCE(marie_low_swappiness_mode) && configured > 1) ?
                 1 : configured;
 ```
 
-`marie_low_swappiness_mode` defaults to **1**, so `vm.swappiness = 180` had
-never taken effect here. MARIE's own header says so: the clamp applies
+`marie_low_swappiness_mode` defaults to **1**, so it replaced any configured
+value above 1 with 1 before the picker saw it. Its header states this applies
 *"regardless of the higher values vm.swappiness / memory.swappiness udev
 rules, tuning daemons, or distro defaults have installed."*
 
-swappiness = 1 makes reclaim file-dominant, which is the wrong direction when
-swap is compressed and fast: an evicted file page costs an NVMe re-read, while
-an anonymous page is only compressed. Measured over one boot: `pgsteal_file`
-31,181,709 against `pgsteal_anon` 8,779,224 — file reclaimed **3.55x** more
-than anon — with both lists refaulting at ~6.8M.
+### Why the default is right here
 
-At 21:14:27 on 2026-09-22 that ended in a kill:
+swappiness = 1 means **file-first** reclaim. That was originally read as the
+problem — "an evicted file page costs an NVMe re-read, while an anonymous page
+is only compressed" — and on a machine with a small anon set that reasoning
+would hold. This machine is the opposite shape:
+
+| | |
+|---|---|
+| page cache | ~27 GB |
+| anonymous | ~2.3 GB, and it is the **live desktop working set** |
+
+So the 27 GB of largely-cold cache is what should be reclaimed, and the 2.3 GB
+of live anon is the one thing that cannot be. File-first does exactly that.
+
+### What clearing it actually did
+
+Measured over one boot, with the clamp cleared and `vm.swappiness = 180` in
+force — anon-first reclaim, against the workload above:
 
 ```
-thrash livelock: net-progress 131141 refault / 192089 steal, free 175450, invoking OOM
-Workqueue: events thrash_wd_fn
- out_of_memory+0x26b/0x340
- thrash_wd_fn+0x4c8/0x600
+pgsteal_anon            201,545,880      pgsteal_file   3,537,572
+workingset_refault_anon 192,572,097      PSI memory full avg10  16.05
 ```
 
-`thrash_wd_fn` is MARIE's own livelock watchdog, and it fired on a premise
-that was false at that moment: free swap was 27,235,488 kB of 32,432,124 kB
-(84% free), 21,599,852 kB of clean inactive page cache was still resident, and
-only 685 MB was free. Its escape gate is `free > high`; the zone highs sum to
-219,589 pages (857 MB), so 685 MB sat below it, the gate never tripped, and
-after 8 consecutive two-second windows of refault:steal at or above 1:2 it
-invoked the OOM killer against `electron` (Discord).
+57x more anon than file reclaimed, and 192 million anon refaults: every page
+reclaimed was faulted straight back. PSI "full" at 16% means *every task* was
+stalled on memory a sixth of the time. That was the sluggishness.
 
-`marie-low-swappiness-mode.conf` clears the knob so the configured 180 reaches
-the pick driver.
+Restoring the default, 60 seconds later:
 
-### This is NOT a complete fix — measured the same evening
+```
+PSI memory full avg10    3.24 -> 0.02
+pgsteal_anon             201545880 -> 201546000   (+120 pages: stopped)
+pgsteal_file             resuming at ~2M/minute
+```
 
-An earlier revision of this file claimed clearing the clamp "is the fix". **That
-was too strong and the logs disprove it.** After the clamp was cleared at
-~22:31, MARIE's watchdog fired **three more times**:
+### And it was not the OOM fix either
 
-| Time | Killed | Running |
-|---|---|---|
-| 21:14:27 | `electron` | ordinary use — *before* the fix |
-| 22:35:44 | `xdg-desktop-por` | kernel build 1 (22:29:56 → ~22:36) |
-| 22:44:46 | `xdg-desktop-por` | kernel build 2 (22:40:27 → 22:46:32) |
-| 22:46:00 | `xdg-desktop-por` | kernel build 2 |
+The kills it was credited with fixing came from a different mechanism entirely:
+MARIE's thrash watchdog, which is a separate detector in `mm/oom_kill.c`
+(`marie-thrash-watchdog.conf`). That watchdog is armed and correct — see that
+file for the numbers. Two symptoms, two causes, and the clamp was never one
+of them.
 
-All three post-fix firings fall inside kernel-build windows; the pre-fix one
-did not. The likely trigger is `MAKEFLAGS="-j$(nproc)"` — **`-j16`** on 16
-threads, which is a large peak-memory build on a 32 GB machine.
+### `vm.swappiness` is set to 1, not 180
 
-**Why the clamp was not decisive.** At the 22:35:44 firing the memory state
-was `inactive_anon:477511` (1.87 GB) against `inactive_file:6324700`
-(**24.7 GB**) with 211 MB free. There was almost no anonymous memory in play —
-the pressure was entirely file-side, where swappiness has nothing to shift. A
-kernel build's working set *is* object files and source, so it thrashes page
-cache no matter how the anon:file split is configured.
-
-So the clamp is a real, verified misconfiguration worth fixing, and fixing it
-is right — but it is **not** the whole story, and the watchdog remains armed
-and will fire under genuine thrash. Two honest caveats on the table: the
-normal-use sample is a single event either side of the change, so "the clamp
-fixes normal use" is plausible rather than proven; and the watchdog may simply
-be correct that a `-j16` kernel build does not fit this machine's memory.
-
-Knobs, if it fires again: `/proc/sys/vm/thrash_wd_mode` (0 disables the
-watchdog — it is a safety net, so prefer fixing the pressure), and lowering
-kernel-build parallelism.
+`99-zswap-swappiness.conf` previously set 180 and argued for it. With the clamp
+on, 180 is a value nothing consumes — which is what sent two diagnoses wrong,
+because the sysctl *read* 180 while the machine used 1. It is now 1, so the
+file agrees with what MARIE actually does.
 
 ## Install
 
@@ -212,16 +201,19 @@ without it nothing ever drains the pool.
 
 ```bash
 swapon --show                             # /swapfile, priority 100
-cat /proc/sys/vm/swappiness               # 180
-cat /sys/kernel/mm/lru_marie/low_swappiness_mode   # 0   <- clamp cleared
+cat /proc/sys/vm/swappiness               # 1
+cat /sys/kernel/mm/lru_marie/low_swappiness_mode   # 1   <- clamp on (MARIE default)
 cat /sys/module/zswap/parameters/enabled           # Y
 cat /sys/module/zswap/parameters/shrinker_enabled  # Y
 sudo cat /sys/kernel/debug/zswap/stored_pages      # grows under pressure
 sudo cat /sys/kernel/debug/zswap/written_back_pages # >0 once the pool drains
 ```
 
-If `low_swappiness_mode` reads 1, the swappiness fix is **not** in effect —
-check `/etc/tmpfiles.d/` and re-run `systemd-tmpfiles --create`.
+**Both should read 1, and that is the intended state** — the sysctl agreeing
+with the clamped value MARIE actually uses. If `low_swappiness_mode` reads 0
+the clamp has been cleared, which lets `vm.swappiness` reach the picker, and
+that combination is the configuration that made the machine thrash. Check
+`/etc/tmpfiles.d/` and re-run `systemd-tmpfiles --create`.
 
 `/sys/kernel/debug/zswap` is readable **only as root**. An unprivileged `[ -d ]`
 or `ls` on it fails with `EACCES` and looks exactly like the directory not
@@ -244,8 +236,8 @@ existing; that mistake was made once here already.
 
 ## What changed on 2026-09-22
 
-- **MARIE's swappiness clamp cleared** — a real misconfiguration, but see the
-  correction above: it is not a complete fix for the watchdog.
+- **MARIE's swappiness clamp was cleared, then restored on 2026-09-23.** The
+  cleared state is what made the machine sluggish; see the correction above.
 - **Swap backend: xswap -> zswap + a 16 GiB swapfile.** The xswap series
   (`2155`-`2168`, `2199`; 15 patches) was removed; patch `2196`, a standalone
   zswap fix salvaged from that series, was added.

@@ -199,8 +199,9 @@ The short version:
   never taken effect: LRU-MARIE clamps the effective value to 1
   (`low_swappiness_mode`, default on) *"regardless of the higher values
   vm.swappiness ... have installed"*. `/proc/sys/vm/swappiness` still read 180.
-  Grep the series for the sysctl name before trusting any tuning value —
-  a readable sysctl is not evidence that it is consulted.
+  It is now set to 1, so it agrees with the clamped value. Grep the series for
+  the sysctl name before trusting any tuning value — a readable sysctl is not
+  evidence that it is consulted.
 - **A README claim is not evidence, including ours.** `swap-stack/README.md`
   justified the swap design with "zram never returns that memory when the
   workload shrinks"; zsmalloc has a shrinker and frees a zspage as soon as it

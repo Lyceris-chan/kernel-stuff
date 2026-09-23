@@ -2868,6 +2868,18 @@ pages (20% of 8,279,784) = **30.1%**, so `zswap_check_limits()` was returning
 false. `pswpout`/`pswpin` are both **0** for the whole boot because MARIE's
 `kcompressd` writes through its own path.
 
+> **CORRECTION (2026-09-23).** The conclusion above — that the clamp is the
+> fault and clearing it is the fix — **was wrong**, and the analysis is
+> preserved as written at the time for exactly that reason.
+> `low_swappiness_mode = 1` is MARIE's correct default for this workload.
+> Clearing it made MARIE reclaim anon almost exclusively against a ~2.3 GB
+> live desktop working set, producing 201M anon steals and 192M anon refaults
+> and driving PSI `memory full` to 16%. The watchdog described above was not a
+> false positive: it was correctly detecting the livelock the clamp change
+> created. Clamp restored 2026-09-23; `vm.swappiness` is now 1 to match. See
+> `../swap-stack/README.md` and `LESSONS.md`, "CORRECTION: the watchdog was
+> right".
+
 ## `[RFC PATCH 00/17] mm, swap: xswap writeback to a physical backend` (2026-09-20)
 
 Baoquan He, `lore-linux-mm`, no replies as of 2026-09-22. The base series
