@@ -3112,6 +3112,59 @@ Only three exist for 7.3: `7.3/hdmi`, `7.3/base`, `7.3/xswap`.
 - `7.3/base` and `7.3/xswap` — the latter is the xswap series we removed
   deliberately; the former is CachyOS's own tree, not a patch source.
 
+## drm-misc (TTM / dma-buf / dmemcg) — swept, and where to get it when freedesktop is down
+
+The 2026-09-24 sweep could not reach this subsystem: every request returned
+**HTTP 503**. It was a freedesktop outage, not a dead host — by the next
+session every endpoint answered again (`/drm/misc/kernel.git/info/refs`, the
+`drm/kernel.git` path, and the GitLab API all return 200). `drm-misc-next`
+fetched fine and is now at `8ef59ee79` (2026-09-21); only `drm-misc-fixes`
+still 503'd.
+
+### Where to get it when freedesktop is down
+
+Tried in this order; the first two are the useful ones.
+
+| Source | Status | Notes |
+|---|---|---|
+| `git.kernel.org/.../next/linux-next.git` | **works, different infrastructure** | drm-misc-next is merged in daily. The `drm-misc` merge commit is in `next-YYYYMMDD` — e.g. `f10d8e0012dc next-20260921/drm-misc`, with the branch tip as its second parent. **The best fallback: different host, different operators, already cloned here.** |
+| `repos/lore-dri-devel` | **works, local** | Every drm-misc patch passes through dri-devel with its review tags. Best source for patch *content and provenance*; carries no tree topology. |
+| `repo.or.cz/drm/drm-misc.git` | **reachable** | Verified by `git ls-remote`: has `drm-misc-next`, `drm-misc-fixes` and `drm-misc-next-fixes`. Keep as a backup remote. A full fetch into our *shallow* clone is slow (fresh negotiation against an unrelated remote), so prefer it for a targeted single-branch fetch. |
+| `cgit.freedesktop.org`, `anongit.freedesktop.org` | **dead** | Both fail to connect at all (curl code 000). The 2024 GitLab migration left these as read-only pull mirrors; they are not a fallback. |
+| `git.kernel.org/.../drm/drm-misc.git` | **does not exist** | 404. kernel.org does not mirror the drm trees. |
+| GitHub | **no mirror** | `freedesktop/drm-misc`, `drm-misc/linux` and `danvet/drm-misc` are all 404. `mripard/linux` exists but is Maxime Ripard's personal fork — 36 heads, no drm-misc branch. Do not treat it as a mirror. |
+
+### What the sweep found: nothing to adopt
+
+469 non-merge commits in `drm-misc-next` since 2026-09-01; **29** touch
+`drivers/gpu/drm/ttm`, `drivers/dma-buf`, `drivers/gpu/drm/scheduler` or the
+`dma-buf`/`dma-fence`/`dma-resv` headers. Sorted out:
+
+- **`CONFIG_DMEM*` is not set here**, so the whole cgroup/dmem / dmem-controller
+  line — `425a783e1` "Hook up a cgroup-aware reclaim callback for the dmem
+  controller" and Natalie Vock's four-patch `ttm` charge/reclaim series
+  (`4e6d9bc15`, `3f356c0e3`, `3d33e9c72`, `bbc744c06`) — **cannot execute on
+  this machine**. That is most of the recent TTM churn, and none of it is ours.
+- **`0e118b936`** `drm/sched: Lock drm_sched_entity_is_idle()` (Philipp Stanner,
+  `Reviewed-by: Tvrtko Ursulin`) is the only real fix in the set — it replaces
+  an invalid lockless read of `entity->stopped`/`entity->list` with the
+  spinlock. It is **already carried as `1056`**.
+
+  Worth recording *how* that was established, because `git apply --check`
+  failed on it while GNU `patch` said *"Reversed (or previously applied) —
+  Skipping"*. Neither is trustworthy alone. The identifier probe settled it:
+  `v7.3-rc4:…/sched_entity.c:210` still reads `rmb(); /* for list_empty to work
+  without lock */`, while our series tree has the `spin_lock(&entity->lock)`
+  form. Same shape as the `1227` amd-pstate case — the fix is carried inside a
+  patch found by grepping the *function*, not the subject.
+- Everything else is docs, kernel-doc, coding style, `MAINTAINERS`, or a
+  refactor (`ttm_swap_ops` static, `drm_class_device_*` removal, dropping the
+  unused `drm_sched_fence_alloc()` argument, the `is_cow_mapping` move).
+
+Also checked and already in rc4: `30d0aff2c` `dma-buf: dma-heap: don't publish
+fd before copy_to_user()` and the `drm/sched` fair-policy reverts
+(`67cf83ac8`, `9e9da8625`, `2bbea6b81`, `9a11db688`).
+
 ## Live dispute over `1065`/`1066` — three postings, none adopted
 
 The upstream-revert pass (triage.md) turned up an active argument about two
