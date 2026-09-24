@@ -3129,12 +3129,57 @@ Tried in this order; the first two are the useful ones.
 |---|---|---|
 | `git.kernel.org/.../next/linux-next.git` | **works, different infrastructure** | drm-misc-next is merged in daily. The `drm-misc` merge commit is in `next-YYYYMMDD` — e.g. `f10d8e0012dc next-20260921/drm-misc`, with the branch tip as its second parent. **The best fallback: different host, different operators, already cloned here.** |
 | `repos/lore-dri-devel` | **works, local** | Every drm-misc patch passes through dri-devel with its review tags. Best source for patch *content and provenance*; carries no tree topology. |
-| `repo.or.cz/drm/drm-misc.git` | **reachable** | Verified by `git ls-remote`: has `drm-misc-next`, `drm-misc-fixes` and `drm-misc-next-fixes`. Keep as a backup remote. A full fetch into our *shallow* clone is slow (fresh negotiation against an unrelated remote), so prefer it for a targeted single-branch fetch. |
+| `repo.or.cz/drm/drm-misc.git` | **reachable, and was the freshest** | Verified by `git ls-remote`: has `drm-misc-next`, `drm-misc-fixes` and `drm-misc-next-fixes`. **Its `drm-misc-next` was newer than the freedesktop copy** (2026-09-23 vs 2026-09-21) — see the correction below. Fetch from it with `--shallow-since`; a plain fetch **silently no-ops** against our shallow clone. |
 | `cgit.freedesktop.org`, `anongit.freedesktop.org` | **dead** | Both fail to connect at all (curl code 000). The 2024 GitLab migration left these as read-only pull mirrors; they are not a fallback. |
 | `git.kernel.org/.../drm/drm-misc.git` | **does not exist** | 404. kernel.org does not mirror the drm trees. |
 | GitHub | **no mirror** | `freedesktop/drm-misc`, `drm-misc/linux` and `danvet/drm-misc` are all 404. `mripard/linux` exists but is Maxime Ripard's personal fork — 36 heads, no drm-misc branch. Do not treat it as a mirror. |
 
-### What the sweep found: nothing to adopt
+### CORRECTION (same day): the first pass used a stale tip
+
+The entry above originally claimed the sweep was complete. It was not. The
+freedesktop fetch had **503'd partway** — it left `origin/drm-misc-next` at
+`8ef59ee79` (2026-09-21) while the branch was really at `f7afecd542`
+(**2026-09-23**), which `repo.or.cz` then served. A partial fetch that leaves
+an older tip is indistinguishable from a complete one unless you compare tips,
+so: **after any 503, check the tip against a second source before trusting the
+sweep.**
+
+Two fetch traps came out of this, both worth the ink:
+
+- **A plain `git fetch <orcz> +refs/heads/X:refs/remotes/orcz/X` into our
+  *shallow* clone exits 0, does two `POST git-upload-pack` round trips, and
+  writes no ref and no `FETCH_HEAD`.** It looks like success. `--shallow-since`
+  makes it actually fetch. The shallow boundary is the difference: without it
+  the negotiation concludes there is nothing to send.
+- `git merge-base --is-ancestor` against `repos/torvalds` is meaningless for
+  commits outside the shallow window — it reports "not an ancestor" for
+  commits that *are* in rc4. Where the object is missing, probe content
+  instead. In the table below, "in rc4" means the object resolved and the
+  ancestry check actually ran.
+
+### Re-swept against the newer tip: still nothing to adopt
+
+The 2026-09-21 → 09-23 delta adds seven TTM / dma-buf / sched commits the
+first pass never saw. Each is inert or already in the base:
+
+| Commit | Subject | Why not |
+|---|---|---|
+| `3db7d7d583` | ttm: fix swapped-out resources never leaving their bulk_move range | **already in rc4** — a genuine use-after-free fix, but the base has it |
+| `fcfe64715b` | ttm: apply the swapout bulk_move fix to the intended condition | **already in rc4** |
+| `2ab510e631` | drm/sched: Fix virtual runtime race | **inert here.** Fixes the *FAIR* policy's rq insertion; `sched_main.c:87` sets `drm_sched_policy = DRM_SCHED_POLICY_FIFO` and the module param doc calls FAIR "experimental". amdgpu selects no policy. |
+| `2302669bb4` | drm/sched: Free the run queues at the end of `drm_sched_fini()` | Robustness only — its own commit message says *"no correct driver can be there"* |
+| `3ed11c671f` | dma-buf/dma-fence: fix checking signaling bit for timeline and driver name | in rc4 |
+| `b344ca94e8` | dma-buf: Fix silent overflow for phys vec to sgt | in rc4 |
+| `06dd5e1ae8` | dma-buf: Split sgl by largest page-aligned chunk | in rc4 |
+| `143755bdab` | dma-buf: Make `DMABUF_DEBUG` default to y on `DEBUG_KERNEL` | in rc4 |
+| `28cc4d5a75` | drm/sched: Create a fake device for KUnit tests | in rc4 |
+
+The two TTM ones were checked by **content**, not ancestry, because they matter:
+`ttm_bo.c:1437` reads `if (ret > 0)` and `ttm_bo.c:535` reads `if (ret)` in
+both rc4 and the series tree — which is precisely the pair `3db7d7d583` +
+`fcfe64715b` establish. The base is correct on both.
+
+### What the first pass found: nothing to adopt
 
 469 non-merge commits in `drm-misc-next` since 2026-09-01; **29** touch
 `drivers/gpu/drm/ttm`, `drivers/dma-buf`, `drivers/gpu/drm/scheduler` or the
