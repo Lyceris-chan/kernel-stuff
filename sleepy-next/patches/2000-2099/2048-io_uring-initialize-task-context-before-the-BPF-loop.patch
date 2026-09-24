@@ -1,0 +1,73 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Yao Kai <yaokai34@huawei.com>
+Date: Wed, 23 Sep 2026 09:43:10 +0800
+Subject: [PATCH v2] io_uring: initialize task context before running the BPF loop
+Message-ID: <20260923014310.591292-1-yaokai34@huawei.com>
+
+Submitting SQEs through an io_uring BPF loop can trigger a NULL pointer
+dereference in io_submit_sqes(), as shown by the following arm64 report:
+
+  [ 2049.380301] Unable to handle kernel NULL pointer dereference at virtual address 0000000000000000
+  [ 2049.388788] pc : io_submit_sqes+0x48/0x6c4
+  [ 2049.389153] lr : bpf_io_uring_submit_sqes+0x10/0x1c
+  [ 2049.396310] Call trace:
+  [ 2049.396531]  io_submit_sqes+0x48/0x6c4 (P)
+  [ 2049.396893]  bpf_io_uring_submit_sqes+0x10/0x1c
+  [ 2049.397293]  bpf_prog_1a2a95cb199202b5+0x3c/0x68
+  [ 2049.397699]  bpf__io_uring_bpf_ops_loop_step+0x5c/0x94
+  [ 2049.398149]  io_run_loop+0x70/0x2e4
+  [ 2049.398461]  __arm64_sys_io_uring_enter+0xf0/0x710
+  [ 2049.398882]  invoke_syscall+0x54/0x10c
+  [ 2049.399414]  el0_svc_common.constprop.0+0x40/0xe0
+  [ 2049.399829]  do_el0_svc+0x1c/0x28
+  [ 2049.400125]  el0_svc+0x38/0x1d0
+  [ 2049.400409]  el0t_64_sync_handler+0xa0/0xe4
+  [ 2049.400779]  el0t_64_sync+0x198/0x19c
+
+io_uring_enter() dispatches to io_run_loop() before reaching the normal
+submission path's io_uring_add_tctx_node() call. The loop only checks
+whether the caller is allowed to run task work; it does not initialize
+current->io_uring or associate the task with the ring. A BPF call to
+bpf_io_uring_submit_sqes() then reaches io_get_task_refs(), which assumes
+that current->io_uring is valid.
+
+A ring created with IORING_SETUP_R_DISABLED, IORING_SETUP_SINGLE_ISSUER
+and IORING_SETUP_DEFER_TASKRUN can be enabled by a different task that
+has never used io_uring. Enabling the ring makes that task the submitter
+without allocating its io_uring task context. Its first BPF-driven
+submission of a pending SQE can therefore cause a kernel Oops.
+
+Call io_uring_add_tctx_node() in io_run_loop() before invoking the loop
+and propagate any initialization error. Do this before acquiring
+uring_lock, since task context setup may acquire the same mutex. This
+also establishes the task-to-ring association used for cancellation.
+
+Fixes: 033af2b3eb19 ("io_uring: introduce callback driven main loop")
+Signed-off-by: Yao Kai <yaokai34@huawei.com>
+---
+ io_uring/loop.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/io_uring/loop.c b/io_uring/loop.c
+index bbbb6ef14e6a..3d472b7827fa 100644
+--- a/io_uring/loop.c
++++ b/io_uring/loop.c
+@@ -2,6 +2,7 @@
+ #include "io_uring.h"
+ #include "wait.h"
+ #include "loop.h"
++#include "tctx.h"
+ 
+ static inline int io_loop_nr_cqes(const struct io_ring_ctx *ctx,
+ 				  const struct iou_loop_params *lp)
+@@ -81,6 +82,10 @@ int io_run_loop(struct io_ring_ctx *ctx)
+ {
+ 	int ret;
+ 
++	ret = io_uring_add_tctx_node(ctx);
++	if (unlikely(ret))
++		return ret;
++
+ 	if (!io_allowed_run_tw(ctx))
+ 		return -EEXIST;
+ 

@@ -2870,6 +2870,61 @@ from 09-20 onward produced ten threads. All ten were resolved, **none adopted**:
   in Mario's series are skipped rather than carried; if that config is ever
   enabled they become live again.
 
+## Adopted 2026-09-24 — nine patches, all verified before adding
+
+Every one passed: named human author + `Signed-off-by`, symbol existence in the
+base, and **both** `git apply --check` and GNU `patch -p1 --forward -F2 --dry-run`
+against pristine `v7.3-rc4`. 243 -> **251**.
+
+| # | Subject | Author | Source | Why it is on-target here |
+|---|---|---|---|---|
+| `2046` | blk-mq: set RQF_USE_SCHED when the operation is known | Keith Busch | `lore-linux-block` `e6f523c` | **kyber is this machine's io scheduler.** `Fixes: 4b6a5d9cea91` is present in rc4, so the leaked domain token and stalled queue are live. `Reviewed-by: Christoph Hellwig`; applied as `ab6c756f28c7` |
+| `2047` | blk-mq: allow cached requests to be used for flush operations | Keith Busch | same series `e6eb5c5` | 2/2 of the pair; `Reviewed-by: Christoph Hellwig`, applied as `9d2c70986bb7`. Applies clean **on top of `2046`** |
+| `2048` | io_uring: initialize task context before running the BPF loop | Yao Kai | `lore-io-uring` `e779402` | NULL deref in `io_submit_sqes()` via `bpf_io_uring_submit_sqes`. v2 applied by Jens as `a3bdf68feecc`; content-identical to v1 (empty changed-line delta) |
+| `2416` | sched_ext: Fix CPU hotplug hang when a dying CPU's tasks sit in the BPF scheduler | Tejun Heo | `lore-sched-ext` `ed5b728` | marked **`for-7.3-fixes`**, `Cc: stable`. This machine runs scx full-switch (`switch_all=1`, `scx_cake`) |
+| `1073` | drm/amdgpu: keep GFX12 DCC blits off the SDMA move entity | `pepp` (GitLab) | drm/amd work item **#5663** | confirmed by a reporter on **RX 9070 XT (Navi 48, gfx1201)** to fix artifacts after S3 suspend. The guard is absent from rc4's `amdgpu_ttm.c` |
+| `9077` | drm/amdgpu/userq: fix reading the WPTR at a non-zero BO offset | Jesse Zhang | `lore-amdgfx` `f275e7c7` | wrong fence seqno in `amdgpu_userq_fence.c` |
+| `9078` | drm/amdgpu/userq: reserve the VM root BO around CWSR param validation | James Zhu | `lore-amdgfx` `ec5c91df` (v2) | fixes `dma_resv_assert_held` on every compute queue create, `mes_userqueue.c` |
+| `0104` | sched/core: Make `finish_task_switch()` and its subfunctions always inline | Xie Yuanbin | sirlucjan `7.3-rc/cachyos-fixes-patches-v6` part 07/12, commit `909c59d8ef23` | **the premise holds here**: `spectre_v2` reads *"Enhanced / Automatic IBRS; IBPB: conditional; STIBP: always-on"*, so mitigations are on, and `finish_task_switch()` is core code scx does **not** bypass. Its `arch/arm|riscv|s390|sparc` hunks are inert in an x86_64 build; the live parts are `arch/x86/include/asm/sync_core.h`, `kernel/sched/core.c`, `kernel/sched/sched.h`, `include/linux/sched/mm.h` |
+| `2041` | net: gso: limit recursive IP-in-IP segmentation | Zihan Xi | `lore-netdev-new` `29a00ee7` | **updated in place v4 -> v6**: replaces the `GSO_MAX_HEADER`/`gso_header_len_exceeded()` headroom test with a per-skb `recursion_counter` in `SKB_GSO_CB` plus `gso_recursion_inc_test()` and `IP_TUNNEL_RECURSION_LIMIT` |
+
+**Provenance note on `1073`.** Its source is a GitLab issue note, not a list
+posting or a merged commit. It carries a `Link:` to the note and a
+`Reported-by:`, but the author is a GitLab handle with **no real name and no
+`Signed-off-by`** — so `Signed-off-by`/`Assisted-by` trailers were added
+naming this project, and the origin is stated rather than implied. The change
+is a 4-line guard; it forces `e = 0` for `AMDGPU_GEM_CREATE_GFX12_DCC` blits
+into VRAM. That is **not** a no-op here: `num_move_entities` is
+`MIN(num_buffer_funcs_scheds, TTM_NUM_MOVE_FENCES)` and Navi 48 has more than
+one SDMA instance, so the engine really is being constrained. It is a
+workaround whose author frames it as experimental ("give it a try and report
+if it helps"). **Drop it first if display artifacts or blit behaviour regress.**
+
+**One adopted candidate was dropped during the series-order audit.** `9078`
+(drm/amdgpu/userq: reserve the VM root BO around CWSR param validation) applies
+to *pristine* rc4 in neither direction and references
+`amdgpu_userq_input_trap_params_validate()`, which **does not exist in rc4** —
+it is written against a newer base where that call was factored out. Fails
+Check 2 (symbol existence) and is dropped. That is what the cumulative audit is
+for: it applies the whole series in order, and three of the nine adopted
+patches initially failed there (`2047` and `1073` needed rebasing or
+reconstruction, `9078` was unfixable).
+
+**Rejected, and why:**
+
+- **`USB: core: sanitize string descriptors against C0`** (cachyos-fixes-v6
+  #08) — a real robustness fix, but the reported device is an ASUS ROG Azoth
+  dongle and this machine's USB tree is a Logitech receiver, a HyperX QuadCast
+  S and two hubs. Generic hardening for a symptom not present here.
+- **`sched/fair: do not scan twice in detach_tasks()`** (v6 #06) — **inert**:
+  `fair.c` does not schedule under scx full-switch.
+- The other ten patches in cachyos-fixes-v6 are for other machines (znver5,
+  two i915 RC6 quirks for a Tuxedo InfinityBook, iwlwifi, Dell XPS `sof`, a
+  touchpad, device-specific `btusb`, a motherboard BT entry, a `drm/gud`
+  revert).
+- **`GPIO-serialization-v4`** (linked from work item #5716) — the GitLab upload
+  returns **HTTP 404**; not retrievable, so not adoptable and not assessable.
+
 ## The 2026-09-24 third-party pass — CachyOS, sirlucjan, firelzrd
 
 These three were **listed in the inventory but not actually swept** in the

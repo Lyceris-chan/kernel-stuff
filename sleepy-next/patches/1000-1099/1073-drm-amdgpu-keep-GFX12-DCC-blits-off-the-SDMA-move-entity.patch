@@ -1,0 +1,35 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: pepp <pepp@users.noreply.gitlab.freedesktop.org>
+Date: Wed, 16 Sep 2026 12:00:00 +0000
+Subject: [PATCH] drm/amdgpu: keep GFX12 DCC blits off the SDMA move entity
+Message-ID: <gitlab-drm/amd-5663-note-3664147>
+
+Force move entity 0 for AMDGPU_GEM_CREATE_GFX12_DCC buffers being moved
+into VRAM from non-VRAM, so a DCC blit is never handed to the alternate
+SDMA engine. On Navi 4x that produces artifacts after S3 suspend/resume.
+
+Reconstructed: the diff in the issue note is space-indented where the
+tree uses tabs and its last three context lines are truncated, so the
+hunk body was rebuilt from the tree. The added lines are the author's,
+content-identical modulo leading whitespace.
+
+Link: https://gitlab.freedesktop.org/drm/amd/-/work_items/5663#note_3664147
+Reported-by: pepp <pepp@users.noreply.gitlab.freedesktop.org>
+Signed-off-by: Sleepy <sleepy@localhost>
+Assisted-by: Claude <noreply@anthropic.com>
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c
+@@ -415,6 +415,11 @@ static int amdgpu_move_blit(struct ttm_buffer_object *bo,
+ 
+ 	e = atomic_inc_return(&adev->mman.next_move_entity) %
+ 			      adev->mman.num_move_entities;
++	bool to_vram = new_mem && new_mem->mem_type == TTM_PL_VRAM;
++	bool not_from_vram = !old_mem || old_mem->mem_type != TTM_PL_VRAM;
++	if (to_vram && not_from_vram && abo->flags & AMDGPU_GEM_CREATE_GFX12_DCC)
++		e = 0;
++
+ 	entity = &adev->mman.move_entities[e];
+ 
+ 	r = amdgpu_ttm_copy_mem_to_mem(adev,

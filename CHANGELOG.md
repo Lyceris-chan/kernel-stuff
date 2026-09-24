@@ -15,6 +15,56 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc4-9-sleepy-next]: 2026-09-24
+
+### Added
+
+Eight patches adopted after a full multi-source sweep, each verified with a
+named author + `Signed-off-by`, symbol existence in the base, and **both**
+`git apply --check` and GNU `patch --forward -F2 --dry-run` — and then the whole
+series re-verified by cumulative apply in order. 243 -> **250**.
+
+- **`2046` + `2047` — blk-mq `RQF_USE_SCHED`** (Keith Busch). **Kyber is this
+  machine's io scheduler**, and `Fixes: 4b6a5d9cea91` is present in rc4, so the
+  leaked domain token and stalled queue are live here. Both carry
+  `Reviewed-by: Christoph Hellwig` and were applied upstream as `ab6c756f28c7`
+  and `9d2c70986bb7`.
+- **`2048` — io_uring: initialize task context before the BPF loop** (Yao Kai).
+  A NULL deref in `io_submit_sqes()` reachable through `bpf_io_uring_submit_sqes`.
+  Applied upstream as `a3bdf68feecc`.
+- **`2416` — sched_ext: Fix CPU hotplug hang** (Tejun Heo). Marked
+  **`for-7.3-fixes`** with `Cc: stable`; this machine runs scx full-switch.
+- **`0104` — sched/core: keep `finish_task_switch()` inline** (Xie Yuanbin,
+  CachyOS `fixes` branch). Its premise holds here: `spectre_v2` reads
+  *"Enhanced / Automatic IBRS; IBPB: conditional; STIBP: always-on"*, so
+  mitigations are on, and this is core code scx does not bypass.
+- **`9077` — drm/amdgpu/userq: fix reading the WPTR at a non-zero BO offset**
+  (Jesse Zhang) — wrong fence seqno.
+- **`1073` — drm/amdgpu: keep GFX12 DCC blits off the SDMA move entity**, from
+  drm/amd work item **#5663**, reporter-confirmed on **RX 9070 XT (gfx1201)** to
+  fix artifacts after S3 suspend. See the provenance note below.
+
+### Changed
+
+- **`2041` — net: gso: limit recursive IP-in-IP segmentation, updated v4 -> v6**
+  (Zihan Xi). A genuine rework: it replaces v4's `GSO_MAX_HEADER` headroom test
+  with a per-skb `recursion_counter` in `SKB_GSO_CB`.
+
+### Notes
+
+- **`9078` was adopted and then dropped.** It references
+  `amdgpu_userq_input_trap_params_validate()`, which does not exist in rc4 — it
+  is written against a newer base. The cumulative audit caught it, along with
+  two others that needed rebasing (`2047`, `1073`). Applying to a pristine tree
+  is not enough; the series-order test is what finds these.
+- **`1073` has weaker provenance than the rest**: its source is a GitLab issue
+  note, not a list posting or merged commit, and the author is a handle with no
+  real name or `Signed-off-by`. The note's diff is also space-indented where the
+  tree uses tabs and is truncated, so the hunk body was rebuilt from the tree
+  with the added lines kept verbatim. It forces `e = 0` for `GFX12_DCC` blits
+  into VRAM, which is not a no-op here (`num_move_entities` is greater than 1 on
+  Navi 48). **Drop it first if blit behaviour or display artifacts regress.**
+
 ## [7.3.0-rc4-8-sleepy-next]: 2026-09-23
 
 ### Fixed
