@@ -3112,6 +3112,37 @@ Only three exist for 7.3: `7.3/hdmi`, `7.3/base`, `7.3/xswap`.
 - `7.3/base` and `7.3/xswap` — the latter is the xswap series we removed
   deliberately; the former is CachyOS's own tree, not a patch source.
 
+## `1073` replaced by `1074` — the upstream, reviewed version of the same fix
+
+`1073` was adopted earlier on 2026-09-24 from **drm/amd work item #5663** with
+provenance this ledger already flagged as weak: a GitLab handle with no real
+name and **no `Signed-off-by`**, and a diff that was space-indented where the
+tree uses tabs *and truncated*, so its hunk body had to be rebuilt by hand.
+
+The mailing-list pass found the **proper upstream posting** of the same fix:
+
+| | `1073` (dropped) | `1074` (adopted) |
+|---|---|---|
+| Origin | GitLab issue note | `[PATCH v2]` on amd-gfx, Message-ID `<20260924140616.2647-1-...>` |
+| Author | `pepp` (handle) | **Pierre-Eric Pelloux-Prayer <pierre-eric.pelloux-prayer@amd.com>** |
+| Review | none | **`Reviewed-by: Alex Deucher`**, **`Reviewed-by: Christian König`** (both AMD maintainers) |
+| Fixes | — | `Fixes: 3a6f6eeb3db5 ("drm/amdgpu: give ttm entities access to all the sdma scheds")` |
+| Link | issue note | **the same** issue #5663 |
+| Mechanism | per-blit: force `e = 0` for GFX12 DCC blits into VRAM | **device-level:** set `num_move_entities = 1` for `IP_VERSION(7,0,0) || IP_VERSION(7,0,1)` in `amdgpu_ttm_enable_buffer_funcs()` |
+
+The device-level form **subsumes** the per-blit one — with `num_move_entities == 1`
+the round-robin `e = atomic_inc_return(...) % num_move_entities` is 0 for every
+blit, not only DCC ones. So carrying both would be redundant, and the weaker
+one is the one to drop.
+
+Rebased to rc4: the author's change is verbatim; the posting's base differs only
+in surrounding context (`rc4` has `kzalloc_objs()` where the posting's base had
+`kcalloc()`), an offset of −25 lines. Applies clean to pristine rc4 **and in
+series order**.
+
+**`1073`'s number is left vacant rather than reused** — the gap is the record
+that something was tried and replaced.
+
 ## The 2026-09-24 full-series audit — every patch placed
 
 Ran three independent tests over all **243** carried patches. Result: no patch is

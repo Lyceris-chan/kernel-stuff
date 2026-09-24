@@ -165,6 +165,43 @@ Message ids are bare 6-digit numbers; per-message pages are
   hunk is stale against a newer base, port the change deliberately rather than
   forcing fuzz.
 
+**`quopri.decodestring` corrupts a bare `==`.** Python's quoted-printable
+decoder eats one `=` from any `==` it sees, because `=` is the QP escape
+character and `==` is invalid QP. Mailers emit bare `==` routinely anyway:
+
+```python
+quopri.decodestring(b'if (x == y)')   # -> b'if (x = y)'
+```
+
+This shipped a real bug once: a sched_ext patch became
+`if (p->scx.dsq = &rq->scx.local_dsq)` — an assignment in a condition, always
+true — and **nothing caught it**. It compiles (no `-Werror`), and the cumulative
+audit only proves a patch *applies*, not what it says. BTF and symbol checks are
+blind to it too.
+
+**Write the decoder instead** — expand only `=XX` pairs and soft line breaks,
+and leave a bare `=` alone:
+
+```python
+def safe_decode(b):
+    out, i = [], 0
+    while i < len(b):
+        if b[i] == 0x3D:                                  # '='
+            if i+2 < len(b) and re.match(rb'[0-9A-Fa-f]{2}', b[i+1:i+3]):
+                out.append(bytes([int(b[i+1:i+3], 16)])); i += 3; continue
+            if i+1 < len(b) and b[i+1:i+2] == b'\n':
+                i += 2; continue                          # soft break
+        out.append(bytes([b[i]])); i += 1
+    return b''.join(out).decode('utf-8', 'replace')
+```
+
+Then diff it against `quopri`'s output on any patch you extract. If the two
+disagree, `quopri` is the one that is wrong.
+
+**And read the added lines of anything you did not write.** The whole
+verification stack here — cumulative apply, BTF, symbol existence, provenance —
+is blind to an operator that changed meaning.
+
 **Outlook-mangled diffs.** Mail from Microsoft-hosted addresses arrives with the
 leading space stripped from every context line and tabs converted to spaces.
 `git apply` says "corrupt patch" and GNU `patch` says "malformed patch". If the

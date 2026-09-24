@@ -1866,6 +1866,50 @@ authoritative per-patch ledger and is not reconstructible from anywhere else.
 Also: `open(p, 'w').write(x, 1)` is a typo that fails *after* the damage —
 the exception is not the safety net it looks like.
 
+## My mail decoder corrupted a patch, and the build did not notice (2026-09-24)
+
+I extracted a patch from a lore mirror with Python's `quopri.decodestring` and
+shipped it. It had been built, installed, and verified — BTF and all.
+
+`quopri` **silently eats one `=` from a bare `==`**:
+
+```
+quopri.decodestring(b'if (x == y)')  ->  b'if (x = y)'
+```
+
+The mailer had emitted a bare `==`, which is invalid quoted-printable but
+common. So `2416` (Tejun Heo's sched_ext CPU-hotplug fix) carried:
+
+```c
+if (p->scx.dsq = &rq->scx.local_dsq)     /* shipped: assignment, always true */
+if (p->scx.dsq == &rq->scx.local_dsq)    /* what he actually wrote */
+```
+
+**Every check I had passed.** The build compiles it (no `-Werror`). The
+cumulative series audit proves a patch *applies* — it says nothing about what
+the patch says. BTF verification checks debug info. None of them read the code.
+
+**What found it** was re-decoding every mail-sourced patch adopted that day with
+a **safe decoder** — expand `=XX` and `=\n` only, leave a bare `=` alone — and
+diffing the two bodies. Of six patches, exactly one differed.
+
+**Two rules:**
+
+1. **Never decode a mail-derived patch with `quopri.decodestring`.** Write the
+   decoder: expand only `=XX` pairs and soft line breaks. Then diff it against
+   `quopri`'s output once — if they disagree, `quopri` is the one that is wrong.
+2. **"It applies and it compiles" is not a correctness check for patch
+   content.** For a patch you did not write, read the added lines. The whole
+   verification stack here — cumulative apply, BTF, symbol existence, provenance
+   — is blind to an operator that changed meaning.
+
+**Useful follow-up scans**, both cheap and both runnable over the whole series:
+assignment-in-condition (`^[+-].*\b(if|while)\s*\(.*[^=!<>+\-*/%&|^]=[^=]`) —
+expect the `while ((x = f()))` idiom as benign hits; and non-ASCII bytes, which
+catch `=XX` decoded into a raw high byte. Non-ASCII hits are usually author
+names (`Kristóf`, `Pakuła`, `König`) or em-dashes in comments, so check where
+the byte lands before worrying.
+
 ## MARIE's watchdog measured the wrong thing, and killed on it repeatedly (2026-09-23)
 
 `thrash_wd_fn()` fires by choice — it calls `out_of_memory()` itself — once

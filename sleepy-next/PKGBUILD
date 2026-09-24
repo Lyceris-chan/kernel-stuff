@@ -182,7 +182,7 @@ _rcver=rc4
 
 pkgver=7.3.0_rc4
 _tagrel=1
-pkgrel=11
+pkgrel=12
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -302,7 +302,7 @@ source=(
   "patches/1000-1099/1070-drm-amdgpu-more-compact-SDMA-7.0-IB-emission.patch"
   "patches/1000-1099/1071-drm-amdgpu-more-compact-VCN-IB-emission.patch"
   "patches/1000-1099/1072-drm-amdgpu-atom-bound-the-VBIOS-getters.patch"
-  "patches/1000-1099/1073-drm-amdgpu-keep-GFX12-DCC-blits-off-the-SDMA-move-entity.patch"
+  "patches/1000-1099/1074-drm-amdgpu-workaround-for-sdma-dcc-corruption.patch"
   "patches/1100-1199/1136-drm-amd-display-update-and-revert-FRL-LT-timeout.patch"
   "patches/1100-1199/1138-drm-amd-display-pull-colorops-into-state-when-recreating-a-plane.patch"
   "patches/1100-1199/1141-drm-amd-display-skip-receiver-power-control-without-AUX.patch"
@@ -1190,7 +1190,7 @@ b2sums=('a9812f8fb24a34af014c1f1f5b556e76bbeb03c557db0d929b4dbad9f082956fcefb75b
         'c4980cfa6b3a6e166d2c0f179fe6868cf327ff761cf3c916bb8cd63dbfc495de9c3df37db28b4581a863444a7ec52b63c0034059913ac36ca3e4a77d1640b2e7'
         '929621ccbe10929801c9af4ad02aceddbfc6da4e1cbcc469f1e5ba73d795e5227c3e4b6e1083dec4e8ae0c4f1c19137851f3d35da7bb8312ad8fe0a6a490badb'
         '1c7cfc7ed595b154f616e5a3d67e8582c86c96209dd165a7e3e4514a5dae42eaddadc34668f28644349eddb25a7aaf5d119355c18d5e573cf59289df8daf05a8'
-        'fae251cb3e4dff00164fb1605bea53ac7571ed356d4758cbdc0c729ce0b946ae7c0f8de3d4f71681dc9e293af0f7f796592d2468d13b2b88eb2655a30baad7e8'
+        '15b59081d5eccfce72080b96599b47336a5dc64d29ec0e02fdf48dade09f080950211238fc43c5ce8a93a03cee16c0dc95488404bd5f51eb63b15ec64732d32f'
         'b283f440cb0f2679ee81d7da4ea1fecdb1e0146ee6183c6271b8e952ffcaebbbb0decf5b18b69534987601b63289a5c9be0397c5a79eff9cc76dca6a439e1cfa'
         '9f336933bfbf1429081581bf02878e91d7fb383ffdca62b523a18266a94c8229b5510e6ccface38256c2967f9387c2c504e49eda9637f36733431cc6e33f200c'
         '0fb08f727791630b6101b8263b23ce433a8b65f895ff757a4d79b282815be449e7b1932a752635e848b3b3ba8235a775a3bf618cfb933bb80d69f3a38f5e5ead'

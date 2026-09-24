@@ -15,6 +15,46 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc4-12-sleepy-next]: 2026-09-24
+
+### Changed
+
+- **`1073` replaced by `1074` — the upstream, reviewed version of the same fix.**
+  `1073` was adopted from drm/amd work item #5663 with provenance already flagged
+  as weak: a GitLab handle with no `Signed-off-by` and a diff that was
+  space-indented and truncated, so its hunk body had to be rebuilt by hand.
+
+  The mailing-list pass found the proper `[PATCH v2]` posting: same issue,
+  authored by **Pierre-Eric Pelloux-Prayer (AMD)** with
+  **`Reviewed-by: Alex Deucher`** and **`Reviewed-by: Christian König`**, and
+  `Fixes: 3a6f6eeb3db5`.
+
+  It also fixes it better — device-level (`num_move_entities = 1` for
+  `IP_VERSION(7,0,0) || IP_VERSION(7,0,1)`) rather than per-blit, which
+  **subsumes** `1073`'s effect, since a single move entity makes the round-robin
+  index 0 for every blit rather than only DCC ones. `1073`'s number is left
+  vacant rather than reused.
+
+### Fixed
+
+- **`2416` was corrupt and had been built and installed.** My mail decoder,
+  Python's `quopri.decodestring`, silently eats one `=` from a bare `==`:
+  `quopri.decodestring(b'if (x == y)')` returns `b'if (x = y)'`. Tejun Heo's
+  sched_ext hotplug fix therefore shipped as
+  `if (p->scx.dsq = &rq->scx.local_dsq)` — an assignment in a condition, always
+  true — instead of `==`.
+
+  **Neither the build nor the series audit can catch that**: it compiles without
+  `-Werror`, and the audit only proves a patch *applies*. BTF and provenance
+  checks are blind to it too. Found by re-decoding every mail-sourced patch
+  adopted that day with a safe decoder (expand `=XX` and soft breaks only) and
+  diffing the bodies — of six patches, exactly one differed. Then whole-series
+  scans for assignment-in-condition (5 hits, 4 benign) and for `=XX` decoding
+  artifacts via non-ASCII bytes (23 hits, all author names or em-dashes).
+
+  Fixed, re-audited, rebuilt, reinstalled. `LESSONS.md` and the `patch-sweep`
+  skill now carry the safe decoder and the rule.
+
 ## [7.3.0-rc4-11-sleepy-next]: 2026-09-24
 
 ### Added
