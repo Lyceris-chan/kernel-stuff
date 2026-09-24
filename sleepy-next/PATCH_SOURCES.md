@@ -2900,6 +2900,24 @@ one SDMA instance, so the engine really is being constrained. It is a
 workaround whose author frames it as experimental ("give it a try and report
 if it helps"). **Drop it first if display artifacts or blit behaviour regress.**
 
+### Adopted 2026-09-24 (evening) — one patch from `next-20260924` (252 -> 253)
+
+The daily linux-next delta carried exactly one on-target commit.
+
+| # | Subject | Why |
+|---|---|---|
+| `2417` | sched_ext: Avoid relocking DSQ during remote DSQ moves | 1-line change in `kernel/sched/ext/ext.c`: `move_task_between_dsqs()` drops `src_dsq->lock` while `p->scx.dsq` is still set, so the following `deactivate_task()` reacquires the lock just to unlink and clear it. Calling `dispatch_dequeue_locked()` before the unlock takes the `!dsq` path instead. **This machine runs scx full-switch** (`switch_all=1`, `scx_cake`), so `move_task_between_dsqs()` is live code. `Suggested-by` **and** `Signed-off-by: Tejun Heo`, plus `Signed-off-by: Usama Arif`. Not in rc4 or mainline. Applies clean to pristine rc4 **and in series order** |
+
+**Everything else in the delta resolved to nothing:**
+
+- **The `mm-unstable` zswap series reappeared with different shas** in `next-20260924` (`610bd40b3e3d` vs `349d75f4907c` for the dropbehind patch). That is linux-next **rebasing its branches**, not new content — the same patches we already adjudicated.
+- **Work items updated since 2026-09-24:** 7 issues, all other-chip. `#5036` and `#5035` name "RDNA 4" in the title but their descriptions say **Navi 44 / RX 9060** — dropped.
+- **sirlucjan's new 2026-09-24 commit** adds the **POC scheduler** (2890 lines). We run sched-ext, not POC.
+- **sirlucjan `zstd-dev-patches-v5`**: our `2100` is **content-identical** (zero changed-line delta in both directions, byte-identical at 130533). We are already at the newest revision.
+- **CachyOS `7.3`**: no new content. The branches are `hdmi` (09-21, already carried as `1163`/`1164`), `base`, `xswap` (deliberately removed), `cachy`, `fixes` (a `drm/gud` revert, not this hardware), and `vesa-dsc-bpp` (08-31, DSC `max_qp` bounds — 1080p240 on FRL6 does not use DSC).
+- **firelzrd**: `lru-marie` is the same `0.11.1r2` we carry, `BORE 7.0.0` is a no-op under sched-ext, `le9uo` is from 2026-05.
+- **Trees**: `torvalds` (now at `415f2044228`, "Merge tag 'landlock-7.3-rc5'"), `drm-next`, `agd5f-linux`, `amd-staging`, `akpm-mm`, `tip`, `linux-pm` — **0 on-key commits** since the previous pass.
+
 ### Deep work-items sweep, 2026-09-24 — nothing new to adopt
 
 Exhaustive pass over the drm/amd tracker for this machine's silicon: **295

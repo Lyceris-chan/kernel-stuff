@@ -182,7 +182,7 @@ _rcver=rc4
 
 pkgver=7.3.0_rc4
 _tagrel=1
-pkgrel=10
+pkgrel=11
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -471,6 +471,7 @@ source=(
   "patches/2400-2499/2414-sched_ext-scx_locked_rq-return-null-from-nmi.patch"
   "patches/2400-2499/2415-sched_ext-reject-nmi-calls-lock-taking-kfuncs.patch"
   "patches/2400-2499/2416-sched_ext-fix-CPU-hotplug-hang-when-a-dying-CPU-s-tasks-sit-in-the-BPF-scheduler.patch"
+  "patches/2400-2499/2417-sched_ext-avoid-relocking-DSQ-during-remote-DSQ-moves.patch"
   "patches/2500-2599/2505-x86-pat-fix-effective-RW-in-lookup_address.patch"
   "patches/9000-9099/9011-drm-amdgpu-Respect-noretry-flag-for-retry-faults-on-GFX12.1.patch"
   "patches/9000-9099/9012-drm-amdgpu-gfxhub-Enable-retry-fault-interrupts-when-needed.patch"
@@ -1357,6 +1358,7 @@ b2sums=('a9812f8fb24a34af014c1f1f5b556e76bbeb03c557db0d929b4dbad9f082956fcefb75b
         '9fabdcf4ba00bb3d71d7c27421473ac9f4689aca8ccc6498a80121f27162ba0438527306651137c22de82931588ab8809306aa8b8de422781315a995b6b1e213'
         '25db1718fda8abe5a3a8cb9b93f2e143702a7a6611cb752461249d18940a1be14d16d4db3a4b6767998ab66f45d9fe810420b71bc14d3539b895fad33c8ba2cf'
         '79521a7a94c0218e1fc70e6d870e90cdd9a4fa4cb0ab9f24192fe932eec6afa99c50bf9210af004513427d6744cbe53c91cfaebcbd877d3c3e4b2c02669a96b6'
+        '7da25d2aeca4fe4fa37229bc0d2f25ea47a8d72f2429df65bc3f8af32143b8aa2b68faa09e0f53e82090fb7062f551541747e13d3989dd970551a976e0ecd02e'
         'c0fa0cef861fa3d0748f805430f41b7c8918554588d05d2a6eae502981ec3b74e6cbec8bc72641b190b7c123c67bb3c8732f1859fc80c620a79dfa1e34bdb6fc'
         '39ade2a62477babf59b762e07e4a08213716b1c952de5df2ff290b4dc58a5202c7131b709fef253e7864cbaa280d66083984041b541531241a164bb5c82af89b'
         '0d75eae660d1cdf8a4d9272560aa5639f17221cedca66164fe6456b8a920d994904ec3cafec982fcb1caa29cb7468ffc98a48797ccc5794310acb80e75fd5573'

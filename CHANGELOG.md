@@ -15,6 +15,30 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc4-11-sleepy-next]: 2026-09-24
+
+### Added
+
+- **`2417` — sched_ext: Avoid relocking DSQ during remote DSQ moves**
+  (Usama Arif, `Suggested-by`/`Signed-off-by: Tejun Heo`). `move_task_between_dsqs()`
+  drops `src_dsq->lock` while `p->scx.dsq` is still set, so the following
+  `deactivate_task()` reacquires that lock only to unlink the task and clear the
+  pointer. Calling `dispatch_dequeue_locked()` before the unlock takes the
+  `!dsq` path and avoids the redundant acquisition. This machine runs sched-ext
+  full-switch, so this is live code. One line in `kernel/sched/ext/ext.c`.
+
+  Found in the `next-20260924` delta — the only on-target commit in the day's
+  sweep. 252 -> **253**.
+
+### Notes
+
+- The `mm-unstable` zswap series reappeared in `next-20260924` with **different
+  shas**: that is linux-next rebasing its branches, not new content.
+- `sirlucjan`'s `zstd-dev-patches-v5` is **content-identical** to our `2100`
+  (zero changed-line delta, byte-identical), so no update was due.
+- Work items `#5036`/`#5035` name "RDNA 4" in the title but their bodies say
+  **Navi 44 / RX 9060** — not this machine.
+
 ## [7.3.0-rc4-10-sleepy-next]: 2026-09-24
 
 ### Added

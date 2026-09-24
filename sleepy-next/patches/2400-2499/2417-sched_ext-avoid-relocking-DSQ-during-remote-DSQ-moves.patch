@@ -1,0 +1,38 @@
+From 84a0d325b0b709962772e66a804677ceaca417e2 Mon Sep 17 00:00:00 2001
+From: Usama Arif <usama.arif@linux.dev>
+Date: Wed, 23 Sep 2026 14:34:44 -0700
+Subject: [PATCH] sched_ext: Avoid relocking DSQ during remote DSQ moves
+
+When scx_bpf_dsq_move*() moves a task from a non-local DSQ to a
+remote local DSQ, move_task_between_dsqs() drops src_dsq->lock while
+leaving p->scx.dsq set. The following deactivate_task() then reacquires
+src_dsq->lock in scx_dispatch_dequeue() to unlink the task and clear
+p->scx.dsq.
+
+Both the source rq and src_dsq are already locked before the source DSQ
+lock is dropped. Call dispatch_dequeue_locked() there so that
+deactivate_task() takes the !dsq path and avoids the redundant lock
+acquisition.
+
+Suggested-by: Tejun Heo <tj@kernel.org>
+Signed-off-by: Usama Arif <usama.arif@linux.dev>
+Signed-off-by: Tejun Heo <tj@kernel.org>
+---
+ kernel/sched/ext/ext.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/kernel/sched/ext/ext.c b/kernel/sched/ext/ext.c
+index 03c85ad0ead4..911bb6d433ba 100644
+--- a/kernel/sched/ext/ext.c
++++ b/kernel/sched/ext/ext.c
+@@ -2697,6 +2697,7 @@ static struct rq *move_task_between_dsqs(struct scx_sched *sch,
+ 			scx_move_local_task_to_local_dsq(sch, p, enq_flags, src_dsq, dst_rq);
+ 			raw_spin_unlock(&src_dsq->lock);
+ 		} else {
++			dispatch_dequeue_locked(p, src_dsq);
+ 			raw_spin_unlock(&src_dsq->lock);
+ 			move_remote_task_to_local_dsq(sch, p, enq_flags, src_rq, dst_rq);
+ 		}
+-- 
+2.55.0
+
