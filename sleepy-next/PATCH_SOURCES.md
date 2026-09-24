@@ -2900,6 +2900,43 @@ one SDMA instance, so the engine really is being constrained. It is a
 workaround whose author frames it as experimental ("give it a try and report
 if it helps"). **Drop it first if display artifacts or blit behaviour regress.**
 
+> **CORRECTION (2026-09-24, same evening).** `2417` was adopted correctly, but
+> this pass also exposed that **`2416`, adopted earlier the same day, was
+> corrupt**, and it had already been built and installed.
+>
+> My mail decoder was Python's `quopri.decodestring`, and **it silently eats one
+> `=` from a bare `==`**:
+>
+> ```
+> quopri.decodestring(b'if (x == y)')  ->  b'if (x = y)'
+> ```
+>
+> The mailer had emitted a bare `==`, which is invalid quoted-printable but
+> common. The result, in `2416` (`kernel/sched/ext/ext.c`):
+>
+> ```c
+> +    if (p->scx.dsq = &rq->scx.local_dsq)      /* shipped - assignment, always true */
+> +    if (p->scx.dsq == &rq->scx.local_dsq)     /* what Tejun Heo actually wrote */
+> ```
+>
+> **Neither the build nor the series audit can catch this.** It compiles (no
+> `-Werror`), and the audit only proves a patch *applies*. A passing build is not
+> a correctness check for patch content.
+>
+> Caught by re-decoding every mail-sourced patch adopted that day with a
+> **safe decoder** (expand `=XX` and soft breaks only, leave a bare `=` alone)
+> and diffing the bodies: of `2046`, `2047`, `2048`, `2416`, `9077`, `2041`,
+> **only `2416` differed**. Then two whole-series scans: assignment-in-condition
+> (5 hits, 4 benign — the `while ((x = f()))` idiom and a removed line's
+> `isascii((type = *p++))`), and non-ASCII bytes as a proxy for `=XX` decoding
+> (23 hits, all author names or em-dashes in comments).
+>
+> Fixed, sums regenerated, re-audited (253 clean), rebuilt, reinstalled.
+>
+> **Rule: never decode a mail-derived patch with `quopri.decodestring`.** Use a
+> decoder that expands only `=XX` and `=\n`. And verify patch *content*, not
+> just appliability.
+>
 ### Adopted 2026-09-24 (evening) — one patch from `next-20260924` (252 -> 253)
 
 The daily linux-next delta carried exactly one on-target commit.

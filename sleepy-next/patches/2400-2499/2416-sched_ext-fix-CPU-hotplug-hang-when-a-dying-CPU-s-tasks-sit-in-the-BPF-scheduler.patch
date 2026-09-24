@@ -81,7 +81,7 @@ Signed-off-by: Tejun Heo <tj@kernel.org>
 +	 * them off.
 +	 */
 +	list_for_each_entry_safe_reverse(p, n, &rq->scx.runnable_list, scx.runnable_node) {
-+		if (p->scx.dsq = &rq->scx.local_dsq)
++		if (p->scx.dsq == &rq->scx.local_dsq)
 +			continue;
 +		guard(sched_change)(p, DEQUEUE_SAVE | DEQUEUE_MOVE | DEQUEUE_NOCLOCK);
 +	}
