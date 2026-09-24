@@ -2870,6 +2870,94 @@ from 09-20 onward produced ten threads. All ten were resolved, **none adopted**:
   in Mario's series are skipped rather than carried; if that config is ever
   enabled they become live again.
 
+## The 2026-09-24 full-series audit — every patch placed
+
+Ran three independent tests over all **243** carried patches. Result: no patch is
+misplaced, none duplicates the base, and 75 are queued upstream.
+
+| Test | Reference | Result |
+|---|---|---|
+| reverse-apply (already in our base?) | pristine v7.3-rc4 | **0 of 243** — no duplicates |
+| reverse-apply (already in mainline?) | `torvalds` origin/master | **1** — `2153` |
+| reverse-apply (queued upstream?) | `next-20260923` | **74** |
+| on-target silicon | running kernel's IP blocks | **0 foreign-only** |
+
+**On-target: clean.** After removing the 12 foreign-chip patches earlier the same
+day, **no carried patch touches only another chip's silicon.** The kernel names
+its own blocks — `gfx_v12_0_0 gmc_v12_0_0 sdma_v7_0_0 smu_v14_0_0 psp_v14_0_0
+vcn_v5_0_0 ih_v7_0_0 mes_v12_0_0 jpeg_v5_0_0`, plus DCN 4.0.1 and `dce_v1_0_0`
+(the last of which is exactly why `1142`/`1143` are live and were kept).
+
+**No duplicates of the base.** Nothing reverse-applies against rc4, so no patch
+is inserting a second copy of something the base already has.
+
+### The 7.4 drop list is much larger than recorded — and the old list was right
+
+74 reverse-apply against `next-20260923`. **That test has known false negatives,
+and two fired:** `2005` and `2415` do not reverse-apply, yet both are merged.
+Confirmed by the authoritative identifier test rather than by reverse-apply —
+`pcpu_user` is 0 in rc4 and 1 in linux-next; `scx_kf_allowed_ctx` is 0 in rc4 and
+6 in linux-next. So the real figure is **75 queued upstream** (74 + `2005` +
+`2415`), of which **`2153` is already in mainline** (via `a52a93358ac`, merged
+2026-09-22) and the other 74 are 7.4-bound.
+
+None is removable now: the base is rc4, which lacks all of them.
+
+**A ledger typo found by this audit:** `2414` was recorded as `8848333267b7`;
+the real commit is `8848333264b7` (a digit transposition). Corrected.
+
+### Version sweep — one real update
+
+34,759 normalised subjects indexed from 132,801 mails across 13 mirrors, narrowed
+to 45 raw hits, then filtered:
+
+| Filter | Removed |
+|---|---|
+| date / different author | 1 — `1151`'s "v4" is a different patch by a different author, older |
+| already merged | 1 — `2415` |
+| content-identical | 31 |
+| different base | 11 — the kbuild v4 block |
+
+**One survives: `2041` (net: gso: limit recursive IP-in-IP segmentation), v4 →
+v6**, posted 2026-09-24. A genuine rework — it replaces v4's
+`gso_header_len_exceeded()` headroom test with a per-skb `recursion_counter` in
+`SKB_GSO_CB` plus `gso_recursion_inc_test()` and `IP_TUNNEL_RECURSION_LIMIT`.
+It applies clean to pristine rc4 **and** to the series tree with `2041` removed,
+and `2041` is the only carried patch touching `include/net/gso.h`,
+`net/core/gso.c`, `net/ipv4/af_inet.c` or `net/ipv6/ip6_offload.c` — so it is a
+safe in-place swap.
+
+**The kbuild v4 block is a bump item, not an update.** Lorenzo Stoakes reposted
+the build-speedup series as `[PATCH v4 NN/22]` (we carry v3 `NN/20`); the series
+resized and renumbered, 11 parts have real deltas, and part `01/22` does not
+apply even to pristine rc4 (it expects `.modinfo : { *(.modinfo) }` where both
+our base and mainline carry `.modinfo : { *(.modinfo) . = ALIGN(8); }`). Keep v3.
+
+**Sweep coverage caveat, stated because it bounds the result:** `lore-linux-mm`
+is lore epoch `linux-mm/2`, which only reaches back to **2026-09-21**. Higher
+epochs return `Not Found`, so `/2` is genuinely newest — but **any mm revision
+posted before 2026-09-21 is invisible**, and we carry 51 mm patches.
+
+### Source status
+
+- **`drm-misc`: UNREFRESHED.** gitlab.freedesktop.org returns HTTP 503
+  (`expected 'acknowledgments'`) on repeated attempts. Origin sits at
+  `8ef59ee79407` against remote `6e375de99d0c`. Negative TTM/dmemcg/dmabuf
+  results are weaker than they read.
+- **`tip`: queried, current.** Its new on-target content is the `sched/cache`
+  series (2026-09-21) — a *feature*, 7.4-bound, and inert under our scx
+  full-switch — plus `x86/mm/pat` warn tweaks. The `posix-cpu-timers` fix
+  (`c21eaa72f02f`) is already **in rc4**.
+- **Work items: 60 issues enumerated** (23 in the tighter 09-22 window).
+  On-target items worth tracking: **#5663** confirmed by a reporter on
+  **RX 9070 XT (Navi 48, gfx1201)** as fixing artifacts after S3 suspend, with
+  the guard verified absent from rc4's `amdgpu_ttm.c`; **#5716**
+  (`NULL deref in dal_ddc_open`), where @rockowitz reports the same class takes
+  *"AMDGPU … off the PCI bus and freezes Plasma"* on Navi. #5716 links a
+  `GPIO-serialization-v4.mbox` uploaded to GitLab — **that upload returns HTTP
+  404 and cannot be retrieved**, so it is recorded as referenced-but-unavailable,
+  not as a candidate. #5418 has bulk retest requests against `63e19ef3ddab`.
+
 ## The 2026-09-24 sweep — the two pending v2s both landed
 
 Base rc4, 243 patches. Window since 2026-09-20.
