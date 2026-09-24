@@ -2900,6 +2900,43 @@ one SDMA instance, so the engine really is being constrained. It is a
 workaround whose author frames it as experimental ("give it a try and report
 if it helps"). **Drop it first if display artifacts or blit behaviour regress.**
 
+### Deep work-items sweep, 2026-09-24 — nothing new to adopt
+
+Exhaustive pass over the drm/amd tracker for this machine's silicon: **295
+issues enumerated** across six search terms, paginated to exhaustion and
+deduped (`9070` 174, `Navi 48` 198, `gfx1201` 43, `DCN 4.0.1` 36, `dcn401` 7 —
+every term's row count matched its `x-total`). 32 dropped as other-chip, 187
+on-target, **1642 comments read** via GraphQL. Of **629** distinct hex tokens
+extracted, only **30 resolved to real commits**; the rest were GitLab
+`/uploads/` paths (257), blob ids, UUIDs, register dumps and version strings.
+
+**Every candidate resolved to nothing actionable here:**
+
+| Finding | Verdict |
+|---|---|
+| `366e77cd4923` / `4408b59eeacf` / `afcdf51d97cd` — the "FPU protect" trio, posted by **agd5f himself across 12 issues**, the sweep's largest grouped find | **Already in rc4.** Verified individually with `git tag --contains` |
+| `63e19ef3ddab` — the pageflip cluster, cited across 12 issues | **Already in rc4** (also recorded at line ~1188) |
+| `c4a5160e3be0` (#5720, HDMI 4K60 black screen / RGB vs YCbCr 4:2:0) | **Already in rc4** |
+| `24ddca9a3af1` (#4877, "Defer transitions from minimal state to final state") | Real AMD commit (Joshua Aberback, 137 insertions in `dc.c`/`dc.h`) with **no upstream equivalent — but it does not apply** to rc4 (`patch failed at dc.c:2963`), and it targets SubVP, which 1080p outputs do not use |
+| #5446 — `amdgpu_driver_release_kms()` clears drvdata owned by vfio-pci | **Off-target.** A VFIO GPU-passthrough bug (unbind `amdgpu` → bind `vfio-pci` with a monitoring daemon holding the DRM node). No upstream fix exists, and this machine has one GPU and no passthrough |
+| `572193a6e3a8` (#4230, mmhub page fault) | A **linux-firmware** "[FW Promotion]" blob, not kernel code |
+| `00c391102abc` (#4753) | A **2024-04-26** commit, outside mainline; stale |
+| Inline patches in notes (#4555 VCN5 decode perf, #4655 stutters, #5720, #4076) | #5720 and #4076's fixes are already in rc4; #4555/#4655 predate the window and carry no sha |
+
+**Two traps this sweep demonstrated**, both worth keeping:
+- **`a23cbb057` (#5339) resolves to a real commit and is still not a fix** — it is
+  the mainline revision the reporter tested on, cited as a version identifier.
+  Grep-and-verify alone files it as an unlanded patch.
+- **`3467811` (#5274) is a GitLab note id** (`#note_3467811`) that is
+  coincidentally a valid 7-hex prefix of an unrelated 2012 `xen-blkfront` commit.
+  And `b89d58b` *is* real, but a 7-char prefix is collision-prone — check by
+  subject, not just `cat-file -t`.
+
+**Two issues were dropped as other-chip but are borderline and are recorded as
+such:** #5135 and #5380 both name DCN 4.0.1 in the title while the reporter's
+silicon is Navi 44. If Navi 44 shares the dcn401 display block, their fixes may
+be generic. Re-run those two through the note pass at the next sweep.
+
 ### Two more adopted 2026-09-24, from a branch sweep (250 -> 252)
 
 The all-branches pass over `agd5f-linux` (132 remote refs) surfaced display
