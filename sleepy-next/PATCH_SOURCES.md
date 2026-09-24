@@ -2870,6 +2870,92 @@ from 09-20 onward produced ten threads. All ten were resolved, **none adopted**:
   in Mario's series are skipped rather than carried; if that config is ever
   enabled they become live again.
 
+## The 2026-09-24 sweep — the two pending v2s both landed
+
+Base rc4, 243 patches. Window since 2026-09-20.
+
+**Headline: both items recorded as "awaiting upstream v2" now have a v2, and both
+have been APPLIED by their maintainers.** Verified by applying them.
+
+| Item | v2 posting | Review | Applied as | Applies to rc4 |
+|---|---|---|---|---|
+| `blk-mq: set RQF_USE_SCHED when the operation is known` (Keith Busch) | `[PATCHv2 1/2]`, 2026-09-22 | `Reviewed-by: Christoph Hellwig` | `ab6c756f28c7` | clean |
+| `blk-mq: allow cached requests to be used for flush operations` (2/2) | same series | `Reviewed-by: Christoph Hellwig` | `9d2c70986bb7` | clean atop 1/2 |
+| `io_uring: initialize task context before the BPF loop` (Yao Kai) | `[PATCH v2]`, 2026-09-23 | — | `a3bdf68feecc` | clean |
+
+The kyber pair is **directly on-target** — kyber is this machine's io scheduler,
+per `60-ioschedulers.rules`. Its `Fixes: 4b6a5d9cea91` is present in rc4, so the
+leaked domain token and stalled queue are live here. The io_uring v2 is
+content-identical to v1 (empty changed-line delta) — a resend, not a revision.
+
+**Two extraction traps fired and were caught**, both documented above but worth
+recording as instances: the mails are **quoted-printable** (`=3D` for `=`, `=20`
+for space, `--=20` for the signature separator), so `git apply` reported
+*corrupt patch* while GNU patch reported clean — decode with `quopri` before
+extracting. And `cat-file -p <sha>` yields the COMMIT object; the email is the
+blob named `m`, so it must be `<sha>:m`.
+
+### New on-target candidates found (triaged, not yet adopted)
+
+| Candidate | Author / date | Why it matters here | State |
+|---|---|---|---|
+| `sched_ext: Fix CPU hotplug hang when a dying CPU's tasks sit in the BPF scheduler` | Tejun Heo, 09-23 | marked **for-7.3-fixes**, `Cc: stable`; this machine runs scx full-switch (`switch_all=1`, `scx_cake`). Applies clean, 4 files / 10 hunks, not yet upstream | ready |
+| `drm/amd/display: Fix compound literal stackframe limit` + `Bump frame warning limit for clang builds of dml` (+ all-builds variant) | 09-23 | our config is exactly `CONFIG_CC_IS_CLANG=y` + `FRAME_WARN=2048`, the case these target | ready |
+| `drm/amdgpu/userq: fix reading the WPTR at a non-zero BO offset` | Jesse Zhang, 09-23 | wrong fence seqno, `amdgpu_userq_fence.c` | ready |
+| `drm/amdgpu/userq: reserve the VM root BO around CWSR param validation` v2 | James Zhu, 09-21 | fixes `dma_resv_assert_held` on every compute queue create | ready |
+| 21-patch gfx12 pipe-reset series (`gfx12: implement detect_hung_queue`, `mes12: gate gfx pipe reset on PER_PIPE`, …) | Jesse Zhang, 09-21 | touches `gfx_v12_0.c` / `mes_v12_0.c`; we carry only the SDMA half (`9072`/`9074`/`9075`) | needs prerequisite check |
+| `drm/amdgpu: reserve fence slot before userq eviction rearm` | Vitaly Prosyak, 09-23 | same author and function as carried `1066`; the author states it supersedes earlier approaches — **resolve against `1066` before adopting either** | resolve first |
+| issue **5663** — `amdgpu_move_blit` picks a non-zero SDMA move entity for `AMDGPU_GEM_CREATE_GFX12_DCC` | GitLab, updated 09-24 | the guard is **absent** from rc4's `amdgpu_ttm.c`; reporter confirmed the fix over 5 suspend cycles on Navi 48 | inline patch, weaker provenance |
+
+### Rejected, with the reason (the reusable part)
+
+- **The whole `mm-unstable` zswap set is already settled.** Every un-carried
+  commit in it has a ledger entry above: `e0f869c71622` is inert (its own scope
+  is `cgroup.memory=nokmem`, which this machine does not set); the folio
+  conversions and `constify` are pure refactors that belong with the pool work;
+  the pool-by-id + xarray pair is a 7.4-bump decision. The newest, Ghiti's
+  `349d75f4907c` "drop cold writeback folios via swap dropbehind", is a
+  self-described workaround **and does not apply**: it needs
+  `remove_mapping_set_shadow()`, which has **zero occurrences** in rc4. Its two
+  predecessors (`5b0fec7c8786`, `debcef32116f`) do apply, but adopting them
+  without the third leaves the mechanism with no user.
+- **Already carried, byte-identical:** amdgpu ip-discovery validation (= `9076`),
+  `sch_cake` v2 (= `2045`), the secure-userq-lifecycle resend (= `9062`–`9071`),
+  Mario's amd-pstate 4-patch (= `1231`/`1232`).
+- **"Already carried" trap again:** Mario Limonciello's `amd-pstate: Fix TOCTOU
+  when changing driver mode via sysfs` (09-21) is **covered by carried `1227`**,
+  which already takes `guard(mutex)(&amd_pstate_driver_lock)` before reading
+  `mode_state_machine[][]`. Subject-matching alone would have added a duplicate.
+- **Wrong chip**, confirmed by target filename: `gfx v12_1` MGCG/VFI, `GFX12.1`
+  RLC clock, `SMUv15.0.8`, `PSP v15.0.3`, `LSDMA v8.0.1`, `HDP v8.0.1`,
+  `IH v8.0`, `sdma v7.1`, VPE 3.0.x, `soc v2_0`, MI300, `RTL8127`/`RTL8125D`,
+  DCE 6.x/8.1.
+- **Inert here:** `tools/sched_ext` sample changes, selftests, `blktests`.
+- **Track, do not adopt:** `[PATCH v6 0/13] nvme-pci` dma-buf-backed requests
+  (Pavel Begunkov, 09-21) — relevant to the Phison E16 but a large new feature
+  under active objection from Hellwig.
+- **No reverts of anything we carry** appeared in the window.
+
+### Source status — what was actually queried
+
+Queried and current: `torvalds`, `linux-next` (tag `next-20260923`), `drm-next`,
+`agd5f-linux`, `amd-staging-drm-next`, `linux-pm`, `tip`, `akpm-mm`, the ten lore
+mirrors, and the `lists.freedesktop.org` amd-gfx / dri-devel archives (HTTP 200).
+
+**UNREFRESHED: `drm-misc`** — gitlab.freedesktop.org returns HTTP 503
+(`expected 'acknowledgments'`); origin sits at `8ef59ee79407` against remote
+`6e375de99d0c`. Any negative result for TTM/dmemcg/dmabuf this sweep is weaker
+than it reads.
+
+**Two stale-mirror traps fired**, both while `fetch` exited 0: `torvalds`'s local
+`master` and `lore-linux-mm`'s `master` (810 mails behind). Both were caught by
+comparing against `git ls-remote` rather than trusting the fetch — and this is
+why every scan keyed on `origin/<branch>`.
+
+The AMD trees are quiet: `drm-next`'s tip since 09-17 is only a `v7.3-rc4`
+backmerge, and `agd5f-linux`'s newest is a `gfx12.1` commit (not our chip). The
+activity is in `akpm-mm` (zswap) and the lists.
+
 ## The 2026-09-22 Discord OOM — MARIE's thrash watchdog, not memory exhaustion
 
 `electron` (PID 2606) was killed at `Sep 22 21:14:27` on boot 0 (rc4-6, so
