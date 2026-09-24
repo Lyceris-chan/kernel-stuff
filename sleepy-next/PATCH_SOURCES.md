@@ -2900,6 +2900,34 @@ one SDMA instance, so the engine really is being constrained. It is a
 workaround whose author frames it as experimental ("give it a try and report
 if it helps"). **Drop it first if display artifacts or blit behaviour regress.**
 
+### Two more adopted 2026-09-24, from a branch sweep (250 -> 252)
+
+The all-branches pass over `agd5f-linux` (132 remote refs) surfaced display
+commits that a tip-only scan does not show — most were test infrastructure, but
+two are real fixes on this machine's display path.
+
+| # | Subject | Why it is on-target here |
+|---|---|---|
+| `1169` | drm/amd/display: Fix null deref of link_enc in `dce110_enable_tmds_link_output` (Srinivasan Shanmugam) | **`dcn401_init.c:97` assigns `.enable_tmds_link_output = dce110_enable_tmds_link_output`**, so this is DCN 4.0.1's own TMDS (HDMI) hook, and the early-return guards a deref of `link->link_enc`. Smatch-reported by Dan Carpenter, `Fixes:` tagged, `Signed-off-by` + 2 `Reviewed-by` |
+| `1170` | drm/amd/display: Fix LSDMA divide by zero (Alex Hung) | `element_size_to_bytes_per_pixel()` in **DML21** returned 0 for element sizes above 4, and an unexpected size divides by it. `dcn401_resource.c` sets `using_dml21 = true`, so DML21 is this machine's display mode library. `Signed-off-by` x2, `Reviewed-by`, `Tested-by` |
+
+Both apply clean to pristine rc4 **and** in series order.
+
+**Considered and not taken** from the same branch sweep:
+
+- **`cb546fdd2cd1`** (clamp cursor hotspot at the register write) — touches
+  `dcn401_hubp.c`/`dcn401_hwseq.c`, so it is genuinely our silicon, but it
+  **fails to apply**: it sits on a cursor refactor chain (`3771cb44ea44` →
+  `a7f51e8c53ca` → `026c7b8249d2` → `f1b4f58e60c1`) that is not carried. The bug
+  it fixes needs the ODM/MPC slice case, which two 1080p outputs do not reach.
+- **`bc7f95c8ddb6`** (Revert "request DMUB HW cursor offload") — its own
+  rationale is *"causes the following failures on **DCN42**"*. DCN 4.2 is not
+  this chip, and we do not carry the reverted commit, so there is nothing to
+  revert.
+- `16b705acfebe`, `9fc881919393`, `f1b4f58e60c1` — display refactors with no
+  fix content, several depending on the same untaken cursor chain.
+- The `Test …` / `Fold … tests` commits are unit-test additions, inert here.
+
 **One adopted candidate was dropped during the series-order audit.** `9078`
 (drm/amdgpu/userq: reserve the VM root BO around CWSR param validation) applies
 to *pristine* rc4 in neither direction and references

@@ -182,7 +182,7 @@ _rcver=rc4
 
 pkgver=7.3.0_rc4
 _tagrel=1
-pkgrel=9
+pkgrel=10
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -321,6 +321,8 @@ source=(
   "patches/1100-1199/1166-drm-amd-display-return-success-status-from-check_mode_supported.patch"
   "patches/1100-1199/1167-dm-restore-native-cursor-early-return-disabled-crtc.patch"
   "patches/1100-1199/1168-drm-amd-display-allow-300ms-for-hdmi-frl-link-training.patch"
+  "patches/1100-1199/1169-drm-amd-display-fix-null-deref-of-link_enc-in-dce110_enable_tmds_link_output.patch"
+  "patches/1100-1199/1170-drm-amd-display-fix-LSDMA-divide-by-zero.patch"
   "patches/1200-1299/1201-cpufreq-amd-pstate-Update-cppc_req_cached-before-w.patch"
   "patches/1200-1299/1202-cpufreq-amd-pstate-Add-per-core-EPP-boost-for-rec.patch"
   "patches/1200-1299/1203-Documentation-amd-pstate-Document-the-epp_boost-pa.patch"
@@ -1206,6 +1208,8 @@ b2sums=('a9812f8fb24a34af014c1f1f5b556e76bbeb03c557db0d929b4dbad9f082956fcefb75b
         '158a3b2603ddbe02ed09247a914c906693c464ad7202b7384236ce22cd06843d9e8606223a90b3845d53f74b00ae3816b2d1330da87bbff049211c20cc2f5f0f'
         'd10be2ac8956f986f3cbfa9a1def8decc708d61d201230e20b64b914e9fa167939089c35850b3cc85ea8d1987541a1cbeae57f8b476a33611c3a31088671e4ca'
         'c54918fc8336226d0dde81d46bb5788da4743afc1d313e5837242e880bbd4aec4247335fe39f5c42773ffc23c62891cbd2f9eb25ad4f60a44d14b902b1fac799'
+        '6c412b04569cca81998ae3a5429201fc3d85f1eaff78f466ffc6b49efbd9dbb212e52b77189664128586bbca310d59ebdd89cc52ff25465dd08dc74493014086'
+        '6ff6a43f6eeb288d80d8b4831ea5a94541c5365864080b76e7dae8dd554f533e68f86849598740248b8dd500f9f70e5e9e83abfa323f08e18851d8238025c45c'
         'e9d464ebf525cd8d93d48f1cbedea0197bd9d0142085da7d83ec3dfda0174483a0fea4077055fd7d1ad9180563dc6dfb77e4f52f9bcb023b7c7d7c9fb5c39ece'
         '9d3e36dbc5c9c5342d2991c4665278ed075073196251e59280bd12f1d6812a37d31db58f5cb978b926e2dcd0a32365960a414b69d10f463bd8f68cedbb4bb6ae'
         '52fe01328f544e023666eab1fd378ae0a0eb47385d495403a55a933f71beedcf295300767c1e43feb46366915fae8bea3b9137f11d16ed194a1fcf71d95aec0d'

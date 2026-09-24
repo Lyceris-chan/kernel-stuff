@@ -15,6 +15,32 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc4-10-sleepy-next]: 2026-09-24
+
+### Added
+
+- **`1169` — drm/amd/display: Fix null deref of link_enc in
+  `dce110_enable_tmds_link_output`** (Srinivasan Shanmugam). On-target because
+  `dcn401_init.c:97` assigns `.enable_tmds_link_output =
+  dce110_enable_tmds_link_output` — that *is* DCN 4.0.1's TMDS/HDMI hook.
+  Smatch-reported by Dan Carpenter, `Fixes:` tagged, two `Reviewed-by`s.
+- **`1170` — drm/amd/display: Fix LSDMA divide by zero** (Alex Hung).
+  `element_size_to_bytes_per_pixel()` in **DML21** returned 0 for element sizes
+  above 4, and an unexpected size divides by it. `dcn401_resource.c` sets
+  `using_dml21 = true`, so DML21 is this machine's display mode library.
+
+Both came from an **all-branches** sweep of `agd5f-linux` (132 remote refs) —
+the tip-only scan showed neither. 250 -> **252**.
+
+### Notes
+
+- `cb546fdd2cd1` (clamp cursor hotspot at the register write) is genuinely
+  dcn401 but **fails to apply**: it depends on a cursor refactor chain that is
+  not carried, and the bug needs the ODM/MPC slice case two 1080p outputs do
+  not reach. Recorded, not taken.
+- The `Revert "request DMUB HW cursor offload"` is **DCN42-only** by its own
+  rationale, and we do not carry the reverted commit.
+
 ## [7.3.0-rc4-9-sleepy-next]: 2026-09-24
 
 ### Added
