@@ -182,7 +182,7 @@ _rcver=rc4
 
 pkgver=7.3.0_rc4
 _tagrel=1
-pkgrel=12
+pkgrel=14
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -303,6 +303,7 @@ source=(
   "patches/1000-1099/1071-drm-amdgpu-more-compact-VCN-IB-emission.patch"
   "patches/1000-1099/1072-drm-amdgpu-atom-bound-the-VBIOS-getters.patch"
   "patches/1000-1099/1074-drm-amdgpu-workaround-for-sdma-dcc-corruption.patch"
+  "patches/1000-1099/1075-drm-amdgpu-dont-leak-bo_va-when-gem_object_open-fails.patch"
   "patches/1100-1199/1136-drm-amd-display-update-and-revert-FRL-LT-timeout.patch"
   "patches/1100-1199/1138-drm-amd-display-pull-colorops-into-state-when-recreating-a-plane.patch"
   "patches/1100-1199/1141-drm-amd-display-skip-receiver-power-control-without-AUX.patch"
@@ -323,6 +324,9 @@ source=(
   "patches/1100-1199/1168-drm-amd-display-allow-300ms-for-hdmi-frl-link-training.patch"
   "patches/1100-1199/1169-drm-amd-display-fix-null-deref-of-link_enc-in-dce110_enable_tmds_link_output.patch"
   "patches/1100-1199/1170-drm-amd-display-fix-LSDMA-divide-by-zero.patch"
+  "patches/1100-1199/1171-drm-amd-display-serialize-hdmi-frl-status-polling-against-link-detect.patch"
+  "patches/1100-1199/1172-drm-amd-display-skip-hdmi-frl-status-polling-while-link-is-down.patch"
+  "patches/1100-1199/1173-drm-amd-display-avoid-to-write-signal-specific-for-tmds.patch"
   "patches/1200-1299/1201-cpufreq-amd-pstate-Update-cppc_req_cached-before-w.patch"
   "patches/1200-1299/1202-cpufreq-amd-pstate-Add-per-core-EPP-boost-for-rec.patch"
   "patches/1200-1299/1203-Documentation-amd-pstate-Document-the-epp_boost-pa.patch"
@@ -472,6 +476,7 @@ source=(
   "patches/2400-2499/2415-sched_ext-reject-nmi-calls-lock-taking-kfuncs.patch"
   "patches/2400-2499/2416-sched_ext-fix-CPU-hotplug-hang-when-a-dying-CPU-s-tasks-sit-in-the-BPF-scheduler.patch"
   "patches/2400-2499/2417-sched_ext-avoid-relocking-DSQ-during-remote-DSQ-moves.patch"
+  "patches/2400-2499/2418-sched_ext-place-dsq_vtime-next-to-dsq_priq.patch"
   "patches/2500-2599/2505-x86-pat-fix-effective-RW-in-lookup_address.patch"
   "patches/9000-9099/9011-drm-amdgpu-Respect-noretry-flag-for-retry-faults-on-GFX12.1.patch"
   "patches/9000-9099/9012-drm-amdgpu-gfxhub-Enable-retry-fault-interrupts-when-needed.patch"
@@ -1191,6 +1196,7 @@ b2sums=('a9812f8fb24a34af014c1f1f5b556e76bbeb03c557db0d929b4dbad9f082956fcefb75b
         '929621ccbe10929801c9af4ad02aceddbfc6da4e1cbcc469f1e5ba73d795e5227c3e4b6e1083dec4e8ae0c4f1c19137851f3d35da7bb8312ad8fe0a6a490badb'
         '1c7cfc7ed595b154f616e5a3d67e8582c86c96209dd165a7e3e4514a5dae42eaddadc34668f28644349eddb25a7aaf5d119355c18d5e573cf59289df8daf05a8'
         '15b59081d5eccfce72080b96599b47336a5dc64d29ec0e02fdf48dade09f080950211238fc43c5ce8a93a03cee16c0dc95488404bd5f51eb63b15ec64732d32f'
+        '30a7e06f1174fcd58705357a926e7ee441d6372262fc9a6f059bb64e32f788e99fc6b723fa0ad1daf96f2bdff947cf8e1c783c3c71c115cead01db9458bc7dd6'
         'b283f440cb0f2679ee81d7da4ea1fecdb1e0146ee6183c6271b8e952ffcaebbbb0decf5b18b69534987601b63289a5c9be0397c5a79eff9cc76dca6a439e1cfa'
         '9f336933bfbf1429081581bf02878e91d7fb383ffdca62b523a18266a94c8229b5510e6ccface38256c2967f9387c2c504e49eda9637f36733431cc6e33f200c'
         '0fb08f727791630b6101b8263b23ce433a8b65f895ff757a4d79b282815be449e7b1932a752635e848b3b3ba8235a775a3bf618cfb933bb80d69f3a38f5e5ead'
@@ -1211,6 +1217,9 @@ b2sums=('a9812f8fb24a34af014c1f1f5b556e76bbeb03c557db0d929b4dbad9f082956fcefb75b
         'c54918fc8336226d0dde81d46bb5788da4743afc1d313e5837242e880bbd4aec4247335fe39f5c42773ffc23c62891cbd2f9eb25ad4f60a44d14b902b1fac799'
         '6c412b04569cca81998ae3a5429201fc3d85f1eaff78f466ffc6b49efbd9dbb212e52b77189664128586bbca310d59ebdd89cc52ff25465dd08dc74493014086'
         '6ff6a43f6eeb288d80d8b4831ea5a94541c5365864080b76e7dae8dd554f533e68f86849598740248b8dd500f9f70e5e9e83abfa323f08e18851d8238025c45c'
+        '74d6bbaa6f4dd19c3344f0ea933d48dd51017b61d2a6af375e7241a5fbb77ce2cde784122a28b044eafa057e06bb0799d83fecf2b814dad4605eb0cd6885a1ab'
+        'ae6757d7e8f7b2cc462c53a0a4c77f4096938ac69d7dc2fb1276bd2c7820c89256c3fd9347299248455a24fb694b79fb59f325a3eb1099af1e283b847fdcb910'
+        'eb234c082c5c7d9f0621964c1c1c52c8e6b344cbfaddcb20a81d09f1988cef8439dcd9a2b461d055da08fd4eba9c22c948fcdcb61534e9748a5280839e21c73e'
         'e9d464ebf525cd8d93d48f1cbedea0197bd9d0142085da7d83ec3dfda0174483a0fea4077055fd7d1ad9180563dc6dfb77e4f52f9bcb023b7c7d7c9fb5c39ece'
         '9d3e36dbc5c9c5342d2991c4665278ed075073196251e59280bd12f1d6812a37d31db58f5cb978b926e2dcd0a32365960a414b69d10f463bd8f68cedbb4bb6ae'
         '52fe01328f544e023666eab1fd378ae0a0eb47385d495403a55a933f71beedcf295300767c1e43feb46366915fae8bea3b9137f11d16ed194a1fcf71d95aec0d'
@@ -1359,6 +1368,7 @@ b2sums=('a9812f8fb24a34af014c1f1f5b556e76bbeb03c557db0d929b4dbad9f082956fcefb75b
         '25db1718fda8abe5a3a8cb9b93f2e143702a7a6611cb752461249d18940a1be14d16d4db3a4b6767998ab66f45d9fe810420b71bc14d3539b895fad33c8ba2cf'
         'd8034f47f10f62ce8a537bfa936b0ee82da7e40750d9b67ff84f0e7611fee3493bccf4690922d77f6d23d2149e45ee1067a5394855390a43775038c1bdf62f1f'
         '7da25d2aeca4fe4fa37229bc0d2f25ea47a8d72f2429df65bc3f8af32143b8aa2b68faa09e0f53e82090fb7062f551541747e13d3989dd970551a976e0ecd02e'
+        '31e9cf4c3efbe6628bee06e71347b976b1673c7e257d454684c433259f7425ec30f7596fcf046f0b2de4be1fcba20b3fc45deae8d39f6df83ca0c68b78b55c8b'
         'c0fa0cef861fa3d0748f805430f41b7c8918554588d05d2a6eae502981ec3b74e6cbec8bc72641b190b7c123c67bb3c8732f1859fc80c620a79dfa1e34bdb6fc'
         '39ade2a62477babf59b762e07e4a08213716b1c952de5df2ff290b4dc58a5202c7131b709fef253e7864cbaa280d66083984041b541531241a164bb5c82af89b'
         '0d75eae660d1cdf8a4d9272560aa5639f17221cedca66164fe6456b8a920d994904ec3cafec982fcb1caa29cb7468ffc98a48797ccc5794310acb80e75fd5573'

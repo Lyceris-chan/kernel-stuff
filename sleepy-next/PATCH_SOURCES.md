@@ -3112,6 +3112,381 @@ Only three exist for 7.3: `7.3/hdmi`, `7.3/base`, `7.3/xswap`.
 - `7.3/base` and `7.3/xswap` — the latter is the xswap series we removed
   deliberately; the former is CachyOS's own tree, not a patch source.
 
+## Live dispute over `1065`/`1066` — three postings, none adopted
+
+The upstream-revert pass (triage.md) turned up an active argument about two
+patches we carry, so it is recorded here in full rather than as a one-liner.
+
+**What we carry.** `1065` (`reserve eviction-fence slot at WPTR caller`) and
+`1066` (`reserve root PD fence slots for userq eviction-fence rearm`) reserve
+`dma_resv` fence slots up front so `amdgpu_evf_mgr_rearm()` cannot fail with
+`-ENOSPC` when it later adds an eviction fence.
+
+**Posting 1 — the revert** (`c091c58ee9` + `9e785a48cb`, 2 of a 3-part series,
+2026-09-17, Vitaly Prosyak): reverts both, on the argument that the up-front
+reservation is the wrong place. **Rejected here, and already on record:**
+CLAUDE.md's trap list says König defended `1065`/`1066` against exactly such a
+series — *"a revert of a carried patch is the opposite of superseding it."*
+No maintainer objection to the revert exists in the mirror.
+
+**Posting 2 — a different fix** (`1c36287c5eec`, 2026-09-23, same author, Cc
+König / Deucher / Priyak Liang): does not revert. It adds a re-reservation in
+`amdgpu_userq_vm_validate_and_restore_queue()` after the validation walk:
+
+```c
+	/* Re-reserve the rearm slot after validation may have rebuilt the lists. */
+	drm_exec_for_each_locked_object(&exec, tmp_key, obj) {
+		ret = dma_resv_reserve_fences(obj->resv, 1);
+		if (ret)
+			goto unlock_all;
+	}
+```
+
+**Not adopted, and deliberately not decided here.** It carries no
+`Reviewed-by`, it is one day old, and it sits in the middle of a dispute whose
+other side wants our carries gone. It may well be complementary rather than
+alternative — the comment says validation can *rebuild the lists*, which our
+up-front reservation does not cover — but "may well be" is not the bar. If the
+revert is dropped and this gains review, it becomes a normal candidate; if the
+revert lands, this patch's context changes with it.
+
+**Watch item:** re-read this thread at the next sweep. The state to look for is
+König's reply to `1c36287c5eec`.
+
+### Other reverts checked, no action
+
+- `Revert "drm/amd/display: Fix CalculateFlipSchedule Calculation"` and
+  `Revert "… Unify CalculateFlipSchedule Logic"` (both 2026-08-28) — **we carry
+  neither side**, so there is nothing to un-carry. Note them because
+  CalculateFlipSchedule is flip-path code and this machine has flip history.
+- `Revert "request DMUB HW cursor offload"` (the nested case) — already
+  assessed: DCN42-only and the reverted commit is not carried.
+- `Revert "drm/amd/pm: defer UCLK DPM enablement on Apple Navi 14"` — Apple.
+- `Revert "drm/amdgpu: debugfs: avoid extra EOLs in amdgpu_gem_info"` — cosmetic.
+
+## Work-items pass, 2026-09-24 — one lead to **measure**, not to patch
+
+The tracker yielded no adoptable patch this time: the one issue that had a
+usable fix, **#5663** (`bisected`), is the SDMA DCC regression we already took
+as **`1074`** — the issue still lists `3a6f6eeb3db5` as the culprit, which is
+exactly the `Fixes:` in that patch.
+
+### `#5418` — 5 s vblank off-delay, idle power
+
+`drm/amd/display: Restore 5s vbl offdelay for NV3x+ DGPUs`
+(`a1fc7bf6677e`, 2026-04-22, `Reviewed-by: Mario Limonciello`) **is in our
+base** and **applies to this GPU**: it triggers for a DGPU whose `DCE_HWIP`
+is `>= IP_VERSION(3, 2, 0)`, and Navi 48 is a DGPU at DCN 4.0.1. The commit is
+an explicit workaround — *"Rapid vblank off is causing flip-done timeouts for
+NV3x and newer ... A proper fix requires further investigation. In lieu of it,
+let's workaround it for now."*
+
+`#5418` reports the cost of that workaround on a 7900 XTX: the 5 s timer keeps
+the vblank path from quiescing at idle, so `dm_handle_vmin_vmax_update` is
+queued at refresh cadence (~5 % of one core at 180 Hz, +10 W, and the IRQ core
+never reaches a low power state).
+
+**Not reverted, deliberately.** This machine has a documented flip-timeout
+history, and the workaround exists precisely to suppress flip-done timeouts on
+this GPU family. Trading a known display-stability workaround for idle power,
+on a hunch, is not a trade this repo makes. Also note the reporter's chip is
+Navi 31 — the *code* is NV3x+, but the symptom has not been reproduced on
+Navi 48 by anyone.
+
+**Measure before believing it applies here**, and do it on an idle machine
+with no build running:
+
+```bash
+# is the IRQ core busy at idle?
+grep amdgpu /proc/interrupts; sleep 10; grep amdgpu /proc/interrupts
+# is the vmin/vmax worker firing?
+sudo bpftrace -e 'kprobe:dm_handle_vmin_vmax_update { @ = count(); }'
+# and the power side
+sudo turbostat --quiet --show PkgWatt,Busy%,Bzy_MHz sleep 10
+```
+
+If `dm_handle_vmin_vmax_update` is firing at refresh cadence here, that is a
+real finding worth a ledger entry of its own — but the answer is a targeted
+fix or an AMD follow-up, not a revert of `a1fc7bf6677e` on its own.
+
+### Other on-target issues with no adoptable fix
+
+- **`#5883`** RX 9060 XT (Navi 44 — same GC 12.0 / DCN 4.0.1 family): black
+  4K DP output after S3, `drm_crtc_vblank_get()` returning `-EINVAL` in
+  `amdgpu_dm_atomic_commit_tail` (`amdgpu_dm.c:10211`). Open, no fix posted,
+  and the topology (DP 4K160 + S3) is not this machine's (HDMI 1080p240).
+- **`#5716`** NULL deref in `dal_ddc_open` on DP HPD — labelled *Strix /
+  Kraken*, and **already guarded here by our `1161`**.
+- **`#5418`/`#4707`/`#5754`/`#5840`** are labelled 6000/7000/5000 series
+  (RDNA 2/3): `pp_dpm_mclk` stuck under FreeSync, KWin page-fault + ring
+  timeout, Samsung-TV HDMI link retrain loop. Different silicon.
+
+## Mailing-list and merged-tree sweep, 2026-09-24 (the "everything in linux-next" pass)
+
+Two method notes first, because both cost time and produced **false clean
+results** that looked like real answers.
+
+### `v7.3-rc4` is not a tag in the AMD trees
+
+`git -C repos/agd5f-linux log v7.3-rc4..origin/amd-staging-drm-next` printed
+nothing — and prints nothing when the tag does not resolve, with the `2>/dev/null`
+hiding `fatal: bad revision`. Every "0 commits since rc4" reading for
+`agd5f-linux`, `amd-staging-drm-next`, `drm-next`, `linux-pm` and `akpm-mm` was
+an **empty range, not an empty diff**. Those clones are `--shallow-since`, so
+the rc4 *commit object* is absent too and cannot be substituted. Use a date
+window (`--since=`) on a shallow tree, or verify the ref first:
+
+```bash
+git -C repos/<tree> rev-parse -q --verify v7.3-rc4^{commit} || echo TAG-MISSING
+```
+
+### The lore mirrors are bare repos
+
+`repos/lore-*` have no `.git` — the repo *is* the directory. `git -C repos/lore-amdgfx`
+fails; use `git --git-dir=repos/lore-amdgfx`. And `git show <sha>` on a mirror
+**diffs the mail file**, so the payload must be recovered by replaying the
+hunks (context `+` added lines), not by taking `+` lines alone — the latter
+drops every context line and yields a malformed patch. Two further traps hit
+here: a folded `Subject:` needs unfolding (a naïve `^Subject:` regex truncates
+it mid-sentence), and splitting a multi-file diff on `'\ndiff --git '` consumes
+the final newline, which `git apply` reports as *"corrupt patch at line N+1"*.
+`patch` accepted that file with fuzz; `git apply` did not. **Run both.**
+
+### The tracker's notes endpoint is now authenticated
+
+`/projects/drm%2Famd/issues/<n>/notes`, `/discussions` and `/links` return
+`401 Unauthorized` to an unauthenticated client; `/issues`, `/participants`,
+`/related_merge_requests` and `/closed_by` still return 200. Issue **comments
+are no longer readable without a token** — earlier sweeps' 1642-comment pass
+cannot be repeated as written. The issue *descriptions* are still served.
+
+### `tip` — 304 commits since rc4, all 7.4-queued
+
+Twelve looked on-target; **all twelve are already in `next-20260924`**, so they
+are next-merge-window material, not 7.3 fixes. Not adopted. The nearest misses:
+
+- `a0bb6fac53fa` sched/core PSI IRQ-time accounting (`Fixes:` tag) — relevant
+  in principle, we do use PSI, but under scx full-switch the core accounting
+  path is not what this machine runs.
+- `b8d1d5b63a8e` x86/mce hardware debug-register corruption on task migration.
+- The six `sched/cache` commits (`CONFIG_SCHED_CACHE=y` here) include two UAF
+  fixes. **Worth revisiting at the bump**: the UAF is in
+  `task_struct->sched_cache_grp` teardown, which can fire independently of
+  which class schedules the task, so "inert under scx full-switch" may not
+  cover those two the way it covers the LLC-placement hunks.
+- `228200f695c0` `x86/CPU/AMD: Fix Zen5 TLB sizes` — **Zen5**, not Zen 4.
+
+### `sched-ext` — four candidates, none clearing the bar
+
+We run scx full-switch, so this list matters. Not adopted, and the reason is
+provenance rather than applicability: each carries only the author's
+`Signed-off-by`, is **not in `next-20260924`**, and has no `Reviewed-by`.
+
+| Mail sha | Subject | Status |
+|---|---|---|
+| `ab87217cfb` | Count `SCX_EV_SUB_BYPASS_DISPATCH` in the dispatch fallback | author SoB + `Fixes:` only |
+| `740162e26b` | Specialize the DSQ hashtable compare | author SoB only |
+| `4b47fc7629`/`b8a7215ddc` | Specialize the TID / scheduler hashtable compare | `Suggested-by: Tejun Heo`, no review |
+| `ffd987bc41`/`4d960bbde1` | reject DSQ draining / reenqueue (08 and 09 of a 16-part Andrea Righi series) | not reviewed; adopting two parts of sixteen out of order is its own risk |
+
+Already carried from the same list: `2416` (CPU-hotplug hang), `2417` (DSQ
+relock on remote moves), `2418` (dsq_vtime placement).
+
+### `linux-pm` — both amd-pstate candidates already carried
+
+`cpufreq: amd-pstate: Propagate cppc_set_auto_sel() errors on mode change` is
+**`1232`**. The `TOCTOU when changing driver mode via sysfs` posting is the
+documented false candidate: **`1227` already takes the lock before reading
+`mode_state_machine[][]`**, which is the fix. Neither adopted; both recorded so
+the next sweep does not re-open them. The `ACPI: CPPC: Resource Priority
+Register` series (10+ parts) is new but is a feature for platforms exposing
+those `_CPC` entries, not a fix.
+
+### `netdev` — wrong chip
+
+`RTL8261C/D` PHY work (LEDs, SerDes lane polarity) is a **discrete 10G PHY**;
+this machine's NIC is an **RTL8125B** MAC-integrated 2.5GbE driven by `r8169`.
+Nothing for `r8169` in the window.
+
+### Still unreachable
+
+`drm-misc` — TTM / dmemcg / dma-buf — returned **HTTP 503** for the whole
+session, and `drm-next`'s fetch failed the same way (`RPC failed; HTTP 503`).
+That remains the one subsystem this sweep cannot speak to.
+
+## Adopted 2026-09-24 — the DC Patches September 22th batch (255 -> 258)
+
+`[PATCH 00/34] DC Patches September 22th, 2026`, posted to `lore-amdgfx`
+2026-09-24 by Fangzhi Zuo. Three taken, one rejected on evidence.
+
+| # | Subject | Mail sha | Review |
+|---|---|---|---|
+| `1171` | Serialize HDMI FRL status polling against link detect (05/34) | `118d17a1b8` | `Reviewed-by: Harry Wentland` |
+| `1172` | Skip HDMI FRL status polling while link is down (11/34) | `24647c058c` | `Reviewed-by: Harry Wentland` |
+| `1173` | avoid to write signal specific for tmds (23/34) | `ecd548fd4f` | `Reviewed-by: Michael Strauss` |
+
+### Why these three, and not the other thirty-one
+
+The batch is a DC pull request, so most parts are DCN60 / DCN42 / DCN30 /
+DCE 6.x and **cannot run here** — this machine is DCN 4.0.1. The three taken
+all sit on paths this machine actually executes:
+
+- **`1171`/`1172` are one change in two steps**, both in
+  `hdmi_frl_status_polling_work()` — the HPD-driven FRL status poll. `1171`
+  takes `dm->dc_lock` with `mutex_trylock()` around the *whole* link walk
+  instead of only around `dc_link_detect()`, so polling can no longer race a
+  link detect after an unplug/replug; `1172` then skips links whose
+  `link_status.link_active` is false. The mail states the failure plainly:
+  *"Hotplugging an HDMI FRL sink can wedge DMCUB when a poll-driven retrain
+  lands on a link whose PHY has just been torn down ... the sink SCDC reads
+  back version 0 and the display fails to light up."* This machine drives the
+  MSI MAG251RX over HDMI **on FRL** (boot log: `DP-HDMI FRL PCON supported`),
+  so both the race and the wedge are reachable here.
+- **`1173`** adds an `is_frl` argument to `write_scdc_data()` and passes
+  `dc_is_hdmi_frl_signal()` from `enable_link_hdmi()` and
+  `link_set_dpms_off()`, so a TMDS mode change stops writing signal-specific
+  SCDC state. *"some panel will generate HPD if receive invalid the action"* —
+  a spurious HPD on a TMDS transition. Both call sites are on this machine's
+  HDMI enable/disable path.
+
+`1172`'s mail also carries a hunk against
+`display/amdgpu_dm/tests/amdgpu_dm_connector_test.c` that does **not** apply:
+the test additions it edits arrived in the *September 16th* batch, which is
+not carried. Its test hunk was stripped; the diffstat line is absent
+accordingly. The code hunk applies with no fuzz and was verified in series
+order after `1171`.
+
+### Rejected: `24/34` — "Fix HDMI2.2 LT timeout duration" (`b59580b90b`)
+
+This one is the reason the batch needed reading rather than skimming. It
+rewrites the polling loop in `hdmi_frl_perform_link_training()` — the *same
+function* as our carried `1136` + `1168` — replacing poll counting with
+wall-clock timeouts. It applies cleanly to the series tree. **It is rejected
+because adopting it would undo `1168` at exactly the rate class this machine
+uses.**
+
+`24/34` sets `poll_timeout_ns = 200 ms`, then raises it to 300 ms only
+`if (link_settings->frl_link_rate >= HDMI_FRL_LINK_RATE_16GBPS)`. The ledger
+entry for `1168` records that this machine's MAG251RX link is **FRL6, below
+the 16 Gbps threshold**, which is precisely why `1168` makes the 300 ms
+budget unconditional. Under `24/34` that link would get **200 ms** — *less*
+than the 105-poll (~210 ms) budget it had before `1136`, and well under the
+~310 ms `1168` gives it. The rewrite may be the better structure, but as
+posted it is a regression here.
+
+**Revisit together with `1136`/`1168` at the 7.4 bump**, where a rebase is
+required anyway: at that point either AMD widens the budget at every rate, or
+the local delta is re-applied on top of their rewrite. Do not cherry-pick
+`24/34` alone.
+
+### Rejected: `6f742bc837f1` — "Restore FreeSync VCP code check for HDMI/PCON sinks"
+
+Same batch, older posting (`2026-09-09`, `Reviewed-by: Roman Li`, `Reviewed-by:
+Alex Hung`, `Tested-by: Dan Wheeler`). Its `Fixes:` names *"Consult MCCS
+FreeSync cap only if requested & supported"* — **the exact commit our `1164`
+reverts.** That makes it look like an obvious swap. It is not, and the
+difference is the whole reason `1163`/`1164` exist.
+
+Upstream's restored check is:
+
+```c
+if ((sink->sink_signal == SIGNAL_TYPE_HDMI_TYPE_A ||
+     as_type == FREESYNC_TYPE_PCON_IN_WHITELIST) &&
+    !sink->edid_caps.freesync_vcp_code)
+	freesync_capable = false;
+```
+
+Our applied tree (`amdgpu_dm_connector.c:3965`) instead has:
+
+```c
+if ((sink->sink_signal == SIGNAL_TYPE_HDMI_TYPE_A ||
+     as_type == FREESYNC_TYPE_PCON_IN_WHITELIST) &&
+    !connector->display_info.hdmi.vrr_cap.supported &&
+    (!sink->edid_caps.freesync_vcp_code ||
+     (sink->edid_caps.freesync_vcp_code && !sink->mccs_caps.freesync_supported)))
+	freesync_capable = false;
+```
+
+Two differences, both decisive:
+
+1. **`6f742bc837f1` covers only the `!freesync_vcp_code` half.** Our
+   unconditional clear already handles that case *and* the
+   `freesync_vcp_code && !mccs_caps.freesync_supported` case — which is the
+   one that actually fires on the MAG251RX, an AMD-VSDB sink whose MCCS VCP
+   does not answer. So the upstream patch adds nothing for this monitor.
+2. **Adopting it would *undo* `1163`.** The new check has no
+   `!connector->display_info.hdmi.vrr_cap.supported` guard, so it clears
+   `freesync_capable` for HF-VSDB VRR sinks that lack an EDID VCP code —
+   the exact population `1163` was written to keep capable, and the reason
+   the flicker stopped in rc3-9. Its KUnit change confirms this is
+   deliberate upstream: `dm_test_fs_caps_hdmi_vsdb` flips from
+   `KUNIT_EXPECT_TRUE` to `KUNIT_EXPECT_FALSE`.
+
+Recorded as a **standing divergence**, not a pending swap: if a future base
+drops `1163`, take `6f742bc837f1` and re-verify the MAG251RX with
+`/sys/class/drm/card*-HDMI-A-1/vrr_capable`.
+
+### Checked and already carried (no action)
+
+Every on-target commit in agd5f `drm-next` / `amd-staging-drm-next` since
+2026-09-08 was reverse-tested **and** identifier-probed against the series
+tree, because reverse-apply alone false-positives:
+
+| Commit | Subject | Status |
+|---|---|---|
+| `aee05c455ad3` | atom: bound the VBIOS getters | carried as **`1072`** (`bios_size` guards at `atom.c` 1423/1491/1498 confirmed) |
+| `a2a27745350c` | reserve root PD fence slots for userq eviction-fence rearm | carried |
+| `5e6b21bce9d9` | reserve eviction-fence slot at WPTR caller | carried |
+| `636139603b99` | hold a runtime PM reference for P2P dma-buf attachments | carried |
+| `04de4007d323` | Fix GPU PCIe link capability reporting | carried |
+| `bc7f95c8ddb6` | Revert "request DMUB HW cursor offload" | rejected earlier, reason in ledger: DCN42-only, reverted commit not carried |
+
+### Wrong-chip rejections from the same pass
+
+- `f35aa5c77f5f` `pm: bound SCLK FCW range entries` — the stack overflow is in
+  `polaris10_get_sclk_range_table()` / `vegam_get_sclk_range_table()`. Both are
+  powerplay DPM; this machine runs `smu_v14_0_0`. Never called here.
+- `a24db07159cd` gfx12.**1** trap workaround, `b2adbdf861e3` GFX 12.**1**
+  `CP_HQD_PQ_CONTROL.SCOPE`, `473b54b63504` DCN42B plane alpha,
+  `228200f695c0` **Zen5** TLB sizes — four different versions of "the filename
+  or the family looks like ours".
+
+## Adopted 2026-09-24 (late) — two reviewed fixes from the mailing-list pass (253 -> 255)
+
+Both cleared the bar the rest of this session's adoptions cleared: reviewed by
+an AMD maintainer, or applied by the subsystem maintainer.
+
+| # | Subject | Review | Why on-target |
+|---|---|---|---|
+| `1075` | drm/amdgpu: don't leak bo_va when `gem_object_open` fails (Xiang Liu, AMD) | **`Reviewed-by: Felix Kuehling`**, **`Acked-by: Alex Deucher`** | Real leak in `amdgpu_gem.c`: an unchecked `amdgpu_vm_bo_add` plus a missing `amdgpu_vm_bo_del` on the error path. Reachable — `amdgpu_evf_mgr_attach_fence` can fail via `ttm_bo_validate`. Applies clean to rc4 **and in series order** |
+| `2418` | sched_ext: Place `dsq_vtime` next to `dsq_priq` (Usama Arif) | **Applied by Tejun Heo to `sched_ext/for-7.4`** | Moves `u64 dsq_vtime` beside `struct rb_node dsq_priq` so rbtree insertion reads both on one cache line. This machine runs scx full-switch, so the DSQ path is hot. Applies clean to rc4 **and in series order**. Changes `struct sched_ext_entity` layout, so out-of-tree scx schedulers built against an older `vmlinux.h` would need a rebuild — CO-RE consumers are unaffected |
+
+### Considered and NOT adopted, with the reason
+
+- **The ATOM parameter-space pair** (`[PATCH v2] fix ATOM parameter space index
+  bounds check` and `[PATCH v3] prevent parameter-space underflow in nested ATOM
+  table calls`, Aldo Ariel Panzardo). Genuinely interesting: external callers
+  pass `sizeof(args)` (bytes) for `params_size`, while `atom.c` uses `ctx->ps_size`
+  as an *element* count in `idx < ctx->ps_size` — so the bound really is 4x too
+  permissive, and `ps_size / 4` is the correct expression. Two things stop it:
+
+  1. **No review.** Zero `Reviewed-by`/`Acked-by` anywhere in either thread, and
+     the author posted v2 and v3 inside one day, so the shape is unsettled.
+  2. **An unresolved interaction.** `atom.c` line ~1669 calls
+     `amdgpu_atom_execute_table(ctx, ATOM_CMD_INIT, ps, 16)` for a buffer that is
+     64 bytes (`memset(ps, 0, 64)` two lines later). Under the patch's own
+     bytes model that call should pass `64`, and the patch would shrink its
+     window from 16 elements to 4. `ATOM_CMD_INIT` only writes `ps[0]`/`ps[1]`,
+     so it likely still works — but "likely still works" is not a review, and
+     this is the VBIOS parser every AMD GPU here depends on. **Revisit when it
+     gets review or the call site is fixed.**
+- **The io_uring `CQE32`/`CQE_MIXED` refill pair** (Hui Peng). Jens Axboe replied
+  to the author: *"I did do this work for you and split it into a 7.3 and 7.4
+  set. See my branches."* Checked his branches directly — **`io_uring-7.3`'s head
+  is `a3bdf68feecc`, which is exactly the commit we carry as `2048`.** So the
+  7.3 half is already ours and the refill fix is on `for-7.4/io_uring`:
+  **7.4-bound, not for now.**
+
 ## `1073` replaced by `1074` — the upstream, reviewed version of the same fix
 
 `1073` was adopted earlier on 2026-09-24 from **drm/amd work item #5663** with

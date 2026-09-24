@@ -15,6 +15,93 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc4-14-sleepy-next]: 2026-09-24
+
+### Added
+
+Three patches from `[PATCH 00/34] DC Patches September 22th, 2026`, the AMD
+display pull request posted to `lore-amdgfx` on 2026-09-24. All three sit on
+paths this machine runs; the rest of the batch is DCN60/DCN42/DCN30/DCE and
+cannot execute on DCN 4.0.1.
+
+- **`1171` — Serialize HDMI FRL status polling against link detect**
+  (`Reviewed-by: Harry Wentland`). `hdmi_frl_status_polling_work()` now takes
+  `dm->dc_lock` with `mutex_trylock()` around the whole link walk rather than
+  only around `dc_link_detect()`, so the poll can no longer race a link detect
+  after an unplug/replug.
+- **`1172` — Skip HDMI FRL status polling while link is down**
+  (`Reviewed-by: Harry Wentland`). Stops a poll-driven retrain landing on a
+  link whose PHY was just torn down — per the mail, that wedges DMCUB and the
+  sink's SCDC then reads back version 0, leaving the display dark.
+- **`1173` — avoid to write signal specific for tmds**
+  (`Reviewed-by: Michael Strauss`). Threads `is_frl` into `write_scdc_data()`
+  so a TMDS transition stops writing signal-specific SCDC state, which on some
+  panels provokes a spurious HPD.
+
+`1172`'s hunk against `amdgpu_dm_connector_test.c` was dropped — it edits test
+additions from the September 16th batch, which is not carried. The code hunk
+is unaffected and was verified in series order after `1171`.
+
+258 patches.
+
+### Not adopted, with reasons
+
+- **`24/34` "Fix HDMI2.2 LT timeout duration"** — applies cleanly and rewrites
+  the polling loop in `hdmi_frl_perform_link_training()`, the same function as
+  our `1136`+`1168`. Rejected: it sets a 200 ms timeout and raises it to 300 ms
+  **only at ≥ 16 Gbps**, but this machine's MAG251RX link is FRL6, below that
+  threshold — the exact reason `1168` makes the budget unconditional. Taking it
+  would cut this link's budget from ~310 ms to 200 ms, less than it had before
+  `1136`. Revisit with `1136`/`1168` at the 7.4 bump, not alone.
+- **`6f742bc837f1` "Restore FreeSync VCP code check for HDMI/PCON sinks"** —
+  its `Fixes:` names the very commit our `1164` reverts, so it looks like a
+  swap. It is not: it restores only the `!freesync_vcp_code` half (which our
+  unconditional clear already covers), and it has no HF-VSDB VRR guard, so
+  adopting it would undo `1163` and re-clear `freesync_capable` for HDMI Forum
+  VRR sinks — the change that stopped the rc3 flicker. Recorded as a standing
+  divergence.
+- **Wrong chip**, verified rather than assumed: `f35aa5c77f5f` (powerplay
+  `polaris10`/`vegam` only), `a24db07159cd` and `b2adbdf861e3` (GFX 12.**1**),
+  `473b54b63504` (DCN42B), `228200f695c0` (**Zen5** TLB sizes).
+
+### Verified already carried
+
+On-target commits since 2026-09-08 in `agd5f` `drm-next`/`amd-staging-drm-next`
+were reverse-tested *and* identifier-probed: `aee05c455ad3` (carried as `1072`,
+`bios_size` guards confirmed in `atom.c`), `a2a27745350c`, `5e6b21bce9d9`,
+`636139603b99`, `04de4007d323`.
+
+## [7.3.0-rc4-13-sleepy-next]: 2026-09-24
+
+### Added
+
+- **`1075` — drm/amdgpu: don't leak bo_va when `gem_object_open` fails**
+  (Xiang Liu). `Reviewed-by: Felix Kuehling`, `Acked-by: Alex Deucher`. A real
+  leak in `amdgpu_gem.c` — an unchecked `amdgpu_vm_bo_add` and a missing
+  `amdgpu_vm_bo_del` on the error path, reachable because
+  `amdgpu_evf_mgr_attach_fence` can fail via `ttm_bo_validate`.
+- **`2418` — sched_ext: Place `dsq_vtime` next to `dsq_priq`** (Usama Arif,
+  applied by Tejun Heo to `sched_ext/for-7.4`). Puts the two fields rbtree
+  insertion touches on one cache line. This machine runs scx full-switch.
+  Note it changes `struct sched_ext_entity` layout — out-of-tree scx schedulers
+  built against an older `vmlinux.h` need a rebuild; CO-RE consumers do not.
+
+255 patches.
+
+### Not adopted, with reasons
+
+- **ATOM parameter-space bounds pair** — the analysis is sound (external callers
+  pass bytes while `atom.c` treats `ps_size` as an element count, so the bound is
+  4x too permissive), but there is **no review on either patch**, the author
+  posted v2 and v3 within a day, and adopting it would shrink the
+  `ATOM_CMD_INIT` window at `atom.c:1669` — a call that passes `16` for a
+  **64-byte** buffer, which is inconsistent under the patch's own bytes model.
+  This is the VBIOS parser every AMD GPU here depends on. Revisit with review.
+- **io_uring CQE32/CQE_MIXED refill** — Jens told the author he had already done
+  the work and split it into 7.3 and 7.4 sets. His `io_uring-7.3` head is
+  `a3bdf68feecc`, **exactly the commit we carry as `2048`** — so the 7.3 half is
+  already ours and the rest is on `for-7.4/io_uring`.
+
 ## [7.3.0-rc4-12-sleepy-next]: 2026-09-24
 
 ### Changed

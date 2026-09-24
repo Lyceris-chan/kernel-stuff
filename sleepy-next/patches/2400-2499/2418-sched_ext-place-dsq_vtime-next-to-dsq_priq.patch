@@ -1,0 +1,87 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Usama Arif <usama.arif@linux.dev>
+Date: Thu, 24 Sep 2026 09:14:46 -0700
+Subject: [PATCH] sched_ext: Place dsq_vtime next to dsq_priq
+Message-ID: <20260924161446.3039726-1-usama.arif@linux.dev>
+
+scx_dispatch_enqueue() calls rb_add() for a vtime-ordered DSQ while
+holding dsq->lock. At each level of the descent, scx_dsq_priq_less()
+loads the visited task's dsq_vtime, and that comparison selects rb_left
+or rb_right from the same task's dsq_priq. In the x86-64 benchmark
+configuration, these accesses fell on different 64-byte cache lines
+before this change, so a cold visited task could require a second cache
+line fill on the dependent descent path.
+
+Move dsq_vtime immediately before dsq_priq, keeping dsq_seq and
+dsq_flags next to dsq_list. In the two x86-64 layouts inspected, where
+scx starts at offsets 776 and 840 in task_struct, the fields from
+dsq_list through dsq_priq occupy one cache line. The exact cache line
+placement depends on the containing task_struct layout and is not
+guaranteed for every configuration or architecture. Where they share a
+line, avoiding the dependent cache line fill helps reduce dsq->lock hold
+time during vtime insertion and therefore contention on the lock.
+
+In a 16-vCPU KVM guest, the instrumented enqueue interval was 4-6%
+shorter with scx_lavd and scx_layered. scx_mitosis and end-to-end
+workload time showed no consistent change.
+
+This only reorders fields; no scheduling behavior change is intended.
+
+Signed-off-by: Usama Arif <usama.arif@linux.dev>
+
+---
+Applied by Tejun Heo to sched_ext/for-7.4 (reply of 2026-09-24).
+---
+ include/linux/sched/ext.h | 23 ++++++++++++-----------
+ 1 file changed, 12 insertions(+), 11 deletions(-)
+
+diff --git a/include/linux/sched/ext.h b/include/linux/sched/ext.h
+index 1e1fc3312bc40..b856768716249 100644
+--- a/include/linux/sched/ext.h
++++ b/include/linux/sched/ext.h
+@@ -197,9 +197,19 @@ struct sched_ext_entity {
+ 	u64			ddsp_slice;
+ 	u64			ddsp_vtime;
+ 	struct scx_dsq_list_node dsq_list;	/* dispatch order */
+-	struct rb_node		dsq_priq;	/* p->scx.dsq_vtime order */
+ 	u32			dsq_seq;
+ 	u32			dsq_flags;	/* protected by DSQ lock */
++
++	/*
++	 * Used to order tasks when dispatching to the vtime-ordered priority
++	 * queue of a dsq. This is usually set through
++	 * scx_bpf_dsq_insert_vtime() but can also be modified directly by the
++	 * BPF scheduler. Modifying it while a task is queued on a dsq may
++	 * mangle the ordering and is not recommended. Kept next to @dsq_priq
++	 * as rbtree insertion reads both on every visited node.
++	 */
++	u64			dsq_vtime;
++	struct rb_node		dsq_priq;	/* p->scx.dsq_vtime order */
+ 	u32			flags;		/* protected by rq lock */
+ 	u32			weight;
+ 	u32			reenq_cnt;	/* reenqueues since last run */
+@@ -225,7 +235,7 @@ struct sched_ext_entity {
+ 	u64			tid;
+ 	struct rhash_head	tid_hash_node;	/* see SCX_OPS_TID_TO_TASK */
+ 
+-	/* BPF scheduler modifiable fields */
++	/* BPF scheduler modifiable fields, along with @dsq_vtime above */
+ 
+ 	/*
+ 	 * Runtime budget in nsecs - how long the task may hold its cpu. Owned
+@@ -240,15 +250,6 @@ struct sched_ext_entity {
+ 	 */
+ 	u64			slice;
+ 
+-	/*
+-	 * Used to order tasks when dispatching to the vtime-ordered priority
+-	 * queue of a dsq. This is usually set through
+-	 * scx_bpf_dsq_insert_vtime() but can also be modified directly by the
+-	 * BPF scheduler. Modifying it while a task is queued on a dsq may
+-	 * mangle the ordering and is not recommended.
+-	 */
+-	u64			dsq_vtime;
+-
+ 	/*
+ 	 * Out-of-band slice request from scx_bpf_task_set_slice() when the
+ 	 * caller does not hold the rq lock, applied under the rq lock at the
