@@ -2870,6 +2870,73 @@ from 09-20 onward produced ten threads. All ten were resolved, **none adopted**:
   in Mario's series are skipped rather than carried; if that config is ever
   enabled they become live again.
 
+## The 2026-09-24 third-party pass — CachyOS, sirlucjan, firelzrd
+
+These three were **listed in the inventory but not actually swept** in the
+earlier passes; this closes that gap. All three are now current.
+
+### sirlucjan — its local `master` was stale, and that hid real content
+
+`repos/sirlucjan-kernel-patches` local `master` sat at `445db953f8` against
+origin `b564922bc3` — **the same silent-staleness trap** that hit `torvalds`
+and `lore-linux-mm`. The fetch had exited 0. The hidden diff added
+`hdmi-patches-v2`, `bore-dev-patches`, `7.2/t2-patches-v2` and the `poc`
+selector — 49,414 lines across 61 files. Load-bearing files were only visible
+after reading `origin/master`.
+
+| Candidate | Verdict |
+|---|---|
+| `7.3-rc/lru-marie-patches-v2` | **No update.** Ours is `0.11.1**r2**` and differs by exactly one changed-line pair; theirs is plain `0.11.1`. We are ahead. |
+| `7.3-rc/hdmi-patches` → `-v2` | **Reflow only.** The v1→v2 delta is `!connector->display_info…` becoming `if (!connector->display_info…` plus a line re-wrap. No semantic change. |
+| `7.3-rc/cachyos-fixes-patches-v6` | **Mostly off-target**, see below. |
+| `7.3-rc/xswap-patches*` | Deliberately removed 2026-09-22 (backend is zswap + swapfile). |
+| `bore-dev-patches`, `poc-selector` | Not carried: this machine runs sched-ext, not BORE/POC. |
+| `7.2/t2-patches-v2` | Apple T2. Not this hardware. |
+
+**`cachyos-fixes-patches-v6` is 12 patches and ten of them are for other
+machines**: `znver5` (this CPU is Zen 4), two `drm/i915` RC6 quirks for a Tuxedo
+InfinityBook, `iwlwifi`, a Dell XPS `sof` quirk, an ASUE140D touchpad, a
+device-specific `btusb` VID/PID, a motherboard-specific BT entry, and a
+`drm/gud` revert (USB display). Two are worth a decision:
+
+- **`sched/fair: do not scan twice in detach_tasks()`** — **inert here**:
+  `fair.c` does not schedule under scx full-switch.
+- **`sched/core: Make finish_task_switch() always inline`** — **the premise
+  holds on this machine.** Its argument is that the call is not inlined even at
+  -O2 and that this costs when Spectre mitigations are active, because
+  `finish_task_switch()` sits right after `switch_mm_irqs_off()`. This machine
+  reads `spectre_v2: Enhanced / Automatic IBRS; IBPB: conditional; STIBP:
+  always-on`, so mitigations are on and `finish_task_switch()` is core code that
+  scx does *not* bypass. Carrying the CachyOS `fixes` squash is a judgement call
+  the project has made before (`0105`/`0106`, last regenerated from **7.2-rc
+  v11** per the notes) — **and it was not regenerated at the 7.3 bump, with no
+  reason recorded.** Flagged as a gap rather than decided unilaterally.
+
+- **`USB: core: sanitize string descriptors against C0`** — a real robustness
+  fix (firmware leaves control characters in string descriptors, systemd then
+  refuses `ID_SERIAL_SHORT` and mutter won't open the device). The reported
+  device is an ASUS ROG Azoth dongle; not observed on this machine's USB tree
+  (Logitech receiver, HyperX QuadCast S, two hubs). Generic hardening, not a
+  fix for a symptom here.
+
+### firelzrd — nothing to take
+
+| Repo | Newest | Verdict |
+|---|---|---|
+| `firelzrd-lru-marie` | Marie LRU **v0.11.1r2**, 2026-09-15 | Same revision we carry (`2101`). No update. |
+| `firelzrd-bore-scheduler` | BORE **7.0.0**, 2026-09-19 | **No-op here** — this machine runs sched-ext (`scx_cake`), not BORE. |
+| `firelzrd-le9uo` | le9uo 1.15, 2026-05-01 | Stale, and inert under LRU-MARIE, which owns reclaim. |
+
+### CachyOS — all 7.3 branches, not just the tips
+
+Only three exist for 7.3: `7.3/hdmi`, `7.3/base`, `7.3/xswap`.
+
+- `7.3/hdmi` — its head is `96f023bb8c13` *"Keep FreeSync for HF-VSDB VRR sinks
+  in MCCS fallback"*, which **we already carry as `1163`** (plus `1164`). The
+  rest of that branch is `1150`/`1151` (passive_vrr) and `1152` (VTEM). Synced.
+- `7.3/base` and `7.3/xswap` — the latter is the xswap series we removed
+  deliberately; the former is CachyOS's own tree, not a patch source.
+
 ## The 2026-09-24 full-series audit — every patch placed
 
 Ran three independent tests over all **243** carried patches. Result: no patch is
