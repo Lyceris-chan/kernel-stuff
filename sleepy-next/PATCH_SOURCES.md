@@ -3112,6 +3112,111 @@ Only three exist for 7.3: `7.3/hdmi`, `7.3/base`, `7.3/xswap`.
 - `7.3/base` and `7.3/xswap` — the latter is the xswap series we removed
   deliberately; the former is CachyOS's own tree, not a patch source.
 
+### Work-item comments: the pageflip cluster is already fixed here
+
+Scanning comment bodies across the 25 recently-updated on-target issues via
+GraphQL, one commit shows up in **eleven** pageflip-timeout threads:
+`63e19ef3ddab` — *"drm/amd/display: Atomize IRQ register read/modify/write
+ops"*. The maintainers' reply on all of them is the same: *"Could you please
+retest this on kernel 7.3-rc4 or later? There is a fix that may address this
+issue: 63e19ef3ddab ... test with 7.3-rc4+."*
+
+**We have it.** `merge-base --is-ancestor` confirms it is in `v7.3-rc4`, and
+the symbols it introduces (`amdgpu_dm_irq_set()`, `amdgpu_dm_irq_ack()`,
+`amdgpu_dm_irq.h`) are present in the rc4 tree. AMD's recommended fix for this
+machine's documented symptom area is therefore already in the base — worth
+recording precisely because the symptom *looks* like the one this machine has
+history with.
+
+Also confirmed from the same pass: our **`1163` is an AMD posting**, not our
+own work — `[PATCH v1 3/3] drm/amd/display: Keep FreeSync for HF-VSDB VRR sinks
+in MCCS fallback`, Fangzhi Zuo `<Jerry.Zuo@amd.com>`, 2026-09-01,
+`lore-dri-devel` `115cfc056b8d`. Only `1164` (the revert of `cfdcf5571c31`) is
+local. That matters for the `6f742bc837f1` analysis above: the exemption it
+would undo is AMD's, not ours.
+
+No other issue's comments produced an uncarried fix.
+
+## Version sweep 2026-09-26 — every carried patch against its latest posting
+
+The pass the sweep skill calls step 2: 268 carried patches checked against all
+11 lore mirrors (18,260 distinct normalised subjects). Ten carried patches had a
+**strictly higher-version posting** upstream. Seven died to Filter 2, and the
+three survivors died to reasons worth recording.
+
+| Carried | Ours → posted | Verdict |
+|---|---|---|
+| `2037` net/neighbour proxy timer | v1 → v2 | resend — changed lines identical |
+| `2039` net/sched qdisc_alloc_handle | v1 → v3 | resend — identical |
+| `2049` io_uring sqpoll RCU | v1 → v2 | resend — **it *is* the v2 we just adopted**; our header drops the `v2` marker, so the comparison always says v1 |
+| `2144` xarray xas_find | v1 → v2 | resend — identical |
+| `2151` shmem forced collapse | v1 → v2 | resend — identical |
+| `2154` page_alloc bulk GFP | v1 → v3 | resend — identical |
+| `2185` mm/swap off-by-one | v1 → v6 | resend — identical |
+| `1151` passive_vrr | v1 → "v4" | **posting is OLDER than the carry** — v4 is 2026-02-16, ours is 2026-09-01. The documented false positive; the version number says nothing about recency |
+| `2415` sched_ext NMI kfuncs | v1 → v3 | **superseded by our own pair.** The v3 adds an `in_nmi()` check to `scx_kf_allowed()`, but it is written against the pre-split `kernel/sched/ext.c`; our carry targets `kernel/sched/ext/ext.c` and uses `scx_kf_allowed_ctx()`, with the NMI rejection living in `2414` (`scx_locked_rq()` returns NULL from NMI) |
+| `2032` tcp collapse timestamps | v2 → v3 | **real update — adopted** (below) |
+
+**Seven of ten were resends.** That is the expected shape: a higher `vN` is
+usually a rebase or a repost, and `lset()` on the changed lines is what tells
+them apart. Do not skip Filter 2 — a version-number sweep without it reports
+ten actions where one is real.
+
+### The one real update: `2032` → v3
+
+`[PATCH v3 net] tcp: preserve timestamps across receive queue collapse`
+(Jason Xing, 2026-09-24, `Fixes: 98aaa913b4ed`) adds one line our v2 lacks:
+
+```c
+	memcpy(nskb->cb, skb->cb, sizeof(skb->cb));
++	TCP_SKB_CB(nskb)->has_rxtstamp = false;
+```
+
+v3's changelog says it came from **Eric Dumazet**: *"fix a corner case (where
+an skb can contribute no bytes if OOO happens) spotted by AI and Eric"*. The
+`memcpy` of `cb` inherits `has_rxtstamp` from an skb that may contribute no
+bytes (a fully-covered skb left in the ofo tree by `tcp_ooo_try_coalesce()` →
+`coalesce_done`), so the new skb could advertise an RX timestamp it does not
+have. Clearing it first makes the conditional block the only place that sets it.
+
+It scored **NEITHER** in the first dry-run — forward failed on the second hunk
+(already carried), reverse failed on the first (not carried). That is the
+*partial* signature, not a duplicate: our tree has hunk 2 and lacks hunk 1.
+Verified by reverting our v2 to base and applying v3 at that exact series
+position — both checkers clean.
+
+### The duplicate I nearly added — and the reason I missed it
+
+`#5870` (an `amdgpu_sync_add_later` use-after-free on RX 9070 XT) has a
+commenter pointing at Donggeun Yoo's *"don't release the fence reference
+consumed by the scheduler"*. The bug is real and I verified it from source:
+`drm_sched_job_add_dependency()` puts the incoming fence both when
+deduplicating and when `xa_alloc()` fails, and stores it otherwise — so every
+path consumes it, and the callers' `dma_fence_put()` on error is a double put.
+Unchanged in `next-20260925`, so it is live. I numbered it `1081` and was one
+step from building it.
+
+**We already carry it as `1064`** — the same three files, the same hunks, and
+CLAUDE.md names `1064` as the worked example of this exact mistake. The check I
+ran to rule it out was:
+
+```bash
+rg -l 'dma_fence_put(f)' sleepy-next/patches/     # matches nothing
+```
+
+`(f)` is a **capture group**, not a literal — that regex matches the string
+`dma_fence_putf`, which appears nowhere, so the search came back empty and I
+read the silence as "no patch touches this". It needed `dma_fence_put\(f\)`.
+
+Two rules, one old and one new:
+
+- **Escape the parentheses.** A grep for a C function call must escape `(`/`)`,
+  or it silently matches nothing — and "nothing" is indistinguishable from
+  "clean" unless you also grep for something you know is there.
+- **Grep the *subject* and the *function*, not just an identifier you pick.**
+  The rule was already written down and I still skipped it. `rg -l 'consumed by
+  the scheduler' sleepy-next/patches/` would have found `1064` immediately.
+
 ## ADOPTED 2026-09-26: `2049` — io_uring SQPOLL task-work publication UAF
 
 `[PATCH v2] io_uring/sqpoll: protect task-work publication with RCU`,

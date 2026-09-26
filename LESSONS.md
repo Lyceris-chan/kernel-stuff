@@ -1,5 +1,27 @@
 # Lessons learned: do not repeat
 
+## An unescaped regex made a duplicate look absent (2026-09-26)
+
+Chasing a real `amdgpu_sync_add_later` use-after-free from work item `#5870`, I
+ruled out that the series already fixed it with:
+
+```bash
+rg -l 'dma_fence_put(f)' sleepy-next/patches/     # matches nothing
+```
+
+`(f)` is a capture group. The pattern matches the literal `dma_fence_putf`,
+which appears in no patch, so the search returned empty — and empty is exactly
+what "no patch touches this" looks like. It needed `dma_fence_put\(f\)`.
+
+The patch we already carry is **`1064`** — and CLAUDE.md names `1064` as the
+worked example of "before proposing a patch as new, grep the series for its
+subject". The rule was written down and I still skipped it, because I grepped
+for an identifier I chose rather than the subject in front of me.
+
+**When grepping for a C call, escape the parentheses. When ruling out a
+duplicate, grep the subject and the function name, and prove the search works
+by also matching something you know is present.**
+
 Full incident log for sleepy-kernel. Kept out of `CLAUDE.md` so the operating
 manual stays short; CLAUDE.md carries only the durable rules. Read this before
 repeating a past mistake. Patch numbers are current as of 7.3-rc3; see
