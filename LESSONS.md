@@ -1,5 +1,50 @@
 # Lessons learned: do not repeat
 
+## Two boot-time messages that are expected, not faults (2026-09-26)
+
+Both look like errors and are consequences of deliberate choices. Recorded so
+the next sweep does not re-open them.
+
+**1. `systemd-sysctl: Couldn't write '0' to 'kernel/nmi_watchdog', ignoring:
+No such file or directory`** — and the same for `kernel/unprivileged_userns_clone`.
+
+`/usr/lib/sysctl.d/70-cachyos-settings.conf` (owned by `cachyos-settings`)
+writes two keys this kernel does not implement:
+
+- `kernel.nmi_watchdog` needs `CONFIG_LOCKUP_DETECTOR` +
+  `CONFIG_HARDLOCKUP_DETECTOR`. **Ours are deliberately unset** — the package
+  targets no bloat / no debugging cruft. The CachyOS reference kernels do set
+  them; that divergence is intentional, so do **not** enable them to silence
+  the message.
+- `kernel.unprivileged_userns_clone` **does not exist in mainline at all**. It
+  is a Debian/Ubuntu patch, shipped in the CachyOS file regardless. Every
+  Arch-based CachyOS user sees this line fail. The state it asks for
+  (unprivileged user namespaces allowed) is mainline's default anyway.
+
+Both are logged at warning level and *ignored* — `systemd-sysctl` reports
+`status=0/SUCCESS`. Nothing is broken.
+
+You cannot silence them from a drop-in: sysctl.d can only *set* keys, never
+remove one, so the only fix is a same-name copy of the vendor file in
+`/etc/sysctl.d/` — which replaces its settings wholesale and goes stale
+silently on every `cachyos-settings` update. **Not worth it for two inert
+lines.** Suppressing the unit's log level would hide genuine sysctl failures,
+which is the exact failure class this repo hunts.
+
+**2. `mkinitcpio: WARNING: No module containing the symbol
+'drm_privacy_screen_register' found in: 'drivers/platform'`** — from
+`/usr/lib/initcpio/install/kms`, which looks for a module implementing the
+laptop privacy-screen interface on kernels >= 5.17. Our PKGBUILD sets
+`scripts/config -d DRM_PRIVACY_SCREEN` (and `-d CHROMEOS_PRIVACY_SCREEN`)
+because this is a desktop with no privacy screen. The symbol is therefore
+genuinely absent, the warning is accurate, and mkinitcpio still exits 0 and
+builds every image.
+
+**The general rule, and it cuts both ways:** *check that a tunable exists
+before believing something is tuned* — but equally, **check whether an
+"error" is the expected consequence of a deliberate choice before "fixing"
+it.** A warning that is accurate and harmless is not a bug.
+
 ## An unescaped regex made a duplicate look absent (2026-09-26)
 
 Chasing a real `amdgpu_sync_add_later` use-after-free from work item `#5870`, I
