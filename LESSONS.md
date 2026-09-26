@@ -1,5 +1,24 @@
 # Lessons learned: do not repeat
 
+## `rg -r` is --replace, not --recursive (2026-09-26)
+
+Hit three times in one session, including twice after writing the rule down.
+ripgrep is recursive by default; `-r` is `--replace`. So:
+
+```bash
+rg -rn 'rp_filter' /etc/sysctl.d/     # WRONG: prints  net.ipv4.conf.default.n = 2
+rg -n  'rp_filter' /etc/sysctl.d/     # right
+```
+
+The output looks plausible — real file paths, real line numbers, just with
+every match silently overwritten by the letter `n`. It does not error, and it
+does not warn. In a session where the whole job is reading config values,
+`-r` turns the answer into nonsense while looking like an answer.
+
+**Use `rg -n`. If the match text is inexplicably a single letter, you used
+`-r`.** The same trap applies to `-r ''` (deletes the match) and any other
+replacement string.
+
 ## Two boot-time messages that are expected, not faults (2026-09-26)
 
 Both look like errors and are consequences of deliberate choices. Recorded so
