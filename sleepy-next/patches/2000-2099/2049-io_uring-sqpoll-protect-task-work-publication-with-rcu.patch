@@ -1,0 +1,69 @@
+From: =?UTF-8?q?J=C3=A9r=C3=A9my=20Jean?= <Jeremy.Jean@oss.cyber.gouv.fr>
+Date: Fri, 25 Sep 2026 09:50:07 +0000
+Subject: [PATCH] io_uring/sqpoll: protect task-work publication with RCU
+
+SQPOLL can consume a request immediately after mpscq_push(). If this
+drops the final ring reference, ctx and tctx may be freed before
+io_req_normal_work_add() finishes using them. KASAN reports:
+  BUG: KASAN: slab-use-after-free in io_req_normal_work_add+0x439/0x510
+  Read of size 4 at addr ff11000000ca0000 by task repro/55
+  (...)
+  BUG: KASAN: slab-use-after-free in queue_work_on+0x25/0x70
+  Write of size 8 at addr ff11000000c3bd00 by task repro/55
+Add guard(rcu)() to io_req_normal_work_add() and wait for RCU readers
+when freeing an SQPOLL ring, as done for DEFER_TASKRUN. Save
+tctx->task before queueing the request so notification can use the
+saved pointer under RCU even if SQPOLL cancellation has freed tctx.
+Fixes: af5d68f8892f ("io_uring/sqpoll: manage task_work privately")
+Assisted-by: LLM
+Signed-off-by: Jérémy Jean <Jeremy.Jean@oss.cyber.gouv.fr>
+---
+Changes in v2:
+- Add guard(rcu)() to io_req_normal_work_add() (Jens Axboe).
+- Extend io_ring_exit_work()'s synchronize_rcu() to SQPOLL (Jens Axboe).
+- Cache tctx->task before publication for SQPOLL cancellation.
+v1: https://lore.kernel.org/all/20260924205056.3759980-2-Jeremy.Jean@oss.cyber.gouv.fr/
+ io_uring/io_uring.c | 4 ++--
+ io_uring/tw.c       | 7 ++++++-
+ 2 files changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/io_uring/io_uring.c b/io_uring/io_uring.c
+index 61053421d809..a1e961549468 100644
+--- a/io_uring/io_uring.c
++++ b/io_uring/io_uring.c
+@@ -2403,8 +2403,8 @@ static __cold void io_ring_exit_work(struct work_struct *work)
+ 	spin_lock(&ctx->completion_lock);
+ 	spin_unlock(&ctx->completion_lock);
+ 
+-	/* pairs with RCU read section in io_req_local_work_add() */
+-	if (ctx->flags & IORING_SETUP_DEFER_TASKRUN)
++	/* pairs with RCU read sections in io_req_{local,normal}_work_add() */
++	if (ctx->flags & (IORING_SETUP_DEFER_TASKRUN | IORING_SETUP_SQPOLL))
+ 		synchronize_rcu();
+ 
+ 	io_ring_ctx_free(ctx);
+diff --git a/io_uring/tw.c b/io_uring/tw.c
+index f573bcc3af6a..0985b6ab6dfe 100644
+--- a/io_uring/tw.c
++++ b/io_uring/tw.c
+@@ -209,6 +209,10 @@ void io_req_normal_work_add(struct io_kiocb *req)
+ {
+ 	struct io_uring_task *tctx = req->tctx;
+ 	struct io_ring_ctx *ctx = req->ctx;
++	struct task_struct *task = tctx->task;
++
++	/* pairs with synchronize_rcu() in io_ring_exit_work() */
++	guard(rcu)();
+ 
+ 	/* tw run already pending, nothing else to do */
+ 	if (!mpscq_push(&tctx->task_list, &req->io_task_work.node))
+@@ -223,7 +227,8 @@ void io_req_normal_work_add(struct io_kiocb *req)
+ 
+ 	/* SQPOLL doesn't need the task_work added, it'll run it itself */
+ 	if (ctx->flags & IORING_SETUP_SQPOLL) {
+-		__set_notify_signal(tctx->task);
++		/* SQPOLL cancellation may have freed tctx after the push. */
++		__set_notify_signal(task);
+ 		return;
+ 	}
+ 

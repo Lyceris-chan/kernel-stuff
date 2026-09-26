@@ -3112,6 +3112,210 @@ Only three exist for 7.3: `7.3/hdmi`, `7.3/base`, `7.3/xswap`.
 - `7.3/base` and `7.3/xswap` — the latter is the xswap series we removed
   deliberately; the former is CachyOS's own tree, not a patch source.
 
+## ADOPTED 2026-09-26: `2049` — io_uring SQPOLL task-work publication UAF
+
+`[PATCH v2] io_uring/sqpoll: protect task-work publication with RCU`,
+Jérémy Jean `<Jeremy.Jean@oss.cyber.gouv.fr>`, 2026-09-25,
+`lore-io-uring` `7512dd8004b2`, `Fixes: af5d68f8892f` ("io_uring/sqpoll: manage
+task_work privately").
+
+**The bug is in our base, confirmed by reading rc4 directly.**
+`io_uring/tw.c:226` in `v7.3-rc4` reads `tctx->task` *after*
+`mpscq_push()`; SQPOLL can consume the request immediately, drop the final
+ring reference, and free `ctx`/`tctx` underneath. The reporter's KASAN trace:
+
+```
+BUG: KASAN: slab-use-after-free in io_req_normal_work_add+0x439/0x510
+BUG: KASAN: slab-use-after-free in queue_work_on+0x25/0x70
+```
+
+**Why this one is adopted, and it is not the author's first design.** The v1
+patch pinned the task with `get_task_struct()`/`put_task_struct()` around the
+push. **Jens Axboe rejected that approach on the list:** *"Thinking about this
+a bit more, I think the following fix would be better: 1) Add a `guard(rcu)()`;
+in `io_req_normal_work_add()` at the top, which is how we handle this for
+DEFER_TASKRUN as well. 2) And similarly, expand the `synchronize_rcu()` run in
+`io_ring_exit_work()` to also include `IORING_SETUP_SQPOLL`. I think that's both
+a cleaner and more efficient fix, rather than fiddle with task_struct
+references."*
+
+**v2 implements exactly that**, hunk for hunk. So the `Signed-off-by` is the
+reporter's, but the design is the maintainer's, prescribed in the thread — which
+is why this clears the bar despite carrying no `Reviewed-by`. Taking v1 here
+would have been taking a fix the maintainer had just argued against.
+
+**On-target?** It is not hardware-specific, but the code path is live: the
+sequence is reachable by any `IORING_SETUP_SQPOLL` user whose completion drops
+the last ring reference. The fix is three hunks over two files, it applies
+cleanly to the 267-patch series tree with both checkers, and it pairs its
+`guard(rcu)()` with the widened `synchronize_rcu()` exactly as intended — the
+two halves are useless apart, so they must be carried together or not at all.
+
+### Not adopted from the same sweep
+
+- **`sched-ext`** (9 postings since 09-24): `Use fetching atomics for cmask`,
+  `Test scx_has_subs() inline before calling sub-sched hooks`,
+  `Count cap-rejected local DSQ inserts in SCX_EV_SUB_REJECT`, and Andrea
+  Righi's `sched_ext/for-7.4` CID/numa kfunc work. **None carries a
+  `Reviewed-by`/`Acked-by` and none is in `next-20260925`.** The CID kfunc is a
+  new feature, not a fix.
+- **`linux-pm`** (31 postings): nothing touching amd-pstate, CPPC, ACPI or
+  cpuidle — the nearest is a hibernation secretmem fix.
+
+## ADOPTED 2026-09-26: `2197` — SLUB prefilled sheaves refill from the barn
+
+`mm/slub: refill prefilled sheaves from the barn`, Hao Li `<hao.li@linux.dev>`,
+2026-09-21, `slab.git` `1b87ea06a34b213e45e3e0c4effd5043f15046ed`.
+`Reviewed-by: Vlastimil Babka (SUSE)` — the SLUB maintainer —
+`Reviewed-by: Harry Yoo (Meta)`, `Signed-off-by: Harry Yoo`.
+
+**What it fixes.** The prefill API refilled a non-full sheaf from partial slabs
+and *never* from the full sheaves in the barn, so once the barn's full list
+filled up it stayed full — and every `kfree_rcu()` sheaf then had to be flushed
+to slabs because there was no room. The patch lets the refill drain the barn
+first and adds a partial sheaf to hold the leftovers, so every full sheaf taken
+out makes room for a future RCU sheaf.
+
+**Why it is on-target here, not merely applicable.** The prefill API has
+exactly one caller in the tree — `lib/maple_tree.c:154` and `:160`
+(`kmem_cache_prefill_sheaf()` / `kmem_cache_refill_sheaf()` on
+`maple_node_cache`) — and the maple tree backs every process's VMA mapping, so
+the path runs constantly. The author's benchmark is will-it-scale `mmap1` on
+that same `maple_node` cache: `27778727 -> 34500556`, **+24.2%**.
+
+**Isolation check.** `rg -l 'mm/slub.c' sleepy-next/patches/` returns nothing —
+no other carried patch touches this file, so there is no interaction with
+LRU-MARIE, gup batching, zswap or zstd. Both checkers pass against the
+266-patch series tree.
+
+### Recorded uncertainty — drop this one first
+
+Stated plainly because it is the weakest part of the entry: **this is an
+optimization, not a fix.** There is no `Fixes:` tag, so unlike the rest of this
+series it is not repairing a known defect on this machine. Two consequences:
+
+- **The measured benefit is from a synthetic.** 192-process will-it-scale
+  `mmap1` is not this desktop's workload. The real gain here is unmeasured and
+  likely much smaller; it is carried because the path is demonstrably live, not
+  because a speedup was observed on this machine.
+- **It has not been through a full -rc cycle.** It sits in `slab.git` for-next,
+  i.e. 7.4 — maintainer review is not the same as mainline exposure. A subtle
+  bug in a core allocator is a severe failure mode, so this patch is the first
+  thing to drop if anything unexplained appears: allocation failures, slab
+  warnings, `BUG: Bad page state`, or anything in `dmesg` naming
+  `barn`/`sheaf`/`slub`.
+
+It is one self-contained file and reverts cleanly, which is what makes carrying
+it an acceptable risk rather than a reckless one.
+
+## Sweep 2026-09-26 — the 7.3-rc5 DRM fixes pull (258 -> 267)
+
+The highest-yield source this pass was not a tree but a **pull request**.
+`[git pull] drm fixes for 7.3-rc5` (Dave Airlie, `lore-dri-devel`,
+`CAPM=9twjOfCE5-LzepSB58uaQtn4kS2yF2sOu52kiJp2xkJXkQ@mail.gmail.com`, merged
+into torvalds as `6812ce4e4379`) carries 60 non-merge commits, 13 of them AMD —
+and every one is a **fix for the kernel we are running**, since our base is
+rc4 and these are the rc5 fixes.
+
+**Why the PR and not the tree.** `repos/torvalds` had the merge; the branch is
+60 commits, of which 13 are ours. Reading the PR body first made the triage
+almost mechanical — the summary lines name exactly the areas ("Display ref
+count fix", "Userq fixes", "VCN 4, 5 reset fixes").
+
+### Adopted (8)
+
+| # | Commit | Subject |
+|---|---|---|
+| `1076` | `aea841bc62a` | amdgpu: Fix vmid_wait fence leak in `amdgpu_ring_init()` |
+| `1077` | `b4f7b4459b1` | amdgpu: Fix last_update fence leak in `amdgpu_vm_init()` |
+| `1078` | `2b86ab1bd66` | amdgpu: Fix runtime PM leak in `amdgpu_debugfs_test_ib_show()` |
+| `1079` | `a997baa6117` | amdgpu: Fix acpi device leak in `amdgpu_acpi_enumerate_xcc()` |
+| `1080` | `c3a31087b1c` | amdkfd: fix use-after-free and multi-container gap in `kfd_dev_mapping` |
+| `1174` | `c5fd4eaad50` | display: Fix dc stream excess put in `dm_update_crtc_state()` |
+| `9079` | `cd195f1616b` | userq: fix double jiffies conversion in hang detect timeout |
+| `9080` | `3022bdfe3e6` | amdgpu: move userq fence wait out of signalling section |
+
+Seven apply clean as posted. `9080` needed **rebasing**, and the reason is worth
+recording: all three of its hunks target code we still have verbatim, but one
+context line in `amdgpu_userq.h` drifted because **our own series changed
+`amdgpu_userq_ensure_ev_fence()` from `void` to `int`**. That is the standing
+"a clean dry-run at a large offset in a subsystem we patch heavily means one of
+our own patches is in there" rule, in its benign form. Rebased by applying with
+GNU patch to a copy and regenerating the diff; the added and removed lines are
+byte-identical to upstream's, only line numbers and that one context line
+differ. Both checkers pass on the result.
+
+`9078` was skipped deliberately — it is a **burned number** (adopted then
+dropped on 2026-09-24 when it turned out to reference a symbol absent from
+rc4). The gap is the evidence.
+
+### Rejected (5)
+
+- **`15814c01ac5`, `18779dd8451`, `0fd5e9ddf36` — the DML frame-warning-limit
+  family.** They exist so the DML build stops *failing* under `CONFIG_WERROR`
+  (and, for the UBSAN one, under sanitizers). **None of that applies here:**
+  `CONFIG_WERROR` is not set, nor `CONFIG_UBSAN`, nor `CONFIG_KASAN`. Our
+  `dc/dml/Makefile` sits at `frame_warn_limit := 2048` against
+  `CONFIG_FRAME_WARN=2048`, so `test-lt` is false and the per-directory flag is
+  **not even emitted**. The family would silence warnings we do not treat as
+  errors — and it *removes* a real signal, since a 2512-byte stack frame on a
+  16 KiB stack is worth seeing. Inert, and inert in the wrong direction.
+- **`f952ed353a2` (vcn5.0.1) and `6b13ddbf5bb` (vcn4.0.3) — video_timeout unit
+  mismatch in the JPEG reset wait.** Real bugs: `adev->video_timeout` is in
+  jiffies and `amdgpu_fence_wait_polling()` takes usecs, so the intended ~2 s
+  wait is a couple of microseconds. **Not ours, and this was checked the hard
+  way rather than by filename.** `amdgpu_discovery.c:2946` shows
+  `IP_VERSION(5,0,0) -> vcn_v5_0_0_ip_block`, and the running kernel reports
+  `vcn_v5_0_0`, so we take `vcn_v5_0_0.c`, not the patched `vcn_v5_0_1.c`.
+  Then the important half: grepping the whole `amdgpu/` tree for the
+  *unconverted pattern* `amdgpu_fence_wait_polling(... video_timeout)` returns
+  exactly two files, `vcn_v4_0_3.c:1692` and `vcn_v5_0_1.c:1338` — and both our
+  `vcn_v5_0_0.c` and `jpeg_v5_0_0.c` have **zero** occurrences of either
+  identifier. So there is no latent equivalent on our silicon. The counter-case
+  that made this worth doing: `vcn_v5_0.c` does not exist in this tree at all,
+  so filename-matching would have been wrong in both directions.
+
+### `#5663` — our `1074` confirmed as the current fix
+
+Read through the work-items tracker this pass (see the GraphQL note below).
+Issue `#5663` is a **Navi 4x SDMA hardware bug** — König: *"this is not related
+to suspend/resume but rather seems to be a HW bug in the SDMA on Navi 4x"* —
+producing accumulating DCC corruption across sleep/wake on **RX 9070 XT**, this
+machine's exact GPU.
+
+Two things worth recording:
+
+1. **`1074` is the v2 patch, and it is what the reporter of the fix calls
+   current.** `pepp` posted the original `e = 0` per-blit workaround on
+   2026-09-16; on **2026-09-25** he wrote that it *"makes the issue much less
+   likely but it doesn't fix it completely"* and linked
+   `lists.freedesktop.org/archives/amd-gfx/2026-September/153767.html` as *"going
+   to be merged soon"*. That mail is
+   `[PATCH v2] drm/amdgpu: implement workaround for sdma dcc corruption`,
+   `20260924140616.2647-1-pierre-eric.pelloux-prayer@amd.com` — **the commit we
+   already carry as `1074`**. A user on 2026-09-26 confirms *"the v2 patch works
+   for me"* on a kernel containing it.
+2. **It is an acknowledged interim workaround.** The same comment says it *"will
+   be revisited once the root cause is understood"*. Do not treat DCC
+   corruption on this GPU as closed if it reappears; the standing mitigation
+   users report is `AMD_DEBUG=nodcc` or `QSG_RHI_BACKEND=vulkan`.
+
+**Work-item comments are readable again — via GraphQL.** The REST `/notes`
+endpoint is 401-gated, but `POST /api/graphql` with
+`{ project(fullPath: "drm/amd") { issue(iid: "5663") { notes(first: 100) { nodes { body createdAt author { username } } } } } }`
+returns them unauthenticated (plain `curl`, no User-Agent). `first:` must be
+sized per issue. This restores the comment sweep the 2026-09-24 pass had to skip.
+
+### `next-20260925` — nothing
+
+1520 non-merge commits. The on-target hits are all 7.4 refactoring —
+`mm/sparse` (twelve commits from Hildenbrand), `mm/damon`, `mm/hugetlb`,
+`mm/swapops` — none of them fixes. One AMD commit,
+`e74db71a3530` "amdgpu: Enable PerfOpt IOMMU perf optimization", is **wrong
+chip**: its own message says *"The AMD IOMMU spec indicates this is only
+supported on integrated GPUs so check explicitly for `AMD_IS_APU`"*, and the
+RX 9070 XT is a discrete GPU.
+
 ## drm-misc (TTM / dma-buf / dmemcg) — swept, and where to get it when freedesktop is down
 
 The 2026-09-24 sweep could not reach this subsystem: every request returned

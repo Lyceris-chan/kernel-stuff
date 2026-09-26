@@ -15,6 +15,74 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc4-17-sleepy-next]: 2026-09-26
+
+### Added — the 7.3-rc5 DRM fixes (8)
+
+Sourced from `[git pull] drm fixes for 7.3-rc5` (Dave Airlie, merged as
+`6812ce4e4379`). These are fixes for the kernel this machine runs: the base is
+rc4, they are the rc5 fixes.
+
+- `1076` amdgpu: vmid_wait fence leak in `amdgpu_ring_init()`
+- `1077` amdgpu: last_update fence leak in `amdgpu_vm_init()`
+- `1078` amdgpu: runtime PM leak in `amdgpu_debugfs_test_ib_show()`
+- `1079` amdgpu: acpi device leak in `amdgpu_acpi_enumerate_xcc()`
+- `1080` amdkfd: use-after-free and multi-container gap in `kfd_dev_mapping`
+- `1174` display: dc stream excess put in `dm_update_crtc_state()`
+- `9079` amdgpu/userq: double jiffies conversion in hang detect timeout
+- `9080` amdgpu: move userq fence wait out of signalling section — **rebased**;
+  one context line had drifted because our own series changed
+  `amdgpu_userq_ensure_ev_fence()` from `void` to `int`
+
+### Added — io_uring SQPOLL UAF (`2049`)
+
+`io_uring/sqpoll: protect task-work publication with RCU` (Jérémy Jean,
+`Fixes: af5d68f8892f`). A KASAN-confirmed slab-use-after-free that **is present
+in rc4**: `io_uring/tw.c:226` reads `tctx->task` after `mpscq_push()`, and
+SQPOLL can consume the request and free `ctx`/`tctx` underneath it. The v2
+implements the fix **Jens Axboe prescribed on the list** (a `guard(rcu)()` in
+`io_req_normal_work_add()` plus widening the `synchronize_rcu()` in
+`io_ring_exit_work()` to include `IORING_SETUP_SQPOLL`) after he rejected the
+v1 `get_task_struct()` approach. The two halves only work together.
+
+### Added — SLUB (`2197`)
+
+`mm/slub: refill prefilled sheaves from the barn` (Hao Li, `Reviewed-by:
+Vlastimil Babka`). Fixes the barn's full list saturating, which forced every
+`kfree_rcu()` sheaf to be flushed to slabs. Only caller is `lib/maple_tree.c`,
+so the path is live here; +24.2% on the author's will-it-scale `maple_node`
+benchmark. **An optimization without a `Fixes:` tag and not yet through a full
+-rc cycle — drop it first if anything unexplained appears.** No other carried
+patch touches `mm/slub.c`.
+
+268 patches.
+
+### Rejected, with reasons
+
+- **DML frame-warning-limit family** (`15814c01ac5`, `18779dd8451`,
+  `0fd5e9ddf36`) — they exist to stop the DML build *failing* under
+  `CONFIG_WERROR`/`CONFIG_UBSAN`. We set neither, and our `dc/dml/Makefile`
+  sits at `frame_warn_limit := 2048` against `CONFIG_FRAME_WARN=2048`, so the
+  flag is not even emitted. Inert — and it would *remove* a real signal about
+  a 2512-byte stack frame.
+- **`vcn5.0.1` / `vcn4.0.3` video_timeout unit mismatch** — real bugs (~2 s
+  intended wait actually lasting microseconds), but wrong chip: discovery maps
+  `IP_VERSION(5,0,0) -> vcn_v5_0_0.c` and the running kernel reports
+  `vcn_v5_0_0`. Checked for a latent equivalent rather than stopping at the
+  filename: the unconverted pattern exists in exactly two files, neither ours,
+  and our `vcn_v5_0_0.c`/`jpeg_v5_0_0.c` have zero occurrences.
+- **`next-20260925`** — 1520 commits, all on-target hits are 7.4 `mm/sparse`,
+  `mm/damon`, `mm/hugetlb` refactors. `e74db71a3530` (IOMMU PerfOpt) is
+  iGPU-only by its own admission (`AMD_IS_APU`); we are a discrete GPU.
+
+### Confirmed
+
+`1074` **is** the v2 SDMA-DCC workaround and remains current: `pepp`'s
+2026-09-25 tracker comment links the very patch we carry as the one "going to
+be merged soon", after noting the earlier `e = 0` form "doesn't fix it
+completely". The issue is a **Navi 4x SDMA hardware bug** on this exact GPU and
+the fix is an acknowledged interim workaround.
+
 ## [7.3.0-rc4-14-sleepy-next]: 2026-09-24
 
 ### Added

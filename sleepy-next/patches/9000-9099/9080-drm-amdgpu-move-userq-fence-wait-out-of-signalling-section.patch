@@ -1,0 +1,65 @@
+From: Prike Liang <Prike.Liang@amd.com>
+Date: Fri, 31 Jul 2026 11:44:37 +0800
+Subject: [PATCH] drm/amdgpu: move userq fence wait out of signalling section
+
+The eviction fence suspend worker waits for every pending userq fence
+from inside a dma_fence_begin_signalling() critical section. Waiting on
+another DMA fence while responsible for signalling one violates the
+cross-driver fence contract and is reported by lockdep as a
+dma_fence_map dependency.
+
+Move the wait before dma_fence_begin_signalling(). Keep userq_mutex held
+so queue lifetime remains stable while inspecting last_fence.
+
+Fixes: fc61df151617 ("drm/amdgpu: annotate eviction fence signaling path")
+Signed-off-by: Prike Liang <Prike.Liang@amd.com>
+Reviewed-by: Vitaly Prosyak <vitaly.prosyak@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+(cherry picked from commit 3bd4fbc5ed89621340b5cd249869092691a9c81f)
+Cc: stable@vger.kernel.org
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_eviction_fence.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_eviction_fence.c
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_eviction_fence.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_eviction_fence.c
+@@ -68,6 +68,9 @@
+ 
+ 	mutex_lock(&uq_mgr->userq_mutex);
+ 
++	/* Fence waits are not allowed in a fence signalling critical section. */
++	amdgpu_userq_wait_for_signal(uq_mgr);
++
+ 	/*
+ 	 * This is intentionally after taking the userq_mutex since we do
+ 	 * allocate memory while holding this lock, but only after ensuring that
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+@@ -1440,7 +1440,7 @@
+ 	return ret;
+ }
+ 
+-static void
++void
+ amdgpu_userq_wait_for_signal(struct amdgpu_userq_mgr *uq_mgr)
+ {
+ 	struct amdgpu_usermode_queue *queue;
+@@ -1469,8 +1469,6 @@
+ void
+ amdgpu_userq_evict(struct amdgpu_userq_mgr *uq_mgr)
+ {
+-	/* Wait for any pending userqueue fence work to finish */
+-	amdgpu_userq_wait_for_signal(uq_mgr);
+ 	amdgpu_userq_evict_all(uq_mgr);
+ }
+ 
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.h b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.h
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.h
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.h
+@@ -180,6 +180,7 @@
+ void amdgpu_userq_mgr_cancel_resume(struct amdgpu_userq_mgr *userq_mgr);
+ void amdgpu_userq_mgr_fini(struct amdgpu_userq_mgr *userq_mgr);
+ 
++void amdgpu_userq_wait_for_signal(struct amdgpu_userq_mgr *uq_mgr);
+ void amdgpu_userq_evict(struct amdgpu_userq_mgr *uq_mgr);
+ 
+ int amdgpu_userq_ensure_ev_fence(struct amdgpu_userq_mgr *userq_mgr,
