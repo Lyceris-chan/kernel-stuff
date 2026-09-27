@@ -178,16 +178,16 @@ fi
 pkgbase="linux-$_pkgsuffix"
 _major=7.3
 _minor=0
-_rcver=rc4
+_rcver=rc5
 
-pkgver=7.3.0_rc4
+pkgver=7.3.0_rc5
 _tagrel=1
-pkgrel=18
+pkgrel=1
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
 # linux-next snapshot (the 7.3 merge-window content) for the wannabe 7.3 preview
-_srctag=linux-7.3-rc4
+_srctag=linux-7.3-rc5
 _srcname=${_srctag}
 # Build parallelism. Previously capped at 8 on a diagnosis that did not hold up.
 #
@@ -259,7 +259,7 @@ _nv_ver=610.43.02
 _nv_pkg="NVIDIA-Linux-x86_64-${_nv_ver}"
 _nv_open_pkg="NVIDIA-kernel-module-source-${_nv_ver}"
 source=(
-  "https://git.kernel.org/torvalds/t/linux-7.3-rc4.tar.gz"
+  "https://git.kernel.org/torvalds/t/linux-7.3-rc5.tar.gz"
   "config"
   "patches/0001-0049/0001-drm-amd-pm-Fix-typo-in-smu_v14_0_set_irq_state.patch"
   "patches/0001-0049/0002-drm-amd-pm-Fix-memory-leaks-in-smu_v14_0_fini_smc_ta.patch"
@@ -304,11 +304,6 @@ source=(
   "patches/1000-1099/1072-drm-amdgpu-atom-bound-the-VBIOS-getters.patch"
   "patches/1000-1099/1074-drm-amdgpu-workaround-for-sdma-dcc-corruption.patch"
   "patches/1000-1099/1075-drm-amdgpu-dont-leak-bo_va-when-gem_object_open-fails.patch"
-  "patches/1000-1099/1076-drm-amdgpu-fix-vmid_wait-fence-leak-in-amdgpu_ring_init.patch"
-  "patches/1000-1099/1077-drm-amdgpu-fix-last_update-fence-leak-in-amdgpu_vm_init.patch"
-  "patches/1000-1099/1078-drm-amdgpu-fix-runtime-PM-leak-in-amdgpu_debugfs_test_ib_show.patch"
-  "patches/1000-1099/1079-drm-amdgpu-fix-acpi-device-leak-in-amdgpu_acpi_enumerate_xcc.patch"
-  "patches/1000-1099/1080-drm-amdkfd-fix-use-after-free-and-multi-container-gap-in-kfd_dev_mapping.patch"
   "patches/1100-1199/1136-drm-amd-display-update-and-revert-FRL-LT-timeout.patch"
   "patches/1100-1199/1138-drm-amd-display-pull-colorops-into-state-when-recreating-a-plane.patch"
   "patches/1100-1199/1141-drm-amd-display-skip-receiver-power-control-without-AUX.patch"
@@ -332,7 +327,6 @@ source=(
   "patches/1100-1199/1171-drm-amd-display-serialize-hdmi-frl-status-polling-against-link-detect.patch"
   "patches/1100-1199/1172-drm-amd-display-skip-hdmi-frl-status-polling-while-link-is-down.patch"
   "patches/1100-1199/1173-drm-amd-display-avoid-to-write-signal-specific-for-tmds.patch"
-  "patches/1100-1199/1174-drm-amd-display-fix-dc-stream-excess-put-in-dm_update_crtc_state.patch"
   "patches/1200-1299/1201-cpufreq-amd-pstate-Update-cppc_req_cached-before-w.patch"
   "patches/1200-1299/1202-cpufreq-amd-pstate-Add-per-core-EPP-boost-for-rec.patch"
   "patches/1200-1299/1203-Documentation-amd-pstate-Document-the-epp_boost-pa.patch"
@@ -396,9 +390,7 @@ source=(
   "patches/2000-2099/2036-net-tcp-account-zerocopy-receive-vma-memory.patch"
   "patches/2000-2099/2037-net-neighbour-serialize-proxy-timer-teardown.patch"
   "patches/2000-2099/2039-net-sched-avoid-quadratic-qdisc_alloc_handle.patch"
-  "patches/2000-2099/2040-net-sched-reject-idr-error-pointers-act-api.patch"
   "patches/2000-2099/2041-net-gso-limit-recursive-ip-in-ip-segmentation.patch"
-  "patches/2000-2099/2043-fs-avoid-repeated-scans-in-evict_inodes.patch"
   "patches/2000-2099/2044-lib-group_cpus-snapshot-cluster-masks-hotplug.patch"
   "patches/2000-2099/2045-net-sched-sch-cake-prevent-shaper-corruption-in-cake_overhead.patch"
   "patches/2000-2099/2046-blk-mq-set-RQF_USE_SCHED-when-the-operation-is-known.patch"
@@ -427,7 +419,6 @@ source=(
   "patches/2100-2199/2150-mm-huge_memory-fix-pgtable-withdrawal-for-huge-zero-PMDs.patch"
   "patches/2100-2199/2151-mm-shmem-ignore-sysfs-configs-for-shmem-forced-collapse.patch"
   "patches/2100-2199/2152-khugepaged-hold-invalidate_lock-across-collapse_file-readahead.patch"
-  "patches/2100-2199/2153-writeback-report-a-Tasks-RCU-quiescent-state-per-cgwb-drain-pass.patch"
   "patches/2100-2199/2154-mm-page_alloc-apply-per-task-GFP-context-in-bulk-allocator.patch"
   "patches/2100-2199/2169-mm-add-page_counter_margin.patch"
   "patches/2100-2199/2170-mm-distinguish-large-folio-swap-allocation-failures.patch"
@@ -528,8 +519,6 @@ source=(
   "patches/9000-9099/9075-drm-amdgpu-userq-reset-a-hung-SDMA-user-queue-over-MMIO.patch"
   "patches/9000-9099/9076-drm-amdgpu-fix-ip-discovery-table-validation.patch"
   "patches/9000-9099/9077-drm-amdgpu-userq-fix-reading-the-WPTR-at-a-non-zero-BO-offset.patch"
-  "patches/9000-9099/9079-drm-amdgpu-userq-fix-double-jiffies-conversion-in-hang-detect-timeout.patch"
-  "patches/9000-9099/9080-drm-amdgpu-move-userq-fence-wait-out-of-signalling-section.patch"
 )
 
 # makepkg 7.1.0 resolves local sources by basename in the PKGBUILD directory
@@ -1162,7 +1151,7 @@ for _p in "${pkgname[@]}"; do
     }"
 done
 
-b2sums=('a9812f8fb24a34af014c1f1f5b556e76bbeb03c557db0d929b4dbad9f082956fcefb75bbe40a3565c1af4fbc9b9e34f36952be1a79a7523059b59808d6ef4b8b'
+b2sums=('4175e807cca0c48e425df3ef20fe6e2fe59e1f6827b5dd41720b3d0b8ec9c9b0431ce89efce077416f2824ddfecd4a56d29bfb432a7641f67592db1337bc03e6'
         '7517360503c9da93f405b810c81a7f1f2c8ca21a704f8251f62c400723f99bd9c14b8cb851c8f36663f412f9865cde759a3a10313e605e6172322bdfa12f6f38'
         'ff25ac7c89880886b454064ba57bd1196fb747cb80c7663d7981006cc603151aee075ebe1b49b1a92866ad2a212d1e599ce622f63bfd140ad64d37b463c17aad'
         '0806d7b3b8e4e9044c14843fc53255ff92b12aaf3b8e0d0490bbf6266aaa6b01872476ce34a65c5b694cda9a1d82e84a38df16dbb9c798ae9aa6d1c9097b32aa'
@@ -1207,11 +1196,6 @@ b2sums=('a9812f8fb24a34af014c1f1f5b556e76bbeb03c557db0d929b4dbad9f082956fcefb75b
         '1c7cfc7ed595b154f616e5a3d67e8582c86c96209dd165a7e3e4514a5dae42eaddadc34668f28644349eddb25a7aaf5d119355c18d5e573cf59289df8daf05a8'
         '15b59081d5eccfce72080b96599b47336a5dc64d29ec0e02fdf48dade09f080950211238fc43c5ce8a93a03cee16c0dc95488404bd5f51eb63b15ec64732d32f'
         '30a7e06f1174fcd58705357a926e7ee441d6372262fc9a6f059bb64e32f788e99fc6b723fa0ad1daf96f2bdff947cf8e1c783c3c71c115cead01db9458bc7dd6'
-        'c632c941b1bc06acc462b19d688874fe06d4af64b320819a9d8096b76a205b9c48239c59b74e854e520e9883184a8ff367b09b102e2b7f2a3da69be8e19a1157'
-        'df49daf9ea3263fa60aef5a954859786afc5271efde7e2038f0755e91a247834e82b3db7536dfd5a2407fba255d856f22c394fda993869bc25930c6b5c160aff'
-        '7c9bc66f6f51fc2ee781c764c601a05613b4471fb7ee1e4f6d2d81b9b0ad2c5c51ed81aee5c1ebea7f6ee7c0452928775fd9346c1a10bc9410bf9669df13778d'
-        '17587e91f39b993ec7eacc431d2d09e7cef4d8077d6e03222c8454fd4e1cdc094936c12a1facf7607b25ff79ae7cf80e0b72f24e3251ff43bd22dc382f3d535b'
-        'f26bb18db2e1d0a85f7a4f7c99be3f3ab2baa5d96d7754fed35637d73435d5a46a8916bef80683c7051cae6f8e9ad17b7c4d61146415508e02dcdc2ec14ac87e'
         'b283f440cb0f2679ee81d7da4ea1fecdb1e0146ee6183c6271b8e952ffcaebbbb0decf5b18b69534987601b63289a5c9be0397c5a79eff9cc76dca6a439e1cfa'
         '9f336933bfbf1429081581bf02878e91d7fb383ffdca62b523a18266a94c8229b5510e6ccface38256c2967f9387c2c504e49eda9637f36733431cc6e33f200c'
         '0fb08f727791630b6101b8263b23ce433a8b65f895ff757a4d79b282815be449e7b1932a752635e848b3b3ba8235a775a3bf618cfb933bb80d69f3a38f5e5ead'
@@ -1235,7 +1219,6 @@ b2sums=('a9812f8fb24a34af014c1f1f5b556e76bbeb03c557db0d929b4dbad9f082956fcefb75b
         '74d6bbaa6f4dd19c3344f0ea933d48dd51017b61d2a6af375e7241a5fbb77ce2cde784122a28b044eafa057e06bb0799d83fecf2b814dad4605eb0cd6885a1ab'
         'ae6757d7e8f7b2cc462c53a0a4c77f4096938ac69d7dc2fb1276bd2c7820c89256c3fd9347299248455a24fb694b79fb59f325a3eb1099af1e283b847fdcb910'
         'eb234c082c5c7d9f0621964c1c1c52c8e6b344cbfaddcb20a81d09f1988cef8439dcd9a2b461d055da08fd4eba9c22c948fcdcb61534e9748a5280839e21c73e'
-        'eeecb53edccec333517ce37cf3c19af3210fe910adff9d110f8d2845adcbc96bc1c3f1cd0147c15da37e39f458c01f94cdc45b7b3abf4af55d352c8200c49998'
         'e9d464ebf525cd8d93d48f1cbedea0197bd9d0142085da7d83ec3dfda0174483a0fea4077055fd7d1ad9180563dc6dfb77e4f52f9bcb023b7c7d7c9fb5c39ece'
         '9d3e36dbc5c9c5342d2991c4665278ed075073196251e59280bd12f1d6812a37d31db58f5cb978b926e2dcd0a32365960a414b69d10f463bd8f68cedbb4bb6ae'
         '52fe01328f544e023666eab1fd378ae0a0eb47385d495403a55a933f71beedcf295300767c1e43feb46366915fae8bea3b9137f11d16ed194a1fcf71d95aec0d'
@@ -1298,9 +1281,7 @@ b2sums=('a9812f8fb24a34af014c1f1f5b556e76bbeb03c557db0d929b4dbad9f082956fcefb75b
         '623cebb6d1611a7d167f968c8752210b11371901fb44f49bfcf3d98ca2b47cd0b266ebb9fd43b66ae4542a207823723bed7ac9ce273bcb9cebe33c0a5f7e2296'
         '24d41ac0d4bb436b460345b0dd830b18eb426ca1d0a4dcf72c10f7321353b776abd49dd73a13b3e4f52bf08fc1d29998db893bcd44bb262a69f52b1f4d38d38a'
         'd5575f9767adddc21c86617365b96784debeb00ac3ae50f9ac26ecbca653d781c7e714941f932f1b28ba181dc8440b4a2848c1d55b3ead39506d1922bcf39bd4'
-        '454ec25372361ff53b1e53c4f0b2731f9628e64913c936339b3b7c42d0749e47ceec614824c0fb944d2f22031213d97a76e47b195b6ec3dff56f2a75176a59ef'
         '4e0e8d78d9897f78ec3e691ff1f465518742a2fbfe1010c0d21cb43d8fb7c5beb25bc5e2653205fd21da196cbbbe721d6c02680a836c2099abe9281ce59c10ab'
-        '89d43dc2a9bc9039c99a9a9372f1b3f3c7addc0555209b9392e32070fc5751275fd4339efe20c14fe2439470b2d85b5e83b544bf9c0d92b9af0a8be16df0a666'
         '7248382887e05269fb762231c77769718955ae07050e818b7c14f93ed4d8bc2a33a038a256c14b9cfddd3d194681fefd16592df54b08fa5252916a828753992e'
         'd24943f7180b4c9e4299972724eede4fcc2ee22408a796c8854f5fdb35ffe6af5d00be3d3d53f17448e710b0ad38afc3dea2bcda14b6a7045bebebf4999bcfe3'
         '6aa4a904aed5867d6504b03fc859ec9187776d550761e6b9c4f45011977e225a1ee404cd1e3094ea02eec044c950eab11fb8b69cee7a7d9a65958f4c030800d6'
@@ -1329,7 +1310,6 @@ b2sums=('a9812f8fb24a34af014c1f1f5b556e76bbeb03c557db0d929b4dbad9f082956fcefb75b
         'b8fae48636cf91693a53abc5d31f0e3835090f1fa999ea8886a4802a7a449517deb8656cf62d283adc050691ae93be88baed41da4384f8740183d690e73cb0e8'
         '9cf0c46cf7f13843adbd5a77b854a4924a5ba29787dd9425e8dd1057d55dbe9241207dca0567c0e2abc1bc2f92a300789c38677515f4ff09b61616a1044b690b'
         'ca1ef67a17397bde9e5cf092589e43ce140cde08779c58232325501752d737f42a0e7c96f17a68751663cc8393ea013fef39ed400877693db05559a836dc29d5'
-        'b6bfa228a20bc031b794a6eea356681825463d7ff3fb6604dce3c2f75288e2ec57e2ab52954d3cbd21aa775253568ea570f773ec5ef230392420b6a010abb301'
         '782aa214a69fdea448c3a497b50751a5af608c200397987fbce052633be1e584227cf5d08c92c6add218743c67a8f26b4723d7535c18c381912085cea2fbc7c1'
         '248f421125422b282194ff39ad70a883c76fb76b6f47fdaed98353b25d3cb018ab013be6fab8414b38ea6055388320e073d3704477c508f9f9c3648e74e1533e'
         'c08072205021ecb00bf2dcf22c83d3df986526317a4dbb99e311d9f6ac077b898afefb31ecdd15f7af9b2b4f42d30b38d60baa42863421cc27c5d954130a2473'
@@ -1430,8 +1410,6 @@ b2sums=('a9812f8fb24a34af014c1f1f5b556e76bbeb03c557db0d929b4dbad9f082956fcefb75b
         'db80eb9c83811ad7978ddc733985c4c3b0f883d4f2c00e68b57360b7e7e725cc45a0b0b8000ecb92dc4ec4b9c541be9d0592d4d064c86aa2402028de59ac7f99'
         '28fcf1738fb0b5179065174d82c0512988ed53bddb94891cd3fd45238995941741279272df1fcc96e07afcbd9fe895ca02ea64fb93b8448a114625998baba8f9'
         'a3420cb6d1214eb53d1fb21e0e28d1c814409dae2fabe7c05e88819ad25061b2426ca97d494bd8bd6f7c467e818ddf18704b7157be43e41428cb86368e3a0dbb'
-        'f92a5ba3a2a8e2e8e9369d080d40094aacd4ff7cf5b6f00cd96ced6aad91d897284d36eb8146ab4183c17a74e6e3ff569b9c433b8659479be208880485e5a1c1'
-        'fc426ea4ff593f8ba774e96fdfc891e1088cbbc9b502d8d902daf33363d67f4e5c6fdb4b77320f929748b543903c37472f146785e5cacc4090a40a7b58e44e29'
         '2cdec9daf2eb9d4a8e95f33bcc81e603899db1f2e4f55cde68fa29727972238b5bd544e055a06bd0c94569e222666f6d8bf231db9fa8593b6d5f4fe52b26022a'
         '4cf91dd679c25cb8c7a519f5d77fdf29cc345043bd8a71b6c8e54d1a4179cf489f464108464ad2b1bc8ccffd743707e6fdaae1e33300b29a4fc7b9457b90e6be')
 

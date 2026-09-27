@@ -47,6 +47,37 @@ the reference on every path, so the callers' `dma_fence_put()` on error is a
 double put, still present in `next-20260925` — but **we already carry it as
 `1064`**, across the same three files.
 
+## [7.3.0-rc5-1-sleepy-next]: 2026-09-27
+
+### Changed
+
+- **Rebased onto mainline `v7.3-rc5`** (`72d3fcf802c`, cut 2026-09-27).
+  `pkgver` `7.3.0_rc4` -> `7.3.0_rc5`; `pkgrel` reset to 1.
+
+### Removed — 11 patches now upstream in rc5 (268 -> 257)
+
+The cumulative audit flagged 11 as `Skipping patch` against the new base. Each
+was verified as genuinely present in rc5 before removal:
+
+- `1076`-`1080`, `1174`, `9079`, `9080` — the eight fixes adopted on 2026-09-26
+  *from* the rc5 DRM pull, so rc5 necessarily contains them.
+- `2040` (net/sched idr error pointers), `2043` (fs `evict_inodes`), `2153`
+  (writeback Tasks-RCU) — merged upstream in the rc4→rc5 window.
+
+`9080` and `2043` reverse-applied cleanly to rc5 while being absent from it, and
+two others failed the reverse check while being present. Both directions of the
+apply check were wrong at least once; every one of the eleven was settled by
+probing the identifiers the patch introduces.
+
+### CachyOS branches
+
+No `01xx` regeneration needed: the audit passes unchanged, and sirlucjan's
+sources for the branches we carry have zero changed files since 2026-09-18.
+Their new commits add an `hdmi-patches-v2` rebundle (already assessed as work we
+carry) and a POC scheduler selector (not used here).
+
+257 patches.
+
 ## [7.3.0-rc4-17-sleepy-next]: 2026-09-26
 
 ### Added — the 7.3-rc5 DRM fixes (8)

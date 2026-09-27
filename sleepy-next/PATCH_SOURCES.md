@@ -3137,6 +3137,56 @@ would undo is AMD's, not ours.
 
 No other issue's comments produced an uncarried fix.
 
+## REBASE 2026-09-27: v7.3-rc4 -> v7.3-rc5 (268 -> 257 patches)
+
+`v7.3-rc5` was cut 2026-09-27 (`72d3fcf802c`); the watcher caught it and the
+series was rebased the same evening. `pkgver` `7.3.0_rc4` -> `7.3.0_rc5`,
+`pkgrel` reset to 1.
+
+### Eleven patches dropped — all now upstream in rc5
+
+The cumulative audit against rc5 reported **11 patches `Skipping patch`**, which
+the script correctly treats as a defect rather than a success. Each was verified
+by hand as **genuinely present in rc5**, then removed:
+
+| # | Subject | Why |
+|---|---|---|
+| `1076` | amdgpu: vmid_wait fence leak in `amdgpu_ring_init()` | adopted 2026-09-26 *from* the rc5 DRM pull — naturally in rc5 |
+| `1077` | amdgpu: last_update fence leak in `amdgpu_vm_init()` | same |
+| `1078` | amdgpu: runtime PM leak in `amdgpu_debugfs_test_ib_show()` | same |
+| `1079` | amdgpu: acpi device leak in `amdgpu_acpi_enumerate_xcc()` | same |
+| `1080` | amdkfd: use-after-free in `kfd_dev_mapping` | same |
+| `1174` | display: dc stream excess put in `dm_update_crtc_state()` | same |
+| `9079` | amdgpu/userq: double jiffies conversion in hang detect | same |
+| `9080` | amdgpu: move userq fence wait out of signalling section | same |
+| `2040` | net/sched: reject idr error pointers | merged upstream in the rc4→rc5 window |
+| `2043` | fs: avoid repeated scans in `evict_inodes()` | merged upstream in the rc4→rc5 window |
+| `2153` | writeback: Tasks-RCU quiescent state per cgwb drain | merged upstream in the rc4→rc5 window |
+
+**Two of the eleven reverse-applied *cleanly* to rc5 and still needed dropping**,
+which is the documented reverse-apply false negative in its milder form: `9080`
+and `2043` failed the reverse check while their content was plainly present —
+`amdgpu_eviction_fence.c:71` carries `9080`'s exact comment and call, and rc5's
+`evict_inodes()` has `2043`'s restructure (no `again:` label, the `need_resched`
+block in place) with only the comment wording differing from the posted version.
+Both were confirmed by content probe, not by the apply check. That is why the
+rule is *grep the identifiers the patch introduces*, not *trust reverse-apply*.
+
+### CachyOS branch patches: nothing to regenerate
+
+The audit passes with every `01xx` unchanged, and sirlucjan's sources for the
+branches we carry (`bbr3-cachyos-patches-sep`, `kbuild-patches-sep`,
+`cpu-isa-patches-sep`) have **zero changed files** between our local `master`
+(2026-09-18) and `origin/master` (2026-09-24).
+
+sirlucjan's 8 new commits add, for the 7.3-rc line: `hdmi-patches-v2` — the
+rebundle already assessed here as *"a rebundle of work we already carry, not an
+upgrade"* — and a new `sched-7.3-introduce-POC-selector` (a scheduler feature we
+do not use; this machine runs scx). Neither is adoptable.
+
+**Note the stale-local trap fired again:** local `master` was 8 commits behind
+`origin/master` after a clean-looking fetch. Always read `origin/<branch>`.
+
 ## Sweep 2026-09-27 12:36 — nothing to adopt (post-shutdown pass)
 
 Machine had been off 05:34–12:24, so this pass covers ~7.5 h of upstream time.
