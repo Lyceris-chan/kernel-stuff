@@ -3137,6 +3137,46 @@ would undo is AMD's, not ours.
 
 No other issue's comments produced an uncarried fix.
 
+## Sweep 2026-09-27 12:36 — nothing to adopt (post-shutdown pass)
+
+Machine had been off 05:34–12:24, so this pass covers ~7.5 h of upstream time.
+**Nothing adoptable.** Per-source:
+
+| Source | Result |
+|---|---|
+| `linux-next` | **No new tag.** Newest is still `next-20260925` — it is the weekend, and linux-next publishes on weekdays |
+| `torvalds` | **unchanged** at `fd179f8a05b` |
+| `tip` | `a14fcf2723cc` → `f23427766130`, but every AMD commit in the delta is one **already dispositioned** — the rc5 fixes we adopted as `1076`-`1080`/`1174`/`9079`/`9080`, the DML frame-warn trio (rejected), the `vcn5.0.1`/`vcn4.0.3` pair (wrong chip), and `4fde4482251` (NBIO, not our silicon) |
+| `agd5f-linux` | unchanged at `a24db07159cd` (2026-09-17) |
+| `drm-misc` | no TTM / dma-buf / sched change. See the mirror note below |
+| lore mirrors | refreshed; weekend volume is small (netdev 61, dri-devel 5, mm 5, io-uring 3, block 1) |
+| work items | 1 on-target updated (`#5894`) — a "will retest when firmware lands" reply, no fix |
+| version sweep | same 10 higher-version postings; all already dispositioned |
+
+### Candidate recorded, NOT adopted: io_uring TX_TIMESTAMP multishot
+
+`4797a0bd87c9` — *"io_uring/cmd_net: end TX_TIMESTAMP multishot when the CQ is
+full"* (`Fixes: 9e4ed359b8ef`, `Cc: stable@vger.kernel.org`). The bug is real and
+**present in our base**: `io_uring/cmd_net.c` exists in rc4 with
+`io_uring_cmd_post_mshot_cqe32()` (line 101) and `SOCKET_URING_OP_TX_TIMESTAMP`
+(line 184). Aux CQEs have no overflow backing, so the multishot loop fails once
+the CQ ring fills, splices unprocessed skbs back and returns `-EAGAIN`, which is
+`IOU_RETRY` — so the request idles until the next poll event instead of ending.
+
+**Not adopted: no `Reviewed-by`, and the posting is hours old** (2026-09-27
+15:42, three hours before this pass). Same bar that deferred the ATOM
+parameter-space pair. Revisit when it has review, or if it appears in a
+drm-fixes-style pull.
+
+### `repo.or.cz` is no longer a reliable drm-misc source
+
+Last pass it served a **newer** tip than freedesktop (`f7afecd542`, 09-23);
+this pass it advertises `98c7fc4219` (2026-06-25) — **backwards**. Freedesktop
+now reports the same `98c7fc4219`, so the branch itself was rebased between
+merge windows (normal for a development branch), but the episode shows the
+mirror can serve a stale tip. **Query freedesktop first and use repo.or.cz only
+as a cross-check**, not as the primary.
+
 ## Sweep 2026-09-27 05:02 — nothing to adopt
 
 Scheduled overnight pass. **Every source was queried; none produced an
