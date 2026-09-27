@@ -3137,6 +3137,62 @@ would undo is AMD's, not ours.
 
 No other issue's comments produced an uncarried fix.
 
+## Sweep 2026-09-27 05:02 — nothing to adopt
+
+Scheduled overnight pass. **Every source was queried; none produced an
+adoptable patch.** Per-source, so "found nothing" is distinguishable from
+"did not look":
+
+| Source | Result |
+|---|---|
+| `linux-next` | **No new tag.** Remote's newest is still `next-20260925`; no `next-20260926/27` was cut |
+| `torvalds` | advanced `6812ce4e437` → `fd179f8a05b`, 64 new commits. One on-target candidate (below); the rest are arm64/RISC-V KVM, ata, and probes |
+| `tip` | advanced `630761837841` → `a14fcf2723cc`, 305 new commits. Three `perf/x86/amd/uncore` commits — all optimizations, no `Fixes:` tag (below) |
+| `agd5f-linux` | 1 new commit: `15814c01ac57` DML frame-warn "all builds" — already rejected 2026-09-26 as inert |
+| `amd-staging-drm-next`, `akpm-mm`, `linux-pm` | unchanged |
+| `drm-misc` (via repo.or.cz) | **no TTM / dma-buf / scheduler change** since 09-23 |
+| `lore-amdgfx`, `lore-dri-devel`, `lore-sched-ext`, `lore-linux-block`, `lore-io-uring`, `lore-netdev-new`, `lore-linux-pm`, `lore-fsdevel-new`, `lore-linux-nvme` | refreshed to 2026-09-26/27; **no new DRM fixes pull** (no `[git pull] drm fixes` since the rc5 one we mined) |
+| `lore-linux-mm` | **initially appeared stale at 2026-09-24 — that was my fetch, not the mirror.** A plain `fetch origin` in a mirror clone only updates `FETCH_HEAD`; the explicit refspec `+refs/heads/master:refs/heads/master` advanced it to **2026-09-27**, exposing **172** unseen patch mails. Swept: all feature series (batched rmap/swapfile, guest_memfd, bpf_proactive_reclaim) plus two `mm/hugetlb` fixes — the latter irrelevant here (no hugepages on this desktop), and one is explicitly a `[PATCH 5.10.y]` stable backport. **Nothing to adopt.** |
+| work items | 3 on-target updated (`#5900`, `#5896`, `#5894`); **no new fixes** — `#5894` is a firmware fix, the other two have no comments |
+| version sweep | same 10 higher-version postings as 2026-09-26; all already dispositioned |
+
+### The one candidate worth recording: AMD NBIO enhanced atomics
+
+`4fde4482251` — *"x86/PCI: Disable enhanced atomics on AMD NBIO 7.7 and 7.11"*
+(Mario Limonciello, `Signed-off-by` from Bjorn Helgaas, `Cc: stable@vger.kernel.org`).
+**This is a data-corruption fix**, and it is the most serious thing in the pass:
+
+> *"Multiple users report data corruption during 64-bit DMA transfers on
+> systems with AMD NBIO 7.7 and 7.11 controllers. This occurs when BIOS enables
+> AMD 'enhanced atomic operations' on PCIe Root Ports. When enhanced atomics
+> are enabled, any 64-bit DMA access may be corrupted."*
+
+**Rejected as not-our-silicon, and this is the check that decided it.** The quirk
+registers by PCI device ID:
+
+| ID | Part | Ours? |
+|---|---|---|
+| `0x14E8` | Phoenix / Hawk Point (NBIO 7.7) | no — mobile APU |
+| `0x1507` | Strix / Krackan (NBIO 7.11) | no — mobile APU |
+| `0x1122` | Strix Halo variant (NBIO 7.11) | no — mobile APU |
+
+Our root complex is **`1022:14d8` "Raphael/Granite Ridge Root Complex"** — desktop
+Zen 4, and **not in the list**. rc4 has no existing enhanced-atomics quirk for
+any AMD ID. So AMD scoped this to mobile parts; adding Raphael would be
+inventing an erratum AMD has not published.
+
+**Revisit if a Raphael/Granite Ridge corruption report appears** — that is the
+trigger, not a date.
+
+### Rejected: `perf/x86/amd/uncore` (three commits, tip)
+
+`6350de8671b9` (free counter slot by index), `4a8557a4e5d2` (remove redundant
+slot scan), `df935e26ca9a` (events as a flexible array). The code does run here
+(Zen 4 has uncore PMUs) but all three are **optimizations or refactors with no
+`Fixes:` tag** — the first turns an O(N²) teardown into O(N), the second skips a
+scan, the third merges two allocations. Nothing is being repaired, and the
+package targets no bloat. Not carried.
+
 ## Version sweep 2026-09-26 — every carried patch against its latest posting
 
 The pass the sweep skill calls step 2: 268 carried patches checked against all
