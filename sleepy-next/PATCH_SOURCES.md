@@ -4913,3 +4913,91 @@ where they arrive for free. Recorded so the 7.4 rebase knows what to expect in
 
 Note `sch_cake.c` is unchanged in the snapshot, so the v4 CAKE fix adopted above
 has **not** reached linux-next yet — the carry is genuinely ahead of it.
+
+## Work items, 2026-09-28 evening — read deeply, nothing adoptable
+
+The earlier pass that day queried only a 6-hour `updated_after` window and read
+three issues. Redone properly: **88 open issues moved in 7 days, 66 on-target by
+title**, descriptions as well as comments fetched, and every hex-shaped token
+checked against the trees rather than cited.
+
+### The one that matters: `#5897` independently confirms `1168`, and shows `1171` is partial
+
+`7.3: HDMI FRL status poll re-detects a live link, next CRTC disable hangs
+(DCN 3.2.1)` — reporter on an RX 7600 with a JVC DLA-NZ9 over HDMI, running
+7.2.3 with the two named commits backported.
+
+**It confirms `1168` targets a real defect, with numbers.** The reporter
+measured the sink setting FRL_Start after a **median ~450 ms**, against a
+**~310 ms** busy-wait budget, and upstream lighting only 2/12 in each of two
+runs — a longer wait lit 23/24. Our `1168` makes the 300 ms FRL link-training
+budget unconditional at every rate; this is the same budget, measured failing,
+on someone else's hardware. That is the first independent corroboration of
+`1168` outside our own reasoning.
+
+**It also shows `1171` is necessary but not sufficient.** The reporter tested
+"the poll under `mutex_trylock(&dm->dc_lock)`" — which *is* our `1171` — and it
+hung twice anyway. Their diagnosis is deeper: with one HDMI connector
+`is_hdmi_frl_in_use()` is false, so the RETRAIN detect is destructive under a
+live stream — it disables the HPO encoder and DSC and runs
+`hdmi_frl_verify_link_cap()` at the sink's maximum rate, and **nothing
+re-enables the stream**. The next CRTC disable then spins in
+`optc32_disable_crtc()` forever. Locking does not help because the damage is in
+what the detect *does*, not in racing for the lock.
+
+Verified present in our base, not inferred: `amdgpu_dm_connector.c:3141` walks
+links with no `dc_lock` and calls `dc_link_detect(..., DETECT_REASON_RETRAIN)`,
+and `link_detection.c:908` runs the destructive `hdmi_frl_verify_link_cap()`
+when `!is_hdmi_frl_in_use(link)`. Both files are shared across DCN versions, so
+this is not a DCN 3.2.1-only path even though the reporter's hardware is.
+
+Our `1172` implements **one of the two gates** the reporter says are needed
+("skip it when the link has no dpms-on stream") — it skips polling unless
+`link_status.link_active`. The second gate and the reporter's proposed
+mechanism — answer `FLT_Update` with a stream restart (dpms off/on via
+`dc_commit_updates_for_stream()`) instead of the destructive RETRAIN detect —
+**exist only as prose in the comment. No patch was posted, in the thread or
+anywhere.** Not adoptable; recorded so the next sweep recognises it if AMD
+posts one.
+
+`1171`/`1172` are both Fangzhi Zuo (AMD) with `Reviewed-by: Harry Wentland`, so
+they were correctly sourced; the point is that they mitigate, and AMD's own
+reviewer approved them as mitigation, not as the whole fix.
+
+### `#5907` — carries `[PATCH]` in its title but the patch is in the description
+
+`Null pointer dereference in ttm_lru_bulk_move_tail / amdgpu_vm_move_to_lru_tail`.
+**Not adoptable, three times over:** the hardware is a **Ryzen 9 8945H /
+Radeon 780M (Phoenix, GFX1103)** — an APU, not this machine's Navi 48; the
+trigger is `options amdgpu gttsize=76800`, which we do not set; and the proposed
+2-step fix is written **by the reporter inside the issue body** ("We propose the
+following 2-step patch… 1. Reset the cursor bucket… 2. Add defensive check"),
+with no author trail, no `Signed-off-by`, no commit or Message-ID. Per CLAUDE.md
+YOU MUST NOT #3 that is not a traceable submission, and the change is a
+`WARN_ON_ONCE` band-aid over a reservation mismatch rather than a root cause.
+Worth watching if a real TTM fix follows it; nothing here to carry.
+
+### Others checked, none actionable
+
+- **`#5894` RX 9070 XT (VCN 5.0.0) vcn_unified_0 ring reset** — answered by
+  nowrep: **a firmware bug, already fixed, pending a linux-firmware update**.
+  Not a kernel fix at all. Useful for us because our GPU is VCN 5.0: if this
+  ring reset ever appears here, the answer is firmware, not a patch.
+- **`#5900`/`#5905`/`#5896`** — read the same evening; no patch in any of them.
+- **`#5868` RX 9070 XT HDMI disconnect/reconnect loop** — a Samsung UE50MU6125
+  declaring no FRL support (`max_frl_rate` 0). Sink-specific, not our display.
+- **`#5663`** — already tracked; the SDMA DCC workaround question, unchanged.
+- The large pageflip-timeout cluster (`#5647`, `#5511`, `#5872`, `#5843`,
+  `#5640`, and ~10 more) remains **bug reports with no referenced fix** —
+  consistent with the standing read of this tracker.
+
+### Method note
+
+The tracker's hex-shaped tokens are mostly noise: in this pass the only
+"commit" in `#5900` was a **bol.com product URL**, and `#5907` cites no sha at
+all. The two genuinely useful commits — `df94112ceebf` and `c953b39f9487` — were
+named in `#5897`'s *description*, not its comments, and `c953b39f9487` is
+**absent from our shallow clone by hash** even though the issue says mainline
+7.3-rc4 has it; it had to be traced by its effect (`is_hdmi_frl_in_use()` at
+`link_detection.c:908`) rather than by `git cat-file`. Reading descriptions, not
+just comments, is what surfaced it.
