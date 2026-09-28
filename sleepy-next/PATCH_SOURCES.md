@@ -4647,3 +4647,94 @@ Cutting the mail body one line short produced a patch that `patch` accepted
 **with fuzz 1** while `git apply` correctly rejected it as corrupt — the exact
 "cut at the wrong line, and only one of the two checkers notices" failure mode
 already on record here.
+
+## Sweep 2026-09-28 07:03 — 7 AM all-source verification, nothing to adopt
+
+The watcher fired with **no new linux-next snapshot** (`next-20260925` is still
+current; there is no `next-20260926` or `next-20260927`), so this ran as the
+instructed full verification pass over every source rather than as a linux-next
+delta sweep. **No patch was added, dropped or regenerated.**
+
+`torvalds` master is at `72d3fcf802c` = `v7.3-rc5` with no commits beyond it, so
+there was no new mainline content to sweep for either. All ten lore mirrors were
+refreshed to 2026-09-28 (new mail: amdgfx 13, dri-devel 64, mm 7, sched-ext 2,
+block 6, netdev 174, pm 14). There is still **no `[git pull] drm fixes` for
+7.3-rc5/rc6** — the rc5 pull we mined on 2026-09-26 remains the latest, so that
+highest-yield source had nothing new in it.
+
+Nothing on-target in the refreshed mail: mm was hugetlb (no hugepages on this
+desktop), DAX, DAMON and `ptr_eq`; sched-ext was a CID feature; block was a Rust
+`DropGuard` and drbd; pm was ARM/embedded. None of those target the hardware in
+the table in `CLAUDE.md`.
+
+### Work items — checked including comments
+
+Three on-target items were open (#5900, #4697, #5896). Comments were read via
+the GraphQL endpoint (REST `/notes` is still 401-gated). **#5900** gained one
+comment on 2026-09-27 from kernelOfTruth — VRR/adaptive-sync and FreeSync
+troubleshooting suggestions plus a request for monitor specs. It is user-side
+triage advice, **not a patch and not a fix**, so there was nothing to adopt.
+Noted because it is at least directionally interesting: the suggestion implies
+RDNA4 pageflip timeouts correlate with VRR being enabled, and this machine runs
+FreeSync. Nothing actionable follows from it today.
+
+### Version sweep — 11 hits, one genuinely new, and it needs no action
+
+The sweep re-reads every carried patch's subject against all 18,118 upstream
+postings across the ten mirrors. It reported **11 higher-version postings**; ten
+of those are already dispositioned in this file (`2049`, `2032` adopted; `2185`,
+`2037`, `2039`, `2154`, `2151`, `2144` resends with identical content; `2415`
+superseded by our own `2414` pair; `1151`'s "v4" is an *older* posting from a
+different author).
+
+The eleventh was new: **`2045` sch_cake is now v3 (2026-09-27)**. It is on-target
+— CAKE is this machine's SQM via `sleepy-next/net-tune/` on the RTL8125B — so it
+was examined properly rather than waved through.
+
+**Verdict: no adoption. The v3 code is byte-identical to the v2 we already
+carry.** The v3 is a packaging change only — the single v2 patch split into a
+two-patch series so each defect carries its own accurate `Fixes:` tag and stable
+backport range (patch 1 `Fixes: c5d34f4583ea`, patch 2 `Fixes: a729b7f0bd5b`,
+per Simon Horman and the Sashiko AI review). The split is bookkeeping for stable
+backports, which this repo does not do: we build one kernel for one machine and
+never backport.
+
+The evidence is the hunk content, not the line count, because a matching diffstat
+is exactly the kind of coincidence that has fooled this audit before:
+
+| | our v2 carry | v3 patches 1/2 + 2/2 |
+|---|---|---|
+| added lines | 11 | 11 — identical set |
+| removed lines | 4 | 4 — identical set |
+| diffstat | `15 +++++++++++----` | `15 +++++++++++----` |
+
+Every added and removed line matches exactly, including the `int hdr_len;`
+declaration, the `skb_transport_header_was_set()` guard, the `hdr_len < 0`
+fallback and the `segs <= 1` change (which simply moves from patch 2/2's hunk
+into patch 1/2). Splitting our `2045` in two would gain nothing and would churn
+the series numbering.
+
+**The adoption bar is not met either**: Horman's two replies of 2026-09-27 are
+process feedback — "do include lore.kernel.org links to earlier versions in the
+changelog" and "please start a new thread for each version" — with **no
+`Reviewed-by`**.
+
+### Rebase and build verification
+
+The rc5 rebase recorded above was re-verified end to end rather than trusted:
+
+- **Cumulative audit**: `audit_series.py --tag v7.3-rc5` reports **all 257
+  patches applied cleanly to v7.3-rc5** — no `FAILED`, no `Skipping patch`, no
+  `Reversed`.
+- **Installed**: `linux-sleepy-next 7.3.0_rc5-1`; the running kernel is still
+  `7.3.0-rc4-18-sleepy-next` pending a reboot, which is expected.
+- **Boot path**: `/boot/loader/loader.conf` defaults to `linux-sleepy-next.conf`,
+  whose `vmlinuz-linux-sleepy-next` and `initramfs-linux-sleepy-next.img` are
+  both dated 2026-09-27 23:08 — the rc5 build. The `loader.conf` comment records
+  that the file now agrees with the EFI variables, so losing NVRAM no longer
+  silently boots the cachyos-rc A/B kernel.
+- **BTF**: `.BTF` sections are present in the installed modules, so
+  `resolve_btfids` ran and the `TCP_CONG_BBR`/`TCP_CONG_BBR3` kfunc collision
+  rule did not fire. `TCP_CONG_BBR` is disabled at `PKGBUILD:732` and again at
+  `:807`; the running kernel offers `reno bbr3 cubic` with `bbr3` default and no
+  `bbr`, confirming the override takes effect as written.
