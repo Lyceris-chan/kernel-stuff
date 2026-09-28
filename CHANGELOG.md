@@ -15,37 +15,50 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
-## [7.3.0-rc4-18-sleepy-next]: 2026-09-26
+## [7.3.0-rc5-2-sleepy-next]: 2026-09-28
 
 ### Updated
 
-- **`2032` → v3** — `tcp: preserve timestamps across receive queue collapse`
-  (Jason Xing). One line our carried v2 lacked: clear
-  `TCP_SKB_CB(nskb)->has_rxtstamp` before the `cb` memcpy, because that memcpy
-  inherits the flag from a source skb that may contribute no bytes (a
-  fully-covered skb left in the ofo tree). Without it the new skb can advertise
-  an RX timestamp it does not have. v3's changelog attributes the corner case
-  to **Eric Dumazet**. It scored NEITHER on a plain dry-run — forward fails on
-  hunk 2 (carried), reverse fails on hunk 1 (not carried) — which is the
-  *partial* signature; verified by reverting to base and applying v3 at that
-  series position.
+- **`2045` -> v4** — `net/sched: sch_cake: prevent shaper corruption and stall
+  in cake_overhead()` (Yuchao Zhang). CAKE is this machine's SQM, run by
+  `sleepy-next/net-tune/` on the RTL8125B path, so both defects it fixes are
+  live here rather than theoretical.
 
-### Version sweep
+  v4 is a **real code change**, unlike the v3 assessed earlier the same day
+  (which was a packaging-only split of the v2 — byte-identical content). Patch 2
+  consolidates the three early `return cake_calc_overhead(q, len, off)` fallback
+  exits into a single `err:` label at the end of the function, per review from
+  **Toke Hoiland-Jorgensen**, the CAKE maintainer, who also adds his
+  `Acked-by` to patch 1. That review is what moves this past the adoption bar
+  the v2 and v3 did not meet.
 
-All 268 carried patches checked against 11 lore mirrors. Ten had a
-higher-version posting; **seven were resends** with byte-identical changed
-lines, one was **older** than what we carry (`1151`: the "v4" is from February,
-ours from September), and one (`2415`) is superseded by our own `2414`+`2415`
-pair against the newer `kernel/sched/ext/` layout.
+  Carried as the single patch `2045` with the combined content of upstream 1/2
+  and 2/2; both `Fixes:` tags are preserved in the commit message. The upstream
+  split exists for stable backport granularity, which this repo does not use.
 
-### Not adopted — already carried
+  Verified by building the combined patch from a throwaway worktree at
+  `v7.3-rc5` (applying 1/2 then 2/2, then `git diff`) and confirming the written
+  patch reproduces that tree byte-for-byte, passes `git apply --check` and GNU
+  `patch --dry-run` with no fuzz, and that the cumulative audit still reports
+  all 257 patches clean.
 
-`#5870` reports an `amdgpu_sync_add_later` use-after-free on RX 9070 XT, and a
-commenter points at Donggeun Yoo's *"don't release the fence reference consumed
-by the scheduler"*. The bug is real — `drm_sched_job_add_dependency()` consumes
-the reference on every path, so the callers' `dma_fence_put()` on error is a
-double put, still present in `next-20260925` — but **we already carry it as
-`1064`**, across the same three files.
+### Not adopted
+
+A full all-source sweep found nothing else worth carrying. Notable rejections,
+recorded in full in `sleepy-next/PATCH_SOURCES.md`: the kbuild build-speedups
+**v4** (does not apply to rc5 — built on three unmerged dependency series), the
+`r8169` RSS series (**RTL8127**, not this machine's RTL8125B), `zram` short
+reads (zram is not in use here), a USB string-descriptor sanitizer (the defect
+does not occur on this machine's devices), and `sched/fair` `detach_tasks`
+(inert: `switch_all=1`, so CFS load balancing never runs).
+
+### Fixed
+
+- **CHANGELOG ordering** — `[7.3.0-rc4-18]` had been inserted above
+  `[7.3.0-rc5-1]` despite being older. Reordered to keep the file newest-first
+  as its own header specifies.
+
+257 patches.
 
 ## [7.3.0-rc5-1-sleepy-next]: 2026-09-27
 
@@ -77,6 +90,38 @@ Their new commits add an `hdmi-patches-v2` rebundle (already assessed as work we
 carry) and a POC scheduler selector (not used here).
 
 257 patches.
+
+## [7.3.0-rc4-18-sleepy-next]: 2026-09-26
+
+### Updated
+
+- **`2032` → v3** — `tcp: preserve timestamps across receive queue collapse`
+  (Jason Xing). One line our carried v2 lacked: clear
+  `TCP_SKB_CB(nskb)->has_rxtstamp` before the `cb` memcpy, because that memcpy
+  inherits the flag from a source skb that may contribute no bytes (a
+  fully-covered skb left in the ofo tree). Without it the new skb can advertise
+  an RX timestamp it does not have. v3's changelog attributes the corner case
+  to **Eric Dumazet**. It scored NEITHER on a plain dry-run — forward fails on
+  hunk 2 (carried), reverse fails on hunk 1 (not carried) — which is the
+  *partial* signature; verified by reverting to base and applying v3 at that
+  series position.
+
+### Version sweep
+
+All 268 carried patches checked against 11 lore mirrors. Ten had a
+higher-version posting; **seven were resends** with byte-identical changed
+lines, one was **older** than what we carry (`1151`: the "v4" is from February,
+ours from September), and one (`2415`) is superseded by our own `2414`+`2415`
+pair against the newer `kernel/sched/ext/` layout.
+
+### Not adopted — already carried
+
+`#5870` reports an `amdgpu_sync_add_later` use-after-free on RX 9070 XT, and a
+commenter points at Donggeun Yoo's *"don't release the fence reference consumed
+by the scheduler"*. The bug is real — `drm_sched_job_add_dependency()` consumes
+the reference on every path, so the callers' `dma_fence_put()` on error is a
+double put, still present in `next-20260925` — but **we already carry it as
+`1064`**, across the same three files.
 
 ## [7.3.0-rc4-17-sleepy-next]: 2026-09-26
 

@@ -4738,3 +4738,178 @@ The rc5 rebase recorded above was re-verified end to end rather than trusted:
   rule did not fire. `TCP_CONG_BBR` is disabled at `PKGBUILD:732` and again at
   `:807`; the running kernel offers `reno bbr3 cubic` with `bbr3` default and no
   `bbr`, confirming the override takes effect as written.
+
+## ADOPTED 2026-09-28: `2045` regenerated to the sch_cake **v4** revision
+
+This supersedes the v3 verdict recorded in the 07:03 entry above, which found v3
+to be a packaging-only split. **v4 is not a repackaging — the code changed**, and
+it now meets the adoption bar on review grounds as well.
+
+### What changed from v2/v3
+
+Patch 1 of the series is unchanged (`segs == 1` → `segs <= 1`). Patch 2 is
+restructured: the three early `return cake_calc_overhead(q, len, off);` fallback
+exits become `goto err;`, with a single label at the end of the function:
+
+```c
+err:
+	return cake_calc_overhead(q, len, off);
+```
+
+Per the cover, this is "per Toke Høiland-Jørgensen review". Patch 1 also gains
+`Acked-by: Toke Høiland-Jørgensen <toke@toke.dk>` — the CAKE maintainer. The
+adoption bar here is **maintainer review**, which the v2 and v3 did not have.
+
+### Why on-target
+
+CAKE is this machine's SQM: `sleepy-next/net-tune/` runs it on the RTL8125B
+path, and both defects (a `segs == 0` shaper stall and an unvalidated transport
+header offset) corrupt live shaper accounting rather than being theoretical.
+
+### Form of the carry
+
+Kept as the single patch `2045` with the combined content of v4 1/2 + 2/2. The
+upstream split exists so each defect carries its own `Fixes:` tag and stable
+backport range; this repo does not backport, so the split buys nothing and would
+only churn the numbering. Both `Fixes:` tags are recorded in the commit message.
+
+### Verification
+
+- Built by applying v4 1/2 then 2/2 to a throwaway worktree at **v7.3-rc5**, then
+  `git diff` — so the combined patch is generated from the tree, not hand-merged.
+- The resulting `cake_overhead()` was read: all three fallbacks route to `err:`,
+  and the label sits after the function's real return.
+- The new `2045` **reproduces that tree byte-for-byte** (`diff` identical),
+  passes `git apply --check`, and passes GNU `patch -p1 --forward -F2 --dry-run`
+  with **no fuzz and no `Skipping patch`**.
+- Cumulative audit: **all 257 patches apply cleanly to v7.3-rc5**.
+- UTF-8 checked byte-wise: the maintainer's name is `H\xc3\xb8iland-J\xc3\xb8rgensen`
+  on disk, not a mojibake replacement character. (See the extractor trap below.)
+
+### Extractor trap hit while doing this
+
+`email.message_from_string()` on a **`str`** silently mangles 8-bit content:
+`Toke Høiland-Jørgensen` came out as `Toke H�iland-J�rgensen`. Read the
+mail as **bytes** and parse with `message_from_bytes()`. The corruption is
+invisible in a terminal and would have shipped a wrong name into the ledger.
+
+## Sweep 2026-09-28 (evening) — all sources, one adoption
+
+Every source queried. Everything below is recorded so the rejections are not
+re-derived next pass.
+
+### Adopted
+
+`2045` → v4 (above). **Series stays at 257.**
+
+### Rejected, with reasons
+
+| Candidate | Source | Reason |
+|---|---|---|
+| kbuild build-speedups **v3 → v4** (`2302`, `2308`, `2313`, `2314`, `2315`, `2317`) | lkml | **Does not apply to rc5.** The v4 series is based on `36d4a11b56aa` in the kbuild tree plus three *unmerged* dependency series (module_ver_remove v2, an objtool series, a kees series), which its cover states outright. Both v4 patches tested fail `git apply --check` on `scripts/kallsyms.c` and `include/asm-generic/vmlinux.lds.h`. Our v3 carries remain correct for this base; revisit when the deps merge |
+| `r8169: add RSS support for RTL8127` v15 (7 patches) | netdev | **Wrong chip.** Explicitly `RTL_GIGA_MAC_VER_80` (RTL8127, 10G-class). This machine is **RTL8125B, XID 641** (confirmed from dmesg). Also a net-next *feature*, not a fix — 970 insertions |
+| `zram: fix short reads from block_state` | block | **zram is not used here.** `lsmod` shows no zram module; the swap stack is zswap + a 16 GiB `/swapfile` |
+| `USB: core: sanitize string descriptors against C0 control chars` | sirlucjan fixes v7 | **Problem not present.** Scanned every `/sys/bus/usb/devices/*/{serial,product,manufacturer}` on this machine: **0** attributes contain control characters. The motivating device (ASUS ROG Azoth, `0b05:1a85`) is not attached; ours are a Logitech receiver, HyperX QuadCast S and two dongles. USB core is also not one of this machine's target components |
+| `EDAC/amd64: … UMC csrow decode` v2 | lkml | EDAC is not loaded (`lsmod` clean). Patch 2 targets **Family 1Ah** (Zen 5); this CPU is Family 19h |
+| `sched/fair: do not scan twice in detach_tasks()` | sirlucjan fixes v7 | **Inert.** `switch_all=1` is set (`/sys/kernel/sched_ext/switch_all`) and `scx_cake` is the active scheduler, so CFS load balancing does not run — the documented `fair.c`-under-scx trap |
+| `x86/mm: Don't apply va_align to hugetlb mappings on AMD F15h` | tip | **Wrong silicon.** F15h is Bulldozer; this is Zen 4 (19h) |
+| `sched_ext: Add a size argument to scx_bpf_cid_topo()` | tip | **Already in rc5.** Probed rather than assumed: rc5's `kernel/sched/ext/cid.c:927` already declares `size_t out__sz`, with `len = min(out__sz, sizeof(*out))` and the `memset(out, 0xff, out__sz)` fill. tip merely has not rebased |
+| sched proxy-execution series (5 commits) | tip | Feature series, not fixes |
+| `xswap` vswap infrastructure (12 patches, ~5,500 lines) | sirlucjan | Unmerged feature series, far outside the fix-shaped bar |
+| `bore` 7.0.0, `poc` selector | sirlucjan | Alternative CPU schedulers. This machine runs **sched-ext**, so both are no-ops here |
+| i915 RC6, `btusb` VID/PID, `iwlwifi`, `sof` Dell XPS, ASUE140D touchpad, `drm/gud` revert | sirlucjan | Off-target hardware (Intel GPU, Bluetooth, Intel wifi, laptop audio, laptop touchpad, USB display) |
+| `iommu/amd: PerfOpt compulsory for APUs` | amdgfx | APU-only; this is a desktop with a discrete GPU |
+| amdgpu SR-IOV VF series (SRAT/VRAM/VBIOS), `ras: skip RAS TA reload for VFs`, `RLC GPU clock on GFX12.1 VF` | amdgfx | **VF (SR-IOV virtual function) and/or GFX12.1.** This is a bare-metal GFX12.0 part |
+| `drm/amdgpu: extend MacBook VRAM-at-0 workaround to VERDE` | dri-devel | Apple hardware and an ancient chip |
+| `nvme-rdma`, `nvmet: cgroup_id` | nvme | We are a PCIe NVMe initiator (Phison E16); neither RDMA nor target mode is used |
+| KVM `5.15.y` backports, ALSA HDA quirks | lkml | Stable backports for old kernels; laptop audio |
+| `mm/zswap: shrinker writeback with iocost` | mm | **RFC** — not mergeable material |
+
+### Recorded but NOT adopted — deferred on the adoption bar
+
+`drm/amdgpu: guard against failed kfd node init` (Yiqing Yao, amdgfx,
+2026-09-28). A real NULL-deref guard — `kfd->num_nodes` is set before
+`kfd->nodes[]` is populated, so a failed `kgd2kfd_device_init()` leaves NULL
+node pointers that `amdgpu_amdkfd_clear_kfd_mapping()` walks. Has
+`Signed-off-by` but **no `Reviewed-by`, no `Fixes:`, no `Cc: stable`**, and is
+not in `agd5f-linux`, `amd-staging-drm-next` or `drm-next` (the hits those trees
+return are a different, August `kfd_dev_mapping` patch). Posted hours ago —
+**adoption bar not met; revisit when reviewed**, same treatment as the io_uring
+fix deferred on 2026-09-27.
+
+### Work items
+
+Six issues moved. Two on-target: `#5905` (RX 9070 XT fan stops below ~50 °C
+hotspot in custom `fan_curve`) and `#5900` (pageflip timeout on a 9070). Comments
+read over GraphQL (REST `/notes` still 401-gated). **Neither yields a patch.**
+`#5905` has no comments; `#5900` is a user reporting back after disabling
+FreeSync, and the one hex-shaped token in it is a bol.com product URL, not a
+commit — the known image-path false positive. Others (#5906 Navi31, #5893 Strix
+Halo, #5871 HawkPoint1, #5847 HP OmniBook) are wrong-chip.
+
+### Source coverage — two gaps, stated rather than skipped
+
+- **`repos/lore-lkml` and `repos/lore-rust-for-linux` are not usable mirrors.**
+  Both are *non-bare single-message* clones (with a stray checked-out `m` and a
+  `.git` subdirectory), so `git --git-dir=` fails on them. lkml is nevertheless
+  fully covered by **`lore-mirror`**, whose origin is `lore.kernel.org/lkml/20`
+  and which is current to 2026-09-28 (1,053 patch mails in the window alone).
+  **Rust is genuinely uncovered** — `repos/lore-rust-for-linux` is the broken
+  clone and `CONFIG_RUST=y` is set, so this is a real, if low-yield, gap. Worth
+  re-cloning: `git clone --mirror https://lore.kernel.org/rust-for-linux/0 repos/lore-rust-for-linux`.
+- **`next-20260928` could not be fetched.** The tag exists on the remote
+  (`97952267cf37`) but the tree is ~13 GB and the fetch exceeded its budget
+  twice. Everything linux-next *aggregates* — tip, drm-next, agd5f, amd-staging,
+  drm-misc, linux-pm, akpm-mm — was swept individually, and the mainline base is
+  unchanged (`origin/master` = `72d3fcf802c` = v7.3-rc5), so the snapshot has no
+  unique content this pass. **Not to be confused with "checked and empty".**
+
+### Freshness trap hit again
+
+`repos/torvalds` **`master` is a stale local branch at 2026-09-21** while
+`origin/master` is current at 2026-09-27 (`72d3fcf802c`). Reading `master` would
+have reported mainline as far older than it is. Same class as the sirlucjan
+stale-local-branch trap: **always read `origin/<branch>`.** The
+`sirlucjan-kernel-patches` working tree is likewise at 2026-09-18 while
+`origin/master` is at 2026-09-28 — which is why the fixes series reads as **v7**
+there and not the v6 visible in the checkout.
+
+### Patch hygiene observation (not acted on)
+
+**151 of 257** carried patches end with a stray `-- ` signature separator and a
+`cgit 1.3.1-korg` line, left by git.kernel.org's HTML view. Always *after* the
+final hunk, so both `git apply` and GNU `patch` ignore it and the cumulative
+audit is unaffected — cosmetic only. Not mass-edited here because it would churn
+151 files and invalidate every checksum for no functional gain; worth stripping
+the next time the extractor is touched, at which point `updpkgsums` is required.
+
+## `next-20260928` — fetched and examined (7.4 material, nothing adopted)
+
+The 2026-09-28 snapshot was fetched with **`git fetch --depth=1 origin tag
+next-20260928`** after two plain fetches blew their budget on history. A
+`--depth=1` tag fetch pulls the tag's tree and nothing else, which is all a
+content comparison needs — worth remembering, since the full fetch had failed
+twice and looked like an unreachable source. The linux-next clone can no longer
+walk history afterwards, so `git log v7.3-rc5..next-20260928` returns *only* the
+tip commit; that is the shallow graft, not an empty range.
+
+Diffing the snapshot's tree against `v7.3-rc5`, for this machine's files:
+
+| File | Δ (ins/del) | What it is |
+|---|---|---|
+| `gfx_v12_0.c` | 18 / 26 | 7.4 refactors: `ring_test_ib` moved to `amdgpu_job_alloc_with_ib()` + `amdgpu_job_submit_direct()`, the VMID loop replaced by `for_each_vmid_and_zero()`, and `gfx_v12_0_is_idle()` removed |
+| `dcn401_resource.c` | 1 / 1 | include path only: `dml2_0/dml2_wrapper.h` -> `dml2_wrapper/dml2_wrapper.h` |
+| `zswap.c` | 210 / 151 | queued zswap work |
+| `r8169_main.c` | 561 / 145 | the **RTL8127** RSS series rejected above |
+| `smu_v14_0_0.c`, `sch_cake.c` | — | unchanged |
+
+**Nothing adopted.** Everything here is queued for the **7.4 merge window**, not
+a 7.3 fix — these are refactors and layout churn (`gfx_v12_0_is_idle()` removal
+and the DML2 directory rename have no `Fixes:` behaviour to port), and the
+`r8169` delta is a series already rejected for targeting the wrong chip. Carrying
+7.4 refactors on a 7.3 base would only manufacture conflicts at the 7.4 bump,
+where they arrive for free. Recorded so the 7.4 rebase knows what to expect in
+`gfx_v12_0.c`.
+
+Note `sch_cake.c` is unchanged in the snapshot, so the v4 CAKE fix adopted above
+has **not** reached linux-next yet — the carry is genuinely ahead of it.

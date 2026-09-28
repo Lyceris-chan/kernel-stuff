@@ -6,8 +6,8 @@ built from **mainline Linux 7.3-rc5** plus a sanitized
 [CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 257 targeted
 upstream/local patches. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0_rc5-1` · **Artifact:**
-`linux-sleepy-next-7.3.0_rc5-1-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0_rc5-2` · **Artifact:**
+`linux-sleepy-next-7.3.0_rc5-2-x86_64.pkg.tar.zst`
 
 ## Target hardware
 

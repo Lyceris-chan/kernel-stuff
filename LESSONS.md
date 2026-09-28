@@ -64,6 +64,42 @@ before believing something is tuned* — but equally, **check whether an
 "error" is the expected consequence of a deliberate choice before "fixing"
 it.** A warning that is accurate and harmless is not a bug.
 
+## A third expected message: `amdgpu: unknown parameter 'si_support' ignored` (2026-09-28)
+
+Same class as the two above — an accurate complaint that is the consequence of a
+deliberate choice, recorded so no future sweep re-opens it.
+
+Boot logs:
+
+```
+amdgpu: unknown parameter 'si_support' ignored
+amdgpu: unknown parameter 'cik_support' ignored
+```
+
+`/usr/lib/modprobe.d/amdgpu.conf` (owned by `cachyos-settings`) passes
+`options amdgpu si_support=1 cik_support=1`. Both parameters **do** exist in
+mainline, but they are compiled out here:
+
+```c
+int amdgpu_si_support = -1;
+#ifdef CONFIG_DRM_AMDGPU_SI
+MODULE_PARM_DESC(si_support, ...);
+module_param_named(si_support, amdgpu_si_support, int, 0444);
+#endif
+```
+
+This config sets `# CONFIG_DRM_AMDGPU_SI is not set` and
+`# CONFIG_DRM_AMDGPU_CIK is not set` — correct for a Navi 48 machine, which is
+neither Southern Islands (GCN 1) nor Sea Islands (GCN 2). An unregistered
+`module_param` is not an error the kernel acts on; it logs and ignores. **Do not
+"fix" this by enabling SI/CIK support**, and do not chase it as a stale config —
+the vendor file is simply written for kernels that build those in.
+
+Worth noting *why* this one is easy to misread: unlike the sysctl case, the
+parameter genuinely exists in the source tree, so grepping for it finds a
+definition and looks like proof the option is honoured. The `#ifdef` is the part
+that matters, and `rg` shows it only if you read the surrounding lines.
+
 ## An unescaped regex made a duplicate look absent (2026-09-26)
 
 Chasing a real `amdgpu_sync_add_later` use-after-free from work item `#5870`, I
