@@ -5001,3 +5001,100 @@ named in `#5897`'s *description*, not its comments, and `c953b39f9487` is
 7.3-rc4 has it; it had to be traced by its effect (`is_hdmi_frl_in_use()` at
 `link_detection.c:908`) rather than by `git cat-file`. Reading descriptions, not
 just comments, is what surfaced it.
+
+## Sweep 2026-09-28 (late) — tip + "anything else" recheck; a CachyOS scan bug found
+
+Prompted by "check the tip repo too". Tip is clean, but the recheck exposed a
+**real bug in how this sweep scans CachyOS**, which had been reporting "nothing
+new" while new content sat on the remote.
+
+### The bug: `cachyos-linux` was being read off a stale 2022 ref
+
+The sweep's freshness loop used `git -C repos/cachyos-linux log -1
+origin/master`, which reports **2022-06-23** — a ref that has nothing to do with
+this kernel. The branches that matter are `7.3/base`, `7.3/fixes`, `7.3/hdmi`
+and friends. Read off the correct refs and compared against `ls-remote`:
+
+| Branch | Local | Remote | |
+|---|---|---|---|
+| `7.3/hdmi` | `96f023bb8c13` | `96f023bb8c13` | up to date |
+| `7.3/base` | `2630fcfd768e` | `8855497eb51b` | **behind** |
+| `7.3/fixes` | `d10310a163ce` | `68f054f6774b` | **behind** |
+
+The fetch had been run and reported success; it simply was never compared
+against the right ref. Same family as the `sirlucjan` stale-local-branch trap
+and the stale `torvalds` `master`: **name the branch you actually care about,
+and compare it to the remote.** A freshness check pointed at the wrong ref is
+worse than none, because it produces a confident "nothing new".
+
+### What the correct refs revealed
+
+**`7.3/fixes` — `68f054f6774b` `mm/slub: refill prefilled sheaves from the
+barn` (Hao Li, 2026-09-21, `mm/slub.c | 81 +++`).** This is **the patch we
+already carry as `2197`** — same author, same 81-insertion one-file shape, and
+our copy was already verified content-identical to upstream v2 and to
+sirlucjan's `0013`. CachyOS has now picked it up. **No action**; recorded so a
+future pass does not re-derive it as a candidate.
+
+**`7.3/base` — the `xswap` series was REVERTED and replaced by `vswap` v5**
+(`596d0b52c29e` reverts the merge we had previously assessed; `8855497eb51b`
+merges `7.3/xswapv5`). Twelve `mm, swap:` commits by **Nhat Pham**, 2026-09-18:
+
+```
+mm, swap: add virtual swap device infrastructure
+mm, swap: support zswap and zero-filled swap pages as vswap backends
+mm, swap: prepare the swap IO path for vswap
+mm, swap: support physical swap as a vswap backend
+mm, swap: enable THP swapin for vswap entries
+mm, swap: write back vswap zswap entries to physical swap
+mm, swap: reclaim physical slots backing cache-only vswap entries
+mm, swap: only charge physical swap entries
+mm, swap: add debugfs counters for vswap
+mm, swap: defer memcg_table allocation for physical swap clusters
+mm, swap: back vswap clusters with a VM_SPARSE array
+```
+
+**Not adopted.** It is a *feature* series — **23 files, 2206 insertions, 285
+deletions**, with a single Fixes/Cc-stable marker across the whole thing — and
+this repo's bar is fixes with traceable provenance or maintainer review. Two
+further reasons to leave it: we **deliberately removed** the xswap predecessor
+on 2026-09-22 and documented why the zswap+swapfile design was chosen (its
+drain is automatic — the shrinker writes pool entries back to the entry's own
+swap device, so a real file behind the pool keeps anonymous pages reclaimable),
+and a 2200-line unmerged series in `mm/zswap.c` and the swap core would fight
+every rebase.
+
+**Recorded because it is the one live, moving thing in our exact subsystem.**
+If the zswap+swapfile design is ever revisited, `vswap` v5 is the candidate and
+this is where it lives. Note it also touches `mm/zswap.c` heavily (+135), which
+we already carry ~20 patches against — a future adoption would need a conflict
+pass, not a clean apply.
+
+### tip — clean, and the reason is worth stating
+
+`origin/master` is at `72c51a366945` (2026-09-28), verified against
+`ls-remote`. Twenty commits in tip/master are **absent from rc5**, and none is
+adoptable:
+
+- **13** are the new **Preferred-CPU** series (`cpumask: Introduce
+  cpu_preferred_mask`, `sysfs: Add preferred CPU file`, `sched/fair: Load
+  balance only among preferred CPUs`, …). A feature, and its `sched/fair`
+  load-balancing piece is **inert here** under `switch_all=1`.
+- **5** are the **proxy-execution** series (`sched: Add sched_ext hooks for
+  proxy execution`, …). A feature.
+- **1** is `x86/cpu: Constify struct x86_cpu_id` — a treewide cleanup.
+- **1** is `x86/mm: Don't apply va_align to hugetlb mappings on AMD F15h` —
+  **F15h**, not our Zen 4; already rejected once.
+- **4** are `virt: Introduce steal governor driver` — we are not a VM guest.
+
+The apparent candidates that look like fixes (`x86/mce: Fix hardware debug
+register corruption`, `drm/amdgpu: Fix last_update fence leak in
+amdgpu_vm_init()`, `drm/amdgpu: Fix runtime PM leak in
+amdgpu_debugfs_test_ib_show()`, `drm/amd/display: Fix dc stream excess put in
+dm_update_crtc_state()`, `sched_ext: Count SCX_EV_SUB_BYPASS_DISPATCH`) are
+**all already in rc5** — present by hash, and confirmed by content probe
+(`SCX_EV_SUB_BYPASS_DISPATCH` appears at both `kernel/sched/ext/inlines.h:67`
+and `:133` in rc5, the second being exactly what that fix adds). tip simply has
+not been rebased onto rc5. **Grep for merges too:** the first pass matched
+merge commits whose tag names contain the subject and briefly looked like five
+adoptable fixes.
