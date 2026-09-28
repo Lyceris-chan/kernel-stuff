@@ -766,6 +766,38 @@ only where stdin genuinely is the password. Same family as the `rg -rn` and
 changes what the command means. `pgrep -af <pattern>` self-matches the invoking
 shell exactly like `pkill -f` — `pgrep -x <name>` is the form that does not.
 
+### Recurrence, in a polling guard (2026-09-28)
+
+The line above was already written when I wrote this watcher, and it still spun
+for seven minutes without ever exiting:
+
+```bash
+until ls sleepy-next/pkg/*.pkg.tar.zst >/dev/null 2>&1; do
+  pgrep -f makepkg >/dev/null 2>&1 || { echo "makepkg gone"; exit 1; }
+  sleep 10
+done
+```
+
+Two independent faults, and the second is the documented one:
+
+1. **Wrong path.** makepkg writes the package beside the `PKGBUILD`
+   (`sleepy-next/linux-sleepy-next-*.pkg.tar.zst`), not into `pkg/`. The glob
+   could never match. Verify where the artifact actually lands before writing a
+   predicate on it — I had already had to go hunting for this file once.
+2. **`pgrep -f` self-match.** The guard's own command line contains the string
+   `makepkg`, so `pgrep -f makepkg` matched *the watcher itself* and reported the
+   build alive forever. The deadlock needed both bugs: either alone would have
+   exited.
+
+**The generalisable rule:** a watcher that polls for a condition needs its
+*negative* path tested too. An `until` loop with an internal liveness check looks
+self-limiting, but it only limits itself if the liveness check can actually
+return false — and a `-f` pattern match on your own script cannot. Prefer a
+predicate that cannot match the watcher (`pgrep -x makepkg`, or check for the
+artifact path you have *verified*), and when a loop is meant to end, confirm the
+exit path fires before walking away. This one was only caught because the user
+asked what the shell was doing.
+
 ### Second occurrence, different spelling (2026-09-16)
 
 A pipe into `echo` looks harmless and is not — `echo` ignores its stdin, so
