@@ -5303,3 +5303,96 @@ which for a 7.2-era patch is surprising and would normally invite adoption — b
 `a4808133047d` (2026-07-15) reverts it, and the reverting author **is the patch's
 own author**, on both `7.2/base` and `7.2/cachy`. A clean apply is not evidence
 of anything; the author withdrawing their own patch is the signal that counts.
+
+## Ultra-sweep 2026-09-30 (late) — work items + mailing lists, 2 adopted
+
+### Adopted: `9078`, `9079` — two reviewed amdgpu/userq fixes
+
+Both by **Jesse Zhang**, posted 2026-09-30, and both **`Reviewed-by: Christian
+König`** (in his replies, not in the reposted patches — see below).
+
+- **`9078` `drm/amdgpu/userq: only accept doorbell BOs as queue doorbell`.**
+  `amdgpu_userq_get_doorbell_index()` pinned *any* BO passed as
+  `doorbell_handle` into the doorbell domain. For a regular BO, TTM moves it
+  with `ttm_bo_move_null()` and **its contents are lost** — and since an
+  importer on the same device gets the exporter's GEM object, a client could do
+  this to a buffer another client had shared with it. `Fixes: f09c1e6077ab`.
+- **`9079` `drm/amdgpu/userq: return the memdup_user() error for the user MQD`.**
+  `mes_userq_mqd_create()` returned `-ENOMEM` for every `memdup_user()`
+  failure, masking `-EFAULT` (bad pointer) and `-EINTR` (signal). Also drops
+  two error messages a client could spam the log with. Two `Fixes:` tags.
+
+Both fixes target code confirmed present in our base by content probe
+(`doorbell_handle` x4 in `amdgpu_userq.c`, `memdup_user` x3 in
+`mes_userqueue.c`), in the userq subsystem we already carry `9062`-`9071` for.
+
+**On the `Reviewed-by`:** König's tag is in his reply, and the author's v2 folds
+in his feedback ("v2: drop the error message, use a local abo variable
+(Christian)"), but the reposted patch carries only `Signed-off-by`. The patch is
+kept **exactly as posted** rather than having a trailer grafted on that its
+author did not write; the review is recorded here with its message-ids
+(`1affeb9e5704cad6f209bb75c3d0bbf09255408d`,
+`6ba77392579e3f055e47f3da9bbfa6e371c73898`) so the provenance is traceable
+without editing the artefact.
+
+### Rejected by the maintainer: the third patch of that series
+
+`drm/amdgpu/userq: don't publish the queue before create is done with it`
+(Jesse Zhang) describes a create/free race on a guessable queue ID. **König
+declined it outright:** *"I honestly don't see that as problematic. debugfs has
+tons of such issues and that is generally ok."* (`02588cfaad04d2cce60715d4c29cbb652e298f56`).
+
+That is why the V2 of the series is 2 patches and the original was 3 — **the
+maintainer dropped it, not the author.** Taking the V2 whole is the correct
+read; taking the original 3-patch series would have carried something its
+maintainer explicitly rejected. This is the "read the thread for an objection"
+rule earning its keep.
+
+### The ultra-sweep of the tracker itself
+
+Done exhaustively rather than by window, because hand-picked sets keep missing
+things: **all 1,835 open issues enumerated** (19 pages of the REST API) and
+**7,078 distinct hex-shaped tokens** extracted from titles *and* descriptions.
+Batch-checked with `git cat-file --batch-check`: **128 are real commits**; the
+rest are URLs, image paths and PCI ids — the expected ratio.
+
+**Every one of the 128 is accounted for. Nothing adoptable.** Probing them
+surfaced a methodology error worth recording: the first pass used
+`rev-list v7.3-rc5` for ancestry, which is **worthless here — the clone reports
+`--is-shallow-repository == true`**, so it returns only grafted history and
+reported 38 commits as "not in rc5". Content probes showed **7 of the 10 most
+plausible were actually present**. The three that still looked absent were also
+false negatives, from grepping the commit's *subject words* instead of the code
+it introduces: `11752c013f56` "mes ring buffer overflow" adds no such string —
+its change is `AMDGPU_RING_TYPE_MES` in `amdgpu_ring.c:245` and the
+`error_undo:` label in `mes_v12_0.c`, both present in rc5.
+
+**The rule this yields: probe for the identifier the commit *adds*, never for
+the words in its subject.** The existing trap in CLAUDE.md covers the duplicate
+direction (a carried patch re-inserting itself); this is the mirror — a
+*false "absent"* that would have justified adding a patch we already have.
+
+**One live check worth recording:** `#5685` reports `GPUReclaim` in
+`/proc/meminfo` drifting to ~93 GiB on a **Navi 48** GPU after a game exits,
+against ~397 MiB of real GTT use. Its referenced fix (`ae80122f3896`, Airlie's
+`NR_GPU_*` accounting v4) **is already in rc5** — `ttm_pool.c:195/232/344/345/370/371`,
+with `NR_GPU_RECLAIM` defined in `mmzone.h`. Measured on this machine:
+`GPUReclaim` 103 MiB against `mem_info_gtt_used` 132 MiB — **consistent, no
+leak reproduces here.**
+
+### Mailing lists
+
+All eleven mirrored lists refreshed to 2026-09-30. New mail scanned for
+on-target material. **The scheduler inversion now shows up in the sweep
+itself:** 14 new `sched_ext` patches arrived, and they are now *low*-value for
+this machine, while `fair.c` mail is the live category — the reverse of every
+previous pass.
+
+Rejected for lack of review (`Reviewed-by` count 0) or wrong scope: amdgpu
+debugfs GRBM/SRBM lock copy-out, amdkfd interrupt-drain lost wakeup, the
+`gfx12 xccs-per-xcp` VFI patch, `io_uring/tw` task-work starvation, and König's
+8-patch VM rework (a restructuring of `amdgpu_vm_update_range` across 6 files,
+not a standalone fix — it carries Timur Kristóf's `Reviewed-by` but taking one
+patch out of a rework series would be incoherent).
+
+**Series is 254 patches.**
