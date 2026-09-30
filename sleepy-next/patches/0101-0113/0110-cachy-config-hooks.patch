@@ -52,30 +52,6 @@ index 10f2013b5321..1b4e59ba4df1 100644
  config BROKEN
  	bool
  	help
-diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index d78467ec6ee1..80ecdcc0a263 100644
---- a/kernel/sched/fair.c
-+++ b/kernel/sched/fair.c
-@@ -76,10 +76,19 @@ unsigned int sysctl_sched_tunable_scaling = SCHED_TUNABLESCALING_LOG;
-  *
-  * (default: 0.70 msec * (1 + ilog(ncpus)), units: nanoseconds)
-  */
-+#ifdef CONFIG_CACHY
-+unsigned int sysctl_sched_base_slice			= 400000ULL;
-+static unsigned int normalized_sysctl_sched_base_slice	= 400000ULL;
-+#else
- unsigned int sysctl_sched_base_slice			= 700000ULL;
- static unsigned int normalized_sysctl_sched_base_slice	= 700000ULL;
-+#endif /* CONFIG_CACHY */
- 
-+#ifdef CONFIG_CACHY
-+__read_mostly unsigned int sysctl_sched_migration_cost	= 400000UL;
-+#else
- __read_mostly unsigned int sysctl_sched_migration_cost	= 500000UL;
-+#endif
- 
- static int __init setup_sched_thermal_decay_shift(char *str)
- {
 diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
 index 56acf502ba26..5fac34a2f67b 100644
 --- a/kernel/sched/sched.h

@@ -5098,3 +5098,208 @@ and `:133` in rc5, the second being exactly what that fix adds). tip simply has
 not been rebased onto rc5. **Grep for merges too:** the first pass matched
 merge commits whose tag names contain the subject and briefly looked like five
 adoptable fixes.
+
+## 2026-09-30: switched from sched-ext (scx_cake) to BORE
+
+User decision: drop `scx_cake`, run BORE instead, with explicit permission to
+drop the sched_ext carries. `pkgrel` 2 -> 3. **257 -> 252 patches.**
+
+### Added
+
+- **`2419-sched-bore-7.0.0-burst-oriented-response-enhancer.patch`** — BORE
+  7.0.0 by **Piotr Gorski**, from sirlucjan `7.3-rc/bore-dev-patches`. 47 hunks,
+  14 files, 947 insertions. Adds `CONFIG_SCHED_BORE` and
+  `CONFIG_MIN_BASE_SLICE_NS` (default 2000000), plus two new files
+  (`kernel/sched/bore.c`, `include/linux/sched/bore.h`). BORE makes EEVDF task
+  selection in `fair.c` burst-aware: it discriminates by runtime since the task
+  last slept or yielded and favours less bursty (more interactive) tasks.
+
+  BORE 6.8.0 also exists in `7.3-rc/bore-patches`; **7.0.0 taken as the newer
+  major** (it is the `-dev` directory — see the risk note below).
+
+- **`2420-sched-fair-do-not-scan-twice-in-detach_tasks.patch`** — Huang Shijie,
+  `sched/fair: do not scan twice in detach_tasks()`. **This is a patch the
+  previous sweep rejected as inert** ("`fair.c` under scx full-switch mode"), and
+  switching to BORE makes it live — exactly the re-evaluation the user asked
+  for. `env.loop_max` was computed from `busiest->nr_running` *without* the RQ
+  lock, so it could disagree with the actual `cfs_tasks` length and walk the same
+  tasks twice; SpecJBB hit it 330,000 times in a 30-minute run. Sets `loop_max`
+  under the lock from `busiest->cfs.h_nr_queued`.
+
+  **Adopted on `Reviewed-by: Vincent Guittot` + `Reviewed-by: Valentin
+  Schneider`** — both scheduler maintainers — which clears the adoption bar.
+  Series numbering `[PATCH 06/13]` stripped per CLAUDE.md YOU MUST #4. Applies
+  clean to `v7.3-rc5`; BORE does not touch `detach_tasks()`.
+
+### Removed — the seven sched_ext carries (user-approved)
+
+`2005`, `2413`, `2414`, `2415`, `2416`, `2417`, `2418`. Every one targets
+`kernel/sched/ext/` or `include/linux/sched/ext.h`. Under BORE the scheduler is
+`fair.c`, so this code is not executed; the user explicitly authorised dropping
+them in favour of BORE. **Recorded plainly because this is the first time this
+repo has removed patches that were not superseded upstream** — they were
+removed because the machine stopped using the subsystem, which is a different
+reason and worth being able to reconstruct. If sched-ext is ever re-enabled,
+these seven need to come back with it: they fix a NULL sub-sched dereference
+raised from NMI (`2414`), a CPU-hotplug hang (`2416`), and a use-after-free.
+
+### Modified — `0110` lost its `fair.c` hunk
+
+BORE and `0110` write the same lines. BORE wraps `sysctl_sched_base_slice` in
+`#ifdef CONFIG_SCHED_BORE ... #else ... #endif`; `0110` wraps the *same* lines
+in `#ifdef CONFIG_CACHY`, setting the base slice to 400000 instead of 700000.
+The two collide at `fair.c:80` and BORE cannot apply.
+
+Resolved by **stripping `0110`'s `fair.c` section**, because BORE makes it dead
+code: with `CONFIG_SCHED_BORE=y` the CachyOS block lands in BORE's `#else`
+branch and is never compiled — `sysctl_sched_base_slice` is recomputed from
+`nsecs_per_tick` and `min_base_slice` regardless. This is the *inverse* of the
+situation the repo has documented for two years: that hunk was inert under
+`switch_all=1`, and it is inert again under BORE, for a completely different
+reason.
+
+`0110`'s other seven hunks (`bus_lock.c`, `init/Kconfig`, `sched/sched.h`,
+`mm/compaction.c`, `mm/huge_memory.c`, `mm/page_alloc.c`, `mm/vmscan.c`) are
+untouched and remain live — which is why the patch stays rather than being
+dropped. **An inert hunk is not an inert patch**, as this file has said before.
+
+### Config
+
+- `scripts/config -e SCHED_BORE` added at `PKGBUILD:750`. `MIN_BASE_SLICE_NS`
+  left at its 2000000 default.
+- **`CONFIG_SCHED_CLASS_EXT` deliberately LEFT ENABLED.** The user asked to drop
+  the sched_ext *changes*, not the config, and BORE does not require it to be
+  off — with no scx scheduler loaded, CFS+BORE is what runs. Keeping it means a
+  fallback exists if BORE 7.0.0 (a `-dev` revision) misbehaves, at the cost of
+  compiled-in code we do not exercise. **Flagged for the user to decide.**
+- `scx_loader.service` disabled and stopped, so no BPF scheduler is loaded and
+  `fair.c` — now BORE — is the active scheduler.
+
+### Verification
+
+- Cumulative audit: **all 252 patches apply cleanly to v7.3-rc5.**
+- BORE 7.0.0 and 6.8.0 both apply clean to bare rc5; the conflict appeared only
+  on the full series, and only in `fair.c` — which is how the `0110` overlap was
+  found rather than assumed.
+
+## Sweep 2026-09-30 — all sources, nothing else adopted
+
+Run alongside the BORE switch; the fixes previously written off as inert were
+re-examined in the new `fair.c`-is-live context.
+
+**Version sweep: nothing new.** 16 content-identical resends; the 6 remaining
+hits are all already dispositioned (`2045` v4 is the one adopted on 09-28;
+`2302`/`2308`/`2314` are the kbuild v4 that cannot apply to rc5; `1151`'s "v4"
+is an older February posting; `2032` is the mail line-wrap artifact).
+
+**`next-20260930` (today) and `next-20260929` fetched with `--depth=1`.**
+`next-20260930` vs `next-20260928` is **unchanged** in `fair.c`, `zswap.c`,
+`slub.c` and `gfx_v12_0.c`. Against rc5 the snapshot differs in
+`fair.c` (61/73), `core.c` (232/214), `zswap.c` (210/151), `slub.c` (206/129),
+`r8169_main.c` (561/145, the RTL8127 series already rejected for wrong silicon)
+and `gfx_v12_0.c` (18/26, 7.4 refactors). **All 7.4 material, not 7.3 fixes.**
+
+**Re-examined per the user's instruction — the things we ignored *because of*
+scx_cake, now that `fair.c` is live:**
+
+| Candidate | Verdict |
+|---|---|
+| `detach_tasks()` scan-twice fix | **ADOPTED** as `2420` (above) |
+| tip `sched/cache` fixes ×6 (all `Fixes:`, up to 3 `Reviewed-by`) | **All already in rc5** — checked by hash, every one. Nothing to do |
+| tip `sched/fair: Load balance only among preferred CPUs` | Part of the **Preferred-CPU feature series**; a feature, not a fix |
+| tip proxy-execution series (5) | Feature |
+| `sched/fair` in `next-20260930` (61/73) | 7.4 work |
+
+**`CONFIG_SCHED_CACHE=y` is set here** — worth knowing, because it is why the
+six `sched/cache` fixes were checked at all rather than waved past as
+feature-adjacent. They are all in rc5, so the config being on costs nothing.
+
+**tip freshness verified against the remote** (`72c51a366945`); the 20 commits
+absent from rc5 remain the Preferred-CPU, proxy-exec, `x86_cpu_id`, F15h and
+steal-governor sets — none adoptable.
+
+**CachyOS**: read off `7.3/*` (the `origin/master` bug fixed last pass).
+`7.3/base` and `7.3/fixes` had both advanced; the fixes advance is `2197`
+(SLUB barn) which we already carry, and the base advance is the `vswap` v5
+series already recorded as a feature.
+
+## Work items + cachymod, 2026-09-30 — nothing adoptable, two useful connections
+
+Done with the methods this conversation established: **descriptions as well as
+comments** (that is what surfaced `#5897` last time), `updated_after` rather than
+page 1, and every hex-shaped token checked as a real commit rather than cited.
+
+23 issues had moved since the previous pass. Nothing carried a fix.
+
+### `#5912` may be the root cause `1074`'s TODO is waiting for
+
+`[amdgpu][gfx1200] Possible DCC metadata corruption on static desktop surfaces
+after S3 resume` — an **RX 9060 XT (Navi 44, `1002:7590`)**, 100% reproducible
+on every S3 cycle, corrupting cached composited surfaces so the damage shows in
+*software screenshots* (i.e. VRAM/backbuffer data, not scanout).
+
+Our `1074` keys on `sdma_ip_version == IP_VERSION(7,0,0) || IP_VERSION(7,0,1)`
+— this machine reports `sdma_v7_0_0` — with the comment:
+
+```c
+/* TODO: workaround for DCC corruption when moving BOs from multiple queues at
+ * the same time: use a single queue until the root cause is identified and fixed.
+ */
+```
+
+So `1074` is a *mitigation with an open TODO*, and `#5912` is a fresh DCC
+corruption report on a **different Navi 4x chip running the same SDMA 7.0.x**.
+Same failure class, same family, root cause still unidentified. **Recorded as a
+corroborating data point for `#5663`**, not as something to adopt — the issue has
+**0 comments** and no patch. Worth re-reading if AMD ever posts a root-cause fix,
+because that would let `1074` (a serialising workaround) be retired.
+
+### `#5910` — a real shared-code bug, no patch, not our chip
+
+`amdgpu_vm_tlb_flush()` returns early on `!*fence`, so a CPU page-table update
+can leave the fence slot NULL and the GEM VA timeline may signal **before** the
+TLB invalidation completes. Silent memory corruption under VA reuse. Reported on
+Navi 32, 0 comments, no patch. **Shared amdgpu code**, so it would apply here,
+but there is nothing to carry. Notable because our `1065`/`1066` are also
+fence-slot work — different path (eviction slots / userq rearm), same subsystem,
+and a reminder this area has more than one live hole.
+
+### Also checked, nothing in them
+
+- `#5909` — Navi 48, but **over USB4/TB5**; its 4 comments are all "changed the
+  description". Not our topology (direct PCIe dGPU).
+- `#5916` — hibernation `thaw()` made a no-op by a 2026-07 patch; superm1 (AMD)
+  engaged, discussion only. We use `mem_sleep_default=deep` (suspend), not
+  hibernation.
+- `#5915`/`#5914` (Navi14), `#5891` (Navi 33), `#5822` (Strix Point),
+  `#5908` (780M), `#5845`/`#5847` (laptop backlight) — wrong silicon or
+  laptop-only.
+
+## cachymod — checked, nothing to include
+
+`repos/cachymod` is a **separate community project** ("CachyMod — run a custom
+kernel on CachyOS"), fresh to 2026-09-27, and it carries **only
+`linux-cachymod-7.2/`** — there is no 7.3 line, so its patches are written
+against a base two releases behind ours.
+
+Its fair.c content is exactly the category we would have skipped while on scx,
+so it was examined properly rather than dismissed:
+
+| Patch | What it is | Verdict |
+|---|---|---|
+| `0260-fair-update-cachy-mods` | sets `sysctl_sched_tunable_scaling = TUNABLESCALING_NONE`, `base_slice = 800000000ULL/HZ*(HZ>500?2:1)`, `migration_cost = 400000` | **Superseded by BORE** |
+| `0360-fair-revert-cachy-mods` | the inverse (back to `TUNABLESCALING_LOG`, 700000, 500000) | alternative option, not a fix |
+| `0280-prefer-idle-core` | `sched/fair: Prefer the previous cpu for wakeup`, Eric Naim | **Reverted — by its own author** |
+| `0000-revert-gaming-sched` | Piotr Gorski reverting CachyOS's gaming-sched | we never carried gaming-sched |
+
+**`0260` independently confirms the `0110` strip was right.** It edits the *same
+lines* BORE and `0110` collide on — `sysctl_sched_tunable_scaling` and
+`sysctl_sched_base_slice` — and it *deletes* the `#ifdef CONFIG_CACHY` block to
+do so. CachyMod reaches by hand the same conclusion BORE reaches structurally:
+when this design is in use, the CACHY base-slice block goes away.
+
+**`0280` is the one to be careful about.** It *applies cleanly to our rc5 base*,
+which for a 7.2-era patch is surprising and would normally invite adoption — but
+`a4808133047d` (2026-07-15) reverts it, and the reverting author **is the patch's
+own author**, on both `7.2/base` and `7.2/cachy`. A clean apply is not evidence
+of anything; the author withdrawing their own patch is the signal that counts.

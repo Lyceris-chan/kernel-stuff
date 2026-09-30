@@ -182,7 +182,7 @@ _rcver=rc5
 
 pkgver=7.3.0_rc5
 _tagrel=1
-pkgrel=2
+pkgrel=3
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -359,7 +359,6 @@ source=(
   "patches/2000-2099/2002-block-bfq-pass-in-queue-directly-to-bfq_insert_reque.patch"
   "patches/2000-2099/2003-block-bfq-serialize-request-dispatching.patch"
   "patches/2000-2099/2004-block-bfq-skip-expensive-merge-lookups-if-contended.patch"
-  "patches/2000-2099/2005-sched-ext-skip-per-cpu-data-allocation-for-built-in-dsqs.patch"
   "patches/2000-2099/2006-zram-convert-to-SG-list-zsmalloc-object-read-API.patch"
   "patches/2000-2099/2007-zsmalloc-remove-old-object-read-API.patch"
   "patches/2000-2099/2008-io_uring-io-wq-stop-a-single-cancel-after-one-running-match.patch"
@@ -470,12 +469,8 @@ source=(
   "patches/2300-2399/2320-kbuild-build-rust-crates-in-parallel-with-the.patch"
   "patches/2300-2399/2321-kbuild-compress-the-kernel-with-pigz-if.patch"
   "patches/2400-2499/2400-sched-Set-need-resched-flags-before-tracing.patch"
-  "patches/2400-2499/2413-sched_ext-protect-idle-search-nodemask-irqsave.patch"
-  "patches/2400-2499/2414-sched_ext-scx_locked_rq-return-null-from-nmi.patch"
-  "patches/2400-2499/2415-sched_ext-reject-nmi-calls-lock-taking-kfuncs.patch"
-  "patches/2400-2499/2416-sched_ext-fix-CPU-hotplug-hang-when-a-dying-CPU-s-tasks-sit-in-the-BPF-scheduler.patch"
-  "patches/2400-2499/2417-sched_ext-avoid-relocking-DSQ-during-remote-DSQ-moves.patch"
-  "patches/2400-2499/2418-sched_ext-place-dsq_vtime-next-to-dsq_priq.patch"
+  "patches/2400-2499/2419-sched-bore-7.0.0-burst-oriented-response-enhancer.patch"
+  "patches/2400-2499/2420-sched-fair-do-not-scan-twice-in-detach_tasks.patch"
   "patches/2500-2599/2505-x86-pat-fix-effective-RW-in-lookup_address.patch"
   "patches/9000-9099/9011-drm-amdgpu-Respect-noretry-flag-for-retry-faults-on-GFX12.1.patch"
   "patches/9000-9099/9012-drm-amdgpu-gfxhub-Enable-retry-fault-interrupts-when-needed.patch"
@@ -749,6 +744,11 @@ EOF
     scripts/config -d LTO_NONE -e LTO_CLANG_THIN
     scripts/config -d CC_OPTIMIZE_FOR_PERFORMANCE -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
     scripts/config -e CACHY   # gates the 0110 CachyOS config-hooks backport
+    # BORE replaces the scx/sched_ext scheduler. CONFIG_SCHED_BORE turns the
+    # EEVDF task selection in fair.c into burst-aware selection; CONFIG_MIN_BASE_SLICE_NS
+    # defaults to 2000000 and is left at its default. Note 0110 no longer carries
+    # its fair.c hunk -- BORE owns sysctl_sched_base_slice now (see PATCH_SOURCES).
+    scripts/config -e SCHED_BORE
     # pcie_aspm=off: disable PCIe ASPM entirely — the !5538 SMU bus-drop stopgap.
     # amdgpu.aspm=0 / amdgpu.runpm=0: conservative amdgpu-side stopgaps for the
     # silent gaming freeze (SMU IF mismatch 0x2e vs 0x33, !5538) — no GPU ASPM or
@@ -1173,7 +1173,7 @@ b2sums=('4175e807cca0c48e425df3ef20fe6e2fe59e1f6827b5dd41720b3d0b8ec9c9b0431ce89
         '1cb6e0ae6f57e9eca2067594ce83c005c6bc49e6a3d7fb11aa1aeee12204691304da0483e5be3c20b233c132a54831ffa587765599634a5ad123489e99982a58'
         'ee5f2c4aead1f2fc8d8096ae2a953d4c45d4c79de29e0578da543767a2d96664f903f043af36cf481adc13f203e2eca8fb616c26257e6cce5b3cae26b1d46ddf'
         'fdc7fc1d942be4fe8dadcb228b7f9c02273eaec91631ff609a07722b74b1db64828e144856e01a8ffd039762d1970a7ec511a3d240481544c570592914573b69'
-        '9e09ebb057ad702b03c3caaaa30660d6f4b1b475002e95f7c1f3fe757980ac3e75a2cead66b01f5ba85bfa2c42bb18b672c316edc3fa645801efee0dfc894e8b'
+        '85590203e850f296930aaa6c8535908ba56e6f3f424159e556321cd8729ab0207cdfcd922fbc09427e27e9259bf167e17d71411406899d1b94ea98eab71466bb'
         '0070a22fe00e90fb691ba892496d9239c81a0bd1242dba1a843a001ae5ee11c81ce3848b763db0d868dba7d366b333cc9ee99f1e29e1963123cb9e49751784e0'
         '7246f1d3dcf36c1b663ba8456dddbee8eba4d1fba97d3ba4224c96dbdbfa0a51534cd2cfa403dc00a651e43473222243f74e57cafb3eb5700c8c253d5f0e3737'
         '2562671a4574c2bd95b783506fda4045db4f54b14dd8b2f35060979eb1ca930064bd785d16ed797afd06b5c2dbaa9e343da7464a8cffc58162520a1729f7d3b2'
@@ -1250,7 +1250,6 @@ b2sums=('4175e807cca0c48e425df3ef20fe6e2fe59e1f6827b5dd41720b3d0b8ec9c9b0431ce89
         '8bff27696075ec53ca042b0c9e0deae345712e652b3b66bab1da82c4deefdf35533d04c00d59de70cbf968380236131bc819e0eeaa8aa40edfd84df3bd0972ef'
         '48c6c8a299d0d5341475936ea8e1974fc933de81fa710c483c0fa54d7d7a70ccb15c56da1b4cf66bc0c4fe486f78f6b74816b38f602ed219e5dd7f679fba2662'
         '2b9bad240296578ddb6a81629263d046b7e2d9ba063faaae38279c98556749b1b1ae6ccc3036a551fabea3d01ce916cffad1f1e56a65b3eab31faaa37de96211'
-        '4b977cbe9f78bd7bbd2369243b197a8e5da8b2dba49abee893dfaa838ba8e92e15357cc1204f23e412afde205c988c5d93029e5eb6d2c6408b9dd8b08a994e8c'
         'c77a9b5a2bc7196f67a7995b381623a9700f15e22e75471123fdeff715b5d4e07ae1ac278cffd71b81d7b9fa0431a2571820e488e460e47906f7295c3d20f071'
         'ac90d43f24a852a05bd9e820e6dc19c4b62764321d7464f4df08b3f4bc8b73c9caac6dbd1ee80a9abd868bb0c7219dcbf0ebe8dc556b90901cd2aea859f07b5a'
         'acbee18a4d7bd71fd1dcb91d59b774bb523d0cde519c7fe7dcbf634b3f5c3e1585200d7b365fa89273d8eba0cc59db2e2b634beee8a08cc9499686c7f2af4fde'
@@ -1361,12 +1360,8 @@ b2sums=('4175e807cca0c48e425df3ef20fe6e2fe59e1f6827b5dd41720b3d0b8ec9c9b0431ce89
         '9c68b602fac54fde41039e569afe46b3710e0c35775ff35bb592752109676070a8caf86a8e7b1a73b7ccd9637881fc8a28e95be14cae7e1a9fdb4b1145ee3c3b'
         '6008e6cfd24e2c638b6f660081b4ad4054f346e30bcac07b05cfa5749530088a6aff17ea9a8995c5f13ce42a07b63c9e156c28d82bbe6de64ada4feb94ba97aa'
         '75d01b85f62c63f495a38367f3d5231d7b291bb7782b98ec1ef15393d0fb391345cfe3d8d18e1d8553d9416014a60e21421c7791b7442339f0fa15b4c5e794ac'
-        'd0a31fd81c81303e6c7dab17aea0183529998ec5214158580b04a03897dce22f3ba97f327d52b0f5198ecd46cc6f35e2d7366e2e07adb26f3561679959d019ec'
-        '9fabdcf4ba00bb3d71d7c27421473ac9f4689aca8ccc6498a80121f27162ba0438527306651137c22de82931588ab8809306aa8b8de422781315a995b6b1e213'
-        '25db1718fda8abe5a3a8cb9b93f2e143702a7a6611cb752461249d18940a1be14d16d4db3a4b6767998ab66f45d9fe810420b71bc14d3539b895fad33c8ba2cf'
-        'd8034f47f10f62ce8a537bfa936b0ee82da7e40750d9b67ff84f0e7611fee3493bccf4690922d77f6d23d2149e45ee1067a5394855390a43775038c1bdf62f1f'
-        '7da25d2aeca4fe4fa37229bc0d2f25ea47a8d72f2429df65bc3f8af32143b8aa2b68faa09e0f53e82090fb7062f551541747e13d3989dd970551a976e0ecd02e'
-        '31e9cf4c3efbe6628bee06e71347b976b1673c7e257d454684c433259f7425ec30f7596fcf046f0b2de4be1fcba20b3fc45deae8d39f6df83ca0c68b78b55c8b'
+        'c0051e7a1a1be068c20e9281e5e17a9341e5e9d25624b1696d1281e01c2690645228589f0e9bb6c1a5e5ac099c75bdb03588652b9a4662acf9844af4cf926101'
+        '2dd42e38ee5cb8d5413ef45c1a6684445661030e3b813635632e4f62dc94f677cd011afdc74593d28ada0ae00bee597b196c39a0da728703c993880b9564ae9d'
         'c0fa0cef861fa3d0748f805430f41b7c8918554588d05d2a6eae502981ec3b74e6cbec8bc72641b190b7c123c67bb3c8732f1859fc80c620a79dfa1e34bdb6fc'
         '39ade2a62477babf59b762e07e4a08213716b1c952de5df2ff290b4dc58a5202c7131b709fef253e7864cbaa280d66083984041b541531241a164bb5c82af89b'
         '0d75eae660d1cdf8a4d9272560aa5639f17221cedca66164fe6456b8a920d994904ec3cafec982fcb1caa29cb7468ffc98a48797ccc5794310acb80e75fd5573'

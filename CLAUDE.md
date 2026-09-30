@@ -17,7 +17,7 @@ base only when the RC line is unusable.
 | GPU | AMD Radeon RX 9070 XT (Navi 48, RDNA 4) | `gfx1201`, `DCN401` (DCN 4.0.1), `SMU14`, `PSP14`, `GC 12.0`, `SDMA 7.0`, `VCN 5.0`, `MMHUB 4.1` |
 | NIC | Realtek RTL8125B 2.5 GbE | `r8169` (in-kernel driver, since 7.2) |
 | NVMe | Phison E16 PCIe 4.0 | `kyber` (CachyOS `60-ioschedulers.rules`) |
-| Scheduler | sched-ext BPF schedulers | `CONFIG_SCHED_CLASS_EXT=y` |
+| Scheduler | BORE (`2419`) | `CONFIG_SCHED_BORE=y`; sched-ext compiled but unused |
 | CPUIdle | NAP governor | `CONFIG_CPU_IDLE_GOV_NAP=y` |
 
 **If a patch does not target one of these components, it does not go in.**
@@ -159,16 +159,24 @@ The short version:
   no-op, not a success). Single-patch dry-runs and `git apply --check` give
   false negatives. Exit 0 = clean, 1 = failures, 2 = environment problem.
 - **A patch that applies can still do nothing.** `select`ed config symbols,
-  `--set-str` on a symbol that no longer exists, MGLRU under LRU-MARIE (the
-  `2131`-`2137` batch, carried for weeks and removed 2026-09-23), and `fair.c`
-  under scx full-switch mode are all inert. Confirm the subsystem is actually
-  owned by the code you are patching — `lru_gen_enabled()` returns false while
-  `lru_marie_enabled()` is true, so the whole MGLRU path is dead here.
+  `--set-str` on a symbol that no longer exists, and MGLRU under LRU-MARIE (the
+  `2131`-`2137` batch, carried for weeks and removed 2026-09-23) are all inert.
+  Confirm the subsystem is actually owned by the code you are patching —
+  `lru_gen_enabled()` returns false while `lru_marie_enabled()` is true, so the
+  whole MGLRU path is dead here. **The scheduler is the other inversion:**
+  `fair.c` was inert from the sched-ext era through 2026-09-30 because
+  `switch_all=1` put every task on scx. **That switch to BORE on 2026-09-30
+  reversed it** — `fair.c` is now the live scheduler, and `kernel/sched/ext/` is
+  the inert one. Every "inert under scx" verdict recorded before that date needs
+  re-reading rather than trusting; `2420` was adopted precisely because it was
+  rejected on that basis and the basis changed.
   **Note the difference between inert and removable:** `0110`'s `fair.c` hunk
-  (base slice 0.4 ms instead of 0.7 ms) is inert because `switch_all=1` puts
-  everything on scx, but `0110` also carries live `mm/vmscan.c`,
-  `mm/page_alloc.c` and `bus_lock.c` changes — so it stays. An inert *hunk* is
-  not an inert *patch*.
+  (base slice 0.4 ms instead of 0.7 ms) was inert under scx, and is inert again
+  under BORE for a different reason — BORE wraps the same lines in its own
+  `#ifdef` and recomputes the slice, so the CACHY block lands in the dead
+  `#else`. It was stripped on 2026-09-30 for exactly that reason, while
+  `0110`'s live `mm/vmscan.c`, `mm/page_alloc.c` and `bus_lock.c` changes stay —
+  so the patch is kept. An inert *hunk* is not an inert *patch*.
 - **A patch that applies can still be a duplicate.** When upstream absorbs a
   patch we carry, the cumulative audit still reports `ok`: the hunk's context
   anchor survives, so instead of failing it inserts a **second copy**. `9007`

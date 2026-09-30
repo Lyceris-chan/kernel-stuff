@@ -15,6 +15,63 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc5-3-sleepy-next]: 2026-09-30
+
+### Changed — the scheduler is now BORE, not sched-ext
+
+`scx_loader` and `scx_cake` are gone; this kernel runs **BORE**
+(Burst-Oriented Response Enhancer). BORE makes the EEVDF task selection in
+`kernel/sched/fair.c` burst-aware, favouring tasks that run less bursty.
+`scx_loader.service` is disabled and stopped, so `fair.c` is the live
+scheduler.
+
+**`257` -> `252` patches.**
+
+### Added
+
+- **`2419` BORE 7.0.0** (Piotr Gorski). Adds `CONFIG_SCHED_BORE` and
+  `CONFIG_MIN_BASE_SLICE_NS` (left at its 2000000 default), and two new files
+  (`kernel/sched/bore.c`, `include/linux/sched/bore.h`).
+- **`2420` `sched/fair: do not scan twice in detach_tasks()`** (Huang Shijie).
+  This is a patch an earlier sweep rejected *specifically* because `fair.c` was
+  inert under scx full-switch mode. BORE makes it live, and it carries
+  `Reviewed-by: Vincent Guittot` and `Reviewed-by: Valentin Schneider`. It
+  computes `env.loop_max` under the RQ lock from `cfs.h_nr_queued` instead of
+  guessing from `nr_running` without the lock, which could walk the same tasks
+  twice.
+
+### Removed — the seven sched_ext carries
+
+`2005`, `2413`-`2418`, all targeting `kernel/sched/ext/`. They are dropped
+because the machine no longer runs the subsystem, **not because upstream
+superseded them** — this is the first removal of its kind here. If sched-ext is
+ever re-enabled, they must come back with it: they fix a NULL sub-sched
+dereference raised from NMI and a CPU-hotplug hang.
+
+### Modified — `0110` lost its `fair.c` hunk
+
+BORE and `0110` write the same lines of `fair.c`; the CACHY base-slice block
+would land in BORE's dead `#else` branch and never compile. Stripped for exactly
+that reason. `0110`'s other seven hunks (`mm/vmscan.c`, `mm/page_alloc.c`,
+`bus_lock.c`, ...) remain live, so the patch stays.
+
+### Note for future maintenance
+
+`fair.c` was inert here from the sched-ext era until 2026-09-30 and is now the
+**live** scheduler — while `kernel/sched/ext/` is the inert side. **Every
+"inert under scx" verdict recorded before that date needs re-reading rather than
+trusting.** `2420` is the case where the basis changed and the verdict flipped.
+
+### Verified
+
+- Cumulative audit: all 252 patches apply cleanly to `v7.3-rc5`.
+- `CONFIG_SCHED_BORE` confirmed **in the built image**: the decompressed vmlinux
+  contains `kernel/sched/bore.c` and the full BORE sysctl set
+  (`sched_burst_penalty_scale`, `sched_burst_smoothness`,
+  `sched_burst_cache_lifetime`, `sched_burst_protect_slice_lv`,
+  `sched_burst_inherit_type`, `sched_burst_penalty_offset`) — checked by
+  decompressing rather than by `strings` on the compressed bzImage.
+
 ## [7.3.0-rc5-2-sleepy-next]: 2026-09-28
 
 ### Updated
