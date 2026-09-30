@@ -5396,3 +5396,41 @@ not a standalone fix — it carries Timur Kristóf's `Reviewed-by` but taking on
 patch out of a rework series would be incoherent).
 
 **Series is 254 patches.**
+
+### Addendum: making the sched-ext switch survive a reboot
+
+Disabling `scx_loader.service` on 2026-09-30 was **not sufficient**, and the
+reason is worth recording because it is invisible to the obvious check.
+
+**Two paths could have re-armed scx_cake at boot:**
+
+1. **`/etc/scx_loader.toml` shipped `default_sched = "scx_cake"`**, and the file
+   says so itself: *"the scheduler that will be started automatically when
+   scx_loader starts (e.g., on boot)"*. Note the real config path is
+   **`/etc/scx_loader.toml`**, *not* `/etc/scx_loader/config.toml` — the latter
+   is what a `find`-by-convention looks for and it does not exist.
+2. **`scx_loader.service` is D-Bus-activatable.** It is described as a *"DBUS
+   on-demand loader"* and `/usr/share/dbus-1/system-services/org.scx.Loader.service`
+   maps the bus name `org.scx.Loader` to `Exec=/usr/bin/scx_loader` with
+   `SystemdService=scx_loader.service`. **A `disabled` unit with an empty
+   `WantedBy=` is still startable on demand via D-Bus**, so `disable` alone
+   left a live re-arm path: anything requesting that bus name would have
+   started the loader, which would then have loaded `scx_cake` — silently
+   taking the scheduler back off `fair.c` and off BORE.
+
+**Both neutralised:**
+
+- `systemctl mask scx_loader.service` — symlinked to `/dev/null`, which blocks
+  systemd *and* D-Bus activation. Verified by trying it: `systemctl start`
+  returns *"Unit scx_loader.service is masked."*
+- `default_sched` commented out in `/etc/scx_loader.toml` (original saved as
+  `.bak-scx-cake`), so even a later unmask does not immediately re-arm scx_cake.
+
+Post-state, checked rather than assumed: `sched_ext state: disabled`,
+`switch_all: 0`, no scx userspace process, zero enabled scx units.
+
+**The generalisable lesson:** for a service that must not come back, `disable`
+answers "will systemd start it?", not "can anything start it?". Check for a
+D-Bus activation file (`/usr/share/dbus-1/system-services/`), a socket unit, an
+autostart entry, and the service's own config for an auto-start default. This
+service had **all four** categories worth checking and two of them were live.
