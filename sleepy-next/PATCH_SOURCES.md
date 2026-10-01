@@ -5434,3 +5434,95 @@ answers "will systemd start it?", not "can anything start it?". Check for a
 D-Bus activation file (`/usr/share/dbus-1/system-services/`), a socket unit, an
 autostart entry, and the service's own config for an auto-start default. This
 service had **all four** categories worth checking and two of them were live.
+
+## Sweep 2026-10-01 — all sources; nothing adopted, two drop-list items, one watch
+
+Ran on `rc5-5` with BORE confirmed live (`sched_burst_penalty_scale`,
+`sched_burst_cache_lifetime`, `sched_burst_smoothness` all present;
+`sched_ext state: disabled`, `switch_all: 0`, `scx_loader: masked`).
+
+### Drop list grows: `2041` and `2151` are both upstream now
+
+Mainline has moved **147 commits past rc5** with a `net-7.3-rc6` merge and no
+`v7.3-rc6` tag yet. Two of our carries are in it, by subject **and** author:
+
+| Ours | Now in mainline |
+|---|---|
+| **`2041`** `net: gso: limit recursive IP-in-IP segmentation` | `006c8b834ae` — same author (Zihan Xi), same date (2026-09-24) |
+| **`2151`** `mm: shmem: ignore sysfs configs for shmem forced collapse` | `72c3d682c16` — same author (Baolin Wang), same stat |
+
+Both will be duplicates at the next rebase. **7.4 drop list is now: `2041`,
+`2151` (landed upstream), `1063` (superseded by Stanner's `4b7a49d66c`).**
+
+### The `fair.c` candidate died on the maintainer's own words
+
+The most promising find was **`sched/fair: Take slice protection into account
+when arming HRTICK` (Christian Loehle, v2 1/5)** — `fair.c`, and therefore
+**live here now that BORE runs**, where it would have been inert a week ago.
+
+**Peter Zijlstra rejected it:**
+
+> *"Right, so I don't much like this. This wrecks the steady state behaviour in
+> favour of our 'dodgy' wakeup heuristics. I would much rather we stick to the
+> paper for steady state, and let wakeups be wakeups."*
+
+and **the author conceded**:
+
+> *"Alright, I guess the same reasoning then for 5/5? Again these are all just
+> from throwing a bunch of artificial rt-app tests against Vincent's patchset
+> and seeing what sticks…"*
+
+**Not adopted.** This is the third time this session that reading the thread
+reversed a verdict — a patch that looks well-formed and is in the live
+subsystem is still not carryable when its maintainer objects and its author
+agrees. Note the sweep would have shown it as a clean, unreviewed candidate.
+
+### Watch: a possible kernel regression in RDNA3/4 gaming
+
+`#5873` (MODE1 reset, *"Illegal opcode in command stream"*, Navi 31) has agd5f
+calling it a possible duplicate of `#5711`, and a reporter giving the decisive
+bisect-shaped observation:
+
+> *"**The kernel is the variable:** linux-cachyos 7.2.6 and 7.2.8 hang within
+> ~10 minutes. linux-cachyos-lts 6.18.52 ran the same game, Mesa and Proton for
+> 66 minutes clean. My last known-good 7.x kernel was **7.1.8**. **Same firmware
+> on both kernels** (ME 0x9ec, PFP 0xa96, MEC 0xae6, MES 0x92 …)."
+
+Same firmware across good and bad kernels rules firmware out — this reads as a
+**kernel regression introduced around 7.2**, with the signature *illegal opcode
+→ MES reset failure → MODE1*.
+
+**`#5917` is the one to watch for this machine specifically:** *"RX9070XT,
+7.3.0-rc5 kernel, ring comp_1.0.1 timeout, screen output freeze with
+Overwatch"* — **our exact GPU (`1002:7550`, Navi 48) on our exact kernel
+version (7.3.0-rc5)**, with a devcoredump attached and one comment that is only
+"changed the description". No fix referenced, no patch. **It reproduces on
+7.2.8 too**, so it is not new to rc5.
+
+Recorded rather than acted on: there is nothing to carry, and the RDNA4 and
+RDNA3 reports may or may not share a root cause. If a fix lands it will matter
+here directly.
+
+### Checked and rejected
+
+- **`drm/amdgpu: copy debugfs register data outside the GRBM/SRBM locks` is now
+  v2** — still the debugfs/umr-only circular-lock path identified on 2026-09-30.
+  Progressing, still no review, still not on our path.
+- The amdgfx **UALink/NPA** series (`Enable remote TLB shootdown`, `Enable RPC
+  on importer NPA mappings`, `Fix NPA-REVOKE racing an in-flight UALink
+  import`) — datacenter interconnect, not Navi 48.
+- `amdgpu: Use 2-argument strscpy()`, `drm/amdkfd: fix lost wakeup in interrupt
+  drain`, `drm/amdgpu: fix memleak when amdgpu_vm_ptes_update fails`,
+  `drm/amdgpu: serialize vblank counter reads against GPU reset`,
+  `io_uring: fix out-of-bounds bvec access`, `io_uring/memmap: fix non-compound
+  alloc fallback`, `mm: Make swapoff interruptible when unusing mms/shmem` —
+  **all originals show zero `Reviewed-by`/`Acked-by`**, and the threads contain
+  no review either.
+- `tcp_bic`/`tcp_hybla`/`tcp_cubic` divide-by-zero series — net-next, and we run
+  BBR3.
+- `nvme-pci: avoid the deepest sleep state on Transcend MTE672A` — not our SSD
+  (Phison E16); `nvme-multipath` v4 — we do not use multipath.
+- 21 work-items moved; the on-target ones beyond the above are Navi 31, Navi 33,
+  Navi 44, Vega20, Picasso/Raven2 and Strix Point — none of this machine.
+
+Series stays at **255 patches**.
