@@ -5526,3 +5526,66 @@ here directly.
   Navi 44, Vega20, Picasso/Raven2 and Strix Point — none of this machine.
 
 Series stays at **255 patches**.
+
+## Sweep 2026-10-02 — coverage gap closed; nothing adopted
+
+### The gap: five subsystem lists were never mirrored
+
+Prompted by merge-tag output listing `driver-core`, `i2c`, `wq`, `cgroup` and
+`perf` — subsystems whose **own** mailing lists this sweep did not watch, so
+their work was only visible after it reached mainline. **Coverage went from 14
+to 18 mirrors**, adding `linux-i2c`, `linux-pci`, `cgroups`, `linux-usb` and
+`linux-gpio`. Probed with `git ls-remote` (a plain `curl` to the list URL
+returns **403** — that is the Anubis-gated web UI, not the git endpoint, which
+is the same trap as the lore.kernel.org rule).
+
+Also tested and **not available as git mirrors**: `linux-wq`,
+`linux-driver-core`, `linux-thermal` (see `linux-pm`), `linux-vfs` (see
+`linux-fsdevel`), `linux-hid`, `linux-pinctrl` (see `linux-gpio`). `ata` is
+`linux-ide`, `hid` is `linux-input`; both available but not on this hardware.
+
+**Relevance of the new five:** `linux-i2c` (we carry DDC/I2C display fixes
+`1141`-`1143`), `linux-pci` (`pcie_aspm=off` is in our cmdline), `cgroups`
+(memcg — the `mem_cgroup_update_lru_size` warning), `linux-usb` and
+`linux-gpio`. `linux-gpio` mattered specifically because our cmdline carries
+`gpiolib_acpi.ignore_interrupt=AMDI0030:00@3,AMDI0030:00@10`.
+
+### What the new lists produced: one near-miss, nothing adoptable
+
+**`pinctrl: amd: Clear S4 wake bits when firmware has _AEI`** (Mario Limonciello,
+2026-10-02) looked promising against our `ignore_interrupt` cmdline workaround.
+Read in full, it is **off-target**: the symptom is *"the machine powers back on
+immediately after shutdown"* on a **Chuwi CoreBook Plus laptop**, caused by
+firmware leaving the S4/S5 wake bit set on GPIO 24. Its `Fixes:` targets
+`ffe8a0c6b552`, a laptop-visible regression. Our workaround addresses a
+different mechanism — spurious GPIO **interrupts** on AMDI0030, not S4 wake
+bits. It carries `Fixes:`, `Cc: stable`, `Reported-by`, `Tested-by` and
+`Closes:` but **no `Reviewed-by`**.
+
+Also from the new lists, all rejected: `linux-i2c` was entirely vendor (Nuvoton,
+Rockchip, Qualcomm, NXP, MCTP); `linux-pci` was ATS / s390 / lan966x / AtomISP;
+`cgroups` had `mm: preserve nolock context through memcg cleanup` (memcg+slub,
+worth a look, unreviewed); `linux-usb` was gadget/typec/dwc3; `linux-gpio` was
+pinctrl-qualcomm, loongson and laptop quirks.
+
+### Work items: checked for patches, not just bug reports
+
+Swept for issues whose **title or description actually contains a patch** —
+`[PATCH]`, "we propose", ```diff``` — rather than triaging titles. Of 59 issues
+in the window, **4 carry one**: `#5923`, `#5910`, `#5907`, `#5760`.
+
+- **`#5923`** `[gfx1036] GPU memory writes vanish after idle with agent-scope
+  dispatch fences` — **gfx1036 is Navi 23 (RDNA2 iGPU)**, not Navi 48, and the
+  reporter states the diagnosis came from an LLM and they *"can only verify as
+  much as I can"* on hardware they *"aren't familiar with"*. Not adopted.
+- `#5910` (Navi 32, `amdgpu_vm_tlb_flush` early-return), `#5907` (Phoenix APU +
+  `gttsize=76800`, reporter-written patch) — both already assessed on 2026-09-30.
+
+### Sources checked, nothing new
+
+- **`next-20261002` does not exist yet** — newest tag is `next-20261001`, already
+  fetched. **`v7.3-rc6` is not tagged**; master sits at the `net-7.3-rc6` merge.
+- Mainline unchanged since the 2026-10-01 pass (147 commits past rc5).
+- tip and drm-misc unchanged.
+
+Series stays at **255 patches**.
