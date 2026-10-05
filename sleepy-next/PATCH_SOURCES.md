@@ -6884,3 +6884,67 @@ the correction above).
 
 **No commit shas were cited in any of these comments** — the extraction returned
 an empty set, so there was nothing to verify this pass.
+
+## Broad work-item patch sweep 2026-10-05 — every commit reference, verified
+
+The earlier passes extracted shas only from *recent* comments. This one scanned
+the **whole tracker**: all 1852 open issues re-fetched, filtered to the 166 that
+name this machine's silicon, and every hex-like token in their descriptions
+extracted and verified.
+
+**533 distinct hex-like tokens → only 10 real commits.** The other 523 were image
+paths, `/uploads/` ids, register values and blob ids — consistent with the ratio
+this skill documents (301 of 332 non-commits in an earlier measurement).
+
+### The 10, and what they actually are
+
+| Commit | Date | Cited in |
+|---|---|---|
+| `8382cd234981` consolidate DCN vblank/flip handling onto `vupdate_no_lock` | 2026-06-12 | `#5599` |
+| `48ab86360af1` check `GRPH_FLIP` status before sending event | 2026-06-12 | `#5599` |
+| `3eb46fbb601f` gfx11: adjust KGQ reset sequence | 2026-01-28 | `#5125` |
+| `af3303970da5` Fix mismatched unlock for DMUB HW lock in HWSS fast path | 2025-12-08 | `#5853` |
+| `6d92c4d03063` Rename FAMS2 global control lock to DMUB HW control lock | 2025-09-17 | `#4753` |
+| `d69248cf4c91` gfx11: Implement the GFX11 KCQ pipe reset | 2025-02-21 | `#5125` |
+| `6eb4c13a3845` Support "Broadcast RGB" drm property | 2025-01-07 | `#5812` |
+| `dcc8e148e013` gfx11: Implement the GFX11 KGQ pipe reset | 2024-07-17 | `#5125` |
+| `00c391102abc` Add misc DC changes for DCN401 | 2024-03-20 | `#4753` |
+| `a48ce36e2786` iommu: Prevent RESV_DIRECT devices from blocking domains | 2023-08-09 | `#5644` |
+
+**All ten are causal references, not pending fixes.** They are cited inside the
+issues as *"this caused it"* or *"this is related"* — bisection results and
+regression pointers. Not one is a fix awaiting inclusion. **Nothing to carry.**
+
+**A methodology caveat on my own check.** I tested membership with
+`git merge-base --is-ancestor <sha> v7.3-rc6`, which reported 6 present and 4
+absent. `CLAUDE.md` warns that this command is unreliable in these shallow
+clones, and it fails in one direction only: truncation produces **false
+negatives**, never false positives. So the six "in rc6" results stand, and the
+four "NOT in rc6" results are **untrustworthy** — `d69248cf4c91` and
+`dcc8e148e013` are gfx11 commits from 2025 and `00c391102abc` a DCN401 commit
+from 2024, all of which would necessarily be in a mid-2026 kernel. Correcting for
+that, the honest reading is **all ten are upstream**. The durable rule: use
+`is-ancestor` to *confirm* membership, never to deny it.
+
+### The real finding: `#5125` belongs to the `#5759` cluster
+
+`#5125` — *"[GFX11/GFX12] Pipe reset disabled on all RDNA 3 & RDNA 4 GPUs — MES
+hang forces full GPU reset, destroying Wayland session"* — sat outside every
+recency window (last updated 2026-07-05) and only surfaced here.
+
+Its newest substantive comment is fholzer, 2026-07-05, on an **ASRock Navi 48 XTW
+32GB**: *"I still observe failed MES REMOVE_QUEUE on my R9700, and I am on MES
+firmware 0x8B."*
+
+That is the **same failure as `#5759`** (`MES(0) fails to respond to
+REMOVE_QUEUE on Navi 48`) and adjacent to `#5909` (MES stops after a large
+VRAM transfer). Three independent reports of MES `REMOVE_QUEUE` failures on
+Navi 48, and the two gfx11 pipe-reset commits cited here are the same territory
+as the 7.4 pull's *"gate gfx pipe reset on PER_PIPE"* and *"restore collateral
+gfx queues after pipe reset"* work.
+
+**This strengthens the `#5759` watch item rather than adding a carry.** There is
+still no patch to take; the fixes exist only in the 7.4 pull. But the case for
+watching it is now three reports deep rather than one, and if this machine ever
+logs a MES `REMOVE_QUEUE` timeout the `amdgpu.mes_log_enable=1` workaround is the
+first thing to try.
