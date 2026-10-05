@@ -19,6 +19,94 @@ does not warn. In a session where the whole job is reading config values,
 `-r`.** The same trap applies to `-r ''` (deletes the match) and any other
 replacement string.
 
+### The worse variant: a clustered `-rln` gives a *silent false negative* (2026-10-02)
+
+Re-hit on 2026-10-02 while probing rc5 for `drm_connector_hdmi_*` — the check
+that decided whether an HDMI NULL-deref fix was on-target. `-rln` parses as
+`-r ln`, so the search ran with matches replaced by `ln`. The giveaway was
+mangled output (`#include <drm/display/ln>`), but here is the dangerous part:
+
+**when a mangled `-r` search finds nothing, it still reports nothing — and a
+negative is indistinguishable from a true negative.** A probe that answers "this
+symbol does not exist in the tree" is exactly the kind of result that gets
+recorded as a rejection reason. Mangled output is self-announcing; an empty
+result is not.
+
+So for any search whose *absence* is load-bearing:
+
+- never put `-r` in a flag cluster with `-l`/`-n`/`-c`;
+- run a **positive control** alongside it (a symbol you know is in the same
+  file) and require it to hit before believing the negative;
+- confirm the file itself exists — `rg` over a missing path with `2>/dev/null`
+  is silent, which is how "no match" and "no file" become the same answer.
+
+The rc5 HDMI rejection was re-run this way before being written into
+`PATCH_SOURCES.md`. It survived — but it had not been earned on the first pass.
+
+## `git rev-parse <rev>:<path>` echoes its argument when the path is absent (2026-10-03)
+
+`rev-parse` is documented to print unrecognised arguments back unchanged. That
+includes a `rev:path` spec whose path does not exist — it does **not** fail, it
+does not warn, and with a `2>/dev/null` it looks exactly like a successful
+resolution:
+
+```bash
+git rev-parse "next-20261001:kernel/sched/bore.c"
+# -> next-20261001:kernel/sched/bore.c     (no error, exit 0)
+```
+
+Comparing two snapshots this way produced a **false "unchanged"** for every file
+that existed in neither. `kernel/sched/bore.c` is not upstream (it is our own
+patch), so it was absent from both tags — and the two identical echoed strings
+compared equal. A second path I had simply spelled wrong (`dcn401_resource.c`
+without its `resource/` directory) silently joined it. Both were reported as
+"same", i.e. as evidence of no change, on a check whose whole purpose was to
+detect change.
+
+**Test existence with `git cat-file -e <rev>:<path>`, never by comparing
+`rev-parse` output.** And when a comparison loop reports a suspiciously uniform
+result, print the raw values rather than a derived boolean — `next-2026` in a
+hash column was the only visible symptom, and it was easy to read past.
+
+Same family as the `rg -r` and `pgrep -f` entries above: a tool that fails
+*quietly* and returns something plausible. The rule generalises — for any probe
+whose negative result will be written down as a conclusion, prove the probe can
+distinguish absent from present before trusting it.
+
+## `journalctl -k` is boot-scoped — it implies `-b` (2026-10-04)
+
+`-k` is `--dmesg`, and the man page is explicit: `--dmesg` is equivalent to
+`--boot --dmesg`. So a bare
+
+```bash
+journalctl -k | rg -c 'MODE1'        # 0  -- but only for THIS boot
+journalctl --no-pager | rg -c 'MODE1' # the real answer, all 26 boots
+```
+
+silently searches **the current boot only**. On 2026-10-04 that was a
+**39-minute** window, because the machine had rebooted at 12:34. Several
+"this machine has never logged X" statements were reported with more confidence
+than that window can support.
+
+**Use `journalctl --no-pager | rg …` for any negative that will be written
+down.** The journal here is persistent (`/var/log/journal`, `SystemMaxUse=500M`)
+and `--list-boots` showed 26 boots spanning 12 days — the history was available,
+the query was wrong.
+
+Two more traps from the same sequence, both of which make an *absence* read as
+an answer:
+
+- **`rg -i 'mes'` matches `names`, `frames`, `timestamps`, `Estimated`.** It
+  reported 17 "MES lines" where a word-boundary probe (`\bMES\b`) finds 2.
+  Short case-insensitive substrings are not identifiers.
+- **`… | tail -8 || echo none` can never report absence** — `tail` exits 0 on
+  empty input, so the fallback never fires. Third member of this family after
+  `| head && echo OK` and the `pgrep -f` self-match.
+
+The general rule, now with four instances: **before writing down a negative,
+prove the probe can return a positive.** A probe that silently narrows its own
+scope is indistinguishable from a clean result.
+
 ## Two boot-time messages that are expected, not faults (2026-09-26)
 
 Both look like errors and are consequences of deliberate choices. Recorded so
@@ -797,6 +885,39 @@ predicate that cannot match the watcher (`pgrep -x makepkg`, or check for the
 artifact path you have *verified*), and when a loop is meant to end, confirm the
 exit path fires before walking away. This one was only caught because the user
 asked what the shell was doing.
+
+### Third occurrence, and the fix that actually works (2026-10-02)
+
+Same trap, a different watcher, and this time the *logic* was right and the
+*pattern* was wrong:
+
+```bash
+until ! pgrep -f 'round-build.sh cosmic-comp' >/dev/null 2>&1; do sleep 20; done
+```
+
+The negation is correct — exit when the builder is gone. It cannot fire, because
+the watcher's own `eval`'d command line contains the literal string
+`round-build.sh cosmic-comp`, so `pgrep -f` always finds at least itself. The
+loop ran to its time limit and was killed, and it reported nothing, while the
+build it was watching had actually **succeeded at 19:22:49** and sat finished the
+whole time. A killed watcher and a running build look identical from outside.
+
+**The fix is the bracket trick** — make the pattern unable to match its own
+literal spelling:
+
+```bash
+until ! pgrep -f '[r]ound-build.sh' >/dev/null 2>&1; do sleep 20; done
+```
+
+The watcher's command line then contains `[r]ound-build.sh`, which the regex
+`[r]ound-build.sh` does not match; the real process's `round-build.sh` does.
+Equivalent: compare against `$$`/`$PPID` and skip self, or poll the artifact path
+you have *verified* rather than the process (the better answer when one exists).
+
+**Three occurrences now, each with the rule already written down.** Treat any
+`pgrep -f`/`pkill -f` in a loop predicate as a defect until the self-match is
+excluded — and after arming any watcher, confirm its exit path actually fires
+rather than assuming a bounded-looking loop is bounded.
 
 ### Second occurrence, different spelling (2026-09-16)
 

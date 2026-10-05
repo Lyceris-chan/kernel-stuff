@@ -77,7 +77,7 @@ diff --git a/init/Kconfig b/init/Kconfig
 index 8583d9f06c52..b44a9482cdc9 100644
 --- a/init/Kconfig
 +++ b/init/Kconfig
-@@ -1,201 +1,6 @@
+@@ -1,206 +1,5 @@
  # SPDX-License-Identifier: GPL-2.0-only
 -config CC_VERSION_TEXT
 -	string
@@ -165,7 +165,7 @@ index 8583d9f06c52..b44a9482cdc9 100644
 -config RUSTC_LLVM_MAJOR_VERSION
 -	int
 -	default $(shell,expr $(rustc-llvm-version) / 10000)
- 
+-
 -config RUSTC_CLANG_LLVM_COMPATIBLE
 -	bool
 -	default y if CC_IS_CLANG && RUSTC_LLVM_MAJOR_VERSION = $(shell,expr $(cc-version) / 10000)
@@ -252,6 +252,11 @@ index 8583d9f06c52..b44a9482cdc9 100644
 -
 -config CC_HAS_MULTIDIMENSIONAL_NONSTRING
 -	def_bool $(success,echo 'char tag[][4] __attribute__((__nonstring__)) = { };' | $(CC) $(CLANG_FLAGS) -x c - -c -o /dev/null -Werror)
+-
+-config CC_OPT_INLINE_MEMSET
+-	string
+-	default "-finline-stringops=memset" if $(cc-option,-finline-stringops=memset)
+-	default "-mllvm -max-store-memset=4294967294" if $(cc-option,-mllvm -max-store-memset=4294967294)
 -
 -config LD_CAN_USE_KEEP_IN_OVERLAY
 -	# ld.lld prior to 21.0.0 did not support KEEP within an overlay description

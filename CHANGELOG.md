@@ -15,6 +15,51 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc6-1-sleepy-next]: 2026-10-05
+
+### Changed — rebased to mainline `v7.3-rc6`
+
+Series rebased from `v7.3-rc5` to `v7.3-rc6` (`4eeccbed21e`, tagged 2026-10-04).
+The cumulative audit reports **all 245 patches applying cleanly**.
+
+**`255` -> `245` patches.**
+
+### Removed — ten carries absorbed upstream
+
+Each was confirmed by content, not by subject: the added lines are present in
+rc6, and for the amdgpu pair, independently by a named entry in Alex Deucher's
+`drm-fixes-7.3` pull of 2026-10-01.
+
+| Patch | Landed as |
+|---|---|
+| `1074` amdgpu SDMA DCC workaround | agd5f `c1702ed0d64a` |
+| `1162` display `dc_state_create_copy()` NULL check | `drm-fixes-7.3` pull |
+| `2010` blk-cgroup IRQ state in `blkg_tryget_closest` | upstream |
+| `2016` nvme-multipath ANA log bounds | upstream |
+| `2041` net GSO recursive ip-in-ip limit | upstream |
+| `2046` blk-mq set `RQF_USE_SCHED` | `ab6c756f28c` |
+| `2047` blk-mq cached requests for flush ops | upstream |
+| `2048` io_uring BPF-loop task context | `a3bdf68feec` |
+| `2049` io_uring SQPOLL task-work RCU | upstream — *code identical to rc6, only the comments differ* |
+| `2151` mm shmem forced-collapse sysfs | upstream |
+
+### Regenerated — four carries rebased onto rc6
+
+`1007` and `1017` (gmc12 TLB-invalidation rework) needed a one-token context
+rebase: the 7.3 fixes pull changed `gmc_v12_0_flush_vm_hub(..., 0)` to
+`flush_type`. `2311` (kbuild toolchain checks) was rebuilt because rc6 added a
+`CC_OPT_INLINE_MEMSET` block inside the region it rewrites. `2049` was inspected
+and found already upstream rather than regenerated.
+
+### Verified
+
+A duplicate audit across the whole series found **no silent duplicates** against
+rc6 — no patch applies cleanly while its content is already present. Built with
+Clang/ThinLTO as usual; `.BTF` and `.BTF_ids` present in the vmlinux,
+`CONFIG_TCP_CONG_BBR` **not set** (so the BBR/BBR3 kfunc collision is avoided),
+`CONFIG_TCP_CONG_BBR3=y`, `CONFIG_SCHED_BORE=y`, `CONFIG_LRU_MARIE=y`, and the
+baked-in cmdline unchanged.
+
 ## [7.3.0-rc5-3-sleepy-next]: 2026-09-30
 
 ### Changed — the scheduler is now BORE, not sched-ext

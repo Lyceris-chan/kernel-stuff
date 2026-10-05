@@ -626,13 +626,18 @@ unaffected.
 
 ### kbuild (2300–2399)
 
-`2302`–`2322` are Lorenzo Stoakes' kbuild build-speedup series, now the
-**v2** posting (`20260914-build-speedup-v2-0-39817ec5db23@kernel.org`,
-21 patches, 2026-09-14), which supersedes the v1 carried previously. v2 drops
-the modpost srcversion hashing pair and adds the toolchain-checks move into
-`init/Kconfig.toolchain` and an objtool instruction-hash sizing patch, with
-the review feedback from v1 folded in. This is why a full rebuild here takes
-about 8 minutes. Build-time only — nothing here changes runtime behaviour.
+`2302`–`2322` are Lorenzo Stoakes' kbuild build-speedup series. **The carried
+files are the v3 posting** (`[PATCH v3 NN/20]`, 2026-09-17) — v3 superseded the
+v2 posting (`20260914-build-speedup-v2-0-39817ec5db23@kernel.org`, 21 patches,
+2026-09-14), which in turn superseded v1. (An earlier revision of this paragraph
+said v2; the patch headers say v3, and the headers win.) v2 dropped the modpost
+srcversion hashing pair and added the toolchain-checks move into
+`init/Kconfig.toolchain` and an objtool instruction-hash sizing patch.
+
+A **v4** posting exists (2026-09-23, 22 parts) and is **not adopted** — see the
+2026-10-02 sweep below for the verified reason. This is why a full rebuild here
+takes about 8 minutes. Build-time only — nothing here changes runtime
+behaviour.
 
 ### Scheduler (2400–2499)
 
@@ -5589,3 +5594,1001 @@ in the window, **4 carry one**: `#5923`, `#5910`, `#5907`, `#5760`.
 - tip and drm-misc unchanged.
 
 Series stays at **255 patches**.
+
+## Sweep 2026-10-02 (evening) — nothing adopted; six io_uring candidates listed
+
+Full pass: all trees, all 17 lore mirrors, the drm/amd work-items tracker with
+comments, and the version sweep over all 255 carries. **Series stays at 255.**
+
+### Version sweep — 6 flagged, all resolved
+
+18 carries were byte-identical to a newer resend and skipped. The 6 that
+differed:
+
+| Carry | Verdict |
+|---|---|
+| `2045` | The v4 "hits" are cover letters (`[PATCH net v4 0/2]`, no diff). Already adopted 2026-09-28. |
+| `2032` | **Line-wrap artifact only.** Upstream v3 wraps one expression across a line break, we emit it as two; the added-line *sets* are otherwise identical. Not a new version. |
+| `2302`, `2308`, `2314` | kbuild **v4** vs our **v3**. Verified below. |
+| `1151` | The "v4" is the older February posting; a September `[PATCH v1 2/3]` re-post of the same passive-VRR work carries no newer content. |
+
+### The kbuild v4, verified rather than assumed
+
+The prior pass recorded "v4 cannot apply to rc5" but did not show the check.
+Re-ran it against a throwaway rc5 worktree (`git apply --check`):
+
+- `2302` **FAILS** — `include/asm-generic/vmlinux.lds.h:855`, `scripts/Makefile.vmlinux:103`
+- `2308` **FAILS** — `scripts/kallsyms.c:5`
+- `2314` applies **clean**, but it is one stage of a reworked interdependent
+  series (the part count went 20 → 22, so part numbering shifted), and it
+  depends on the two that fail.
+
+Independently, **v4's additional content is predominantly ARM64 support** — the
+lines v4 adds that v3 lacks are `_veneer`, `_SDA2_BASE_`,
+`__kvm_nvhe___kcfi_typeid_`, `L0`, `/* arm */`. That is hardware this machine
+does not have. **Not adopted**; revisit at the version bump when the base moves.
+
+### Mailing-list coverage gap: `rg -r` is `--replace`, not `--recursive -l`
+
+Caught mid-sweep. `rg -rln '<pattern>' <path>` does not mean "list files"; `-r`
+is `--replace`, so the match text is substituted in the output. A first pass
+used it while probing for `drm_connector_hdmi_*` and `drm_hdmi_helper.h` in rc5
+and produced mangled output (`#include <drm/display/ln>`). The negatives were
+re-run with plain `rg -n` / `rg -l` and a positive control before being
+believed. Same family as the `rg -h` trap already in `LESSONS.md`.
+
+### Work items — 28 updated since 2026-09-30
+
+One new on-target thread, no fix posted:
+
+- **`#5921` (filed 2026-10-02) `[Navi 48 / DCN 4.0.1] MODE1 reset on every
+  suspend`** — another RX 9070 XT (`1002:7550`) + DCN 4.0.1 box, Bazzite,
+  kernel 7.2.7. Reports the SMU driver/firmware IF mismatch
+  (`driver 0x2e` vs `fw 0x33`) and an `optc401_disable_crtc` `REG_WAIT`
+  timeout. **agd5f answered the same day: *"The firmware IF is a red herring.
+  We've already removed that message from the driver to avoid future
+  confusion."*** So the obvious lead is ruled out by the maintainer and the
+  cause is unstated. **Checked against this machine: the journal has never
+  logged a `MODE1 reset`, and this box does not suspend.** Watch only.
+- `#5917` (RX 9070 XT / 7.3.0-rc5 comp_1.0.1 timeout) and `#5912` (gfx1200 DCC
+  after S3) had **description edits only** — no new analysis.
+
+### Candidates found, not adopted (phase 2 — list before adding)
+
+**1. `io_uring` 7.3-rc6 fixes pull — six un-carried commits.** (Jens Axboe, tag
+`io_uring-7.3-20261002`, head `a92193c91e88`.) This is a maintainer pull, so it
+clears the bar. **We already carry its two most important commits**: `2049` *is*
+the SQPOLL `task_work` use-after-free (`io_req_normal_work_add`), and `2048` is
+the BPF-loop task-context init. Not carried, and the configs are **live here**
+(`CONFIG_IO_URING_ZCRX=y`, `CONFIG_IO_URING_BPF=y`):
+
+| Commit | Author |
+|---|---|
+| `io_uring/bpf_filter: mark source as COW when cloning filters` | Hui Peng |
+| `io_uring: only post the dummy skip CQE on CQE_MIXED rings` | Hui Peng |
+| `io_uring: fix free entry check for 32b CQEs on CQE32 rings` | Hui Peng |
+| `io_uring: zero big_cqe for aux CQEs on CQE32 rings` | Hui Peng |
+| `io_uring/zcrx: requeue multishot receives stopped by a local resource` | Junyuan Feng |
+| `io_uring: End a TX_TIMESTAMP multishot cmd when the CQ is full` | lollipopkit |
+
+**The basis for an earlier verdict changed here — re-read it.** The 2026-09-27
+entry dispositioned the Hui Peng CQE32/CQE_MIXED work as *"7.4-bound, not for
+now"*, because Axboe had replied *"I did do this work for you and split it into a
+7.3 and 7.4 set"* and the remaining half sat on `for-7.4/io_uring`. **He has now
+folded those same three commits into the 7.3-rc6 pull.** The branch a patch sits
+on is not a durable property; this is the same failure mode as `2420`, rejected
+under scx and adopted once `fair.c` became live. All six clear the audit bar.
+
+**2. `drm/sched: Fix out of bounds entity priority check`** (Tvrtko Ursulin,
+part 1/9 of a cleanup series). The bug is real: `entity->rq_priority` is computed
+from the **unclamped** `priority` and then used to index `sched_rq[]`, and rc5's
+default is `DRM_SCHED_POLICY_FIFO` (`sched_main.c:87`), so the raw priority is the
+one used. **Unreachable here:** amdgpu sets `num_rqs = DRM_SCHED_PRIORITY_COUNT`
+(the maximum, `amdgpu_device.c:2294`) and sanitizes userspace priority through an
+allowlist that maps to values 1–3, so it cannot emit an out-of-bounds index. No
+`Reviewed-by` yet — posted the same day. **Deferred**, either way.
+
+**3. `drm/display: hdmi: Prevent NULL dereference in sync_scdc()`** (Cristian
+Ciocaltea, `Reported-by: Dan Carpenter`). **Rejected with evidence:** the code it
+fixes does not exist in rc5. `drivers/gpu/drm/display/drm_hdmi_helper.c` is 428
+lines of infoframe helpers only, containing **zero** `drm_connector_hdmi_*`
+symbols — verified with a positive control on the surrounding helpers — and
+amdgpu references `drm_connector_hdmi` in **zero** files. The whole HDMI
+scrambling/SCDC framework the `Fixes:` tag points at is 7.4 material.
+
+### Other sources — nothing on-target
+
+- **cachyos `7.3/fixes`**: `68f054f6774b mm/slub: refill prefilled sheaves from
+  the barn` is **already ours** (`2197`, adopted 2026-09-26 — same Hao Li patch,
+  CachyOS picked it up afterwards). `2d0a9e75fe41 wireguard: queueing: preserve
+  tstamp_type` — **`# CONFIG_WIREGUARD is not set`**, no path here.
+- **`bdea4980182 net: page_pool: fix use-after-free in page_pool_recycle_ring_bulk()`**
+  — a well-formed fix (two `Reviewed-by`, `Fixes:`, one line) but **rejected as
+  unreachable**: `r8169` does not use page_pool; the only Realtek driver that
+  does is `rtase`, a different part, and nothing else on this machine loads a
+  page_pool user. Machine-specific rejection, not a quality judgement.
+- `drm-next` / `agd5f-linux` / `amd-staging` — 7.4 material (`amd-drm-next-7.4`)
+  and MacBook VI ASIC resets. Not our silicon.
+- `tip` — 7.4-window merges (`x86/tdx`, `sgx`, `sev`, `microcode`, …).
+- `firelzrd-bore-scheduler` tops out at **BORE 6.8.0 for 7.3-rc2**; we carry
+  **7.0.0** (`2419`) — the repo is behind us, not ahead.
+- `firelzrd-lru-marie` **v0.11.1r2** = what we carry. Current.
+- `sirlucjan/7.3-rc/cachyos-fixes-patches-v6` = what we carry; no v7 exists.
+  `bore-patches/` carries `bore6.8.0`.
+- `linux-tkg` idle since 2026-09-12. `linux-mm` v2 is an unused-API removal.
+
+### State
+
+**`next-20261002` still does not exist** — newest is `next-20261001`. **`v7.3-rc6`
+is not tagged**: `git ls-remote --tags` on torvalds returns rc1–rc5 only and
+`origin/master`'s `Makefile` reads `EXTRAVERSION = -rc5`, so the `pm-7.3-rc6`
+and `mtd/fixes-for-7.3-rc6` tags in the subsystem trees are pull-request tags
+named for the rc they are destined for, **not** evidence that rc6 exists.
+Mainline is 203 commits past rc5 (was 147); master `5e0f8396d48`.
+
+## Sweep 2026-10-03 — one candidate; three carries confirmed absorbed upstream
+
+Full pass: torvalds, linux-next (`next-20261002`, newly published), tip, drm-next,
+agd5f, amd-staging, all 17 lore mirrors, the drm/amd tracker with comments, and
+the version sweep over all 255 carries. **Series stays at 255.**
+
+### `1074` has been absorbed upstream — drop list
+
+`next-20261002`'s change to `amdgpu_ttm.c` **is our `1074`, line for line** — the
+same `TODO` comment, the same `num_move_entities = 1` for
+`IP_VERSION(7,0,0) || IP_VERSION(7,0,1)`. The landed commit is agd5f
+`c1702ed0d64a` *"drm/amdgpu: implement workaround for sdma dcc corruption"*
+(Pierre-Eric Pelloux-Prayer, `Reviewed-by: Alex Deucher`, `Reviewed-by:
+Christian König`, `Fixes: 3a6f6eeb3db5`), present in `amd-staging-drm-next` and
+now in linux-next.
+
+Work item **`#5663` is resolved**: agd5f, 2026-10-02 — *"The patch was sent
+upstream for 7.3/7.4 this week and once that lands it will make its way back to
+stable kernels."* This is the condition the ledger has been watching for since
+`1073`→`1074`; the workaround's `TODO` (root cause still unknown) has **not**
+been closed, so the workaround is the accepted resolution, not a stopgap we
+replaced.
+
+**Our rc5 base does not contain it, so `1074` stays for now.** Drop it when the
+base moves to a tree that has `c1702ed0d64a` — otherwise it is a duplicate
+carry, the `9007` failure mode.
+
+### Three more carries now in mainline master — drop list
+
+Mainline advanced `5e0f8396d48` → `e767a4ea70a` (123 new commits). Among them:
+
+| Carry | Upstream commit | Note |
+|---|---|---|
+| `2046` | `ab6c756f28c` blk-mq: set RQF_USE_SCHED when the operation is known | Keith Busch, `Reviewed-by: Christoph Hellwig` |
+| `2048` | `a3bdf68feec` io_uring: initialize task context before running the BPF loop | |
+| `2049` | `a92193c91e8` io_uring: fix task_work add use-after-free with SQPOLL | |
+
+The whole `io_uring-7.3-20261002` pull is in master, so the six io_uring commits
+listed as candidates on 2026-10-02 will arrive with the base — they no longer
+need carrying as patches, they need dropping once the base has them. **All four
+are drop-list entries, not removals**: nothing is removed without explicit
+approval.
+
+### Candidate: `2198` — `mm/slab: do not wake up kswapd in __kfree_rcu_sheaf()`
+
+| | |
+|---|---|
+| Commit | `af2fb3ee667` (mainline master) |
+| Author | Harry Yoo (Meta) `<harry@kernel.org>` |
+| Problem | `kfree_rcu()` can run under `pi_lock` (a raw spinlock in the scheduler). Allocating with `__GFP_KSWAPD_RECLAIM` wakes kswapd, which takes `pi_lock` — **circular lock dependency and deadlock**. Confirmed with a lockdep splat (`&p->pi_lock` vs `&pgdat->kswapd_wait`). |
+| Fix | Use `__GFP_NOWARN` instead of `GFP_NOWAIT` in `__pcs_replace_full_main()` and `__kfree_rcu_sheaf()`, so no kswapd wakeup. |
+
+**Verified:**
+
+- **Not carried** — grepped the series for the subject, the author and the
+  function; the only `kswapd` hits are unrelated (`2139`, `2140`, `2184`,
+  `2101`).
+- **Applies clean** to a throwaway rc5 worktree (`git apply --check`).
+- **Target lines exist in rc5**: `mm/slub.c:5972`
+  (`alloc_empty_sheaf(s, GFP_NOWAIT, SLAB_ALLOC_DEFAULT)`) and `:6131`
+  (`gfp_t gfp = allow_spin ? GFP_NOWAIT : __GFP_NOWARN`).
+- **No conflict with our series.** `2197` is the only patch of ours that touches
+  `mm/slub.c`, and its hunks are at lines 453/3329/3346/5104 while this one's are
+  at 5969/6128/6157 — disjoint regions.
+- Numbered `2198` (next free in `2100–2199`). **Listed, not adopted** — per the
+  documented cycle, candidates are listed before anything is added.
+
+### Sources with nothing on-target
+
+- **Mainline's other 120 commits** are laptop ALSA/ASoC quirks, CIFS/netfs
+  client fixes, bpf tracing edge cases, spi, virtio_blk and kprobes. None touch
+  this machine's hardware.
+- **tip: 0 new commits** since `8f511d67b4fb` — unchanged.
+- **`next-20261002` vs `next-20261001`**: 221 on-target files changed, an
+  amdgpu-wide batch (`drivers/gpu/drm/amd/amdgpu/*`). The only on-target delta
+  that is a *fix* rather than 7.4 material is the `amdgpu_ttm.c` hunk above.
+- **cachyos `7.3/fixes`** unchanged since the 2026-10-02 pass
+  (`2d0a9e75fe41`). **drm-next / agd5f / amd-staging** on 7.4 material.
+- **Version sweep: the identical six, unchanged.** `2045` (cover letters,
+  adopted), `2032` (line-wrap artifact — content-identical, re-confirmed),
+  `2302`/`2308`/`2314` (kbuild v4, verified to fail against rc5),
+  `1151` (older February posting). 18 content-identical resends skipped.
+- **Work items (35 updated)**: `#5663` resolved as above. The other on-target
+  threads are CC-only or unresolved — `#5902` (HDMI FRL same-sink HPD pulse
+  leaves the display dark), `#5905` (Navi 48 fan stops below ~50 °C in custom
+  fan_curve mode), `#5910` (missing TLB flush fence for CPU page-table updates)
+  each have a single `agd5f` CC note and no patch. `#5921` (Navi 48 MODE1 reset
+  on suspend) had agd5f rule the SMU IF mismatch a red herring on 2026-10-02.
+- **New list postings** are features or off-target: the amdgpu second-level trap
+  handler v3 series, the 17-part DC 3.2.401 batch (7.4), the v9 luminance
+  property series, and an amdkfd surprise-removal pair (GPU hot-unplug — not
+  this machine's topology).
+
+### Tooling traps hit and corrected this pass
+
+- **`git rev-parse <rev>:<path>` echoes its argument back when the path does not
+  resolve** rather than failing. My snapshot comparison printed
+  `next-2026` for `kernel/sched/bore.c` (not upstream — it is our patch) and for
+  a `dcn401_resource.c` path I had spelled wrong, and both compared "same" — a
+  **false "unchanged"** for files that simply do not exist. Absence must be
+  tested with `git cat-file -e <rev>:<path>`, not by comparing `rev-parse`
+  output.
+- **`for f in $FILES` does not word-split in zsh.** This shell is zsh, and an
+  unquoted expansion stayed one word, so a 13-file comparison silently ran as a
+  single 300-character path. Use a `while read` loop.
+- `fatal: expected 'acknowledgments'` during the fetch-all is a **transient
+  remote error, not corruption** — `fsck --connectivity-only` over every
+  top-level clone found no damage, only benign dangling commits in `agd5f-linux`
+  and `akpm-mm`.
+
+**`v7.3-rc6` is still not tagged** (torvalds tags stop at rc5) and
+`next-20261003` does not exist — 2026-10-03 is a Saturday.
+
+## Sweep 2026-10-03 (pre-rc6) — sirlucjan/cachyos refreshed; every delta a verified no-op
+
+Run in advance of the rc6 tag expected 2026-10-04. `v7.3-rc6` is **still not
+tagged** (torvalds tags stop at rc5; `origin/master` Makefile reads `-rc5`).
+**Series stays at 255.**
+
+### sirlucjan — refreshed, and the stale-HEAD trap fired again
+
+Local `master` was at `445db953` while `origin/master` was `0f0dfad7`, hiding
+three commits (*"Add 7.3-rc line"* for fixes/amd/cambyses). **Always read
+`origin/<branch>`** — this is the second time this exact repo has hidden content
+behind a stale local ref.
+
+The 7.3-rc tree grew 76 → **93 directories**. Every one that intersects our
+carries was checked against its content, not its version label:
+
+| New dir | Verdict |
+|---|---|
+| `cachyos-fixes-patches-v7`, `-v8` | **No-op.** v8 is v6 plus exactly two patches: `13/14 mm/slub: refill prefilled sheaves from the barn` — **already ours as `2197`** — and `14/14 wireguard: preserve tstamp_type`, and `# CONFIG_WIREGUARD is not set` here. Patches 01–12 are identical to the v6 set we already triaged. |
+| `hdmi-patches-v2` | **Rebase only, no content change.** A plain `diff` shows 70 changed lines, but those are entirely `From <sha>` headers and `@@` line offsets. Comparing **added/removed content lines only**: 124 vs 124, with **zero** lines unique to either side. v2 is v1 rebased onto a newer base. |
+| `bore-dev-patches` | **Identical to our `2419`.** Both `linux7.3-bore7.0.0`; the diff bodies are byte-identical (1370 lines each). BORE 7.0.0 is current, and `bore-patches/` still carries the older 6.8.0. |
+| `amd-iommu-patches` (11 patches, new) | **Rejected — wrong IOMMU mode.** The series adds PerfOpt and *"Force identity mode for selected GPUs only"*, and is aimed at **APUs in identity mode**. This machine is verified **not** in identity mode: `journalctl -k` reports `iommu: Default domain type: **Translated**`, there is no `iommu=pt` on the cmdline, and `lspci` shows **no Raphael iGPU at all** — only the Navi 48 card. This settles on evidence the earlier PerfOpt question that had rested on inference. |
+| `xswap-patches-v3` | **Not applicable** — xswap was dropped deliberately on 2026-09-22 in favour of zswap + swapfile. |
+| `poc-selector-dev-patches`, `cambyses-patches-v2` | **Competing scheduler designs** (*"introduce POC selector"*, *"Context-Aware Migration Balancer"*). This machine runs BORE; neither is a fix to it. |
+| `aufs-patches`, `arch-patches-v2` | aufs (unused filesystem); a sysctl to disable unprivileged `CLONE_NEWUSER` plus another copy of the wireguard patch. |
+
+### cachyos — unchanged
+
+`7.3/base`, `/cachy`, `/fixes`, `/hdmi`, `/xswap` are all at the same commits as
+the 2026-10-02 pass (`7.3/fixes` still `2d0a9e75fe41`). Nothing new.
+
+### Version sweep — five remaining, all previously dispositioned
+
+`2032` **left the list** and is now counted among the 19 content-identical
+resends, which independently confirms the line-wrap finding made by hand on
+2026-10-02. The five that remain are `2045` (v4 cover letters, no diff), the
+three kbuild v4 that fail to apply to rc5, and `1151` (the older February
+posting).
+
+### New on-target work item: `#5807` — the open DCN4 flip-pending root cause
+
+**`#5807`** *"[amdgpu] Pageflip timed out / CRTC flip_done timeout freezes KWin
+Wayland (RX 9070 XT, RDNA4)"*, filed 2026-09-11, **updated 2026-10-03**. This is
+our exact part (`1002:7550`, rev c0) with HDMI at 1080p and FreeSync forced
+always, plus a second DP monitor — the closest match to this machine of anything
+in the tracker.
+
+It matters because it is the same family as the workaround our `README` already
+documents: `dcdebugmask=0x800` covers *"the clock-gated HUBP flip-pending
+misread: when the HUBP is clock-gated, `hubp2_is_flip_pending()` reports no
+pending flip, so flip completion can arrive before the hardware latches"*. That
+note ends *"drop it if a proper DCN4 flip-pending fix lands"* — **no such fix has
+landed**, and the thread's newest note (2026-10-03) says only *"The cause is as
+yet unknown."*
+
+**Checked against this machine rather than assumed:**
+
+- **No `flip_done timed out` and no `fbcon: Taking over console` anywhere in the
+  journal** — the signature this issue is built on has never occurred here.
+- **Neither HDMI output advertises VRR** (`vrr_capable` is empty for both
+  `card1-HDMI-A-1` and `card1-HDMI-A-2`), which is the intended result of our
+  `1164` MCCS fix. The reporter's suspected trigger is *"FreeSync forced always
+  on"* — **that state is not active on this machine.**
+- `amdgpu.dcdebugmask=0x800` is confirmed live on the running cmdline.
+
+**Verdict: watch item.** It reinforces keeping `dcdebugmask=0x800` rather than
+retiring it, and it is the thread to re-read if a DCN4 flip-pending fix is ever
+posted. No action now.
+
+### Tooling trap hit this pass
+
+A comparison printed **"DIFF CONTENT IDENTICAL" while both `sed` invocations had
+failed** — empty outputs compare equal, so the `&&` branch fired on nothing. Same
+family as the `… | head && echo OK` rule already in `LESSONS.md`. Both
+comparisons above were re-run resolving filenames with `find`, asserting the
+extracted files were non-empty, and comparing **content lines only**. The BORE
+result survived; the naive `diff` verdict on the HDMI series did not — it would
+have reported a 70-line content change where there is none.
+
+## Sweep 2026-10-03 (second pass) — Guittot's short-slice series assessed: rejected
+
+Fresh refresh of every tree and all 17 lore mirrors, plus an assessment of the
+linux-pm series the user linked. **Series stays at 255.**
+
+### `[PATCH 00/18 v2] Improving latency of short slice tasks` (Vincent Guittot) — REJECTED
+
+<20261002154415.2270586-1-vincent.guittot@linaro.org>, linux-pm, 2026-10-02.
+Read from `repos/lore-linux-pm`; the lore web UI is Anubis-gated and was not
+fetched. The linked `-1-` id is the **cover letter**.
+
+The series has five parts: 1–2 decay positive lag, 3–5 use slice when selecting
+CPU, 7–11 add a push callback for fair, 12–14 push short-slice tasks, 15–18 make
+`feec`/EAS slice-aware.
+
+**Four independent reasons, any one sufficient:**
+
+1. **No review.** Every patch carries only the author's own `Signed-off-by`. No
+   `Reviewed-by`/`Acked-by` anywhere in v1 or v2. Peter Zijlstra *did* engage the
+   v1 `[PATCH 0/8]` on 2026-09-22 (patches 4, 5, 6 and 8) — but his replies are
+   questions (*"Should this …"*), not tags. This is the case the adoption bar
+   exists for: substantive maintainer discussion is not endorsement.
+2. **It does not apply to rc5.** Spot-checked against a throwaway rc5 worktree,
+   all three fail: 01/18 at `kernel/sched/fair.c:8019`, 03/18 at `:1116`,
+   07/18 at `:9799`. It is written against a tree that already has the queued v1
+   patches — the cover says *"The first 3 patches of v1 have been queued"*.
+3. **Patches 15–18 are EAS/energy-model** (`energy_model.h`, `feec()`), which
+   only activate on **asymmetric CPU capacity topologies**. This machine is a
+   symmetric 8-core Zen 4 desktop, so that quarter of the series is inert by
+   construction. The benchmarks were run on a **dragonboard rb5** (ARM
+   big.LITTLE) using uclamp to *"target the high and mid cores"*.
+4. **It is a feature, not a fix** — a latency optimisation series competing with
+   the scheduler design this machine actually runs.
+
+**On live-vs-inert, stated honestly rather than over-claimed:** BORE does *not*
+replace everything here. It rewrites task *selection* and the slice in
+`pick_next_task_fair`, so parts 1–2 and 12–14 (lag decay, short-slice push) are
+EEVDF-internal and would land in BORE's shadow — the `0110` precedent, where the
+CACHY hunk fell into a dead `#else` because BORE recomputes the slice. But parts
+3–5 and 7–11 touch `wake_affine`/`select_task_rq_fair` and the load-balancing
+push path, which **BORE does not replace**, so they would not be automatically
+inert. The question is moot given (1) and (2), and it is recorded here so a
+future pass does not have to re-derive it.
+
+**Revisit only if** it gains `Reviewed-by` and rebases onto our base.
+
+### tip has ~90 branches and `master` is not where all sched work lives
+
+While locating the queued v1 patches, a `--grep` restricted to `origin/master`
+found nothing. Searching **every** ref showed sched work on
+`origin/sched/core` and the `origin/core/*` family that `master` does not
+surface: `sched/eevdf: Always update slice protection`, `sched/eevdf: Take into
+account current's lag when updating slice protection`, `sched/fair: Prevent
+negative lag increase during delayed dequeue`, `sched/fair: Revert force wakeup
+preemption`, `sched/fair: Limit run to parity to the min slice of enqueued
+entities`, `sched/eevdf: Ensure that vprot will never go above a min slice`.
+**These are EEVDF-internals fixes, and `fair.c` is live here under BORE** — but
+membership in rc5 was not established this pass, so they are recorded as
+**unresolved, not rejected**. That is the next thing to check.
+
+### Fresh state
+
+- `v7.3-rc6` **still not tagged** — torvalds tags stop at rc5.
+- Mainline advanced `e767a4ea70a` → **`a74306e2e67`**.
+- **tip unchanged** (`8f511d67b4fb`), **cachyos `7.3/fixes` unchanged**
+  (`2d0a9e75fe41`), **sirlucjan unchanged** (`0f0dfad7`).
+- `next-20261002` remains the newest linux-next.
+- **Version sweep: identical again** — 19 content-identical resends, and the
+  same 5 remaining (`2045` cover letters, the three kbuild v4 that fail against
+  rc5, `1151`'s February posting).
+
+### New work items
+
+- **`#5931`** — *stack-protector panic in `dp_parse_link_loss_status` on the HPD
+  RX IRQ*. A stack-protector panic is a buffer overflow, so this is a real
+  memory-safety bug in the DisplayPort path. **Both displays here are HDMI**
+  (`card1-HDMI-A-1`, `card1-HDMI-A-2`), so the DP link-loss path is not
+  exercised — watch item, not a carry.
+- **`#5932`** — shutdown hangs when a monitor is connected through USB-C. Not
+  this machine's topology.
+- `#5807` (the open DCN4 flip-pending root cause) remains the highest-value
+  on-target watch item, as recorded in the previous pass.
+
+### Tooling
+
+A `--grep` over *all* tip refs matched unrelated commits — the pattern
+`min slice` hit `drm/amd/display: Correct Slice reset calculation` across dozens
+of branches, producing ~90 blocks of noise with ~6 real hits. **Anchor greps on
+symbol names or exact subjects, not on short common words**, when scanning every
+ref of a large tree.
+
+## Sweep 2026-10-04 (rc day) — futex UAF is the candidate; EEVDF thread closed
+
+Full refresh of every tree and all 17 lore mirrors. **Series stays at 255.**
+`v7.3-rc6` is **not tagged yet** (master `6addb4f3855`); Sunday tags land later
+in the day.
+
+### The open EEVDF thread from yesterday is CLOSED — all in rc5
+
+Resolved by commit *date* rather than by an ancestry walk (`merge-base` lies in
+these shallow clones), then confirmed by content:
+
+| Subject | Commit date |
+|---|---|
+| `sched/fair: Limit run to parity to the min slice of enqueued entities` | 2025-07-08 |
+| `sched/fair: Revert force wakeup preemption` | 2026-01-23 |
+| `sched/fair: Prevent negative lag increase during delayed dequeue` | 2026-04-23 |
+| `sched/eevdf: Always update slice protection` | 2026-06-24 |
+| `sched/eevdf: Ensure that vprot will never go above a min slice` | 2026-09-21 |
+
+rc5 was tagged **2026-09-27**, so the last one is six days before it. Content
+probe confirms it: rc5's `fair.c` has `se->vprot = min_vruntime(se->vprot,
+vruntime + calc_delta_fair(slice, se));` at line **1154**, which is that commit's
+whole change (1 insertion, 2 deletions upstream). **All five are in rc5 — nothing
+to carry.** They appear as ancestors on ~90 tip refs because they are old common
+history, which is also why the subject grep looked alarming.
+
+### Candidate: `f35e3b578422` — futex private-hash use-after-free on resize
+
+| | |
+|---|---|
+| Author | Chris Mason (Meta) |
+| Trailers | **`Reviewed-by: Paul E. McKenney`**, `Signed-off-by: Peter Zijlstra (Intel)`, `Assisted-by: kres`, `Fixes: 56180dd20c19` |
+| Status | **tip only** (2026-10-02) — not in mainline master |
+| File | `kernel/futex/core.c` |
+
+`__futex_pivot_hash()` publishes `mmph->batches` **before** swapping
+`mmph->hash`. New grace periods can start in between, so `futex_ref_drop()` can
+advance while a reader still holds the old hash — a use-after-free. The fix
+swaps the two assignments and drops the now-unneeded `scoped_guard(rcu)`.
+
+**Verified live in our tree, not assumed:**
+
+- rc5's `kernel/futex/core.c:217-218` contains the buggy ordering verbatim:
+  `mmph->batches = get_state_synchronize_rcu();` then
+  `rcu_assign_pointer(mmph->hash, new);`
+- `Fixes: 56180dd20c19` is dated **2025-07-10** — so this is **not** a 7.3
+  regression; it has been latent for over a year, across every kernel since.
+- Core kernel, reachable by any threaded program that resizes its futex hash.
+
+**Disposition: hold for rc6, then carry if absent.** It clears the audit bar
+outright (maintainer-signed *and* independently reviewed). It may well ride into
+rc6 later today; if it does, the version bump absorbs it and no carry is needed.
+Re-check at the moment the tag appears.
+
+### Rejected / already covered
+
+- **`drm/amdgpu/gmc12: properly pass flush_type to gmc_v12_0_flush_vm_hub()`
+  (`0bfb1bfc82e8`) — MOOT for us.** The bug is real and present in rc5
+  (`gmc_v12_0.c:330` still calls `gmc_v12_0_flush_vm_hub(adev, vmid, vmhub, 0)`),
+  and it is our exact IP (`gmc_v12_0` = GC 12.0). But **our `1017` is part 14/16
+  of the TLB-invalidation rework and deletes the entire function** the upstream
+  patch edits — 211 removed lines from `gmc_v12_0.c`. The patch cannot apply to
+  our series tree and the code it fixes does not exist after `1017`. Our
+  `1008`/`1012`/`1013`/`1014`/`1017` carry `flush_type` through the new helpers.
+  This is the mirror image of the `9007` duplicate trap: not "applies twice", but
+  "looks like a fix for code our own series already replaced".
+- **`drm/amdgpu/gfx12: set KMD_QUEUE for kernel gfx queues` (`9fe5745f9d8e`) —
+  already in rc5** (content probe: `gfx_v12_0.c:3251` has the
+  `REG_SET_FIELD(..., CP_HQD_PQ_CONTROL, KMD_QUEUE, 1)`).
+- **Wrong-chip traps filtered from tip's 434 new commits**, by identifier rather
+  than by subject: `sdma 7.1` (we are `sdma_v7_0`), `gmc_v12_1` (we are
+  `gmc_v12_0`), `gfx6`, `gfx11` (we are `gfx_v12_0`), `drm/amd/pm/si`,
+  `drm/radeon`, `switcheroo`-parked GPUs, `MacBookPro14,3`, `MST mode`
+  (no MST here), and PWM backlight curves (desktop monitors).
+
+### Sources with nothing on-target
+
+- **torvalds**: 7 new commits, all EDAC `altera`/`versalnet` — SoC/FPGA hardware.
+- **tip**: 434 new commits, overwhelmingly `x86/tdx`, bpf, `drm/mediatek`,
+  Input and EDAC. The only on-target material is listed above.
+- **New list postings since 2026-10-03** are the 38-part VMA-predicate refactor
+  (Lorenzo Stoakes, v4) and an MGLRU RFC — **MGLRU is inert here** (LRU-MARIE
+  owns reclaim, per the `2131`–`2137` finding), and the VMA series is a refactor
+  with no fix content.
+- One new posting worth a look next pass: **`drm/amdgpu: Fix double runtime PM
+  put in amdgpu_debugfs_gpr_read()`** (dri-devel, 2026-10-04) — a refcount bug,
+  though `amdgpu.runpm=0` is on this machine's cmdline, which may make the path
+  unreachable. Not yet triaged.
+- **Version sweep: identical for the fourth consecutive pass** — 19
+  content-identical resends and the same 5 (`2045` cover letters, the three
+  kbuild v4 that fail against rc5, `1151`'s February posting).
+- **cachyos and sirlucjan unchanged** (`2d0a9e75fe41`, `0f0dfad7`).
+
+## Sweep 2026-10-04 (work items + comments, freshly) — one strong lead
+
+The rc-day pass had covered the trees, mirrors and version sweep but **not** the
+tracker; this pass adds it. 24 issues updated since 2026-10-03, and the
+`x-total: 24` / `x-total-pages: 1` headers confirm the full set was read rather
+than page 1 of many.
+
+**Commit shas in comment bodies: zero real ones.** The only two hex-looking
+tokens were `548bbb036f76622de151dbd048b0ee73` (a GitLab `/uploads/` path from a
+`dmesg` attachment) and `bea0000000000108` (a register value). Both were caught
+by the verify-before-citing rule — a tracker full of image paths is exactly the
+`112d2111f50a…` trap the skill documents.
+
+### `#5759` — the lead, and it is our exact GPU
+
+*`amdgpu/mes12: MES(0) intermittently fails to respond to REMOVE_QUEUE on Navi 48
+(gfx1201), forcing MODE1`* — new substantive comment 2026-10-04 by `bkvargyas`,
+on five Navi 48 parts (`1002:7551`, the AI PRO R9700 — ours is `1002:7550`, same
+silicon family).
+
+- **Signature:** `MES(1) failed to respond to msg=INVALIDATE_TLBS`, ~150 times
+  since 2026-09-17, always while page tables are written at full speed.
+- **Escalation:** three `INVALIDATE_TLBS` timeouts → `MES(0) failed to respond to
+  msg=REMOVE_QUEUE` → *"MES might be in unrecoverable state, issue a GPU reset"* →
+  `device lost from bus!` with SMU bus errors.
+- **What does NOT change the rate:** MES firmware version (0x8b / 0x91 / 0x93),
+  power draw (32–75 W as readily as 210 W), temperature, `vm_update_mode=3`,
+  `ras_enable=0`.
+- **What DOES:** **`amdgpu.mes_log_enable=1` — 0 timeouts in 24 four-card
+  launches, against 6-in-6 with the default**, with identical launch time and
+  throughput. Their read of `mes_v12_0.c` is that the only thing the flag
+  changes toward firmware is `enable_mes_event_int_logging = 1` plus the
+  `event_intr_history_gpu_mc_ptr` buffer in `SET_HW_RESOURCES`.
+
+**This is the MES TLB-invalidation path, and we carry a whole TLB-invalidation
+rework (`1008`–`1017`).** It also shares a family with the `#5910` note already
+in this ledger (`amdgpu_vm_tlb_flush()` returning early on `!*fence`).
+
+**Checked against this machine, and the result is a clean negative — see the
+correction below for why the scoping matters.** Across the full 12-day, 26-boot
+journal: `INVALIDATE_TLBS` **0**, `failed to respond to msg` **0**,
+`device lost from bus` **0**, `unrecoverable state` **0**, `MODE1` **0**,
+`ring … timeout` **0**, `GPU reset` **0**, `flip_done timed out` **0**.
+
+**Disposition: watch, do not act.** `mes_log_enable` is available here (the
+param exists and reads `0`), so the workaround is one cmdline token away if the
+signature ever appears. It is **not** being adopted on the strength of one
+reporter's 24 launches on different hardware in a vfio/passthrough topology —
+that is a measurement, not a review, and we have never reproduced the fault.
+
+### Other on-target items from the same pass
+
+- **`#5934`** (filed today) — DCN 4.0.1, RX 9070 XT: `enabling link 3 failed: 19`
+  plus `CRB Config Warning: DET size (3,14,8,0) + Compbuf size (1) > CRB segments
+  (21)`, white-noise static over **HDMI 2.1 FRL + DSC at 4K120 with VRR/ALLM**.
+  Our display block, but not our configuration — both displays here are 1080p,
+  under HDMI 2.0 rates, and neither advertises VRR. Watch item.
+- **`#5935`** (filed today) — RX 9070 XT, `1002:7550` rev c0: raising
+  `power1_cap` after a `pp_od_clk_voltage` commit silently reverts the voltage
+  offset. Our exact part, but it is an overclocking/undervolting interaction we
+  do not exercise. Watch item.
+- **`#4753`** — `gfx1201` display pipeline stall on memory clock change with
+  FAMS2 (100 notes, active). Our exact IP. No fix: fililip notes FAMS2 on RDNA4
+  *"just never works as well as FAMS1"*, everything reports healthy (no
+  underflows, no DMUB errors), and suspects a coordinated firmware+kernel fix.
+  Watch item.
+
+### CORRECTION: `journalctl -k` is boot-scoped, and I had been treating it as global
+
+**`journalctl -k` implies `-b`.** The man page states `--dmesg` is equivalent to
+`--boot --dmesg` — so every "this machine has never logged X" conclusion drawn
+from `journalctl -k` in this session was scoped to **the current boot alone**.
+On this pass that was a **39-minute window** (the box rebooted at 12:34), and
+earlier passes were no better. The claims were stated with more confidence than
+the evidence supported.
+
+Re-run against the **whole journal** — `journalctl --no-pager | rg …`, no `-k` —
+the picture is Sep 23 14:14 → Oct 04 13:13, **26 boots, 1,002,265 lines**, and
+the negatives above are now genuinely cross-boot. The conclusions did not change;
+the evidence now actually supports them. Two further traps hit in the same
+sequence:
+
+- **`rg -i 'mes'` matched `names`, `frames`, `timestamps`, `Estimated`** — it
+  reported "17 MES lines" where the word-boundary probe finds **2**. Anchor on
+  `\bMES\b`, not on a short case-insensitive substring.
+- **`… | tail -8 || echo "none"` cannot report absence** — `tail` exits 0 on
+  empty input, so the fallback never fires. Same family as the `… | head && echo
+  OK` rule already in `LESSONS.md`.
+
+`/var/log/journal` exists with `SystemMaxUse=500M`, so the history **is** there —
+the scoping was mine, not the journal's.
+
+## Sweep 2026-10-04 (second pass) — the drm-next-7.4 AMD pull, assessed
+
+Fresh refresh of every tree and all 17 lore mirrors, plus an assessment of the
+pull the user linked. **Series stays at 255.** `v7.3-rc6` is **still not tagged**
+(master `6addb4f3855`).
+
+### `[pull] amdgpu, amdkfd, radeon drm-next-7.4` (Alex Deucher, 2026-10-02)
+
+<20261002175316.1428352-1-alexander.deucher@amd.com>, read from
+`repos/lore-dri-devel` / `lore-amdgfx`; the lore web UI is Anubis-gated and was
+not fetched. Tag `amd-drm-next-7.4-2026-10-02`, head `41505ac433cc`, built on
+`2abe8e7e339` — which is **exactly where our `drm-next` clone still sits**, so
+Dave Airlie has not merged it yet.
+
+**This is 7.4 merge-window material, and our base is 7.3-rc5.** Nothing in it is
+carryable now: porting 7.4 driver code onto a 7.3 base is the wrong-base case the
+ledger has rejected repeatedly. It is recorded here as the thing to re-read when
+7.4 becomes the base.
+
+I fetched the tag (bounded, `--depth=200`) and inspected the commits rather than
+judging by the summary. **175 commits: ~20 on-target, 31 confirmed wrong-chip**
+(recorded below so a future pass does not re-litigate them).
+
+**Three clusters matter, and two map onto open work items from yesterday:**
+
+| Cluster | Commits | Links to |
+|---|---|---|
+| MES / userq reset | `mes12: restore collateral gfx queues after pipe reset`, `mes12: read the gfx user queue VMID for MMIO reset`, `gate gfx pipe reset on PER_PIPE`, `userq: fix reading the WPTR at a non-zero BO offset`, `userq: preserve kernel rings during gfx pipe reset`, `userq: reject mappings without a backing BO` | **`#5759`** — the MES `REMOVE_QUEUE` / `INVALIDATE_TLBS` MODE1 escalation |
+| HDMI FRL | `Serialize HDMI FRL status polling against link detect`, `Skip HDMI FRL status polling while link is down`, `Fix HDMI2.2 LT timeout duration`, `Default HDMI RGB output to limited range on CTA modes` | **`#5934`** — the DCN 4.0.1 `enabling link 3 failed: 19` FRL report |
+| `mes_dbgext` | `add mes_dbgext core support`, `update MES v11/v12 API for mes_dbgext`, `wire mes_dbgext on gfx11 and gfx12` | Likely the *proper* upstream mechanism behind `#5759`'s `mes_log_enable=1` workaround |
+
+**Every one of the seven spot-checked on-target commits carries a `Reviewed-by`
+from an AMD maintainer, and NONE carries `Cc: stable`.** That is the decisive
+detail: there is no backport path into 7.3.y, so none of this reaches our line
+except by a 7.4 rebase.
+
+Also present: **our `1074`** (`drm/amdgpu: implement workaround for sdma dcc
+corruption`) — a third confirmation it is upstream — and the `gmc12 flush_type`
+fix already established last pass as **moot here** (`1017` deletes that function).
+
+**Disposition: no action. Re-read at the 7.4 rebase.** The two clusters are the
+strongest argument yet that `#5759` and `#5934` have real upstream work behind
+them; if either fault ever appears on this machine, the fixes exist, just not on
+our line.
+
+### Everything else
+
+- **Version sweep: identical for the fifth consecutive pass** — 19
+  content-identical resends and the same 5 (`2045` cover letters, the three
+  kbuild v4 that fail against rc5, `1151`'s February posting).
+- **cachyos (`2d0a9e75fe41`) and sirlucjan (`0f0dfad7`) unchanged.**
+- Wrong-chip commits recorded from this pull, by identifier not subject:
+  `mmhub v5_0_1`, `sdma 7.1`, `gmc_v12_1`, `GC 12.1.0 A0`, `vpe v3.0`, `dcn60`,
+  `PSP 15.0.3`, `nbif v7_10`, `lsdma v8_0_1`, `SI DPM`, `DCE 6`/`DCE 8.1`,
+  `MacBookPro14,3`, `Sun XVR-300`/Sparc64.
+
+## Question answered 2026-10-04: what would rebasing to linux-next give us?
+
+`next-20261002` (`d64fba75362e`) vs our base `v7.3-rc5` (`72d3fcf802c`). rc5 **is**
+an ancestor of the snapshot, so the trees diff directly — but the linux-next
+clone is `--depth=1`, so `rev-list <range>` returns **1** and commit counts are
+unavailable. **Tree diffs work; commit ranges do not.** Use `git diff <sha1>
+<sha2> -- <path>` here, never a range.
+
+### What we would gain, verified by content probe
+
+| Item | In next-20261002? |
+|---|---|
+| `af2fb3ee667` slab kswapd deadlock (our pending `2198`) | **YES** — both `Don't wake up kswapd, it will cause deadlock under pi_lock` hunks present (`mm/slub.c:6093`, `:6281`) |
+| Our `1074` SDMA DCC workaround | **YES** — `num_move_entities = 1` present, so `1074` would become a drop |
+| io_uring `CQE32`/`CQE_MIXED` fixes | **YES** — `CQE_MIXED` ×5, `big_cqe` ×14 |
+| 7.4 amdgpu MES/userq + HDMI FRL clusters | **YES** (the 792-file batch) |
+
+**Scale of the change:** `drivers/gpu/drm/amd` **792 files**, `arch/x86` 175,
+`mm` 106, `kernel/sched` 21, `io_uring` 21, `block` 14, `drivers/nvme` 13,
+`r8169` 2.
+
+### What it would NOT give us
+
+**The futex UAF fix (`f35e3b578422`) is absent** — `kernel/futex/core.c` is
+**byte-identical** between rc5 and next-20261002. The one genuinely live bug
+found this cycle would still have to be carried.
+
+### The cost, now quantified
+
+**73 of our 255 patches touch an amdgpu file that changed in that window** —
+29% of the series needs rebase work in amdgpu alone, before the CachyOS squashes
+and the other subsystems are counted.
+
+### Verdict
+
+**Not worth it now.** Almost everything a rebase would hand us is either already
+carried and working (`1074`, `2046`, `2048`, `2049`, the io_uring set) or
+destined for our line anyway via rc6 / 7.3.y. The genuinely new content is 7.4
+**feature** work — 792 amdgpu files of new silicon support (SMU 15, MMHUB 5.0,
+VCN/VPE 3.0, GC 12.1, DCN 6) aimed at hardware this machine does not have — and
+it replaces a stabilised rc line with a daily-rebuilt preview, which `CLAUDE.md`
+reserves for when the RC line is unusable. The right next base is **rc6**.
+
+## Checked 2026-10-04: MGLRU-FG RFC v3 — inert here by construction
+
+`[PATCH RFC v3 04/17] mm/mglru: frequency guided workingset promotion (MGLRU-FG)`
+— Kairui Song (Tencent) via B4 Relay, to linux-mm, 2026-10-03,
+<20261003-mglru-fg-v3-4-cbd4546a5bd9@tencent.com>. Read from `repos/lore-mirror`;
+the lore web UI is Anubis-gated and was not fetched.
+
+It complements MGLRU's eviction-time tier-PID protection with access-time
+frequency-guided promotion, reworking the `refs` count in folio flags
+(`LRU_REFS_REFERENCED/WORKINGSET/PROTECTED/MAX`), folding `PG_workingset` and
+`PG_referenced` into the low two bits of `refs`. Touches
+`include/linux/mm_inline.h`, `include/linux/mmzone.h`, `kernel/bounds.c`,
+`mm/folio.c`, `mm/vmscan.c`, `mm/workingset.c`. Only `Signed-off-by` — no
+review. **RFC, v3 of 17 parts, still under discussion.**
+
+**Verdict: reject. Three independent reasons, and the third is structural.**
+
+1. **RFC** — explicitly not proposed for merging.
+2. **MGLRU-only** — the cover states *"This doesn't affect classical LRU in any
+   way"*, so nothing here reaches the LRU path this machine uses.
+3. **The MGLRU path is inert here, verified rather than recalled.** Our `2101`
+   (LRU-MARIE 0.11.1r2) **renames `lru_gen_enabled()` to
+   `lru_gen_core_enabled()`** and introduces a masking `lru_gen_enabled()` that
+   additionally returns false whenever Marie owns aging. Our own patch comment:
+   *"Marie and MGLRU are mutually exclusive at runtime. When Marie owns aging,
+   every MGLRU code path must be inert... Reporting MGLRU as disabled here makes
+   'both managers touch the same folio' structurally unrepresentable."* The live
+   kernel confirms Marie is the active manager (`Marie LRU 0.11.1 by Masahito
+   Suzuki`).
+
+**The trap this sits on, worth restating:** `/sys/kernel/mm/lru_gen/enabled`
+reads **`0x0007`** on this machine — the tunable is present, readable, and says
+MGLRU is enabled, while the masking makes every MGLRU path inert. This is the
+same shape as the `vm.swappiness = 180` finding: **a readable knob is not
+evidence that it is consulted.** That is why the `2131`–`2137` batch was removed
+on 2026-09-23 and why this RFC is rejected on inertness rather than on quality.
+
+## Work items, 2026-10-04 (fresh)
+
+**15 issues updated; `x-total: 15`, `x-total-pages: 1` — the full set.**
+
+New/updated on-target:
+
+- **`#5872`** (today, 17:17) — *RX 9070 XT (Navi 48) over USB4: pageflip timeout
+  when set as primary display*. Our GPU, and a pageflip-timeout family — but
+  over USB4/eGPU, which is not this machine's topology. Watch.
+- **`#5902`** (updated today 12:46) — *HDMI FRL: same-sink HPD pulse leaves the
+  display dark after the destructive verify*. Previously CC-only; now re-updated.
+  HDMI is our display path, so this stays on the watch list.
+- `#5934` (DCN 4.0.1 HDMI FRL / `enabling link 3 failed: 19`), `#5935` (SMU
+  14.0.2 power cap), `#5917` (RX 9070 XT `comp_1.0.1`), `#5759` (MES
+  `REMOVE_QUEUE`), `#4753` (`gfx1201` FAMS2 stall) — all previously triaged,
+  no change in disposition.
+- `#5939` (DCN 3.5 Strix panel replay), `#5938` (gfx1152), `#5937` (Granite
+  Ridge iGPU), `#5936`/`#5751`/`#4843`/`#5005`/`#3659` — other silicon.
+
+## Rebase to v7.3-rc6 — 13 of 255 patches need resolution (AWAITING APPROVAL)
+
+Base `v7.3-rc5` (`72d3fcf802c`) → `v7.3-rc6` (`4eeccbed21e`, tagged 2026-10-04).
+Tag verified by control: `git.kernel.org/torvalds/t/linux-7.3-rc6.tar.gz` 301→**200**,
+against rc9 301→**404**. PKGBUILD bumped `_rcver=rc6`, `pkgver=7.3.0_rc6`,
+`pkgrel` 5→**1** (the reset convention: rc3→rc4 was 26→1, rc4→rc5 18→1),
+`_srctag`/`source=()` to rc6.
+
+Cumulative audit (`audit_series.py --tag v7.3-rc6`) reports **13 of 255 failing**:
+9 inert `Skipping patch`, 4 `FAILED`.
+
+### Drop candidates — 9, content-verified present in rc6
+
+| # | Patch | Evidence |
+|---|---|---|
+| `1074` | drm-amdgpu-workaround-for-sdma-dcc-corruption | 4/4 added lines in rc6; landed as agd5f `c1702ed0d64a` |
+| `1162` | dc_state_create_copy NULL check in dm_suspend | 5/5 |
+| `2010` | blk-cgroup save IRQ state in blkg_tryget_closest | 3/3 |
+| `2016` | nvme-multipath ANA log bounds | 3/3 |
+| `2041` | net gso limit recursive ip-in-ip | 10/10 (already on the agreed drop list) |
+| `2046` | blk-mq set RQF_USE_SCHED | 22/22; landed as `ab6c756f28c` |
+| `2047` | blk-mq allow cached requests for flush ops | the 2 lines it **deletes** are gone from rc6 (0 occurrences) — the change is in |
+| `2048` | io_uring init task context before BPF loop | 1/1; landed as `a3bdf68feec` |
+| `2151` | mm shmem ignore sysfs configs for forced collapse | 1/1 (already on the agreed drop list) |
+
+`2041` and `2151` were already signed off. **The other seven await explicit approval** —
+`CLAUDE.md` YOU MUST NOT #8.
+
+### Regenerate — 4
+
+| # | Patch | Why |
+|---|---|---|
+| `1007` | gmc12: disallow gfxoff around TLB flushes | 0/4 added lines in rc6 — genuinely drifted (part 04/16 of the TLB-inv series) |
+| `1017` | gmc12: switch to new gmc tlb inv helpers | 0/3 — genuinely drifted (part 14/16) |
+| `2049` | io_uring SQPOLL task_work RCU | its two distinctive added lines (`struct task_struct *task = tctx->task;`, `__set_notify_signal(task);`) are **absent** from rc6 — our carry may be a different revision than what landed; needs care, not a blind drop |
+| `2311` | kbuild: move toolchain checks into init/Kconfig.toolchain | `init/Kconfig.toolchain` **does not exist in rc6** |
+
+### Two probe errors caught in the process — both would have caused a wrong drop
+
+- **`2311`'s content probe read 99% (116/117 lines "present") and was wrong.** The patch
+  *moves* lines from `init/Kconfig` into a new file, so every added line already
+  exists at the source location and the probe counted it as "upstream". Verified
+  properly by testing for the **created file**, which is absent. **A content probe
+  cannot distinguish "this line is new here" from "this line already lives
+  elsewhere"** — for any patch that moves code, probe the created artefact, not
+  the lines.
+- **`2047` reverse-applies *failing* while its content is plainly present.** This is
+  the documented trap in the direction the ledger had not recorded: rc6 has **zero**
+  occurrences of the two lines it deletes, so the change is in — but `--check -R`
+  fails because the surrounding context moved underneath it. Reverse-apply is
+  unreliable in *both* directions, exactly as `CLAUDE.md` warns.
+
+## Sweep 2026-10-05 — nothing to adopt; three of our carries appear in the 7.4 amd-pstate pull
+
+Full refresh (trees + all 17 lore mirrors), version sweep, and the trees the
+user named. **Series stays at 255.**
+
+### Version sweep — no patch of ours has a new version
+
+**Sixth consecutive identical pass**: 17 mirrors, 255 carries, **19
+content-identical resends**, and the same 5 needs-look entries, all previously
+dispositioned — `2045` (v4 cover letters, no diff), `2302`/`2308`/`2314` (kbuild
+v4, fail against both rc5 and rc6), `1151` (older February posting).
+
+### The `[GIT PULL] amd-pstate 7.4 content (10/4/26)` — and our overlap with it
+
+Mario Limonciello, linux-pm, 2026-10-04 (`5a3fc9d654`), tag
+`amd-pstate-v7.4-2026-10-14`, head `6b64d65c8368` — **not merged yet** (absent
+from our linux-pm clone; only its base `c8663e0457e6` is present). Ten patches
+across `arch/x86/kernel/acpi/cppc.c`, `drivers/cpufreq/acpi-cpufreq.c`,
+`amd-pstate.c`, `amd-pstate.h`, `amd-pstate-ut.c`.
+
+**Three of the ten are already ours** — we adopted them from the list before the
+pull was assembled:
+
+| Upstream (7.4 pull) | Our carry |
+|---|---|
+| `cpufreq/amd-pstate: Skip auto_sel write when it already matches the mode` (Wentao Guan) | **`1230`** |
+| `cpufreq: amd-pstate: Restore previous mode when changing driver mode fails` (Mario) | **`1231`** |
+| `cpufreq: amd-pstate: Propagate cppc_set_auto_sel() errors on mode change` (Mario) | **`1232`** |
+
+The rest: `Fix TOCTOU when changing driver mode via sysfs`, `ACPI: CPPC: Refactor
+boost ratio handling`, `acpi-cpufreq: Use amd_get_boost_ratio()`, `Get Highest
+Freq for a CPU`, `Restore previous EPP if profile_name allocation fails`, plus
+**two Zen6-only** entries (`amd-pstate-ut: Fix max_freq and EPP test failures on
+Zen6`, `Update Zen6 client EPP tuning values`) which do not apply to Zen 4.
+
+**Our `1227` is adjacent but not the same layer.** It is
+`[PATCH v7 18/20] ACPI: CPPC: Accept requests to retain immutable autonomous
+selection` — the **CPPC-level** fix at `arch/x86/kernel/acpi/cppc.c`. The pull's
+TOCTOU patch is the **amd-pstate-level** fix. Worth a deliberate comparison at
+the 7.4 rebase rather than assuming one subsumes the other.
+
+**Disposition: nothing to adopt now.** It is explicitly *"content for 7.4"*, our
+base is rc6, and the three overlapping carries are already in.
+
+### Trees — nothing on-target
+
+- **tip: 0 new commits** since `f191df9f71d2`.
+- **linux-pm: nothing new** in the tree (`100638f0f`, 2026-10-01); the pull above
+  is on the list, not yet merged.
+- **akpm-mm: 14 new commits**, none matching the on-target filter.
+- **linux-next: `next-20261002` remains the newest** (dated **2026-10-03**).
+
+**A silent failure caught here.** `git -C repos/linux-next diff --name-only
+4eeccbed21e next-20261002` returned **0 files**, which reads as "nothing
+changed". It was a **failed lookup**: rc6 (`4eeccbed21e`) is **absent from the
+linux-next clone**, and geometrically so — the snapshot is dated 2026-10-03 and
+rc6 was tagged 2026-10-04, so **the snapshot predates the tag**. Re-run against
+rc5 (a genuine ancestor) the delta is real: **792 amdgpu files, 175 x86, 106 mm,
+21 sched, 21 io_uring, 14 block, 13 nvme, 2 r8169**. `2>/dev/null` is what made
+"bad revision" and "no differences" indistinguishable.
+
+### Work items — 19 updated, full set (`x-total: 19`, `x-total-pages: 1`)
+
+- **`#4960`** *(20 notes, updated 2026-10-05)* — *Excessive power consumption due
+  to low default driver GPU load targeting*. On this GPU family: amdgpu raises
+  core clocks to hold ~70 % GPU load, so a frame-capped game draws ~220 W for no
+  frame-rate gain. Long-running (since 2026-02), newest note contrasts Linux
+  behaviour with Windows' fixed 85 % target. Behavioural, no patch.
+- **`#5902`** — the reporter **corrected their own environment**: "connected
+  directly" was actually through a **5 m HDMI-powered active optical cable**, and
+  re-running on 1.5 m passive copper with a `c953b39f9487` backport changed the
+  picture. **`c953b39f9487` verified as a real commit** —
+  `drm/amd/display: Reintroduce "Force validation link training on all ASICs"`
+  (2026-06-11), present in tip and linux-next. Not an upload path; the
+  verify-before-citing rule was applied and passed.
+- New since the last pass: `#5940` (firmware brightness curve steps near 0 %),
+  `#5669` (Navi 44 T-Bar eGPU), `#4333` (Valve Index HPD). Other silicon.
+- `#5934`, `#5935`, `#5917`, `#5872`, `#5759`, `#4753` — unchanged dispositions.
+
+### Mailing lists — nothing on-target
+
+`drm/rockchip` dw-hdmi-qp v12 (Rockchip), `net/sched: cls_bpf`, and
+`sched_ext/for-7.4: Add NUMA balancing support` — **sched_ext is inert here**
+(BORE owns scheduling; `kernel/sched/ext/` is the dead path, per the
+2026-09-30 inversion). Two mm postings worth a look next pass:
+`mm/page_alloc: skip shuffling and reporting for no-lock frees` and
+`mm: vmscan: don't count per-node proactive reclaim as memory pressure`.
+
+### Docs gate caught a real omission
+
+The `commit-gate.sh` hook blocked a command because `docs/README.md` still said
+base `7.3.0_rc5-5` after the PKGBUILD was bumped to `7.3.0_rc6-1`. **The gate was
+right** — a bump is not complete until the docs agree. Corrected the base version
+and the "mainline Linux 7.3-rc5" line in `docs/README.md`. The only remaining
+`rc5` string is a *historical* CHANGELOG entry describing the rc4→rc5 bump, which
+is correct as written.
+
+## Duplicate audit against rc6 — no silent duplicates found (2026-10-05)
+
+The rebase audit only reports the 13 patches that *fail*. `CLAUDE.md` records the
+opposite trap: **a patch can apply cleanly while its content is already upstream,
+inserting a second copy** (`9007` programmed `DB_RING_CONTROL` twice). So all 255
+carries were scanned against rc6 for content that is already present.
+
+### Method, and why the first pass over-reported
+
+**Pass 1 — added-line presence.** 207 patches clean, **35 with ≥70 % of added
+lines already in rc6** (many at exactly 100 %), 13 with no testable content.
+
+That number is not trustworthy on its own: a check for "does this line exist in
+the target file" matches a line that *legitimately lives elsewhere in the same
+file*. `1166` (a 1-line change), `9019`, `1056`, `1018`, `0034` and others were
+100 % on this test and are not duplicates.
+
+**Pass 2 — hunk post-image.** For each suspect, build the hunk's post-image
+(context + added lines) and require it to appear as a **contiguous block** at the
+patched location. This dropped most of the 35 to "genuinely new" and left **8**:
+
+| Verdict | Patches |
+|---|---|
+| DUPLICATE, already known drops | `1074`, `1162`, `2010`, `2016`, `2041`, `2046`, `2048`, `2151` |
+| **newly flagged** | `2026` |
+
+### `2026` is a FALSE POSITIVE — and the reason generalises
+
+`2026-io_uring-drop-files-buffers-at-release.patch` **moves**
+`io_sqe_buffers_unregister()` / `io_sqe_files_unregister()` from
+`io_ring_ctx_free()` to `io_ring_ctx_wait_and_kill()`. The post-image block is
+found in rc6 **at the original location**, so the test called it a duplicate.
+
+**Neither the added-line test nor the post-image test can distinguish "already
+upstream" from "this patch moves code."** Both see the lines present. This is the
+same failure that made `2311` read 99 % earlier in the same session, and it is
+the third distinct spelling of one underlying error: **a content probe answers
+"does this text exist", never "is this change already applied."** For move/refactor
+patches only the structural test is valid — does the created artefact exist, or
+does the source location still hold the code.
+
+After resolving `2026`, **the duplicate set is exactly the 8 the audit had already
+identified, of which 7 are proposed drops and `1162` is confirmed below. No silent
+duplicates exist in the series against rc6.**
+
+### The `drm-fixes-7.3` pull — the one for OUR line, found on this pass
+
+The user linked the **drm-next-7.4** pull. There is a second, more relevant one:
+**`[pull] amdgpu, amdkfd, radeon drm-fixes-7.3`**, Alex Deucher, 2026-10-01,
+`<20261001230115.1319089-1-alexander.deucher@amd.com>`, tag
+`amd-drm-fixes-7.3-2026-10-01` — **fixes for the 7.3 stream, which is our line**.
+
+25 commits, cross-checked against all 255 carries by subject. **Exactly two match:**
+
+- `Jiangshan Yi — drm/amd/display: check dc_state_create_copy() for NULL in dm_suspend` → our **`1162`**
+- `Pierre-Eric Pelloux-Prayer — drm/amdgpu: implement workaround for sdma dcc corruption` → our **`1074`**
+
+Both are already in the proposed drop set, **and this independently confirms
+`1162`**: the rebase audit and the added-line test both said "already upstream"
+while the post-image test said "genuinely new" (0/2 hunks). A named entry in the
+7.3 fixes pull is the third and decisive signal. **`1162` drops.**
+
+The other 23 commits in the pull are either not carried by us, wrong-chip
+(`DCE 6.x`, `DCE 8.1`, `SI DPM`, `MacBookPro14,3`, `radeon`, `gfx11`, `sdma 7.1`,
+`gmc_v12_1`), or already accounted for (`gfx12 KMD_QUEUE` is in rc5; the
+`gmc12 flush_type` pair is moot because our `1017` deletes that function).
+
+**Disposition: no change to the drop set. `1074` and `1162` confirmed; no new
+drops, no regenerations added.**
+
+### Rebase COMPLETED — all 245 patches apply cleanly to v7.3-rc6
+
+Resolution of the 13 failures above:
+
+- **10 dropped** (content-verified present in rc6): `1074`, `1162`, `2010`, `2016`,
+  `2041`, `2046`, `2047`, `2048`, `2049`, `2151`.
+- **3 regenerated**: `1007` and `1017` by one-token context rebase
+  (`gmc_v12_0_flush_vm_hub(..., 0)` → `flush_type`, the 7.3 fixes pull changed it);
+  `2311` rebuilt because rc6 inserted a `CC_OPT_INLINE_MEMSET` block inside the
+  region it rewrites.
+- `2049` was listed for regeneration but on inspection **was already upstream** —
+  rc6 has both halves (`guard(rcu)()` in `io_req_normal_work_add()` and
+  `IORING_SETUP_DEFER_TASKRUN | IORING_SETUP_SQPOLL` in the `synchronize_rcu()`
+  condition). Only the *comments* differ, which is why reverse-apply **and** the
+  added-line probe both missed it. Read the code, not the diff.
+
+Final audit: **`OK: all 245 patches applied cleanly to v7.3-rc6.`**
+Both `git apply --check` and `patch -p1 --dry-run` accept the regenerated `2311`.
+
+Built `7.3.0_rc6-1` and verified: `.BTF` + `.BTF_ids` present in the vmlinux,
+`CONFIG_TCP_CONG_BBR` **not set** with `CONFIG_TCP_CONG_BBR3=y` (the kfunc
+collision avoided), `CONFIG_SCHED_BORE=y`, `CONFIG_LRU_MARIE=y`, built-in cmdline
+unchanged. Installed and boot entries regenerated; default entry
+`linux-sleepy-next.conf`.
