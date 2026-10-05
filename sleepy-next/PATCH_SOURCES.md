@@ -6662,3 +6662,76 @@ against `1017`.
 - **No thread in amd-gfx, dri-devel or linux-pm names any of this machine's IPs**
   (Navi 48, gfx12, DCN 4.0.1, SMU 14, PSP 14, SDMA 7, VCN 5, or the
   dcc/tlb/mes/userq/hdmi/flip families) since 2026-10-03.
+
+## Full work-item enumeration 2026-10-05 — all 1855 open issues, not just recent
+
+The `updated_after` filter only sees *recent* activity; the tracker is ~1855 open
+issues across 19 pages and an older issue updated months later is invisible to
+it. Enumerated the **entire set**: 19 pages, **1855 issues fetched, matching
+`x-total: 1855` / `x-total-pages: 19` exactly** — no truncation.
+
+- **165 issues name this machine's exact silicon** (Navi 48 / gfx1201 / `1002:7550`
+  / RX 9070 / DCN 4.0.1 / SMU 14 / PSP 14 / SDMA 7.0 / VCN 5.0 / Granite Ridge).
+- 436 more fall in the broader families that could touch us (flip_done,
+  pageflip, FRL, VRR, DCC, userq, MES, TLB, HDMI, MODE1, suspend).
+
+### What the full enumeration found that the recency filter had missed
+
+**`#5870` — `amdgpu_sync_add_later` use-after-free (RX 9070 XT, 7.2.6).** Updated
+2026-09-20, so it never appeared in any `updated_after=2026-10-xx` pass. A
+commenter pointed at a mailing-list fix:
+
+> `[PATCH] drm/amdgpu: don't release the fence reference consumed by the
+> scheduler` — Donggeun Yoo, dri-devel, 2026-09-10,
+> `<20260910035531.559908-1-donggeunyoo.kernel@gmail.com>`
+
+**Three `Fixes:` tags**, including `c1c4a8b21721 ("drm/amdgpu: grab extra fence
+reference for drm_sched_job_add_dependency")`. It removes a `dma_fence_put()` on
+the error path after `drm_sched_job_add_dependency()` — which is claimed to
+**consume** the reference — across `amdgpu_cs.c`, `amdgpu_sync.c` and
+`amdgpu_vm_sdma.c`.
+
+**Two things verified:**
+
+1. **The bug is live in rc6, and therefore in what we just built.** rc6
+   `amdgpu_cs.c:1303-1309` still reads:
+   ```c
+   fence = &p->jobs[i]->base.s_fence->scheduled;
+   dma_fence_get(fence);
+   r = drm_sched_job_add_dependency(&leader->base, fence);
+   if (r) {
+           dma_fence_put(fence);      /* <- the subject of the fix */
+           return r;
+   }
+   ```
+2. **The patch applies clean to rc6** — both `git apply --check` and
+   `patch -p1 --dry-run`.
+
+**Not adopted, and deliberately so.** It clears the *technical* bar (real bug,
+live in our tree, applies cleanly, three `Fixes:` tags) but **fails the review
+bar: zero replies on the list, no `Reviewed-by`, no `Acked-by`** — only the
+author's `Signed-off-by`. Our bar is maintainer-applied, maintainer-signed, or
+≥1 Reviewed-by. The patch's whole correctness rests on one claim — that
+`drm_sched_job_add_dependency()` consumes the fence reference — and **that claim
+was not independently verified this pass**; if it is wrong, removing the put
+*leaks* a reference instead of fixing a double-put. Carrying an unreviewed
+ownership change into the GPU submission path on the strength of one commenter's
+"it applies cleanly" is precisely the mistake this ledger exists to prevent.
+
+**Revisit if it gains a `Reviewed-by`.** It is a strong candidate the moment
+someone signs off on it.
+
+### Other items the full pass surfaced
+
+- **`#5894` — RX 9070 XT (VCN 5.0.0) ring reset never recovers.** Our VCN.
+  Resolved as a **firmware** bug: nowrep states it is *"already been fixed and
+  will be available when VCN firmware in linux-firmware repo is updated."* Not a
+  kernel fix — a `linux-firmware` update, outside this package.
+- **`#5896`** — CRB Config Warning on RDNA4/DCN4, 0 notes; the sibling of `#5934`.
+- Large recurring families on our part, for context rather than action:
+  **"Pageflip timed out" / 9070 XT** (`#5511`, `#5647`, `#5217`, `#5059`,
+  `#5132`, `#5040`, `#5067`, `#4763`, `#5843`, `#5799`), **`device lost from
+  bus` + SMU** (`#5811`, `#5820`, `#5439`, `#5102`, `#5185`, `#5538`, `#4903`),
+  and **HDMI FRL** (`#5862`, `#5869`, `#5671`, `#5349`). These corroborate the
+  `#5807` watch item — the DCN4 flip-pending root cause is still open and still
+  the most-reported class on this silicon.
