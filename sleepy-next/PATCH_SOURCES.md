@@ -6817,3 +6817,70 @@ Two notes on reading this batch:
 - `#5776`'s only new note is Ray6161 attaching `ism-deadlock-suspend.patch`
   (`/uploads/…`, not a commit). The fix is **already in rc6** — verified last pass
   at both call sites.
+
+## Attribution pass 2026-10-05 — what actually moved in today's linux-next
+
+The previous entry left `sched/fair.c` and four `mm` files unattributed because
+the linux-next clone is `--depth=1` and range queries return only the merge
+commit. Attributed by reading the **diffs** instead.
+
+### `kernel/sched/fair.c` (+85/−21) — a feature, not a fix
+
+Adds **`select_idle_smt_cpu()`**: *"Redirect a CPU to a higher-priority available
+sibling in its SMT domain, subject to task affinity."* `select_idle_sibling()`
+gains a `select_smt_priority` exit path; five `return` sites become `target = …;
+goto select_smt_priority;`.
+
+**It is gated on `sd->flags & SD_ASYM_PACKING`** and returns immediately if
+`sched_smt_active()` is false or the domain lacks both `SD_SHARE_CPUCAPACITY` and
+`SD_ASYM_PACKING`. That is the **preferred-core / ITMT** family — the same
+"Preferred-CPU feature series" already recorded on tip as a feature rather than a
+fix.
+
+**Not carrying it: it is a feature, not a fix, and it is 7.4 material.** Whether
+`SD_ASYM_PACKING` is even set on this machine was **not established** — the
+debugfs domain path was unreadable without root, and the kernel log shows no
+ITMT/asymmetric-packing lines (the "asymmetric key" hits are crypto, unrelated).
+`amd_pstate_highest_perf` does exist, so CPPC preferred cores are exposed, but
+whether they drive `SD_ASYM_PACKING` here is unresolved. Recorded as open, not as
+"inert" — that word has burned this repo before.
+
+### `mm/memory.c` (+76/−?) — a refactor, not a fix
+
+Gives `insert_pfn()` a `bool mkwrite` parameter and moves the private-mapping /
+COW-PFN comment into the `mkwrite` branch, adding a `pte_pfn(entry) != pfn` check
+with `WARN_ON_ONCE(!is_zero_pfn(...))`. This is the
+`__vm_insert_mixed()`/`vmf_insert_mixed_mkwrite()` series seen posted to
+linux-mm (v2 1–3), which is cleanup work. Not a fix, 7.4 material.
+
+### The rest
+
+`mm/shmem.c` (+8), `mm/swap_state.c` (4), `mm/swapfile.c` (2) are small and were
+not individually attributed; `arch/x86/kernel/cpu/bugs.c` is a 2-line change
+matching the `CONFIG_MITIGATION_RETPOLINE=n` mitigation-reporting fix already seen
+on tip; `kernel/futex/core.c` is the private-hash UAF fix **already in rc6** (see
+the correction above).
+
+**Nothing in today's snapshot is a fix we need to carry.**
+
+### Work items — no new fixes, and one notable reversal
+
+- **`#5910` (missing TLB flush fence) — the maintainer disputes it.** Christian
+  König replied 2026-10-05: *"The bug description doesn't really adds up: …"*.
+  This ledger had recorded it as *"shared code, real bug, no patch posted"* on
+  the strength of the reporter's analysis. **That characterisation no longer
+  stands** — a maintainer has challenged the premise. Downgraded from "real bug"
+  to "disputed", pending what König concludes.
+- **`#5754`** — the KWin/ring-timeout "regression": **not this hardware** (RX 5500
+  XT, now a 6.12 LTS kernel). The newest comment offers an `ntsync` correlation
+  and a `nocompute` workaround with frame-time cost. Not actionable here.
+- **`#5395`** — drm-resident-vram over-reporting. pepp diagnosed it in June:
+  buffers with `AMDGPU_GEM_CREATE_DISCARDABLE` are dismissed early in
+  `ttm_bo_evict` without being removed from `drm-resident-vram`. **A diagnosis
+  with no patch**, and a statistics-accounting bug — visible only through
+  `amdgpu_top`, no correctness or stability impact.
+- **`#5936`** — another instance of the pageflip family, this time RX 9070 XT with
+  a 4K60 + 1440p144 pair. Zero notes, no analysis.
+
+**No commit shas were cited in any of these comments** — the extraction returned
+an empty set, so there was nothing to verify this pass.
