@@ -6735,3 +6735,85 @@ someone signs off on it.
   and **HDMI FRL** (`#5862`, `#5869`, `#5671`, `#5349`). These corroborate the
   `#5807` watch item — the DCN4 flip-pending root cause is still open and still
   the most-reported class on this silicon.
+
+## Sweep 2026-10-05 (post-boot) — CORRECTION: the futex UAF fix is already in rc6
+
+The machine has rebooted into `7.3.0-rc6-1-sleepy-next` (boot 2026-10-05 22:23).
+Full refresh, `next-20261005` fetched, work items re-read.
+
+### CORRECTION to the 2026-10-04 entry
+
+That entry recorded the futex private-hash use-after-free (`f35e3b578422`) as
+**absent from rc6** and a candidate to carry. **That was wrong.** It is in rc6,
+and therefore in the kernel currently running.
+
+- rc6's `kernel/futex/core.c` shows the **fixed** ordering — `rcu_assign_pointer(mmph->hash, new)` at line 216, then
+  `mmph->batches = get_state_synchronize_rcu()` at line 221, with the comment
+  *"mmph->batches must reference a grace period which started after mmph->hash
+  was assigned."*
+- `git merge-base --is-ancestor f35e3b578422 v7.3-rc6` → **is an ancestor**.
+- Timeline: the `locking-urgent-2026-10-04` pull merged **2026-10-04 08:29 -0700**;
+  rc6 was tagged **13:45 -0700** — five hours later.
+
+**How the error happened, because the shape recurs:** I compared
+`v7.3-rc5:kernel/futex/core.c` against `next-20261002:kernel/futex/core.c`, found
+them byte-identical, and *extrapolated* that the fix was in neither — without ever
+reading rc6's copy. The comparison was correct; the conclusion drawn from it was
+not. `next-20261002` predates the 10-04 locking pull, so of course it matched rc5.
+**Two trees agreeing tells you about those two trees, nothing about a third.**
+
+The original entry hedged with *"Re-check at the moment the tag appears"*, and
+that hedge is what resolves it correctly: checked now, it is in. **No carry
+needed.** The bug is fixed in what we run.
+
+A second-order lesson for the same entry: a grep for
+`mmph->batches = get_state_synchronize_rcu` matches **both** the buggy and the
+fixed versions — the line is present either way, only its *order* changes. Any
+probe for a reordering fix must read the surrounding lines, never grep for the
+moved line alone.
+
+### Today's linux-next — `next-20261005` (`15551282e82d`)
+
+558 files changed vs `next-20261002`, but **on-target subsystems are nearly
+static**:
+
+| Subsystem | Files changed |
+|---|---|
+| `drivers/gpu/drm/amd` | **0** |
+| `io_uring`, `block`, `drivers/nvme`, `r8169` | **0** each |
+| `kernel/sched` | 6 (`core.c`, `fair.c`, `ext/*`, `sched.h`, `topology.c`) |
+| `mm` | 4 (`memory.c`, `shmem.c`, `swap_state.c`, `swapfile.c`) |
+| `arch/x86` | 5 (TDX, `cpu/bugs.c`, `bpf_jit_comp.c`) |
+| `kernel/futex` | 1 |
+
+**No amdgpu changes at all** — nothing new for this GPU in today's snapshot. The
+`mm` files touched (`swapfile.c`, `swap_state.c`) are our swap stack's, and
+`kernel/sched/fair.c` (+85/-21) is our live scheduler, but this pass did not
+attribute their commits: the range query on this clone returns the linux-next
+merge commit only, because it is `--depth=1`. **Recorded as unresolved, not
+dismissed** — the content diff is real, the attribution is not yet done.
+
+### sirlucjan — `cachyos-fixes-patches-v9` is a no-op for us
+
+Directory set advanced `0f0dfad7` → `30f3785b` (*"Add 7.3-rc line (fixes)"* /
+*"(arch)"*). **v9 is 15 patches; v8 was 14; the single addition is
+`[PATCH 15/15] drm/i915/dp: On DPCD init wake the DPRx for eDP` — i915, not this
+hardware.** Patches 01–14 are identical to v8. We source the fixes set from v6,
+whose content is a subset. **No action.**
+
+### Work items — 24 updated today, full set (`x-total: 24`)
+
+New since the last read: **`#5754`** *"[REGRESSION] AMDGPU / KWin crash with VM
+Page Fault and ring gfx timeout"*, **`#5395`** (*drm-resident-vram reports
+impossibly high VRAM usage*), **`#5788`** (gfx1152/Krackan), **`#5742`** (7.3
+regression, ONEXPLAYER handheld). The rest are the known set.
+
+Two notes on reading this batch:
+
+- **Many updates cluster at 13:36–13:59 with no new comments** (`#5930`, `#5933`,
+  `#5934`, `#5935`, `#5936`, `#5938`, `#5939`, `#5940`, `#5927`, `#5929`) — the
+  signature of a bulk label/edit sweep, not ten independent reports. Treating
+  each as activity would have inflated this pass tenfold.
+- `#5776`'s only new note is Ray6161 attaching `ism-deadlock-suspend.patch`
+  (`/uploads/…`, not a commit). The fix is **already in rc6** — verified last pass
+  at both call sites.
