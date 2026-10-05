@@ -6592,3 +6592,73 @@ Built `7.3.0_rc6-1` and verified: `.BTF` + `.BTF_ids` present in the vmlinux,
 collision avoided), `CONFIG_SCHED_BORE=y`, `CONFIG_LRU_MARIE=y`, built-in cmdline
 unchanged. Installed and boot entries regenerated; default entry
 `linux-sleepy-next.conf`.
+
+## Activity check 2026-10-05 (post-bump) — nothing actionable
+
+Run after the rc6 rebase landed (`483ca42`). Trackers, branches and lists all
+checked.
+
+### Work items — 11 updated, full set (`x-total: 11`, `x-total-pages: 1`)
+
+- **`#5776` (new today) — poweroff/reboot hang, deadlock between
+  `amdgpu_dm_ism_disable()` and `dm_ism_delayed_work_func`.** `dm_suspend` held
+  the ISM mutex across `disable_delayed_work_sync()` while the pending work func
+  tried to take the same mutex. Ray6161 confirmed today it is *"included in DC
+  3.2.383 release and upstream Linux v7.2 kernel"*.
+
+  **Verified present in rc6, not assumed.** rc6's `amdgpu_dm.c` carries the fix
+  with its explanatory comment at **both** call sites — line 873 and line 1576:
+  *"Quiesce workers first without dc_lock (they take dc_lock themselves, so
+  syncing under it would deadlock)"*, followed by `amdgpu_dm_ism_disable()`
+  outside the lock and `amdgpu_dm_ism_force_full_power()` inside it. **No action.**
+
+  The sha in that thread (`dc9fed0990ae77f74b79b8b13ebb9110`) is an **`/uploads/`
+  path** for the attached patch, not a commit — caught by the verify rule.
+
+- **`#5872` — RX 9070 XT (Navi 48) over USB4, pageflip timeout as primary
+  display.** New comment today: superm1 had suggested retesting on 7.3-rc4+ citing
+  `63e19ef3ddab806c472748c825f4dc88dcd994e8`; **the reporter retested on mainline
+  7.3-rc5 and it still reproduces**, now on Fedora 44 KDE rather than SteamOS, so
+  Valve's out-of-tree patches are ruled out. `63e19ef3ddab` **verified as a real
+  commit** (`drm/amd/display: Atomize IRQ register read/modify/write ops`,
+  2026-08-25, present in torvalds/tip/agd5f/linux-next). **Not this machine's
+  topology** (eGPU over USB4) — watch only.
+
+- **`#5902` — HDMI FRL.** The reporter corrected their own environment again: the
+  "direct" connection was a **5 m HDMI-powered active optical cable**, and they
+  re-ran on 1.5 m passive copper with `amdgpu.hdmi_hpd_debounce_delay_ms=5000`
+  and the `c953b39f9487` backport. `c953b39f9487` is a real commit
+  (`Reintroduce "Force validation link training on all ASICs"`, 2026-06-11).
+
+- `#5940`, `#5939`, `#5776`-adjacent, `#5751`, `#5669`, `#4960`, `#4843`,
+  `#4333`, `#3659` — other silicon or unchanged.
+
+### Branch activity — none
+
+Every relevant branch is at the same commit as the pre-bump pass:
+
+| Tree | Branch | Last commit |
+|---|---|---|
+| agd5f-linux | `drm-fixes-7.3` | 2026-09-24 |
+| agd5f-linux | `drm-next` | 2026-09-23 |
+| agd5f-linux | **`tlb_inv_rework`** | 2026-09-11 |
+| agd5f-linux / amd-staging | HEAD | 2026-09-30 |
+| drm-next | `drm-next`, `drm-next-tip` | 2026-09-26 |
+| tip | `sched/urgent`, `sched/core` | 2026-09-22 |
+
+Worth noting for a future pass: agd5f carries a **`tlb_inv_rework`** branch —
+*"drm/amdgpu/gmc12: use MES or SDMA for pasid TLB invalidation"* — which is the
+same territory as our `1008`–`1017` carries. It has not moved since 2026-09-11,
+so there is nothing to sync, but if it advances it is the first thing to diff
+against `1017`.
+
+### Mailing lists — nothing on-target
+
+- **amd-gfx: 1 message** since 2026-10-04 (a `dcn_optc_lock_unlock_state`
+  trace-event patch). Effectively silent.
+- **dri-devel: 155 messages**, all off-target — dma-buf heaps/CMA, `drm/armada`,
+  `media: tegra-vde`, the `rockchip` `dw-hdmi-qp` v12 series, Intel `accel/ivpu`,
+  Novatek/Synaptics panels, Qualcomm `msm/dpu`, `fastrpc`.
+- **No thread in amd-gfx, dri-devel or linux-pm names any of this machine's IPs**
+  (Navi 48, gfx12, DCN 4.0.1, SMU 14, PSP 14, SDMA 7, VCN 5, or the
+  dcc/tlb/mes/userq/hdmi/flip families) since 2026-10-03.
