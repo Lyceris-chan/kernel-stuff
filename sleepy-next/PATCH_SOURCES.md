@@ -7018,3 +7018,47 @@ an **EDID** parser case, and we carry EDID patches), `#5942` (DCN35 PSR),
 `#5339` (*RA24 little-endian is not valid for RDNA4 display hardware but is
 listed as supported*) remains open and is a genuine display-caps mismatch on our
 silicon.
+
+## Rebasing the zswap series onto rc6 — attempted, and it is NOT one hunk
+
+The question was whether the single failing hunk could be fixed. It can't,
+because **the "1 of 9 hunks FAILED" count was GNU `patch`'s, and it counts only
+hunks it could not place *with fuzz*. git apply refused more.** Reading the
+contexts rather than the count, the series is written against a **newer base than
+rc6**, and each difference surfaces only after the previous one is fixed.
+
+Four distinct base differences found, all consistent with the same cause — the
+series targets the folio-converted zswap in 7.4, and rc6 predates that:
+
+| # | Where | Patch expects | rc6 has |
+|---|---|---|---|
+| 1 | `p1` hunk 5 (context) | `sg_set_folio(&input, folio, PAGE_SIZE, index * PAGE_SIZE)` | `sg_set_page(&input, page, PAGE_SIZE, 0)` |
+| 2 | `p1` hunk 8 (context) | `return false;` | `int ret = 0, dlen;` |
+| 3 | `p2` | `struct zswap_pool *pool = zswap_entry_pool(entry);` | `struct zswap_pool *pool = entry->pool;` |
+| 4 | `p2` | `if (WARN_ON_ONCE(!pool))` | *(absent)* |
+
+**`p1` is fully rebased and verified**: after adapting differences 1 and 2 it
+applies **cleanly under both `git apply --check` and `patch -p1 --dry-run`, with
+zero failing or fuzzy hunks.** That part is done and reproducible.
+
+**`p2` is NOT done.** Adapting difference 3 moved the failure to difference 4,
+and there is at least one more behind it. **I stopped rather than keep guessing**:
+each adaptation is an edit to someone else's patch in the swap-in path, and the
+`zswap_entry_pool()` → `entry->pool` substitution in particular is not a
+mechanical one — `zswap_entry_pool()` presumably carries semantics beyond field
+access, and silently flattening it is how a "rebased" patch stops being the
+patch that was reviewed. `Acked-by: Nhat Pham` covers what was posted, not what I
+would produce.
+
+**Disposition: do not port this now.** It is a contention/latency optimisation
+whose prerequisites (folio conversion, `zswap_entry_pool()`, the `WARN_ON_ONCE`
+guard) all arrive with 7.4. The right moment is the rc7 or 7.4 rebase, where
+these are already in the tree and the series may apply as posted. Carrying a
+hand-ported version into the swap-in path to gain a latency improvement on a
+machine that has shown no zswap contention would be a poor trade.
+
+**Method note for next time:** "N of M hunks FAILED" is a `patch`-specific count
+that ignores fuzz, and it understates the work. The number that matters is how
+many **base differences** exist, and that is only discoverable by fixing one and
+re-running. Two context edits looked like "one hunk" until the fourth difference
+appeared.
