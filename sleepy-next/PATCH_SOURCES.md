@@ -6948,3 +6948,73 @@ still no patch to take; the fixes exist only in the 7.4 pull. But the case for
 watching it is now three reports deep rather than one, and if this machine ever
 logs a MES `REMOVE_QUEUE` timeout the `amdgpu.mes_log_enable=1` workaround is the
 first thing to try.
+
+## Sweep 2026-10-07 — zswap request-contention series assessed; next-20261006
+
+Full refresh, `next-20261006` fetched, work items read.
+
+### `[PATCH 0/2] mm: zswap: reduce request contention on loads` (Usama Arif) — candidate, not adopted
+
+The series the user linked (`<20261006002307.2669023-1-usama.arif@linux.dev>`, the
+`-1-` id is the **cover letter**). Usama Arif is already a contributor here — we
+carry `2129` (*zstd: skip the BMI2 probe when dynamic BMI2 dispatch is
+disabled*) from him.
+
+- **1/2** `mm: zswap: use separate compression and decompression requests`
+- **2/2** `mm: zswap: use stack requests for synchronous decompression`
+
+The problem, from the patch text: *"A low-priority load that is preempted after
+the codec drops its stream lock keeps holding the mutex and stalls every other
+load on that CPU, including higher-priority ones."* The fix lets synchronous
+codecs decompress with an **on-stack request and take no zswap lock**;
+asynchronous ones keep the per-CPU request and mutex. *"All in-tree software
+compressors qualify"* — **zstd is what this machine runs.**
+
+**It clears the review bar: `Acked-by: Nhat Pham <nphamcs@gmail.com>`**
+(2026-10-07) on patch 2/2. Nhat Pham maintains zswap. Sergey Senozhatsky and
+Nhat Pham also replied on 1/2.
+
+**But it does not apply to rc6**, so it cannot be carried as-is:
+
+| Patch | Result against `v7.3-rc6` |
+|---|---|
+| 1/2 | `git apply --check` **FAILS** at `mm/zswap.c:866`; `patch` reports **1 of 9 hunks FAILED** — eight apply |
+| 2/2 | **FAILS**, 4 of 5 hunks — because it **depends on 1/2** being in place first |
+
+The single failing hunk in 1/2 is drift, not a rework — eight of nine hunks land.
+A rebase is likely tractable. **I did not characterise that hunk** (a filename
+glob missed and the command ran against nothing); recorded as unfinished rather
+than guessed at.
+
+**Disposition: candidate for the next bump, not a carry now.** It is a
+contention/latency optimisation with an `Acked-by`, its base dependency needs
+rebasing onto rc6, and it has not reached linux-next yet (`MAX_SYNC_COMP_REQSIZE`
+is absent from both `next-20261005` and `next-20261006`). The natural moment to
+take it is the rc7 rebase, where patch 1/2 may well be upstream already.
+
+**Also noted in the same thread, not triaged:** `[PATCH v8 14/30] mm: zswap:
+reject high-order swap cache allocations backed by zswap` (Usama Arif), and
+Baoquan He's xswap v4 series — both touch our swap stack.
+
+### `next-20261006` (`e634eccf3de1`)
+
+On-target deltas vs `next-20261005`: `drivers/gpu/drm/amd` **1 file**, `mm` **16**,
+`kernel/sched` 1, `io_uring` 1, `block` 0, `kernel/futex` 0. Not attributed this
+pass. **The zswap series is not in it.**
+
+### Work items — 16 updated since 2026-10-06
+
+Most on-target is **`#5897` (2026-10-07)** — *"7.3: HDMI FRL status poll
+re-detects a live link, next CRTC disable …"*. **This is our kernel line and our
+display path**, and it is adjacent to work we already carry: `1171`
+(*serialize HDMI FRL status polling against link detect*) and `1136`
+(*update and revert FRL LT timeout*). Worth reading in full next pass — it may be
+the same defect our `1171` addresses, or a second instance.
+
+Also new: `#5946` (DP monitor with conflicting 420-only EDID declarations —
+an **EDID** parser case, and we carry EDID patches), `#5942` (DCN35 PSR),
+`#5941` (KCQ enable failure after hibernate), `#5944`/`#5884`/`#5906` (Navi31
+"Illegal opcode" cluster), `#5945` (Navi21 ROCm queues stop with GFXOFF).
+`#5339` (*RA24 little-endian is not valid for RDNA4 display hardware but is
+listed as supported*) remains open and is a genuine display-caps mismatch on our
+silicon.
