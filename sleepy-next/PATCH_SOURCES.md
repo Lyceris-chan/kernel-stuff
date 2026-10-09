@@ -7062,3 +7062,84 @@ that ignores fuzz, and it understates the work. The number that matters is how
 many **base differences** exist, and that is only discoverable by fixing one and
 re-running. Two context edits looked like "one hunk" until the fourth difference
 appeared.
+
+## Sweep 2026-10-09 — a verified, adoptable HDMI FRL fix found via `#5897`
+
+Full refresh; `next-20261008` is the newest snapshot. 29 work items updated
+(`x-total: 29`). Source of the finding: **`#5897`**, the 7.3 HDMI FRL issue flagged
+on 2026-10-07.
+
+### `495606b324cd` — *Skip HDMI FRL status polling while link is down*
+
+Found because a contributor in `#5897` named two related fixes and said *"both are
+in amd-staging-drm-next as `9981a9b111fe` and `495606b324cd`"*. Both verified as
+real commits in `agd5f-linux`:
+
+| Commit | Subject | Ours? |
+|---|---|---|
+| `9981a9b111fe` (2026-09-13) | Serialize HDMI FRL status polling against link detect | **already carried as `1171`** |
+| `495606b324cd` (2026-09-15) | **Skip HDMI FRL status polling while link is down** | **not carried — the candidate** |
+
+**Provenance clears the bar**: `Signed-off-by: Fangzhi Zuo <jerry.zuo@amd.com>`,
+**`Reviewed-by: Harry Wentland <harry.wentland@amd.com>`** — the AMD display
+maintainer.
+
+**What it does** — in `hdmi_frl_status_polling_work()`, skip a link whose
+`link_status.link_active` is false before polling FRL status, so the poll cannot
+act on a down link:
+
+```c
+			if (dc_link->frl_link_settings.frl_link_rate == 0)
+				continue;
+
++			if (!dc_link->link_status.link_active)
++				continue;
++
++			link_update = dc_link_frl_poll_status_flag(dc_link);
+```
+
+**Verification (complete):**
+
+- Against **bare rc6 it fails** — correctly, because it **builds on `1171`**. Its
+  hunk indentation alone shows the dependency: the `+` lines sit one level deeper
+  than the `-` lines, matching the block `1171` introduces.
+- Against **rc6 + our `1171` the driver hunk applies cleanly.** `1171` applies
+  clean to bare rc6.
+- **The kunit test-file hunk must be dropped.** It touches
+  `amdgpu_dm/tests/amdgpu_dm_connector_test.c:9141` and rc6's copy differs.
+  **This costs nothing: `CONFIG_KUNIT` is not set** — verified in both our
+  `config` and the running kernel — so those tests are never built.
+- **Connector-only variant, on top of `1171`: `git apply --check` CLEAN and
+  `patch -p1 --dry-run` reports zero failed or fuzzy hunks.** Both tools, as
+  `CLAUDE.md` requires.
+
+**Disposition: adopt — the strongest candidate this session.** It is a genuine
+fix for an open 7.3 issue on this machine's display path, it carries a maintainer
+`Reviewed-by`, its prerequisite is already ours, and it verifies clean under both
+tools. Mechanically it needs a free number in `1100–1199` (**1233** is the next
+unused), a `source=()` entry, `updpkgsums`, and a rebuild.
+
+**Caveat to state plainly: our machine has never logged the FRL failure this
+addresses.** We have never seen `enabling link 3 failed` or the poll-induced hang;
+both displays are 1080p with no FRL in play (`vrr_capable` empty). So this is
+adopted as *correct-by-provenance and free to carry*, not as a fix for an observed
+fault — consistent with `1171` and `1136`, which we already hold on the same code.
+
+### The other linked item: `[PATCH 0/2] mm/zswap: plug the writeback IO of an LRU walk`
+
+Alexandre Ghiti (`alex@ghiti.fr`), 2026-10-07; the user's `-1-` id is the cover
+letter; the patch itself is `...-3-...`. **`Acked-by: Nhat Pham`** (2026-10-09),
+so it clears the bar too. It wraps `zswap_shrinker_scan()`'s
+`list_lru_shrink_walk()` in `blk_start_plug()/blk_finish_plug()` so the block
+layer can merge writeback IOs to NVMe that the slot-contiguity batch cannot —
+aimed squarely at our zswap + NVMe-swapfile stack.
+
+**Does not apply to rc6**, and it is the same class of drift as the Usama series:
+its base has `shrink_memcg_cb` taking a **struct of out-params**
+(`.encountered_page_in_swapcache = &…`), while rc6 passes a plain `bool *`. Five
+hunks fail. `blk_start_plug` is in **neither rc6 nor `next-20261008`**.
+
+**Neither this nor the Usama series is carryable now; both are 7.4-rebase
+material.** That is now three separate zswap patches this week blocked on the same
+prerequisite — the zswap folio/struct refactor — which is a useful signal about
+where the 7.4 rebase will pay off.
