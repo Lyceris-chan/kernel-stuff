@@ -7143,3 +7143,62 @@ hunks fail. `blk_start_plug` is in **neither rc6 nor `next-20261008`**.
 material.** That is now three separate zswap patches this week blocked on the same
 prerequisite — the zswap folio/struct refactor — which is a useful signal about
 where the 7.4 rebase will pay off.
+
+## The second 7.4 pull — `amd-drm-next-7.4-2026-10-08` (Deucher)
+
+`<20261008212310.2508510-1-alexander.deucher@amd.com>`, head `c54e4d105077`.
+*"A few last odds and ends for 7.4. Mostly bug fixes."* **57 commits, 13
+on-target, 8 filtered as wrong-chip.** **Not merged into any of our clones yet**
+(the tag head is absent from `agd5f-linux`, `amd-staging-drm-next` and
+`drm-next`).
+
+**A correction to my own filter, stated because it inflated the list:** several of
+the "on-target commits" I first extracted are not commits at all — they are bullet
+lines inside the changelog of the **`Promote DC to 3.2.401`** commit
+(*"Add HDMI RR and SCDC skips", "Send HDMI VRR metadata in VTEM info packet slot",
+"Update link training no timeout behaviour on HDMI"*, …). They are real changes,
+but they arrive bundled in a DC version promotion, not as separable commits. My
+subject-line extractor could not tell the difference.
+
+### Three of our carries are in this pull
+
+| Ours | Upstream subject |
+|---|---|
+| `1174` | Fix direct scanout alpha on some DRM_FORMATs |
+| `9078` | userq: only accept doorbell BOs as queue doorbell |
+| `9079` | userq: return the memdup_user() error for the user MQD |
+
+The same pattern as the amd-pstate pull last week: we adopt from the list, and the
+formal pull arrives later containing what we already run.
+
+### Genuinely interesting, in order
+
+1. **Runtime PM rework — three commits** (`rework runtime pm management for cs`,
+   `push down runtime pm handling in amdgpu_gem_create_ioctl`, `handle runtime pm
+   in amdgpu_gem_userptr_ioctl`). The first is 7 lines in `amdgpu_cs.c`,
+   `Reviewed-by: Christian König`. **Directly relevant because this machine runs
+   `amdgpu.runpm=0`** — any rework of the runtime-PM entry points crosses a knob we
+   have deliberately pinned. Nothing to do now, but this is the item to re-read at
+   the 7.4 rebase, and to re-test `runpm` against afterwards.
+2. **`serialize vblank counter reads against GPU reset`** — vblank-versus-reset
+   ordering, adjacent to the flip/flip_done family that dominates our work items.
+3. **`copy debugfs register data outside the GRBM/SRBM locks`** — the patch asked
+   about earlier in this session; still 7.4-bound, still not carried.
+4. **`exclude npa_vmid from the userq vmids too`** — userq/MES vmid mask handling,
+   the `#5759` territory.
+5. The **DC 3.2.401 promotion** bundles HDMI work on our display path (RR/SCDC
+   skips, VRR metadata in VTEM, HDMI link-training timeout) — but as a promotion,
+   not as separable fixes.
+
+### Verdict
+
+**Nothing here changes the plan.** It is 7.4 merge-window material, it does not
+touch any of this machine's open issues by name (`#5807` flip-pending, `#5759`
+MES, `#5934`/`#5897` FRL), and it is not merged yet. It is rebase-target content,
+consistent with the opinion recorded earlier: go to **7.4-rc1**, not to a
+linux-next snapshot.
+
+**And `495606b324cd` (the verified FRL skip fix) is NOT in this pull** — so it is
+not 7.4-tagged work we would inherit. That slightly strengthens the case for
+carrying it as `1233` now: it is not queued for the next base, and its
+prerequisite `1171` is already ours.
