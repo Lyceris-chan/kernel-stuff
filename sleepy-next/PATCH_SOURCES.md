@@ -7202,3 +7202,80 @@ linux-next snapshot.
 not 7.4-tagged work we would inherit. That slightly strengthens the case for
 carrying it as `1233` now: it is not queued for the next base, and its
 prerequisite `1171` is already ours.
+
+## 7.4 / linux-next delta 2026-10-11 — most of it arrives WITHOUT a rebase
+
+State: `v7.3` **final is not tagged**; newest is **`v7.3-rc6`**, and master's
+`Makefile` still reads `EXTRAVERSION = -rc6`. The merges landing now are **rc7 fix
+pulls** (`amd-drm-fixes-7.3-2026-10-08`, `sound-7.3-rc7`, `i2c-fixes-7.3-rc7`,
+`edac_urgent_for_v7.3_rc7`) — **the merge window has not opened.** `v7.4` tags: 0.
+Mainline is 390 commits past rc6.
+
+### The finding that reframes the question
+
+**Much of what looked like "7.4 content" is already in mainline via the 7.3 fixes
+pull `amd-drm-fixes-7.3-2026-10-08` (`492c4ded0ff`)** — so it reaches this machine
+on the 7.3 line at rc7/final, with **no rebase at all**:
+
+| Item | Status |
+|---|---|
+| `make Mac FB workaround generic` | in 7.3-fixes |
+| `amdkfd: fix dma_buf reference leak` | in 7.3-fixes |
+| `display: Don't replace a sink mode that shares the native totals` | in 7.3-fixes |
+| `amdkfd: align SDMA doorbell base for shader doorbell writes` | in 7.3-fixes |
+| `amdgpu: copy debugfs register data outside the GRBM/SRBM locks` | in 7.3-fixes |
+| `amdgpu: serialize vblank counter reads against GPU reset` | in 7.3-fixes |
+| `display: disable self-refresh on tearing flips` | in 7.3-fixes |
+| `userq: return the memdup_user() error` | **already ours (`9079`)** |
+| `userq: only accept doorbell BOs as queue doorbell` | **already ours (`9078`)** |
+| `display: Fix direct scanout alpha on some DRM_FORMATs` | **already ours (`1174`)** |
+| ~20 drm-wide fixes (xe, i915, vc4, nouveau, panthor, bridge, dp, fb-helper) | in 7.3-fixes, not our hardware |
+
+**A methodology error caught here, in the direction that matters.** I first tested
+these with `merge-base --is-ancestor <sha> 492c4ded0ff` and it reported "NOT in
+7.3-fixes" for **every** one. That is wrong: `CLAUDE.md` warns `is-ancestor` lies
+in these shallow clones, and it **only ever fails negatively**. The
+`git log 4eeccbed21e..492c4ded0ff` range listing is authoritative and shows them
+all present. **Use `is-ancestor` only to confirm, never to deny** — a rule now hit
+twice in one week.
+
+### What is genuinely 7.4-only
+
+- **Runtime PM rework** (3 commits) — matters because this machine runs
+  `amdgpu.runpm=0`.
+- **`exclude npa_vmid from the userq vmids too`** — userq/MES, the `#5759` area.
+- **`Assign alt wa bit in fams2 cmd`** — FAMS2, adjacent to `#4753` (fams2 stall on
+  **gfx1201**, our GPU).
+- **DC 3.2.401 promotion**, which bundles HDMI RR/SCDC skips, VRR metadata in the
+  VTEM slot, and the HDMI link-training timeout change — our display path, but
+  arriving as a version promotion.
+- The bulk: **new IP-block support for hardware we do not own** — SMUIO 15.0.3,
+  PSP 15.0.3, MMHUB 5.0, LSDMA 8.0, NBIF 7.10, NBIO 7.11.5, VPE 3.0, UALink,
+  SOC 1.0, IH 8.0, HDP 8.0, JPEG 5.0.1, GMC 12.1, GFX 9.4.2, `amdgpu_xcp`.
+
+### The scale, and the cost
+
+`next-20261009` (`c74ef2fbf60f`) vs rc5: **815 amdgpu files**, 183 x86, 107 mm,
+25 io_uring, 22 sched, 15 nvme, 14 block, 7 drm/display, 5 drm/scheduler.
+
+**Of those 815 amdgpu files only ~56 touch this machine's silicon** — and even
+that count is inflated, because shared core files (`amdgpu_device.c`,
+`amdgpu_discovery.c`, `amdgpu_ring.c`) change merely to *register* the new IP
+blocks. **72 of our 245 carries touch a changed file** — that is the rebase
+surface.
+
+### Work items — 29 updated, several new and on-target
+
+- **`#5967` (today)** — *RX 9070 XT (DCN 4.0.1): atomic commits fail with EBUSY,
+  screen corruption*. Our exact GPU and display block.
+- **`#5965` (today)** — *Radeon AI PRO R9700 (Navi 48 / `1002:7551`): SMU hangs,
+  hwmon sensors*. Navi 48.
+- **`#5961`** — *[9070 XT][7.2.8] framebuffer corruption after standby*. Ours.
+- `#5846` (*Pageflip timed out*), `#5657` (DMCUB + flip_done), `#5585` (RX 9070 XT
+  artifacts on high refresh + FreeSync) — all in the dominant flip family.
+
+### sirlucjan
+
+Advanced to `753c3849` and added **`zram-patches`** and **`zstd-patches`** for
+7.3-rc. **zstd is what our zswap pool uses**, so this is worth a look on a future
+pass; not triaged here.
