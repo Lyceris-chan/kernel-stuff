@@ -7279,3 +7279,95 @@ surface.
 Advanced to `753c3849` and added **`zram-patches`** and **`zstd-patches`** for
 7.3-rc. **zstd is what our zswap pool uses**, so this is worth a look on a future
 pass; not triaged here.
+
+## Deep mailing-list sweep 2026-10-11 — 374 reviewed/tagged on-target patches
+
+Scanned **all 19 lore mirrors** back to 2026-09-20 for on-target patches carrying
+`Reviewed-by`, `Acked-by`, `Tested-by` or `Fixes:`. **374 distinct topics.** This
+is far more than the earlier passes surfaced, because those filtered to *recent
+updates* rather than to *review state*.
+
+| Subsystem | Count |
+|---|---|
+| AMD/DRM | **234** |
+| BLOCK | 47 |
+| KBUILD | 24 |
+| io_uring | 21 |
+| MM/SWAP | 17 |
+| X86 | 13 |
+| FUTEX | 10 |
+| AMD-PM | 5 |
+| OTHER (r8169) | 3 |
+
+### NEW and directly on our hardware: two r8169 fixes that apply CLEAN
+
+Both **apply cleanly to rc6**, both carry `Fixes:`, and both target **RTL8125 —
+this machine's NIC**:
+
+| Patch | Fixes | rc6 |
+|---|---|---|
+| `r8169: preserve checksum offload when packet padding is un…` | `8d520b4de3ed` (*r8169: work around RTL8125 UDP hw bug*) | **CLEAN** |
+| `r8169: flush pending transmit packets when an skb is dropped` | `ef14358546b1` (*r8169: make use of xmit_more*) | **CLEAN** |
+
+The first is a checksum-offload bug in the RTL8125 UDP workaround — literally our
+chip. The second is a **TX** bug. Neither was in any earlier pass.
+
+**Review status: only `Signed-off-by: iugfdin` — no `Reviewed-by`.** They clear the
+"real fix with `Fixes:`" bar but not the review bar. Strong candidates to watch,
+and unlike most of this list they need no rebase.
+
+Also seen and **not ours**: the `r8169: add RSS support for RTL8127` v15/v16
+series (Javen Xu, Realtek — RTL8127, a different part, and net-next), `Giga Lite
+fallback on RTL8168EP`, and `disable EEE on RTL8168h/8111h` (harmless here — this
+machine's EEE is already disabled, verified earlier).
+
+### The dominant cluster: AMD userq / MES, from AMD authors
+
+234 AMD/DRM topics, heavily weighted to one vein. A batch dated 2026-10-08/09 with
+`Fixes:` from **Jesse Zhang, Prike Liang, Benjamin Cheng, Heng Zhou** (all
+`@amd.com`) plus outside contributors:
+
+- **`Prike Liang` v4 userq query-status series — carries `Reviewed-by`** (UAPI +
+  implementation)
+- `userq: actually invalidate userq BOs` (Benjamin Cheng)
+- `userq: reject imported dma-bufs as WPTR BO` (Jesse Zhang)
+- `userq: don't drop the runtime PM reference twice`
+- `free the userptr ranges when a CS fails after parser…`
+- `return -EFAULT from AMDGPU_INFO_UQ_FW_AREAS`
+- `mes: wake the GPU before toggling mes_dbgext from debugfs`
+- `wake the GPU for INFO queries that access the hardware`
+- `fix the error path in amdgpu_vm_pt_alloc()`
+- amdkfd: `fix doorbell allocation race`, `fix lost wakeup in interrupt drain`
+  (v3), `Fix use-after-free in the process creation error path`
+
+**We already carry an 11-patch userq set from these authors.** This cluster is the
+single richest source of follow-on work for it, and it overlaps the `#5759` MES
+territory.
+
+### Other notable
+
+- **FUTEX**: `futex: Fix mm reuse handling for FUT_OFF_MMSHARED` (Jann Horn,
+  `Fixes:`) — newer than the private-hash UAF and not previously examined.
+- **KBUILD**: Kees Cook's `Mark the gzip recipes as recursive` /
+  `Mark the initcall ordering recipe as recursive` — `Fixes:` + `Reviewed-by` +
+  `Acked-by`. Also a `modpost` batch (Leizhen Zhang) with several `Fixes:`
+  including a **stack out-of-bounds read** for unterminated PNP strings.
+- **io_uring**: 21, several `Fixes:` — RLIMIT_MEMLOCK charging, CONNECT filter
+  fields, task-restriction exemption.
+- **MM/SWAP**: the Acked zswap series (already assessed), `mm/slub: initialize the
+  free pointer of the bootstrap kmem_cache_node`, `fs: don't lose inodes that
+  another LRU walker is isolating`.
+- **AMD-PM**: `Fix TOCTOU when changing driver mode via sysfs` (assessed, adjacent
+  to our `1227`), plus a **new** `Don't fail active mode init on read-only
+  auto_sel` (Akram Boulahia, `Fixes:`).
+
+### What this changes
+
+**The "staging for 7.4" picture is much larger than the handful of items tracked
+so far.** For the 7.4 rebase this is not a list of things to port individually —
+it is the argument for the rebase: the AMD userq/MES vein alone is ~12 reviewed
+or `Fixes:`-tagged patches in code we already patch heavily, and the two r8169
+fixes need no rebase at all.
+
+**Immediate, no-rebase candidates:** `495606b324cd` (HDMI FRL skip, verified), the
+two r8169 fixes, and Jann Horn's `FUT_OFF_MMSHARED` — subject to the review bar.
