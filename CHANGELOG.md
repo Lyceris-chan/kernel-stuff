@@ -65,29 +65,47 @@ so under BORE that symbol is never declared. One hunk was added, giving
 `update_protect_slice()` the wrapper BORE already uses. Reuses BORE's own idiom
 verbatim; no `.rej`, and no `normalized_…` use remains outside an `#else` arm.
 
-### Known gap — BBR3 and LRU-MARIE are NOT in this preview
+### Rebased — `0101` (BBR3) and `2101` (LRU-MARIE) now apply
 
-Both carries fail against this base and are skipped, so the preview has **no
-BBR3** (`CONFIG_TCP_CONG_BBR3` absent) and **no LRU-MARIE**
-(`CONFIG_LRU_MARIE` absent). Measured, not assumed: the dumped config has
-neither symbol.
+Both carries originally failed against this base and were skipped, leaving the
+preview with no BBR3 and no LRU-MARIE. Both are now rebased and apply with
+**zero failed hunks**, so `CONFIG_TCP_CONG_BBR3=y` and `CONFIG_LRU_MARIE=y` are
+back. Neither has an upstream version for this base (CachyOS's newest branch is
+`7.3`, sirlucjan's newest tree is `7.3-rc`, firelzrd's newest MARIE is the
+`v0.11.1r2 for Linux 7.3` we already carry), so both were ported by hand.
 
-Failing hunks, by file — **`0101-cachy-bbr3` (6)**: `bpf_tcp_ca.c` ×2,
-`tcp_bbr.c` ×2, `tcp_output.c`, `include/net/tcp.h`, `tcp_ca_kfunc.c` (selftest).
-**`2101` MARIE (8)**: `memcontrol.h`, `mm/Kconfig`, `page_alloc.c` ×2,
-`page_io.c`, `mm/swap.h`, `vmscan.c` ×2.
+The method matters: each patch was rebased against the tree at *its own
+position* in `source=()` (`0101` is entry 17, `2101` entry 122), then
+regenerated from `git diff`. Working at the end state reports failures that are
+not real — later patches touch the same files, and `2033` also edits
+`tcp_output.c`.
 
-Some are "absorbed upstream" — in `include/net/tcp.h` the snapshot already has
-`u32 (*tso_segs)(struct sock *sk, u32 mss_now)` with a new comment, so BBR3's
-`min_tso_segs`→`tso_segs` half is redundant and only its `skb_marked_lost`
-addition is still needed. The rest need real ports. Neither has an upstream
-version for this base: CachyOS's newest branch is `7.3`, sirlucjan's newest tree
-is `7.3-rc`, and firelzrd's newest MARIE is `v0.11.1r2 for Linux 7.3` — the
-patch we already carry.
+**BBR3** — six failing hunks were all the same change. Upstream has already
+converted the `min_tso_segs` congestion-control callback to `tso_segs`, so five
+are dropped. The sixth **applied and added a second `bbr_tso_segs()`** beside
+upstream's — the same redefinition trap as `9060` — and is redundant because
+`tcp_bbr3.c` is self-contained, carrying its own helper and its own
+`"bbr3"` ops. But the `tcp.h` hunk also adds `skb_marked_lost`, which upstream
+lacks and which `tcp_input.c` and `tcp_bbr3.c` both require, so that hunk was
+rewritten rather than deleted.
 
-**Do not hand-rebase these into a bootable kernel unattended.** They touch TCP
-and mm internals; the correct path is a version-bump session, which is where the
-CachyOS squashes are regenerated.
+**LRU-MARIE** — five failing hunks. Three were pure context drift: `mm/Kconfig`
+gained `def_bool y`, `__swap_writepage()` (the `mm/swap.h` anchor) is gone, and
+`mem_cgroup_get_zone_lru_size()` was rewritten upstream with a `const` lruvec,
+which required `const`-qualifying MARIE's read helper. Two were real merges:
+`page_alloc.c` had to combine upstream's new `reclaim_order` parameter *and* its
+`reclaim_order == order` term with MARIE's `nr_progress` accounting and its
+swap-backend-failure OOM trigger; and `vmscan.c`'s `move_folios_to_lru()` gained
+an upstream `do_rotate` tail-add that had to be merged with MARIE's
+tracked-vs-orphan axis — clean, because `lru_marie_orphan_add()` already takes a
+`@tail` flag.
+
+The `page_alloc.c` refault half could not simply be dropped: an applied hunk
+already writes `ac->last_refaults`, so omitting the read side would have left
+the counter written and never read — silently disarming MARIE's thrash
+detector, which `LESSONS.md` records being wrongly muted once already.
+
+Full detail is in `sleepy-next/PATCH_SOURCES.md`.
 
 ### Cmdline
 
@@ -100,8 +118,21 @@ Built with Clang/ThinLTO as usual. `.BTF` (section 16) and `.BTF_ids`
 (section 17) present in the extracted vmlinux. `CONFIG_SCHED_BORE=y`,
 `CONFIG_CPU_IDLE_GOV_NAP=y`, `CONFIG_DEBUG_INFO_BTF=y`,
 `CONFIG_DEBUG_INFO_DWARF5=y` (not `DWARF_TOOLCHAIN_DEFAULT`), and
-`CONFIG_LOCALVERSION=""`. `CONFIG_TCP_CONG_BBR` is **not set**, so the BBR/BBR3
-BTF kfunc collision cannot arise — neither is built here.
+`CONFIG_LOCALVERSION=""`.
+
+With the two rebases landed, `CONFIG_TCP_CONG_BBR3=y`, `CONFIG_LRU_MARIE=y` and
+`CONFIG_LRU_MARIE_DEFRAG=y`. `CONFIG_TCP_CONG_BBR` stays **not set**: `bbr_tso_segs`
+is a `__bpf_kfunc` in both `tcp_bbr.c` and `tcp_bbr3.c`, so building BBR would
+collide on the BTF kfunc symbol — the documented BBR/BBR3 rule, unchanged.
+
+### net-tune is owned by `linux-sleepy-rc` only
+
+The two packages install side by side, and pacman has no notion of shared file
+ownership, so both shipping `net-tune` is a hard conflict — `/usr/local/bin/net-tune.sh`,
+`/etc/net-tune.conf`, both units and both `.wants` symlinks. `sleepy-next` now
+builds the service's config but does not install it (`_ship_net_tune=no` in its
+PKGBUILD); `linux-sleepy-rc` owns it. Installing the preview alone therefore
+leaves net-tune unmanaged until `linux-sleepy-rc` is present.
 
 Also checked against the snapshot, since they were candidates: the HDMI FRL fix
 `495606b324cd` is **already upstream** in `next-20261009`

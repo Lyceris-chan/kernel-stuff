@@ -225,6 +225,12 @@ _srcname=${_srctag}
 # and the machine measured comfortable, not because it is meaningfully faster.
 # Lower it if build-time interactivity suffers while the desktop is busy.
 _jobs=16
+# net-tune is shipped by exactly one package. `linux-sleepy-rc` owns it:
+# both packages are installed side by side on this machine, and pacman has no
+# notion of shared file ownership, so a second owner is a hard conflict
+# (/usr/local/bin/net-tune.sh, /etc/net-tune.conf and the two units). The
+# preview still builds the service's config, it just does not install it.
+_ship_net_tune=no
 pkgdesc='Sleepy-next kernel: Linux 7.3-rc4 + sleepy hardware merges (CachyOS optimizations included)'
 _kernver="$pkgver-$pkgrel"
 _kernuname="${pkgver}-${_pkgsuffix}"
@@ -907,6 +913,7 @@ _package() {
     # Used by mkinitcpio to name the kernel
     echo "$pkgbase" | install -Dm644 /dev/stdin "$modulesdir/pkgbase"
 
+    if [ "$_ship_net_tune" = "yes" ]; then
     # net-tune: unified CAKE SQM + low-latency ethernet tuning service.
     # This package owns net-tune as of 2026-09-12: it was previously shipped by
     # the 7.2 `linux-sleepy` package, which was dropped, so the side-by-side
@@ -939,6 +946,10 @@ _package() {
     # does no route work, so it does not hold the boot back.
     install -d "$pkgdir/etc/systemd/system/multi-user.target.wants"
     ln -s /usr/lib/systemd/system/net-tune-eee.service "$pkgdir/etc/systemd/system/multi-user.target.wants/net-tune-eee.service"
+
+    else
+        echo "net-tune not installed: linux-sleepy-rc owns it (side-by-side install)."
+    fi
 
     echo "Installing modules..."
     ZSTD_CLEVEL=19 make "${BUILD_FLAGS[@]}" INSTALL_MOD_PATH="$pkgdir/usr" INSTALL_MOD_STRIP=1 \
@@ -1165,7 +1176,7 @@ b2sums=('28569142d3df12ed5ca2b5f477e769e61fcf4da2b988be33cf1b1e3c9a4b540013f0b36
         'bb8068b44b22abd2316e41425cc250e517bcd76b52885a6ab81de8129f1a82bb93e6f048d521325666cbddb23f32cf74038abc577d1fbe6a20e655dc3f852137'
         'dbae23fc923db3fa3bd04e2d4dcba2774919d2133c031ce728f71f152cd3f4e0b0415054eb98a8768d56f49ac39aef7be13ce62af37785fdea1173d7c8477662'
         '212368b3fce77d1a0704a7a477ca71cee62c5cadd0ed85edfa29fadb8d012f7ea045f1f5be3b985cf559b7451eb54d94f3c872756494871a3527d767aa9b2094'
-        '1cb6e0ae6f57e9eca2067594ce83c005c6bc49e6a3d7fb11aa1aeee12204691304da0483e5be3c20b233c132a54831ffa587765599634a5ad123489e99982a58'
+        '0ef112cca52a54d02083a4b8c86e57acb2cb645280c637c1790e0e4deebaf03e80b45548f71e075042ffad5b2b138afec76caeba50a6dfaab2d7998d348acb34'
         'ee5f2c4aead1f2fc8d8096ae2a953d4c45d4c79de29e0578da543767a2d96664f903f043af36cf481adc13f203e2eca8fb616c26257e6cce5b3cae26b1d46ddf'
         'fdc7fc1d942be4fe8dadcb228b7f9c02273eaec91631ff609a07722b74b1db64828e144856e01a8ffd039762d1970a7ec511a3d240481544c570592914573b69'
         '85590203e850f296930aaa6c8535908ba56e6f3f424159e556321cd8729ab0207cdfcd922fbc09427e27e9259bf167e17d71411406899d1b94ea98eab71466bb'
@@ -1270,7 +1281,7 @@ b2sums=('28569142d3df12ed5ca2b5f477e769e61fcf4da2b988be33cf1b1e3c9a4b540013f0b36
         '7248382887e05269fb762231c77769718955ae07050e818b7c14f93ed4d8bc2a33a038a256c14b9cfddd3d194681fefd16592df54b08fa5252916a828753992e'
         '3bb9de4d4fa715ca00ec36298de9978805bdb9ab9227d7604d72d1a3e065f848a4ae141a62d0ad8e09a5570eb7c27f5690a8592151b41a15819bc511e992eb1a'
         '04fe6270d9e54b974ee745261575fd710e3af252c6e2b2788a082455c6eeccfd2ea944245f5f58a9f4de418eca3058aaae8a27f90173b254aac15036c7a95c49'
-        'f178ba85d30ec1c15d7d9d4d4f9063c8132e8ffc99a27da3af9ec02abbc2b9f406a13054781035ca0ce9c8dcd69afc07987fa03ca0184412e3f7738430845c7c'
+        '75e4d69c8dfb5e826e405b783d2cf44535f89ad271da53f94d05ff32c9ccada785f24b33b49305c18b002be3c025b159b4128c2c24b3f5de0607d7a15470c050'
         'a745db752d2586475d373cb29e64b4f42f6e305b4b3e588efbce955491429c73b3d16c426e76118b1499bbfb4a2159192f3950ed06d309064eb28750a1d6e6aa'
         '8820c684d4f21c9c74729a518f187334b817b8059436aa808e423533a67a6b752a93df4e79c200307b29635f0de393f6749aaa52cfc20e28957f759b4adb6ce0'
         '877dc1eebcaec113969ea45471b63e0339066a270da667b5c1aa1578e26aa01c7ec34e1cb4c436565553388e0ba04add10bf3540fe4ba7e11b24aa8a8d8ccc4f'
