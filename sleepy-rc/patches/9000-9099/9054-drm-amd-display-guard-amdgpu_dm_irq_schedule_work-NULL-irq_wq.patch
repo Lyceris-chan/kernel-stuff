@@ -1,0 +1,36 @@
+From 0372d4c817bcedb14a8d9c0018a26ef4fc71d6b1 Mon Sep 17 00:00:00 2001
+From: Ivan Lipski <ivan.lipski@amd.com>
+Date: Tue, 18 Aug 2026 12:39:27 -0400
+Subject: [PATCH] drm/amd/display: Guard amdgpu_dm_irq_schedule_work against
+ NULL irq_wq
+
+[Why&How]
+An interrupt racing DM teardown can reach amdgpu_dm_irq_schedule_work()
+after the IRQ workqueue is destroyed, passing a NULL wq to queue_work()
+and crashing in __queue_work(). Bail out early when adev->dm.irq_wq is
+NULL so a registered handler is simply not queued.
+
+Reviewed-by: Alex Hung <alex.hung@amd.com>
+Signed-off-by: Ivan Lipski <ivan.lipski@amd.com>
+Tested-by: Dan Wheeler <daniel.wheeler@amd.com>
+---
+ drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_irq.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_irq.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_irq.c
+index 9be63996b062..560ff697ff95 100644
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_irq.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_irq.c
+@@ -618,6 +618,9 @@ STATIC_IFN_KUNIT void amdgpu_dm_irq_schedule_work(struct amdgpu_device *adev,
+ 
+ 	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
+ 
++	if (!adev->dm.irq_wq)
++		goto out_unlock;
++
+ 	if (list_empty(handler_list))
+ 		goto out_unlock;
+ 
+-- 
+2.55.0
+

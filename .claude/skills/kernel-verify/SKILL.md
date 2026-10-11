@@ -4,9 +4,10 @@ description: >
   Runs the sleepy-kernel verification suite — patch hygiene, checksums, provenance, documented claims, skill-spec compliance, the cumulative apply, plus checkpatch and sparse in the deep tier. Use before committing or releasing, when asked to verify the series or the packaging, or when a change to patches, PKGBUILD, or docs needs checking.
 ---
 
-> Repo is single-package: everything here lives in `sleepy-next/`. Unless a step
-> says otherwise, `cd sleepy-next` first. From the repo root, prefix paths with
-> `sleepy-next/`.
+> Two packages share one patch series: `sleepy-rc/` is the mainline
+> package and `sleepy-next/` is the linux-next preview. These workflows target
+> **`sleepy-rc/`** unless a step says otherwise — `cd sleepy-rc` first, and from
+the repo root prefix paths with `sleepy-rc/`.
 
 # Verify the series and the packaging
 
@@ -83,9 +84,9 @@ Each check exists because this project has actually got it wrong:
 compiles through `make`, so it needs the generated headers and `.config`:
 
 ```bash
-cd sleepy-next && rm -rf src pkg && makepkg -o     # prepare only, keeps src/
+cd sleepy-rc && rm -rf src pkg && makepkg -o     # prepare only, keeps src/
 python3 .claude/skills/kernel-verify/scripts/verify.py --tier deep \
-    --tree sleepy-next/src/linux-<version>     # the directory makepkg -o created
+    --tree sleepy-rc/src/linux-<version>     # the directory makepkg -o created
 ```
 
 Run `--tier all` before a release; run the `fast` tier before every commit (the

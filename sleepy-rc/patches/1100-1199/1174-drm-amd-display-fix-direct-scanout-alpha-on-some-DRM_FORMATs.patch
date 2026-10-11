@@ -1,0 +1,57 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: <sunpeng.li@amd.com>
+Date: Wed, 30 Sep 2026 12:25:38 -0400
+Subject: [PATCH] drm/amd/display: Fix direct scanout alpha on some DRM_FORMATs
+Message-ID: <20260930162803.555299-1-sunpeng.li@amd.com>
+
+From: Leo Li <sunpeng.li@amd.com>
+
+[Why]
+
+DM was declaring it's own list of has_alpha DRM formats to check against
+for enabling alpha blending, when the format->has_alpha already does
+that for us.
+
+The self-declared list missed some has_alpha formats, causing
+direct-scanout planes with such formats to appear opaque.
+
+[How]
+
+Drop the self-declared list, instead use the format->has_alpha field
+directly.
+
+Cc: stable@vger.kernel.org
+Signed-off-by: Leo Li <sunpeng.li@amd.com>
+---
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_plane.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_plane.c
+index 0b5c4be1b3ec1..df6784d58c382 100644
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_plane.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_plane.c
+@@ -113,25 +113,7 @@ void amdgpu_dm_plane_fill_blending_from_plane_state(const struct drm_plane_state
+ 
+ 	if (plane_state->pixel_blend_mode == DRM_MODE_BLEND_PREMULTI ||
+ 		plane_state->pixel_blend_mode == DRM_MODE_BLEND_COVERAGE) {
+-		static const uint32_t alpha_formats[] = {
+-			DRM_FORMAT_ARGB8888,
+-			DRM_FORMAT_RGBA8888,
+-			DRM_FORMAT_ABGR8888,
+-			DRM_FORMAT_ARGB2101010,
+-			DRM_FORMAT_ABGR2101010,
+-			DRM_FORMAT_ARGB16161616,
+-			DRM_FORMAT_ABGR16161616,
+-			DRM_FORMAT_ARGB16161616F,
+-		};
+-		uint32_t format = plane_state->fb->format->format;
+-		unsigned int i;
+-
+-		for (i = 0; i < ARRAY_SIZE(alpha_formats); ++i) {
+-			if (format == alpha_formats[i]) {
+-				*per_pixel_alpha = true;
+-				break;
+-			}
+-		}
++		*per_pixel_alpha = plane_state->fb->format->has_alpha;
+ 
+ 		if (*per_pixel_alpha && plane_state->pixel_blend_mode == DRM_MODE_BLEND_COVERAGE)
+ 			*pre_multiplied_alpha = false;
+

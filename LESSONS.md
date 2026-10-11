@@ -2302,3 +2302,48 @@ The condition no longer holds, so the safety net is back on
 
 The `-j8` build cap from the same session is unaffected and still correct: 16
 clang jobs genuinely over-commit this machine, independently of any of the above.
+
+## A scan whose input is missing reports success (2026-10-11)
+
+While hunting the absorbed-duplicate that was breaking the `sleepy-next` build I
+wrote a detector that compares each carried patch's added lines against a
+pristine base tree. It reported **0 duplicates** — twice, after two "fixes".
+
+The tree was empty. `git -C repos/linux-next worktree add repos/_pnext <tag>`
+resolves the new worktree path **relative to the `-C` directory**, so it landed
+at `repos/linux-next/repos/_pnext`, and my scan read `repos/_pnext`, which did
+not exist. `pristine_text()` returned `None` for every file, every patch took the
+`continue` branch, and the loop finished cleanly with nothing to report.
+
+**A detector that finds nothing because its input is missing is
+indistinguishable, in its output, from one that finds nothing because there is
+nothing to find.** Two guards would each have caught it:
+
+1. **Assert the input exists before trusting a null result.** The scan should
+   have failed loudly on a missing tree rather than skipping files silently. Any
+   "found nothing" verdict needs a positive control — a count of files actually
+   examined, not just a count of hits.
+2. **Validate against a known positive.** The build had already failed on
+   `redefinition of 'svm_range_window_resident'`, so a correct detector *had* to
+   flag `9060`. One that returned zero was disproved by a fact already in hand.
+   The same rule is recorded above for the dead-carry detectors; it applies to
+   every scanner, including ones written in the same session that produced the
+   evidence.
+
+The count that settled it: `find repos/_pnext -type f | wc -l` → `0`, against
+96,740 once the path was right. Cheap to run, and it is the check I skipped.
+
+### Corollary: a detector's precision is limited by the shape it matches
+
+The same detector then over-reported, because kernel style splits a function's
+return type and its parameter list across lines. Matching only `type name(`
+missed `static bool` / `svm_range_window_resident(...)`; matching the name alone
+then counted prototypes and macros as definitions, and stopped its lookahead
+before the `{` that a multi-line parameter list pushes five lines down. It
+settled only when it counted *bodies* — a definition line followed by an opening
+brace — at which point it flagged `9060` and nothing else across 100 applied
+patches, agreeing with the compiler.
+
+**Count the thing that actually breaks, not something correlated with it.** The
+build does not fail on a duplicated macro or a prototype; it fails on a second
+function body.

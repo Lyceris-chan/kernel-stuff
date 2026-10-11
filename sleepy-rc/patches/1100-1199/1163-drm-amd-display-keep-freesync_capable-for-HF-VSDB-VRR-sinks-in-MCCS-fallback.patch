@@ -1,0 +1,43 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Fangzhi Zuo <Jerry.Zuo@amd.com>
+Date: Tue, 1 Sep 2026 15:12:51 -0400
+Subject: [PATCH] drm/amd/display: keep freesync_capable for HF-VSDB VRR sinks in MCCS fallback
+
+amdgpu_dm_update_freesync_caps() clears freesync_capable for any HDMI sink
+whose EDID carries a FreeSync VCP code that the MCCS read does not confirm.
+HDMI-Forum-VRR sinks - G-Sync Compatible panels included - negotiate VRR
+through the HF-VSDB instead, so the clear immediately undoes the HF-VSDB
+fallback that set the flag. Skip the clear for sinks that advertise
+vrr_cap.supported, so FreeSync signalling keeps flowing and the sink does not
+sit in a half-negotiated state.
+
+[sleepy] Rebase of the upstream submission
+<20260901191251.2653684-4-jerry.zuo@amd.com>, which this series carried as
+patch 1145 until the v7.3-rc3 rebase. The rebase dropped it on the assumption
+that rc3's rewrite of amdgpu_dm_update_freesync_caps() superseded its purpose;
+the rewrite restructured the function but kept the MCCS clear without the
+vrr_cap.supported term. CachyOS's flicker-free kernel demonstrably carries the
+guarded version. One-line behavioural addition to the rewritten function.
+
+Signed-off-by: Fangzhi Zuo <Jerry.Zuo@amd.com>
+---
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
+@@ -4010,7 +4010,15 @@
+ 	if (do_mccs) {
+ 		dm_helpers_read_mccs_caps(adev->dm.dc->ctx, amdgpu_dm_connector->dc_link, sink);
+ 
+-		if (sink->edid_caps.freesync_vcp_code && !sink->mccs_caps.freesync_supported)
++		/*
++		 * HF-VSDB VRR sinks keep freesync_capable even when the MCCS
++		 * read does not answer: the panel negotiates VRR through the
++		 * HDMI Forum VSDB, not the AMD MCCS VCP. Clearing the flag here
++		 * stops FreeSync signalling and leaves such panels (G-Sync
++		 * Compatible included) in a half-negotiated state that flickers.
++		 */
++		if (sink->edid_caps.freesync_vcp_code && !sink->mccs_caps.freesync_supported &&
++		    !connector->display_info.hdmi.vrr_cap.supported)
+ 			freesync_capable = false;
+ 
+ 		if (sink->mccs_caps.freesync_supported && freesync_capable)

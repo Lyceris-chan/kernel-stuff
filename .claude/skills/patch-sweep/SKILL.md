@@ -9,7 +9,7 @@ description: >
 Finds patches worth carrying and brings carried patches up to date. A sweep
 produces a **report plus a triage**, not a build; adopting is the follow-up.
 
-Paths are relative to the repo root. Add the `sleepy-next/` prefix for package
+Paths are relative to the repo root. Add the `sleepy-rc/` prefix for package
 files (`PKGBUILD`, `patches/`, `PATCH_SOURCES.md`).
 
 ## The three passes
@@ -164,7 +164,7 @@ that as the verdict.
 
 **Before calling a candidate new, grep our own series for its subject and
 author.** `1064` was already carried while three separate passes proposed it as
-an addition; the giveaway was one `rg` in `sleepy-next/patches/`.
+an addition; the giveaway was one `rg` in `sleepy-rc/patches/`.
 
 ## Step 6 — triage every candidate
 
@@ -205,7 +205,7 @@ fabricated diff is not — report it, do not invent one.
 ## Step 7 — number and document
 
 Next unused number in the correct range; ranges are in the `patch-audit` skill
-table. Document in `sleepy-next/PATCH_SOURCES.md` **before** adding to
+table. Document in `sleepy-rc/PATCH_SOURCES.md` **before** adding to
 `PKGBUILD`, then `updpkgsums`. Never reuse a vacated number — the gap is the
 evidence that something was tried.
 

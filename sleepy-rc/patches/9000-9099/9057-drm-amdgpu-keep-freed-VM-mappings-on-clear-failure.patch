@@ -1,0 +1,52 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: oushinnyo <oushinnyo@163.com>
+To: amd-gfx@lists.freedesktop.org
+Cc: alexander.deucher@amd.com, christian.koenig@amd.com, Harish.Kasiviswanathan@amd.com, dri-devel@lists.freedesktop.org, linux-kernel@vger.kernel.org, oushinnyo <oushinnyo@163.com>, stable@vger.kernel.org
+Subject: [PATCH v1] drm/amdgpu: keep freed VM mappings on clear failure
+Date: Sat,  5 Sep 2026 10:31:51 +0800
+Message-Id: <20260905023151.90699-1-oushinnyo@163.com>
+
+amdgpu_vm_clear_freed() removes a mapping from vm->freed before
+clearing its page table entries. If amdgpu_vm_update_range() fails,
+the mapping is currently freed even though the PTE update might not
+have completed.
+
+This is particularly problematic with CPU VM updates. Waiting for an
+earlier submission is interruptible, so a signal can abort the wait
+before any PTE is cleared. The old mapping then exists neither in the
+VA tree nor on the freed list, allowing a later VM update to reuse the
+virtual address while an earlier submission still references it.
+
+Put the mapping back on vm->freed on every update error. This keeps the
+pending clear operation alive and makes later VM updates retry it before
+installing new PTEs. It also covers partial CPU or SDMA updates
+conservatively.
+
+Fixes: b4d42511b7f2 ("drm/amdgpu: Support page table update via CPU")
+Cc: stable@vger.kernel.org
+Assisted-by: Codex:gpt-5
+Signed-off-by: oushinnyo <oushinnyo@163.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+index 47cde5459469..e20905d2d90c 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+@@ -1606,11 +1606,12 @@ int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
+ 		r = amdgpu_vm_update_range(adev, vm, false, false, true, false,
+ 					   &sync, mapping->start, mapping->last,
+ 					   0, 0, 0, NULL, NULL, &f);
+-		amdgpu_vm_free_mapping(adev, vm, mapping, f);
+ 		if (r) {
++			list_add(&mapping->list, &vm->freed);
+ 			dma_fence_put(f);
+ 			goto error_free;
+ 		}
++		amdgpu_vm_free_mapping(adev, vm, mapping, f);
+ 	}
+ 
+ 	if (fence && f) {
+-- 
+2.25.1

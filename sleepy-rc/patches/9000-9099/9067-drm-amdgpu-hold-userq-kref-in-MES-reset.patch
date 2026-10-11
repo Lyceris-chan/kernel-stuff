@@ -1,0 +1,85 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Zhu Lingshan <lingshan.zhu@amd.com>
+To: <Alexander.Deucher@amd.com>, <felix.kuehling@amd.com>
+CC: <Ray.Huang@amd.com>, <amd-gfx@lists.freedesktop.org>, Zhu Lingshan <lingshan.zhu@amd.com>
+Subject: [PATCH RESEND 06/10] drm/amdgpu: hold userq kref in MES reset
+Date: Mon, 14 Sep 2026 21:07:20 +0800
+Message-ID: <20260914130724.130794-7-lingshan.zhu@amd.com>
+
+Current mes_userq_reset_queue() walks the
+user queue doorbell xarray without holding its
+spin lock and does not take a queue->kref when
+if finds a queue. So the queue could be
+unexpectedly deconstructed and casuing an
+use-after-free problem.
+
+This commit fixes this problem by using
+the helper amdgpu_lookup_queue_by_doorbell()
+to properly acquire the spin lock of the xarray,
+and hold its kref during processing the queue.
+
+Signed-off-by: Zhu Lingshan <lingshan.zhu@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/mes_userqueue.c | 46 +++++++++++-----------
+ 1 file changed, 23 insertions(+), 23 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/mes_userqueue.c b/drivers/gpu/drm/amd/amdgpu/mes_userqueue.c
+index 7f334f718cd8..3de71615cde0 100644
+--- a/drivers/gpu/drm/amd/amdgpu/mes_userqueue.c
++++ b/drivers/gpu/drm/amd/amdgpu/mes_userqueue.c
+@@ -244,30 +244,30 @@ int mes_userq_reset_queue(struct amdgpu_device *adev,
+ {
+ 	struct amdgpu_usermode_queue *uq;
+ 	bool use_mmio = adev->gfx.mec.use_mmio_for_reset;
+-	unsigned long uq_id;
+-	int r;
++	int r = 0;
+ 
+-	xa_for_each(&adev->userq_doorbell_xa, uq_id, uq) {
+-		if (uq->queue_type == queue_type) {
+-			if (uq == guilty_uq)
+-				continue;
+-			if (uq->doorbell_index == db) {
+-				uq->state = AMDGPU_USERQ_STATE_HUNG;
+-				if (use_mmio)
+-					r = amdgpu_mes_reset_queue_mmio(adev, queue_type, 0, 1, pipe, queue, 0);
+-				else
+-					r = amdgpu_mes_reset_user_queue(adev, queue_type, db, 0);
+-				if (r)
+-					return r;
+-				r = mes_userq_unmap(uq);
+-				if (r)
+-					return r;
+-				amdgpu_userq_fence_driver_force_completion(uq);
+-				break;
+-			}
+-		}
+-	}
+-	return 0;
++	uq = amdgpu_lookup_queue_by_doorbell(&adev->userq_doorbell_xa, db);
++	if (!uq)
++		return 0;
++
++	if (uq == guilty_uq || uq->queue_type != queue_type)
++		goto put_queue;
++
++	uq->state = AMDGPU_USERQ_STATE_HUNG;
++	if (use_mmio)
++		r = amdgpu_mes_reset_queue_mmio(adev, queue_type, 0, 1, pipe, queue, 0);
++	else
++		r = amdgpu_mes_reset_user_queue(adev, queue_type, db, 0);
++	if (r)
++		goto put_queue;
++
++	r = mes_userq_unmap(uq);
++	if (!r)
++		amdgpu_userq_fence_driver_force_completion(uq);
++
++put_queue:
++	amdgpu_userq_put(uq);
++	return r;
+ }
+ 
+ static int mes_userq_create_ctx_space(struct amdgpu_userq_mgr *uq_mgr,
+-- 
+2.53.0

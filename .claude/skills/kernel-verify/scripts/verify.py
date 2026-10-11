@@ -100,9 +100,9 @@ def run(cmd: list[str], cwd: pathlib.Path | None = None, timeout: int = 600) -> 
 
 def repo_root(start: pathlib.Path) -> pathlib.Path:
     for candidate in [start, *start.parents]:
-        if (candidate / "sleepy-next" / "PKGBUILD").is_file():
+        if (candidate / "sleepy-rc" / "PKGBUILD").is_file():
             return candidate
-    raise EnvError("no sleepy-next/PKGBUILD found above the working directory")
+    raise EnvError("no sleepy-rc/PKGBUILD found above the working directory")
 
 
 def pkgbuild_entries(pkgbuild: pathlib.Path) -> list[str]:
@@ -285,11 +285,11 @@ def check_provenance(package_dir: pathlib.Path, ledger: pathlib.Path, entries: l
 
 def check_doc_claims(root: pathlib.Path, entries: list[str]) -> None:
     """Documented patch count and base version must match reality."""
-    package_dir = root / "sleepy-next"
+    package_dir = root / "sleepy-rc"
     pkgrel = re.search(r"^pkgrel=(\d+)", (package_dir / "PKGBUILD").read_text(encoding="utf-8"), re.M)
     pkgver = re.search(r"^pkgver=(\S+)", (package_dir / "PKGBUILD").read_text(encoding="utf-8"), re.M)
     # The package version keeps pkgver's underscore ("7.3.0_rc2-10"); only the
-    # kernel release string uses a dash ("7.3.0-rc2-10-sleepy-next"). Compare
+    # kernel release string uses a dash ("7.3.0-rc2-10-sleepy-rc"). Compare
     # against the package form, which is what docs quote as the base version.
     expected_version = f"{pkgver.group(1)}-{pkgrel.group(1)}" if pkgrel and pkgver else None
 
@@ -304,7 +304,7 @@ def check_doc_claims(root: pathlib.Path, entries: list[str]) -> None:
         if expected_version and version and version.group(1) != expected_version:
             problems.append(f"docs/README.md says base {version.group(1)}, PKGBUILD is {expected_version}")
     else:
-        problems.append("sleepy-next/docs/README.md missing")
+        problems.append("sleepy-rc/docs/README.md missing")
     if problems:
         record("fast", "documented claims", "FAIL", "; ".join(problems))
     else:
@@ -421,7 +421,7 @@ def check_sparse(tree: pathlib.Path, root: pathlib.Path, entries: list[str]) -> 
 
 
 def package_dir_of(root: pathlib.Path) -> pathlib.Path:
-    return root / "sleepy-next"
+    return root / "sleepy-rc"
 
 
 def survey_tools() -> None:
@@ -548,7 +548,7 @@ def main() -> int:
 
     try:
         root = repo_root(pathlib.Path.cwd())
-        package_dir = root / "sleepy-next"
+        package_dir = root / "sleepy-rc"
         pkgbuild = package_dir / "PKGBUILD"
         entries = pkgbuild_entries(pkgbuild)
     except EnvError as exc:

@@ -1,0 +1,46 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Jesse Zhang <Jesse.Zhang@amd.com>
+Date: Wed, 23 Sep 2026 17:52:13 +0800
+Subject: [PATCH] drm/amdgpu/userq: fix reading the WPTR at a non-zero BO offset
+Message-ID: <20260923095217.3932523-1-Jesse.Zhang@amd.com>
+
+The user queue UAPI permits the WPTR at any 8-byte aligned offset within a
+BO. amdgpu_userq_fence_read_wptr() locates the mapping containing the WPTR
+address, but amdgpu_bo_kmap() returns the start of the BO, so the code read
+the first u64 regardless of the WPTR offset. USERQ_SIGNAL uses this value as
+the exported fence seqno, so a wrong read makes the fence signal early (or
+never), breaking dependency synchronization.
+
+Translate the WPTR GPU address to a byte offset within the BO, accounting
+for the VA mapping start and the mapping's BO offset, before reading it.
+
+Signed-off-by: Jesse Zhang <Jesse.Zhang@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c
+index c270635c907b..b885e90ec5f5 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c
+@@ -372,7 +372,7 @@ static int amdgpu_userq_fence_read_wptr(struct amdgpu_device *adev,
+ 	struct amdgpu_bo_va_mapping *mapping;
+ 	struct amdgpu_bo *bo;
+ 	struct drm_exec exec;
+-	u64 addr, *ptr;
++	u64 addr, offset, *ptr;
+ 	int ret;
+ 
+ 	addr = queue->userq_prop->wptr_gpu_addr;
+@@ -404,7 +404,10 @@ static int amdgpu_userq_fence_read_wptr(struct amdgpu_device *adev,
+ 		goto lock_error;
+ 	}
+ 
+-	*wptr = le64_to_cpu(*ptr);
++	/* The WPTR can be anywhere within the BO's VA mapping. */
++	offset = addr - (mapping->start << AMDGPU_GPU_PAGE_SHIFT);
++	offset += mapping->offset;
++	*wptr = le64_to_cpu(ptr[offset / sizeof(*ptr)]);
+ 
+ 	amdgpu_bo_kunmap(bo);
+ 	drm_exec_fini(&exec);

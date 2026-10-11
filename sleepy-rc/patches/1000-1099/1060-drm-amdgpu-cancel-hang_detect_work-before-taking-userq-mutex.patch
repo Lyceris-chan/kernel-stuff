@@ -1,0 +1,60 @@
+From: vitaly.prosyak at amd.com (vitaly.prosyak at amd.com)
+Date: Thu, 27 Aug 2026 18:25:23 -0400
+Subject: [PATCH 1] drm/amdgpu: cancel hang_detect_work before taking
+ userq_mutex
+Message-ID: <20260827222531.127950-1-vitaly.prosyak@amd.com>
+
+From: Vitaly Prosyak <vitaly.prosyak at amd.com>
+
+cancel_delayed_work_sync() waits for any running work instance to finish.
+hang_detect_work takes userq_mutex during its run, so calling
+cancel_delayed_work_sync() inside userq_mutex in amdgpu_userq_destroy()
+risks deadlock:
+
+  amdgpu_userq_destroy holds userq_mutex
+  -> cancel_delayed_work_sync -> __flush_work (waits for work)
+  -> hang_detect_work (running) tries to acquire userq_mutex
+  -> DEADLOCK
+
+  WARNING: possible circular locking dependency detected
+  amd_basic/3761 is trying to acquire lock:
+    (work_completion)(&(&queue->hang_detect_work)->work), at: __flush_work
+  but task is already holding lock:
+    (&userq_mgr->userq_mutex), at: amdgpu_userq_destroy+0x76/0x3e0 [amdgpu]
+
+Move the cancel before mutex_lock() to eliminate this dependency.
+
+Cc: Christian Koenig <christian.koenig at amd.com>
+Cc: Alex Deucher <alexander.deucher at amd.com>
+Cc: Sunil Khatri <sunil.khatri at amd.com>
+Cc: Prike Liang <prike.liang at amd.com>
+Signed-off-by: Vitaly Prosyak <vitaly.prosyak at amd.com>
+Reviewed-by: Christian Koenig <christian.koenig at amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+index 0a816b3c5ff9..52cd7d1c9f2b 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+@@ -543,12 +543,15 @@ amdgpu_userq_destroy(struct amdgpu_userq_mgr *uq_mgr, struct amdgpu_usermode_que
+ 	trace_amdgpu_userq_destroy_start(queue);
+ 
+ 	cancel_delayed_work_sync(&uq_mgr->resume_work);
++	/* Cancel before taking userq_mutex: cancel_delayed_work_sync() waits
++	 * for any running instance, which itself takes userq_mutex.
++	 */
++	cancel_delayed_work_sync(&queue->hang_detect_work);
+ 
+ 	mutex_lock(&uq_mgr->userq_mutex);
+ 	amdgpu_userq_wait_for_last_fence(queue);
+ 
+ 	amdgpu_userq_detach_doorbell(queue);
+-	cancel_delayed_work_sync(&queue->hang_detect_work);
+ 
+ #if defined(CONFIG_DEBUG_FS)
+ 	debugfs_remove_recursive(queue->debugfs_queue);
+-- 
+2.54.0
+

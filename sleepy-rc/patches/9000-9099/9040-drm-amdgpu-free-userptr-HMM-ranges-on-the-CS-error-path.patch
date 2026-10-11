@@ -1,0 +1,33 @@
+From: devnull+moonafterrain.outlook.com at kernel.org (Junrui Luo via B4 Relay)
+Date: Tue, 11 Aug 2026 00:13:14 +0800
+Subject: [PATCH 5/5] drm/amdgpu: free userptr HMM ranges on the CS error path
+Message-ID: <20260811-amdgpu-fixes-v1-5-4954a417b8ff@outlook.com>
+
+Signed-off-by: Junrui Luo <moonafterrain at outlook.com>
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c
+index 617f53f135f3..17c4fec21402 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c
+@@ -1416,6 +1416,16 @@ static void amdgpu_cs_parser_fini(struct amdgpu_cs_parser *parser)
+ 				amdgpu_vm_bo_invalidate(bo, false);
+ 			}
+ 		}
++
++		/*
++		 * Release the ranges still live on the error paths;
++		 * amdgpu_cs_submit() already freed and cleared them when it
++		 * got far enough to check them for invalidation.
++		 */
++		amdgpu_bo_list_for_each_userptr_entry(e, parser->bo_list) {
++			amdgpu_hmm_range_free(e->range);
++			e->range = NULL;
++		}
+ 		amdgpu_bo_list_put(parser->bo_list);
+ 	}
+ 
+
+-- 
+2.51.2
+
+

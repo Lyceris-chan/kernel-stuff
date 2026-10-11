@@ -1,0 +1,115 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Zhu Lingshan <lingshan.zhu@amd.com>
+To: <Alexander.Deucher@amd.com>, <felix.kuehling@amd.com>
+CC: <Ray.Huang@amd.com>, <amd-gfx@lists.freedesktop.org>, Zhu Lingshan <lingshan.zhu@amd.com>
+Subject: [PATCH RESEND 09/10] drm/amdgpu: free userq by kref_put when fails to create
+Date: Mon, 14 Sep 2026 21:07:23 +0800
+Message-ID: <20260914130724.130794-10-lingshan.zhu@amd.com>
+
+In amdgpu_userq_create(), once the user queue is
+published to userq_doorbell_xa, other threads could
+access the queue from the XArray. But the queue
+may fails to map the queue and kfree(queue),
+this causes the accessor use-after-free issue.
+
+This commit fixes this issue by properly
+get and put the kref of a queue to maintain
+the lifecycle of a user queue.
+
+There are some minor improvements in this commit:
+
+1) Early detach the doorbell of a queue when fails to map
+a queue, because the map helper set the queue state to HUNG,
+and the asynchronous post reset helper amdgpu_userq_post_reset
+can find the queue from the XArray and remaps the queue again,
+which causes a queue leaking because the user space
+already receive an error code for the queue
+from amdgpu_userq_create()
+
+2) Use xa_cmpxchg_irq in amdgpu_userq_detach_doorbell().
+Once fails to map a queue, the queue destruction process
+is asynchronous (a delayed worker), and a new created queue
+could re-use the doorbell, xa_cmpxchg_irq compares the doorbell
+which to be deleted with the doorbell which @index points to,
+so it does not detach the doorbell of the new created queue.
+
+Signed-off-by: Zhu Lingshan <lingshan.zhu@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c | 30 +++++++++++++++++++++++++-----
+ 1 file changed, 25 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+index 0dab395ef0f4..21a9a2138fc8 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+@@ -424,7 +424,9 @@ static void amdgpu_userq_detach_doorbell(struct amdgpu_usermode_queue *queue)
+ 	struct amdgpu_device *adev = queue->userq_mgr->adev;
+ 
+ 	down_read(&adev->reset_domain->sem);
+-	xa_erase_irq(&adev->userq_doorbell_xa, queue->doorbell_index);
++	/* It doesn't alloc any memory here, so pass 0 to gfp */
++	xa_cmpxchg_irq(&adev->userq_doorbell_xa, queue->doorbell_index,
++		       queue, NULL, 0);
+ 	up_read(&adev->reset_domain->sem);
+ }
+ 
+@@ -836,8 +838,29 @@ amdgpu_userq_create(struct drm_file *filp, union drm_amdgpu_userq *args)
+ 	if (r)
+ 		goto clean_mqd;
+ 
++	/*
++	 * Once the queue has been published to doorbell_xa,
++	 * it could be accessed by other threads, so it has to be
++	 * destroyed through kref put. The destroy work decreases
++	 * userq_count, so we have to increase it here.
++	 */
++	atomic_inc(&uq_mgr->userq_count[queue->queue_type]);
++
+ 	r = amdgpu_userq_ensure_ev_fence(&fpriv->userq_mgr, &fpriv->evf_mgr);
+-	if (r)
+-		goto erase_doorbell;
++	if (r) {
++		/*
++		 * [sleepy] This error path comes from our base: the doorbell
++		 * is published before the eviction-fence setup, and the mutex
++		 * is already released on failure (see
++		 * amdgpu_userq_ensure_ev_fence). The upstream patch removes
++		 * the erase_doorbell label this goto targeted, so detach the
++		 * published doorbell and free through the kref path, the same
++		 * as the map-failure path below.
++		 */
++		trace_amdgpu_userq_create_end(queue, r);
++		amdgpu_userq_detach_doorbell(queue);
++		amdgpu_userq_put(queue);
++		return r;
++	}
+ 
+ 	/* don't map the queue if scheduling is halted */
+@@ -872,12 +882,14 @@ amdgpu_userq_create(struct drm_file *filp, union drm_amdgpu_userq *args)
+ 		if (r) {
+ 			drm_file_err(uq_mgr->file, "Failed to map Queue\n");
+ 			trace_amdgpu_userq_create_end(queue, r);
++			amdgpu_userq_detach_doorbell(queue);
+ 			mutex_unlock(&uq_mgr->userq_mutex);
+-			goto erase_doorbell;
++			amdgpu_userq_put(queue);
++
++			return r;
+ 		}
+ 	}
+ 
+-	atomic_inc(&uq_mgr->userq_count[queue->queue_type]);
+ 	mutex_unlock(&uq_mgr->userq_mutex);
+ 
+ 	r = xa_alloc(&uq_mgr->userq_xa, &qid, queue,
+@@ -898,8 +910,6 @@ amdgpu_userq_create(struct drm_file *filp, union drm_amdgpu_userq *args)
+ 	args->out.queue_id = qid;
+ 	return 0;
+ 
+-erase_doorbell:
+-	xa_erase_irq(&adev->userq_doorbell_xa, index);
+ clean_mqd:
+ 	uq_funcs->mqd_destroy(queue);
+ clean_doorbell_bo:
+-- 
+2.53.0

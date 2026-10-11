@@ -1,0 +1,67 @@
+From nobody Mon Sep 17 00:00:00 2001
+Date: Sun, 13 Sep 2026 23:20:41 +0800
+From: Zhaoyu Liu <zackary.liu.pro@gmail.com>
+To: viro@zeniv.linux.org.uk, brauner@kernel.org, jack@suse.cz,  axboe@kernel.dk, tz2294@columbia.edu
+Cc: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org
+Subject: [PATCH] fs/buffer: check for NULL pointer before folio_test_dropbehind()
+Message-ID: <pfk6l6lsgecie4xwy5njrgtzpave4uayxbl4lkz3iekcdds7fg@bpihjzlnz7m2>
+
+Add a NULL check for bh->b_folio before folio_test_dropbehind()
+to avoid panic for non-pagecache buffer heads from jbd2.
+
+Sample crash report:
+
+BUG: kernel NULL pointer dereference, address: 0000000000000000
+PGD 0 P4D 0
+Oops: Oops: 0000 [#1] SMP PTI
+CPU: 2 UID: 0 PID: 332 Comm: jbd2/vda1-8 Not tainted
+7.3.0-rc2-next-20260907+ #3 PREEMPT (lazy)
+Hardware name: QEMU Standard PC (Q35 + ICH9, 2009),
+BIOS 2024.05-2ubuntu0.3 05/07/2025
+RIP: 0010:__bh_submit+0xa2/0x240
+RSP: 0018:ffffce590064bc48 EFLAGS: 00010246
+RAX: 0000000000000000 RBX: ffff8ab102861960 RCX: 0000000000000000
+RDX: 0000000000000000 RSI: 0000000000000000 RDI: 0000000000000000
+RBP: ffffce590064bc90 R08: 0000000000000000 R09: 0000000000000000
+R10: 0000000000000000 R11: 0000000000000000 R12: 0000000000009801
+R13: 0000000000000000 R14: ffff8ab10ab90600 R15: 0000000000000000
+FS:  0000000000000000 GS:ffff8ab2e2571000   knlGS:0000000000000000
+CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+CR2: 0000000000000000 CR3: 0000000109364000 CR4: 00000000000006f0
+Call Trace:
+ <TASK>
+ ? __pfx_journal_end_buffer_io_sync+0x10/0x10
+ bh_submit+0x15/0x30
+ jbd2_journal_commit_transaction+0x6c3/0x1840
+ ? psi_group_change+0x201/0x4e0
+ kjournald2+0xa9/0x250
+ ? __pfx_autoremove_wake_function+0x10/0x10
+ ? __pfx_kjournald2+0x10/0x10
+ kthread+0xfd/0x140
+ ? __pfx_kthread+0x10/0x10
+ ret_from_fork+0x2a4/0x320
+ ? __pfx_kthread+0x10/0x10
+ ret_from_fork_asm+0x1a/0x30
+
+Fixes: a2c924c240e7 ("buffer: set BIO_COMPLETE_IN_TASK for dropbehind writeback")
+
+Signed-off-by: Zhaoyu Liu <zackary.liu.pro@gmail.com>
+---
+ fs/buffer.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/fs/buffer.c b/fs/buffer.c
+index 427d8a817cd5..4aea0bb08609 100644
+--- a/fs/buffer.c
++++ b/fs/buffer.c
+@@ -1106,7 +1106,7 @@ static void __bh_submit(struct buffer_head *bh, blk_opf_t opf,
+ 
+ 	bio = bio_alloc(bh->b_bdev, 1, opf, GFP_NOIO);
+ 
+-	if (folio_test_dropbehind(bh->b_folio) && op_is_write(opf))
++	if (bh->b_folio && folio_test_dropbehind(bh->b_folio) && op_is_write(opf))
+ 		bio_set_flag(bio, BIO_COMPLETE_IN_TASK);
+ 
+ 	if (IS_ENABLED(CONFIG_FS_ENCRYPTION))
+-- 
+2.45.2

@@ -1,0 +1,74 @@
+From ee10fc32395bc2c3312d63489c2631fb565cab9a Mon Sep 17 00:00:00 2001
+From: Alex Deucher <alexander.deucher@amd.com>
+To: <amd-gfx@lists.freedesktop.org>
+Date: Mon, 21 Sep 2026 16:10:25 -0400
+Subject: [PATCH] drm/amdgpu: fix ip discovery table validation
+
+From: Lin Cao <lincao12@amd.com>
+
+Fix ip discovery table_check, get_mall_info, and get_vcn_info to guard
+on both offset and size being non-zero before parsing.
+
+Signed-off-by: Danijel Slivka <danijel.slivka@amd.com>
+Signed-off-by: ZhenGuo Yin <zhenguo.yin@amd.com>
+Signed-off-by: Lin Cao <lincao12@amd.com>
+Reviewed-by: Frank Min<Frank.Min@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_discovery.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
+---
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_discovery.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_discovery.c
+index 965063696308e..366588c2642d1 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_discovery.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_discovery.c
+@@ -697,7 +697,7 @@ static int amdgpu_discovery_table_check(struct amdgpu_device *adev,
+ 		break;
+ 	}
+ 
+-	if (check_table && offset) {
++	if (check_table && offset && table_size) {
+ 		if (act_val != exp_val) {
+ 			dev_err(adev->dev, "invalid ip discovery %s signature\n", table_name);
+ 			return -EINVAL;
+@@ -2203,7 +2203,7 @@ static int amdgpu_discovery_get_mall_info(struct amdgpu_device *adev)
+ 	union mall_info *mall_info;
+ 	u32 u, mall_size_per_umc, m_s_present, half_use;
+ 	u64 mall_size;
+-	u16 offset;
++	u16 offset, size;
+ 
+ 	if (!discovery_bin) {
+ 		DRM_ERROR("ip discovery uninitialized\n");
+@@ -2213,8 +2213,9 @@ static int amdgpu_discovery_get_mall_info(struct amdgpu_device *adev)
+ 	if (amdgpu_discovery_get_table_info(adev, &info, MALL_INFO))
+ 		return -EINVAL;
+ 	offset = le16_to_cpu(info->offset);
++	size = le16_to_cpu(info->size);
+ 
+-	if (!offset)
++	if (!offset || !size)
+ 		return 0;
+ 
+ 	mall_info = (union mall_info *)(discovery_bin + offset);
+@@ -2259,7 +2260,7 @@ static int amdgpu_discovery_get_vcn_info(struct amdgpu_device *adev)
+ 	uint8_t *discovery_bin = adev->discovery.bin;
+ 	struct table_info *info;
+ 	union vcn_info *vcn_info;
+-	u16 offset;
++	u16 offset, size;
+ 	int v;
+ 
+ 	if (!discovery_bin) {
+@@ -2280,8 +2281,9 @@ static int amdgpu_discovery_get_vcn_info(struct amdgpu_device *adev)
+ 	if (amdgpu_discovery_get_table_info(adev, &info, VCN_INFO))
+ 		return -EINVAL;
+ 	offset = le16_to_cpu(info->offset);
++	size = le16_to_cpu(info->size);
+ 
+-	if (!offset)
++	if (!offset || !size)
+ 		return 0;
+ 
+ 	vcn_info = (union vcn_info *)(discovery_bin + offset);

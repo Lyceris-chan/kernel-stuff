@@ -1,0 +1,52 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Dennis Thomsen <dennis.fich.thomsen@gmail.com>
+To: amd-gfx@lists.freedesktop.org
+Cc: alexander.deucher@amd.com, harry.wentland@amd.com, sunpeng.li@amd.com, Dennis Thomsen <dennis.fich.thomsen@gmail.com>
+Subject: [PATCH] drm/amd/display: Guard NULL DDC pins in dal_ddc_open
+Date: Mon, 31 Aug 2026 21:49:26 +0200
+Message-ID: <20260831194926.274044-1-dennis.fich.thomsen@gmail.com>
+
+[Why]
+dal_gpio_open_ex() can return GPIO_RESULT_OK while leaving gpio->pin
+NULL: a concurrent HPD vs display power-down race closes the pin after
+the open succeeds and before FROM_HW_GPIO_PIN(). dal_ddc_open() then
+dereferences pin_clock->pin->store.en (NULL+0x28) and the kworker dies
+with IRQs off, hard-wedging the machine.
+
+Observed on Radeon 890M (DCN 3.5, Strix/Kraken) after DPMS-off when the
+DP sinks drop their links.
+
+[How]
+If either pin is NULL after a successful open, close what was opened
+and return GPIO_RESULT_OPEN_FAILED so AUX fails instead of oopsing.
+
+This does not serialize HPD detect against DPMS-off; it only stops the
+NULL deref turning that race into a hang.
+
+Closes: https://gitlab.freedesktop.org/drm/amd/-/issues/5716
+
+Signed-off-by: Dennis T. <dennis.fich.thomsen@gmail.com>
+---
+ drivers/gpu/drm/amd/display/dc/gpio/gpio_service.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/display/dc/gpio/gpio_service.c b/drivers/gpu/drm/amd/display/dc/gpio/gpio_service.c
+index 95f8b7c7d657..af66978590a8 100644
+--- a/drivers/gpu/drm/amd/display/dc/gpio/gpio_service.c
++++ b/drivers/gpu/drm/amd/display/dc/gpio/gpio_service.c
+@@ -577,6 +577,13 @@ enum gpio_result dal_ddc_open(
+ 		goto failure;
+ 	}
+ 
++	if (!ddc->pin_data->pin || !ddc->pin_clock->pin) {
++		BREAK_TO_DEBUGGER();
++		result = GPIO_RESULT_OPEN_FAILED;
++		dal_gpio_close(ddc->pin_clock);
++		goto failure;
++	}
++
+ 	/* DDC clock and data pins should belong
+ 	 * to the same DDC block id,
+ 	 * we use the data pin to set the pad mode. */
+-- 
+2.55.0

@@ -1,0 +1,20 @@
+[Unit]
+Description=Disable EEE before NetworkManager brings the ethernet link up
+Documentation=file:/usr/local/bin/net-tune.sh
+# Turning EEE off restarts auto-negotiation, which drops the link for ~3s.
+# Running that before NetworkManager means the link comes up once and cleanly,
+# instead of flapping seconds into the boot — which used to take the network
+# (and therefore DNS) out at exactly the moment blocky resolves its upstream
+# and the user logs in. See the header of net-tune.sh.
+Before=NetworkManager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/net-tune.sh eee-off
+# The script bounds its own wait for a NIC to appear (~3s). This is only a
+# backstop so a wedged ethtool call can never hold NetworkManager back.
+TimeoutStartSec=10
+
+[Install]
+WantedBy=multi-user.target

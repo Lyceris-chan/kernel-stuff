@@ -1,0 +1,102 @@
+From: Andrea Righi <arighi@nvidia.com>
+To: Ingo Molnar <mingo@redhat.com>,
+	Peter Zijlstra <peterz@infradead.org>,
+	Juri Lelli <juri.lelli@redhat.com>,
+	Vincent Guittot <vincent.guittot@linaro.org>,
+	Dietmar Eggemann <dietmar.eggemann@arm.com>
+Cc: Steven Rostedt <rostedt@goodmis.org>,
+	Ben Segall <bsegall@google.com>,
+	Mel Gorman <mgorman@suse.de>,
+	Valentin Schneider <vschneid@redhat.com>,
+	K Prateek Nayak <kprateek.nayak@amd.com>,
+	Gabriele Monaco <gmonaco@redhat.com>,
+	bpf@vger.kernel.org,
+	linux-kernel@vger.kernel.org
+Subject: [PATCH] sched: Set need-resched flags before tracing
+Date: Fri, 11 Sep 2026 23:33:00 +0200
+Message-ID: <20260911213300.1305763-1-arighi@nvidia.com>
+Content-Transfer-Encoding: 8bit
+Content-Type: text/plain
+MIME-Version: 1.0
+
+sched_set_need_resched_tp is emitted before the corresponding thread
+flag is set. This allows a BPF tracepoint program to recursively invoke
+the same tracepoint while leaving its RCU read-side critical section.
+
+If rcu_read_unlock_special() must defer a quiescent state while
+preemption or interrupts are disabled, it calls
+set_need_resched_current(). Since TIF_NEED_RESCHED is still clear, this
+emits the tracepoint again and repeats until the kernel stack overflows:
+
+  __trace_set_need_resched()
+    bpf_trace_run3()
+      rcu_read_unlock_migrate()
+        rcu_read_unlock_special()
+          set_need_resched_current()
+            set_tsk_need_resched()
+              __trace_set_need_resched()
+
+Set the thread flag before emitting the tracepoint in both
+set_tsk_need_resched() and __resched_curr(). For a remote reschedule,
+retain the result of set_nr_and_not_polling() so that tracing remains
+ahead of IPI delivery while still observing the updated flag.
+
+Fixes: adcc3bfa8806 ("sched: Adapt sched tracepoints for RV task model")
+Signed-off-by: Andrea Righi <arighi@nvidia.com>
+---
+ include/linux/sched.h | 5 ++++-
+ kernel/sched/core.c   | 7 +++++--
+ 2 files changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index 59f6366fdf501..6003dcd080e6c 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -2105,8 +2105,11 @@ static inline int test_tsk_thread_flag(struct task_struct *tsk, int flag)
+ static inline void set_tsk_need_resched(struct task_struct *tsk)
+ {
+ 	if (tracepoint_enabled(sched_set_need_resched_tp) &&
+-	    !test_tsk_thread_flag(tsk, TIF_NEED_RESCHED))
++	    !test_tsk_thread_flag(tsk, TIF_NEED_RESCHED)) {
++		set_tsk_thread_flag(tsk, TIF_NEED_RESCHED);
+ 		__trace_set_need_resched(tsk, TIF_NEED_RESCHED);
++		return;
++	}
+ 	set_tsk_thread_flag(tsk,TIF_NEED_RESCHED);
+ }
+ 
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 91f059a556950..aed403fd2f82e 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -1196,6 +1196,7 @@ static void __resched_curr(struct rq *rq, int tif)
+ {
+ 	struct task_struct *curr = rq->curr;
+ 	struct thread_info *cti = task_thread_info(curr);
++	bool send_ipi;
+ 	int cpu;
+ 
+ 	lockdep_assert_rq_held(rq);
+@@ -1212,15 +1213,17 @@ static void __resched_curr(struct rq *rq, int tif)
+ 
+ 	cpu = cpu_of(rq);
+ 
+-	trace_sched_set_need_resched_tp(curr, cpu, tif);
+ 	if (cpu == smp_processor_id()) {
+ 		set_ti_thread_flag(cti, tif);
+ 		if (tif == TIF_NEED_RESCHED)
+ 			set_preempt_need_resched();
++		trace_sched_set_need_resched_tp(curr, cpu, tif);
+ 		return;
+ 	}
+ 
+-	if (set_nr_and_not_polling(cti, tif)) {
++	send_ipi = set_nr_and_not_polling(cti, tif);
++	trace_sched_set_need_resched_tp(curr, cpu, tif);
++	if (send_ipi) {
+ 		if (tif == TIF_NEED_RESCHED)
+ 			smp_send_reschedule(cpu);
+ 	} else {
+-- 
+2.55.0
+

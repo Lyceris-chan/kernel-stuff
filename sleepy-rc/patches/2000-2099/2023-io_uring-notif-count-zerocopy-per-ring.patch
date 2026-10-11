@@ -1,0 +1,68 @@
+From e857a19d9f7152bef7d7f3d9f60093dbda72d7f1 Mon Sep 17 00:00:00 2001
+From: Jens Axboe <axboe@kernel.dk>
+To: io-uring@vger.kernel.org
+Cc: juanlu@fastmail.com,
+	Jens Axboe <axboe@kernel.dk>
+Subject: [PATCH 06/10] io_uring/notif: count pending zerocopy notifications per ring
+Date: Fri, 11 Sep 2026 09:45:30 -0600
+Message-ID: <20260911154811.646705-7-axboe@kernel.dk>
+X-Mailer: git-send-email 2.55.0
+In-Reply-To: <20260911154811.646705-1-axboe@kernel.dk>
+References: <20260911154811.646705-1-axboe@kernel.dk>
+Precedence: bulk
+X-Mailing-List: io-uring@vger.kernel.org
+List-Id: <io-uring.vger.kernel.org>
+List-Subscribe: <mailto:io-uring+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:io-uring+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+
+SEND_ZC notifications are io_kiocbs like any other as far as request
+and task accounting goes, but they are special in that they cannot be
+canceled and only complete once the network stack is done with the
+data. With an unresponsive peer, that can take a while.
+
+The exit and release paths are about to start waiting for requests to
+finish so that the files they pin get released in a timely manner, and
+notifications neither pin files nor finish in a timely manner. Keep a
+per-ring count of them so those paths can leave them out.
+
+Signed-off-by: Jens Axboe <axboe@kernel.dk>
+---
+ include/linux/io_uring_types.h | 2 ++
+ io_uring/notif.c               | 2 ++
+ 2 files changed, 4 insertions(+)
+
+diff --git a/include/linux/io_uring_types.h b/include/linux/io_uring_types.h
+index 39629ee77b91..90fea94ad202 100644
+--- a/include/linux/io_uring_types.h
++++ b/include/linux/io_uring_types.h
+@@ -522,6 +522,8 @@ struct io_ring_ctx {
+ 
+ 	/* protected by ->completion_lock */
+ 	unsigned			nr_req_allocated;
++	/* pending SEND_ZC notifications, protected by ->uring_lock */
++	unsigned			nr_notifs;
+ 
+ #ifdef CONFIG_NET_RX_BUSY_POLL
+ 	struct list_head	napi_list;	/* track busy poll napi_id */
+diff --git a/io_uring/notif.c b/io_uring/notif.c
+index efce8ae12eaa..6c49aff515df 100644
+--- a/io_uring/notif.c
++++ b/io_uring/notif.c
+@@ -36,6 +36,7 @@ static void io_notif_tw_complete(struct io_tw_req tw_req, io_tw_token_t tw)
+ 		}
+ 
+ 		nd = nd->next;
++		ctx->nr_notifs--;
+ 		io_req_task_complete((struct io_tw_req){notif}, tw);
+ 	} while (nd);
+ }
+@@ -119,6 +120,7 @@ struct io_kiocb *io_alloc_notif(struct io_ring_ctx *ctx)
+ 
+ 	if (unlikely(!io_alloc_req(ctx, &notif)))
+ 		return NULL;
++	ctx->nr_notifs++;
+ 	notif->ctx = ctx;
+ 	notif->opcode = IORING_OP_NOP;
+ 	notif->flags = 0;

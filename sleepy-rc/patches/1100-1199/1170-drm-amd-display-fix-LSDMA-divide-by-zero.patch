@@ -1,0 +1,59 @@
+From 382b847ce0820e0f8a8c95b06b194267c6a3f667 Mon Sep 17 00:00:00 2001
+From: Alex Hung <alex.hung@amd.com>
+Date: Fri, 11 Sep 2026 10:29:02 -0600
+Subject: [PATCH] drm/amd/display: Fix LSDMA divide by zero
+
+[WHY]
+element_size_to_bytes_per_pixel() handled only element sizes 0 to 4 and
+returned 0 for every other value, and an unexpected element size caused
+a divide by zero.
+
+[HOW]
+Derive the size as 1 << element_size, which matches the existing
+encoding, and fall back to 1 for values of 8 or more to keep the result
+nonzero.
+
+Reviewed-by: Austin Zheng <austin.zheng@amd.com>
+Signed-off-by: Alex Hung <alex.hung@amd.com>
+Signed-off-by: George Zhang <george.zhang@amd.com>
+Tested-by: Dan Wheeler <daniel.wheeler@amd.com>
+---
+ .../alternate_pstate_shared_lib.c             | 22 +------------------
+ 1 file changed, 1 insertion(+), 21 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_standalone_libraries/alternate_pstate_shared_lib.c b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_standalone_libraries/alternate_pstate_shared_lib.c
+index 53ead9f687ac..f082f058001e 100644
+--- a/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_standalone_libraries/alternate_pstate_shared_lib.c
++++ b/drivers/gpu/drm/amd/display/dc/dml2_0/dml21/src/dml2_standalone_libraries/alternate_pstate_shared_lib.c
+@@ -884,27 +884,7 @@ static void populate_lsdma_start_end_lines(
+ 
+ static uint8_t element_size_to_bytes_per_pixel(uint8_t element_size)
+ {
+-	uint8_t bytes_per_pixel = 0;
+-
+-	switch (element_size) { // 0: 8bpp, 1: 16bpp, 2: 32bpp, 3: 64bpp, 4: 128bpp - Values supported by LSDMA Controller
+-	case 0:
+-		bytes_per_pixel = 1;
+-		break;
+-	case 1:
+-		bytes_per_pixel = 2;
+-		break;
+-	case 2:
+-		bytes_per_pixel = 4;
+-		break;
+-	case 3:
+-		bytes_per_pixel = 8;
+-		break;
+-	case 4:
+-		bytes_per_pixel = 16;
+-		break;
+-	}
+-
+-	return bytes_per_pixel;
++	return element_size < 8 ? (uint8_t)(1U << element_size) : 1;
+ }
+ 
+ static void populate_lsdma(
+-- 
+2.55.0
+

@@ -44,12 +44,12 @@ class AuditError(RuntimeError):
 
 
 def find_repo_root(start: Path) -> Path:
-    """Walk up from *start* until a directory containing sleepy-next/ is found."""
+    """Walk up from *start* until a directory containing sleepy-rc/ is found."""
     for candidate in [start, *start.parents]:
-        if (candidate / "sleepy-next" / "PKGBUILD").is_file():
+        if (candidate / "sleepy-rc" / "PKGBUILD").is_file():
             return candidate
     raise AuditError(
-        "could not find the repository root (no sleepy-next/PKGBUILD above "
+        "could not find the repository root (no sleepy-rc/PKGBUILD above "
         f"{start}). Run this from inside the sleepy-kernel checkout."
     )
 
@@ -141,7 +141,7 @@ def audit(worktree: Path, patches: list[Path]) -> list[tuple[Path, str]]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--pkgbuild", type=Path, default=None, help="default: sleepy-next/PKGBUILD")
+    parser.add_argument("--pkgbuild", type=Path, default=None, help="default: sleepy-rc/PKGBUILD")
     parser.add_argument("--repo", type=Path, default=None, help="clone to branch the worktree from; default: repos/linux-next")
     parser.add_argument("--tag", default=None, help="base tag; default: _srctag from the PKGBUILD")
     parser.add_argument("--worktree", type=Path, default=None, help="scratch worktree path; default: repos/_audit")
@@ -151,7 +151,7 @@ def main() -> int:
 
     try:
         root = find_repo_root(Path.cwd())
-        pkgbuild = (args.pkgbuild or root / "sleepy-next" / "PKGBUILD").resolve()
+        pkgbuild = (args.pkgbuild or root / "sleepy-rc" / "PKGBUILD").resolve()
         package_dir = pkgbuild.parent
         repo = (args.repo or root / "repos" / "linux-next").resolve()
         worktree = (args.worktree or root / "repos" / "_audit").resolve()

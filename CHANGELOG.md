@@ -15,6 +15,99 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc6-1-sleepy-next (linux-next `next-20261009`)]: 2026-10-11
+
+The repository is now **two packages**. `sleepy-next/` became **`sleepy-rc/`** by
+`git mv` — same series, same patch numbers, renamed package — and `sleepy-next/`
+was recreated as the **linux-next snapshot preview**. Each sets its own
+`_pkgsuffix`, which drives both `pkgbase` and the kernel release, so the two
+install side by side: distinct module directories, distinct boot artefacts,
+distinct pacman packages.
+
+> **Version caveat.** The preview's kernel release is
+> `7.3.0-rc6-1-sleepy-next` — byte-identical to the rc6 build's, because
+> `localversion.20-pkgname` deliberately strips the snapshot date and
+> `_pkgsuffix` no longer carries it. The two are indistinguishable by `uname -r`.
+> Not changed this session, deliberately: kernel identity is not worth editing
+> untested. Recorded as a recommendation.
+
+### Added — the preview package
+
+| | |
+|---|---|
+| Base | linux-next `next-20261009`, tag `becb95e45ef0` |
+| Tree `Makefile` | `7.3.0-rc6` |
+| Package | `linux-sleepy-next-7.3.0_rc6-1` |
+
+`prepare()` **skips** patches that no longer apply rather than failing, so an
+unstable base still yields a build. Of **239** `source=()` entries, **99 applied
+and 140 were skipped**.
+
+### Excluded from `source=()` — two groups that cannot be carried partially
+
+- **`1008`/`1012`/`1013`/`1014`/`1017`** (amdgpu TLB-invalidation rework).
+  `1008`, which declares `tlb_inv_num_dw` and `amdgpu_emit_tlb_inv()`, no longer
+  applies, while `1012`/`1013` consume exactly those. A partially applied rework
+  does not compile.
+- **`9060`** (amdkfd fault-window skip). Upstream already has
+  `svm_range_window_resident()` in this snapshot, so the patch applied *and*
+  inserted a second definition — `error: redefinition`. This is the trap where a
+  clean apply proves nothing: an absorbed carry re-applies rather than failing.
+
+`sleepy-rc` retains all six. `sleepy-next/PATCH_SOURCES.md` records the detail.
+
+### Regenerated — `2419` (BORE) rebased
+
+The snapshot added `update_protect_slice()`, which reads
+`normalized_sysctl_sched_base_slice`. BORE wraps the sibling
+`set_protect_slice()` in `#ifdef CONFIG_SCHED_BORE` and supplies its own slice,
+so under BORE that symbol is never declared. One hunk was added, giving
+`update_protect_slice()` the wrapper BORE already uses. Reuses BORE's own idiom
+verbatim; no `.rej`, and no `normalized_…` use remains outside an `#else` arm.
+
+### Known gap — BBR3 and LRU-MARIE are NOT in this preview
+
+Both carries fail against this base and are skipped, so the preview has **no
+BBR3** (`CONFIG_TCP_CONG_BBR3` absent) and **no LRU-MARIE**
+(`CONFIG_LRU_MARIE` absent). Measured, not assumed: the dumped config has
+neither symbol.
+
+Failing hunks, by file — **`0101-cachy-bbr3` (6)**: `bpf_tcp_ca.c` ×2,
+`tcp_bbr.c` ×2, `tcp_output.c`, `include/net/tcp.h`, `tcp_ca_kfunc.c` (selftest).
+**`2101` MARIE (8)**: `memcontrol.h`, `mm/Kconfig`, `page_alloc.c` ×2,
+`page_io.c`, `mm/swap.h`, `vmscan.c` ×2.
+
+Some are "absorbed upstream" — in `include/net/tcp.h` the snapshot already has
+`u32 (*tso_segs)(struct sock *sk, u32 mss_now)` with a new comment, so BBR3's
+`min_tso_segs`→`tso_segs` half is redundant and only its `skb_marked_lost`
+addition is still needed. The rest need real ports. Neither has an upstream
+version for this base: CachyOS's newest branch is `7.3`, sirlucjan's newest tree
+is `7.3-rc`, and firelzrd's newest MARIE is `v0.11.1r2 for Linux 7.3` — the
+patch we already carry.
+
+**Do not hand-rebase these into a bootable kernel unattended.** They touch TCP
+and mm internals; the correct path is a version-bump session, which is where the
+CachyOS squashes are regenerated.
+
+### Cmdline
+
+`amdgpu.dcdebugmask=0x800` (DC_DISABLE_IPS) is dropped in the preview only, so
+the snapshot's display code runs with IPS enabled. `sleepy-rc` keeps it.
+
+### Verified
+
+Built with Clang/ThinLTO as usual. `.BTF` (section 16) and `.BTF_ids`
+(section 17) present in the extracted vmlinux. `CONFIG_SCHED_BORE=y`,
+`CONFIG_CPU_IDLE_GOV_NAP=y`, `CONFIG_DEBUG_INFO_BTF=y`,
+`CONFIG_DEBUG_INFO_DWARF5=y` (not `DWARF_TOOLCHAIN_DEFAULT`), and
+`CONFIG_LOCALVERSION=""`. `CONFIG_TCP_CONG_BBR` is **not set**, so the BBR/BBR3
+BTF kfunc collision cannot arise — neither is built here.
+
+Also checked against the snapshot, since they were candidates: the HDMI FRL fix
+`495606b324cd` is **already upstream** in `next-20261009`
+(`amdgpu_dm_connector.c` carries the `link_active` guard, and the commit
+reverse-applies cleanly), so it needs no carry.
+
 ## [7.3.0-rc6-1-sleepy-next]: 2026-10-05
 
 ### Changed — rebased to mainline `v7.3-rc6`

@@ -1,0 +1,93 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Zhu Lingshan <lingshan.zhu@amd.com>
+To: <Alexander.Deucher@amd.com>, <felix.kuehling@amd.com>
+CC: <Ray.Huang@amd.com>, <amd-gfx@lists.freedesktop.org>, Zhu Lingshan <lingshan.zhu@amd.com>
+Subject: [PATCH RESEND 05/10] drm/amdgpu: implement asynchronous userq destruction routine
+Date: Mon, 14 Sep 2026 21:07:19 +0800
+Message-ID: <20260914130724.130794-6-lingshan.zhu@amd.com>
+
+The last kref of a user queue may be released
+from a context where can not sleep or
+require an alrady hold lock(reset_domain->sem, reset_mutext, etc)
+in the same context.
+
+This commit helps resovle these issues by refactoring
+the user queue destruction function to a deferred
+work item, so it does not conflict with the caller context.
+
+Signed-off-by: Zhu Lingshan <lingshan.zhu@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c | 15 ++++++++++++---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_userq.h |  7 +++++++
+ 2 files changed, 19 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+index f398986a61a5..9fe20cb9af58 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+@@ -596,11 +596,11 @@ amdgpu_userq_destroy(struct amdgpu_userq_mgr *uq_mgr, struct amdgpu_usermode_que
+ 	return r;
+ }
+ 
+-static void amdgpu_userq_kref_destroy(struct kref *kref)
++static void amdgpu_userq_destroy_worker(struct work_struct *work)
+ {
+ 	int r;
+ 	struct amdgpu_usermode_queue *queue =
+-		container_of(kref, struct amdgpu_usermode_queue, refcount);
++		container_of(work, struct amdgpu_usermode_queue, destroy_work);
+ 	struct amdgpu_userq_mgr *uq_mgr = queue->userq_mgr;
+ 
+ 	r = amdgpu_userq_destroy(uq_mgr, queue);
+@@ -610,6 +610,14 @@ static void amdgpu_userq_kref_destroy(struct kref *kref)
+ 	amdgpu_userq_mgr_dec_refs(uq_mgr);
+ }
+ 
++static void amdgpu_userq_kref_release(struct kref *kref)
++{
++	struct amdgpu_usermode_queue *queue =
++		container_of(kref, struct amdgpu_usermode_queue, refcount);
++
++	WARN_ON_ONCE(!queue_work(system_unbound_wq, &queue->destroy_work));
++}
++
+ struct amdgpu_usermode_queue *amdgpu_userq_get(struct amdgpu_userq_mgr *uq_mgr, u32 qid)
+ {
+ 	struct amdgpu_usermode_queue *queue;
+@@ -656,7 +664,7 @@ amdgpu_lookup_queue_by_doorbell(struct xarray *xa, u32 doorbell)
+ void amdgpu_userq_put(struct amdgpu_usermode_queue *queue)
+ {
+ 	if (queue)
+-		kref_put(&queue->refcount, amdgpu_userq_kref_destroy);
++		kref_put(&queue->refcount, amdgpu_userq_kref_release);
+ }
+ 
+ static int amdgpu_userq_priority_permit(struct drm_file *filp,
+@@ -724,6 +732,7 @@ amdgpu_userq_create(struct drm_file *filp, union drm_amdgpu_userq *args)
+ 	amdgpu_userq_mgr_inc_refs(uq_mgr);
+ 	INIT_DELAYED_WORK(&queue->hang_detect_work,
+ 			  amdgpu_userq_hang_detect_work);
++	INIT_WORK(&queue->destroy_work, amdgpu_userq_destroy_worker);
+ 
+ 	r = amdgpu_userq_fence_driver_alloc(adev, &queue->fence_drv);
+ 	if (r)
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.h b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.h
+index a13d8d4dd5c7..ecc450be7eb2 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.h
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.h
+@@ -87,6 +87,13 @@ struct amdgpu_usermode_queue {
+ 	 * Delayed work which runs when userq_fences time out.
+ 	 */
+ 	struct delayed_work	hang_detect_work;
++
++	/**
++	 * @destroy_work:
++	 *
++	 * Work struct used to destroy the queue when kref == 0
++	 */
++	struct work_struct	destroy_work;
+ 	struct kref		refcount;
+ 
+ 	union {
+-- 
+2.53.0

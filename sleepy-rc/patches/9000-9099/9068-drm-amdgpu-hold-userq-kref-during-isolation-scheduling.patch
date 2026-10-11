@@ -1,0 +1,151 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Zhu Lingshan <lingshan.zhu@amd.com>
+To: <Alexander.Deucher@amd.com>, <felix.kuehling@amd.com>
+CC: <Ray.Huang@amd.com>, <amd-gfx@lists.freedesktop.org>, Zhu Lingshan <lingshan.zhu@amd.com>
+Subject: [PATCH RESEND 07/10] drm/amdgpu: hold userq kref during isolation scheduling
+Date: Mon, 14 Sep 2026 21:07:21 +0800
+Message-ID: <20260914130724.130794-8-lingshan.zhu@amd.com>
+
+The enforce-isolation stop and start handlers
+iterate the doorbell XArray, but process a user queue
+without holding its kref. Therefore, a concurrent queue
+destruction process can free a queue before these paths
+finish their work, causing use-after-free problems.
+
+This commit fixes this issue by introducing a new helper
+amdgpu_userq_xa_find() which finds a queue from a XArray
+and hold its kref, and employ this helper in the
+enforce-isolation stop and start handlers.
+
+Signed-off-by: Zhu Lingshan <lingshan.zhu@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c | 72 +++++++++++++++++++++--
+ 1 file changed, 68 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+index 9fe20cb9af58..1427ff175dab 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+@@ -661,6 +661,54 @@ amdgpu_lookup_queue_by_doorbell(struct xarray *xa, u32 doorbell)
+ 	return queue;
+ }
+ 
++/**
++ * amdgpu_userq_xa_find - search the XArray for a queue
++ * @xa: user queue XArray
++ * @index: first index to search, updated by every iteration of the search
++ *
++ * Return: a queue which has the lowest index that is at least @index,
++ * or NULL when no queue was found.
++ *
++ * The caller must release the kref of a queue with amdgpu_userq_put() after use.
++ */
++static struct amdgpu_usermode_queue *
++amdgpu_userq_xa_find(struct xarray *xa, unsigned long *index)
++{
++	struct amdgpu_usermode_queue *queue;
++	unsigned long flags;
++
++	xa_lock_irqsave(xa, flags);
++	queue = xa_find(xa, index, ULONG_MAX, XA_PRESENT);
++	while (queue) {
++		/*
++		 * If found a queue but failed to get a kref,
++		 * it means the queue is in destruction process,
++		 * so skip it by continuing the loop.
++		 *
++		 * If get a kref of the queue, break the loop and return it.
++		 */
++		if (kref_get_unless_zero(&queue->refcount))
++			break;
++
++		/*
++		 * If the index is ULONG_MAX, we have reached the end of the XArray.
++		 * Break the loop and return NULL because ULONG_MAX + 1 = 0,
++		 * which is the start of the XArray.
++		 */
++		if (*index == ULONG_MAX) {
++			queue = NULL;
++			break;
++		}
++
++		(*index)++;
++		queue = xa_find(xa, index, ULONG_MAX, XA_PRESENT);
++	}
++
++	xa_unlock_irqrestore(xa, flags);
++
++	return queue;
++}
++
+ void amdgpu_userq_put(struct amdgpu_usermode_queue *queue)
+ {
+ 	if (queue)
+@@ -1496,7 +1544,7 @@ int amdgpu_userq_stop_sched_for_enforce_isolation(struct amdgpu_device *adev,
+ 	u32 ip_mask = amdgpu_userq_get_supported_ip_mask(adev);
+ 	struct amdgpu_usermode_queue *queue;
+ 	struct amdgpu_userq_mgr *uqm;
+-	unsigned long queue_id;
++	unsigned long queue_id = 0;
+ 	int ret = 0, r;
+ 
+ 	/* only need to stop gfx/compute */
+@@ -1506,7 +1554,8 @@ int amdgpu_userq_stop_sched_for_enforce_isolation(struct amdgpu_device *adev,
+ 	if (adev->userq_halt_for_enforce_isolation)
+ 		dev_warn(adev->dev, "userq scheduling already stopped!\n");
+ 	adev->userq_halt_for_enforce_isolation = true;
+-	xa_for_each(&adev->userq_doorbell_xa, queue_id, queue) {
++	queue = amdgpu_userq_xa_find(&adev->userq_doorbell_xa, &queue_id);
++	while (queue) {
+ 		uqm = queue->userq_mgr;
+ 		cancel_delayed_work_sync(&uqm->resume_work);
+ 		mutex_lock(&uqm->userq_mutex);
+@@ -1518,6 +1567,13 @@ int amdgpu_userq_stop_sched_for_enforce_isolation(struct amdgpu_device *adev,
+ 				ret = r;
+ 		}
+ 		mutex_unlock(&uqm->userq_mutex);
++		amdgpu_userq_put(queue);
++
++		if (queue_id == ULONG_MAX)
++			break;
++		queue_id++;
++		queue = amdgpu_userq_xa_find(&adev->userq_doorbell_xa,
++					     &queue_id);
+ 	}
+ 
+ 	return ret;
+@@ -1529,7 +1585,7 @@ int amdgpu_userq_start_sched_for_enforce_isolation(struct amdgpu_device *adev,
+ 	u32 ip_mask = amdgpu_userq_get_supported_ip_mask(adev);
+ 	struct amdgpu_usermode_queue *queue;
+ 	struct amdgpu_userq_mgr *uqm;
+-	unsigned long queue_id;
++	unsigned long queue_id = 0;
+ 	int ret = 0, r;
+ 
+ 	/* only need to stop gfx/compute */
+@@ -1541,7 +1597,8 @@ int amdgpu_userq_start_sched_for_enforce_isolation(struct amdgpu_device *adev,
+ 
+ 	adev->userq_halt_for_enforce_isolation = false;
+ 
+-	xa_for_each(&adev->userq_doorbell_xa, queue_id, queue) {
++	queue = amdgpu_userq_xa_find(&adev->userq_doorbell_xa, &queue_id);
++	while (queue) {
+ 		uqm = queue->userq_mgr;
+ 		mutex_lock(&uqm->userq_mutex);
+ 		if (((queue->queue_type == AMDGPU_HW_IP_GFX) ||
+@@ -1552,6 +1609,13 @@ int amdgpu_userq_start_sched_for_enforce_isolation(struct amdgpu_device *adev,
+ 				ret = r;
+ 		}
+ 		mutex_unlock(&uqm->userq_mutex);
++		amdgpu_userq_put(queue);
++
++		if (queue_id == ULONG_MAX)
++			break;
++		queue_id++;
++		queue = amdgpu_userq_xa_find(&adev->userq_doorbell_xa,
++					     &queue_id);
+ 	}
+ 
+ 	return ret;
+-- 
+2.53.0

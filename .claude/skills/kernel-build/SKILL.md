@@ -4,9 +4,10 @@ description: >
   Builds sleepy-kernel with makepkg and verifies the result — BTF, net-tune, and the built-in cmdline. Use when asked to build the kernel, when a build fails on a patch or hunk, or to verify BTF/vmlinux after a build.
 ---
 
-> Repo is single-package: everything here lives in `sleepy-next/`. Unless a step
-> says otherwise, `cd sleepy-next` first. From the repo root, prefix paths with
-> `sleepy-next/`.
+> Two packages share one patch series: `sleepy-rc/` is the mainline
+> package and `sleepy-next/` is the linux-next preview. These workflows target
+> **`sleepy-rc/`** unless a step says otherwise — `cd sleepy-rc` first, and from
+the repo root prefix paths with `sleepy-rc/`.
 
 # Kernel build
 

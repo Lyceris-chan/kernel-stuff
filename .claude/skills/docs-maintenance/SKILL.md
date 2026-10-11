@@ -4,9 +4,10 @@ description: >
   Updates sleepy-kernel documentation and commits the result after a maintenance session: README, GUIDE, PATCH_SOURCES.md, and CHANGELOG.md. Use when asked to update the docs, record patch provenance, write a commit message, or commit a maintenance result.
 ---
 
-> Repo is single-package: everything here lives in `sleepy-next/`. Unless a step
-> says otherwise, `cd sleepy-next` first. From the repo root, prefix paths with
-> `sleepy-next/`.
+> Two packages share one patch series: `sleepy-rc/` is the mainline
+> package and `sleepy-next/` is the linux-next preview. These workflows target
+> **`sleepy-rc/`** unless a step says otherwise — `cd sleepy-rc` first, and from
+the repo root prefix paths with `sleepy-rc/`.
 
 # Docs maintenance & commit
 

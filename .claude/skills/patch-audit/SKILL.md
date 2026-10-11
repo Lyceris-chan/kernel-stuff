@@ -4,9 +4,10 @@ description: >
   Ingests or upgrades one named kernel patch — adds a commit or series, swaps a revision, and verifies provenance, symbol existence, and that it applies cleanly. Use when given a specific patch, commit, or series to bring into the tree, or to audit an existing entry. For the periodic all-source sweep, use patch-sweep instead.
 ---
 
-> Repo is single-package: everything here lives in `sleepy-next/`. Unless a step
-> says otherwise, `cd sleepy-next` first. From the repo root, prefix paths with
-> `sleepy-next/`.
+> Two packages share one patch series: `sleepy-rc/` is the mainline
+> package and `sleepy-next/` is the linux-next preview. These workflows target
+> **`sleepy-rc/`** unless a step says otherwise — `cd sleepy-rc` first, and from
+the repo root prefix paths with `sleepy-rc/`.
 
 # Patch Audit & Ingestion
 
@@ -16,7 +17,7 @@ Never scrape `lore.kernel.org` — its anti-bot protection blocks agents.
 
 All apply-checks and symbol greps target the **base tree**: a `git worktree` of
 `repos/linux-next` checked out at the PKGBUILD's `_srctag` (read it from
-`sleepy-next/PKGBUILD` — it moves with every bump).
+`sleepy-rc/PKGBUILD` — it moves with every bump).
 Create one with
 
 ```bash

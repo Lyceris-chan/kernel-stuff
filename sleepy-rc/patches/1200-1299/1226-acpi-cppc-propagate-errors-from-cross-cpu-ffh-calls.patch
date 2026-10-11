@@ -1,0 +1,173 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Christian Loehle <christian.loehle@arm.com>
+Subject: [PATCH v7 17/20] ACPI: CPPC: Propagate errors from cross-CPU FFH calls
+Date: Wed, 16 Sep 2026 17:28:02 +0100
+
+	by smtp.subspace.kernel.org (Postfix) with ESMTP id C4AB75A9869;
+	Wed, 16 Sep 2026 16:29:42 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=217.140.110.172
+ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
+	t=1789576187; cv=none; b=A8OqNUsacSBtc4cXlvJCuMURnauBH4ggOUtI1vQPic/VCDL5VPEVi2DvfcRJ8w9iAQ5rzDW+C/WuISe91JnUpDiG8TA/OSLbiiVGxIKvcg3GhjpHCQ1IN7URUnj5ByqW+EAR8bR2UZavb1cBzWL68e/zrLy5BZ7z1qdEaNQ66Ow=
+ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
+	s=arc-20240116; t=1789576187; c=relaxed/simple;
+	bh=wXKQoHwSGPiZJlMjn/ELdHKMrUAbjo2VwzzGOf424RU=;
+	h=From:To:Cc:Subject:Date:Message-Id:In-Reply-To:References:
+	 MIME-Version; b=N22qTnDcPUUyVQLdVttcOTf89YIVYf0KBpOrEGJyarrAmigD7SUq93xQB7hTCGoyCrLPiSWeHk5qLL2CcZjRjhTtq4/ePpujUKrwsaI29jOGmU8BycnIBviLqcBDERmlQRHKkzC+0LsOBPwonHpnUT7mS4EBfwkiOVM8UO9ND0Y=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=arm.com; spf=pass smtp.mailfrom=arm.com; dkim=pass (1024-bit key) header.d=arm.com header.i=@arm.com header.b=lvuh7cHe; arc=none smtp.client-ip=217.140.110.172
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=arm.com
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=arm.com
+Authentication-Results: smtp.subspace.kernel.org;
+	dkim=pass (1024-bit key) header.d=arm.com header.i=@arm.com header.b="lvuh7cHe"
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.121.207.14])
+	by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 752F0176A;
+	Wed, 16 Sep 2026 09:29:38 -0700 (PDT)
+Received: from e127648.carmbridge.arm.com (unknown [10.0.129.72])
+	by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 819803F7B4;
+	Wed, 16 Sep 2026 09:29:39 -0700 (PDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=arm.com; s=foss;
+	t=1789576182; bh=wXKQoHwSGPiZJlMjn/ELdHKMrUAbjo2VwzzGOf424RU=;
+	h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+	b=lvuh7cHeao6i1+dVt4gyVhS/W6KfGIHZKqgr2f0WNAaNua4LGVdUXJIoHNsK3E59l
+	 5XzhFuMlVQ1k4svCx1LloyK8k7ptretjGTInRZSbEu0RG3YHAIrM38yUc2BPNx8WmA
+	 c3Tfkz7dNQnfi+AYy+kZ2nyr+YZ3XxVhQ2NzPtuE=
+From: Christian Loehle <christian.loehle@arm.com>
+To: "Rafael J . Wysocki" <rafael@kernel.org>,
+	Viresh Kumar <viresh.kumar@linaro.org>
+Cc: linux-pm@vger.kernel.org,
+	linux-acpi@vger.kernel.org,
+	linux-kernel@vger.kernel.org,
+	Len Brown <lenb@kernel.org>,
+	Jie Zhan <zhanjie9@hisilicon.com>,
+	Lifeng Zheng <zhenglifeng1@huawei.com>,
+	Pierre Gondois <pierre.gondois@arm.com>,
+	Sumit Gupta <sumitg@nvidia.com>,
+	Sudeep Holla <sudeep.holla@arm.com>,
+	Ionela Voinescu <ionela.voinescu@arm.com>,
+	zhongqiu.han@oss.qualcomm.com,
+	Christian Loehle <christian.loehle@arm.com>,
+	stable@vger.kernel.org
+Subject: [PATCH v7 17/20] ACPI: CPPC: Propagate errors from cross-CPU FFH calls
+Date: Wed, 16 Sep 2026 17:28:02 +0100
+Message-Id: <20260916162805.1039247-18-christian.loehle@arm.com>
+X-Mailer: git-send-email 2.34.1
+In-Reply-To: <20260916162805.1039247-1-christian.loehle@arm.com>
+References: <20260916162805.1039247-1-christian.loehle@arm.com>
+Precedence: bulk
+X-Mailing-List: linux-pm@vger.kernel.org
+List-Id: <linux-pm.vger.kernel.org>
+List-Subscribe: <mailto:linux-pm+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:linux-pm+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+
+The arm64 and RISC-V CPPC FFH accessors ignore the return value of
+smp_call_function_single(). If the target CPU is offline, the call can
+return -ENXIO without running the callback. The accessors then consume
+callback output which was never initialized and may report success.
+
+CPU offlining leaves the CPU's CPPC sysfs attributes present. On arm64,
+the AMU feature mask does not exclude an offline CPU, so a paired counter
+read can expose uninitialized stack values through feedback_ctrs. RISC-V
+has the same problem in both SBI and CSR reads, and its write paths also
+inspect an uninitialized callback status after a failed cross-CPU call.
+
+Return the SMP call error before using callback output. The arm64 single
+and paired counter readers already check the helper's return value. For
+RISC-V, also check the callback status before copying a read value: an
+unsupported CSR sets the error but does not initialize the value.
+
+Fixes: 68c5debcc06d ("arm64: implement CPPC FFH support using AMUs")
+Fixes: 30f3ffbee86b ("ACPI: RISC-V: Add CPPC driver")
+Cc: stable@vger.kernel.org
+Signed-off-by: Christian Loehle <christian.loehle@arm.com>
+---
+ arch/arm64/kernel/topology.c |  2 +-
+ drivers/acpi/riscv/cppc.c    | 26 ++++++++++++++++++++------
+ 2 files changed, 21 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 2c030e78d5e4..55bd8fa3e95c 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -427,7 +427,7 @@ int counters_read_on_cpu(int cpu, smp_call_func_t func, void *val)
+ 			return -EPERM;
+ 		func(val);
+ 	} else {
+-		smp_call_function_single(cpu, func, val, 1);
++		return smp_call_function_single(cpu, func, val, 1);
+ 	}
+ 
+ 	return 0;
+diff --git a/drivers/acpi/riscv/cppc.c b/drivers/acpi/riscv/cppc.c
+index 42c1a9052470..4ea4ddedd91f 100644
+--- a/drivers/acpi/riscv/cppc.c
++++ b/drivers/acpi/riscv/cppc.c
+@@ -97,6 +97,7 @@ bool cpc_ffh_supported(void)
+ int cpc_read_ffh(int cpu, struct cpc_reg *reg, u64 *val)
+ {
+ 	struct sbi_cppc_data data;
++	int ret;
+ 
+ 	if (WARN_ON_ONCE(irqs_disabled()))
+ 		return -EPERM;
+@@ -107,19 +108,27 @@ int cpc_read_ffh(int cpu, struct cpc_reg *reg, u64 *val)
+ 
+ 		data.reg = FFH_CPPC_SBI_REG(reg->address);
+ 
+-		smp_call_function_single(cpu, sbi_cppc_read, &data, 1);
++		ret = smp_call_function_single(cpu, sbi_cppc_read, &data, 1);
++		if (ret)
++			return ret;
++		if (data.ret.error)
++			return sbi_err_map_linux_errno(data.ret.error);
+ 
+ 		*val = data.ret.value;
+ 
+-		return (data.ret.error) ? sbi_err_map_linux_errno(data.ret.error) : 0;
++		return 0;
+ 	} else if (FFH_CPPC_TYPE(reg->address) == FFH_CPPC_CSR) {
+ 		data.reg = FFH_CPPC_CSR_NUM(reg->address);
+ 
+-		smp_call_function_single(cpu, cppc_ffh_csr_read, &data, 1);
++		ret = smp_call_function_single(cpu, cppc_ffh_csr_read, &data, 1);
++		if (ret)
++			return ret;
++		if (data.ret.error)
++			return data.ret.error;
+ 
+ 		*val = data.ret.value;
+ 
+-		return data.ret.error;
++		return 0;
+ 	}
+ 
+ 	return -EINVAL;
+@@ -128,6 +137,7 @@ int cpc_read_ffh(int cpu, struct cpc_reg *reg, u64 *val)
+ int cpc_write_ffh(int cpu, struct cpc_reg *reg, u64 val)
+ {
+ 	struct sbi_cppc_data data;
++	int ret;
+ 
+ 	if (WARN_ON_ONCE(irqs_disabled()))
+ 		return -EPERM;
+@@ -139,14 +149,18 @@ int cpc_write_ffh(int cpu, struct cpc_reg *reg, u64 val)
+ 		data.reg = FFH_CPPC_SBI_REG(reg->address);
+ 		data.val = val;
+ 
+-		smp_call_function_single(cpu, sbi_cppc_write, &data, 1);
++		ret = smp_call_function_single(cpu, sbi_cppc_write, &data, 1);
++		if (ret)
++			return ret;
+ 
+ 		return (data.ret.error) ? sbi_err_map_linux_errno(data.ret.error) : 0;
+ 	} else if (FFH_CPPC_TYPE(reg->address) == FFH_CPPC_CSR) {
+ 		data.reg = FFH_CPPC_CSR_NUM(reg->address);
+ 		data.val = val;
+ 
+-		smp_call_function_single(cpu, cppc_ffh_csr_write, &data, 1);
++		ret = smp_call_function_single(cpu, cppc_ffh_csr_write, &data, 1);
++		if (ret)
++			return ret;
+ 
+ 		return data.ret.error;
+ 	}

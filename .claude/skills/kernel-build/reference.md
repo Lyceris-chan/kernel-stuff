@@ -14,7 +14,7 @@ Detail doc for the `kernel-build` skill. Load it when touching `prepare()`,
 
 ## `scripts/config` calls in `prepare()`
 
-These mirror `sleepy-next/PKGBUILD`. Read the PKGBUILD for the authoritative
+These mirror `sleepy-rc/PKGBUILD`. Read the PKGBUILD for the authoritative
 list — this is the rationale, not a second source of truth.
 
 ```bash
@@ -121,11 +121,11 @@ echo "-${pkgbase#linux-}" > localversion.20-pkgname
 scripts/config --set-str LOCALVERSION ""
 ```
 
-Resolves to `uname -r` → `<version>-<pkgrel>-sleepy-next`.
+Resolves to `uname -r` → `<version>-<pkgrel>-sleepy-rc`.
 
 ## net-tune
 
-See `sleepy-next/net-tune/README.md` for the service, its configuration, and the
+See `sleepy-rc/net-tune/README.md` for the service, its configuration, and the
 manual verification commands.
 
 ## Why not `ld.mold`

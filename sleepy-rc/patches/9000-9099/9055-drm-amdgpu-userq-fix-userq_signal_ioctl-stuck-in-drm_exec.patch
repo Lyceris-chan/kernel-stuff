@@ -1,0 +1,69 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Yogesh Mohan Marimuthu <yogesh.mohanmarimuthu@amd.com>
+To: <amd-gfx@lists.freedesktop.org>
+CC: <alexander.deucher@amd.com>, <christian.koenig@amd.com>, <sukhatri@amd.com>, Yogesh Mohan Marimuthu <yogesh.mohanmarimuthu@amd.com>
+Subject: [PATCH] drm/amdgpu/userq: fix userq_signal_ioctl stuck in drm_exec_until_all_locked()
+Date: Mon, 7 Sep 2026 14:17:19 +0530
+Message-ID: <20260907084719.3972-1-yogesh.mohanmarimuthu@amd.com>
+
+If in userq_signal_ioctl only bo_write_handles is passed and
+num_bo_read_handles is zero then if there is contention the code is stuck
+in drm_exec_until_all_locked()
+
+This happens because read bo's are handled first and then write bo's in
+drm_exec_until_all_locked loop. When there is contention in one of the
+write bo, exec->contended bo is set and the loop is retried, but
+read bo is zero, still drm_exec_retry_on_contention() macro for read bo
+is executed without drm_exec_lock_contended() getting executed.
+drm_exec_retry_on_contention will keep going to beginning of the loop
+causing infinite loop.
+
+Fix this by only locking and reserving fence for bo only if there are
+bo passed userq_signal_ioctl.
+
+Observed this issue when testing with MR
+https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/40808
+
+Signed-off-by: Yogesh Mohan Marimuthu <yogesh.mohanmarimuthu@amd.com>
+---
+ .../gpu/drm/amd/amdgpu/amdgpu_userq_fence.c   | 24 +++++++++++--------
+ 1 file changed, 14 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c
+index c270635c9..135e77837 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c
+@@ -572,17 +572,21 @@ int amdgpu_userq_signal_ioctl(struct drm_device *dev, void *data,
+ 		      (num_read_bo_handles + num_write_bo_handles));
+ 
+ 	drm_exec_until_all_locked(&exec) {
+-		r = drm_exec_prepare_array(&exec, gobj_read,
+-					   num_read_bo_handles, 1);
+-		drm_exec_retry_on_contention(&exec);
+-		if (r)
+-			goto exec_fini;
++		if (num_read_bo_handles) {
++			r = drm_exec_prepare_array(&exec, gobj_read,
++						   num_read_bo_handles, 1);
++			drm_exec_retry_on_contention(&exec);
++			if (r)
++				goto exec_fini;
++		}
+ 
+-		r = drm_exec_prepare_array(&exec, gobj_write,
+-					   num_write_bo_handles, 1);
+-		drm_exec_retry_on_contention(&exec);
+-		if (r)
+-			goto exec_fini;
++		if (num_write_bo_handles) {
++			r = drm_exec_prepare_array(&exec, gobj_write,
++						   num_write_bo_handles, 1);
++			drm_exec_retry_on_contention(&exec);
++			if (r)
++				goto exec_fini;
++		}
+ 	}
+ 
+ 	/* And publish the new fence in the BOs and syncobj */
+-- 
+2.43.0

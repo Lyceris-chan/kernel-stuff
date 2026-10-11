@@ -4,9 +4,10 @@ description: >
   Bumps sleepy-kernel to a new Linux RC or release and refreshes the CachyOS 01xx squashes that no longer apply. Use when asked to move to a new -rcN or release, or to regenerate the CachyOS branch squashes.
 ---
 
-> Repo is single-package: everything here lives in `sleepy-next/`. Unless a step
-> says otherwise, `cd sleepy-next` first. From the repo root, prefix paths with
-> `sleepy-next/`.
+> Two packages share one patch series: `sleepy-rc/` is the mainline
+> package and `sleepy-next/` is the linux-next preview. These workflows target
+> **`sleepy-rc/`** unless a step says otherwise — `cd sleepy-rc` first, and from
+the repo root prefix paths with `sleepy-rc/`.
 
 # Kernel version bump
 
@@ -20,7 +21,7 @@ Stop and tell the user if this 404s — don't guess a nearby tag or round to one
 that exists.
 
 **linux-next snapshots are a fallback, not a target.** There is one package
-(`sleepy-next/`), and it tracks **mainline RCs**. Only build from a
+(`sleepy-rc/`), and it tracks **mainline RCs**. Only build from a
 `next-YYYYMMDD` snapshot when the RC line is genuinely unusable — bump
 `_srctag` to the snapshot and run the `patch-sweep` linux-next step afterwards.
 Never bump to a tag that does not exist yet.

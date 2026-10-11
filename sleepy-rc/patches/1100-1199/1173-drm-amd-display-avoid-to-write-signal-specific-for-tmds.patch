@@ -1,0 +1,71 @@
+From: Fangzhi Zuo <jerry.zuo@amd.com>
+Date: Thu, 24 Sep 2026 14:45:36 -0400
+Subject: [PATCH] drm/amd/display: avoid to write signal specific for tmds
+
+From: Charlene Liu <Charlene.Liu@amd.com>
+
+[why]
+some panel will generate HPD if receive invalid the action.
+
+Signed-off-by: Charlene Liu <Charlene.Liu@amd.com>
+Signed-off-by: Fangzhi Zuo <jerry.zuo@amd.com>
+Reviewed-by: Michael Strauss <michael.strauss@amd.com>
+
+diff --git a/drivers/gpu/drm/amd/display/dc/link/link_dpms.c b/drivers/gpu/drm/amd/display/dc/link/link_dpms.c
+index 48b086d15ab0..c009d0fb14ca 100644
+--- a/drivers/gpu/drm/amd/display/dc/link/link_dpms.c
++++ b/drivers/gpu/drm/amd/display/dc/link/link_dpms.c
+@@ -1898,6 +1898,7 @@ static void enable_link_hdmi(struct pipe_ctx *pipe_ctx)
+ 		write_scdc_data(
+ 			stream->link->ddc,
+ 			stream->phy_pix_clk,
++			dc_is_hdmi_frl_signal(pipe_ctx->stream->signal),
+ 			(stream->timing.flags.LTE_340MCSC_SCRAMBLE != 0));
+ 
+ 	if (dc->debug.enable_hdmi_idcc) {
+@@ -2438,6 +2439,7 @@ enum dc_status link_set_dpms_off(struct pipe_ctx *pipe_ctx)
+ 		write_scdc_data(
+ 			link->ddc,
+ 			165000,//vbios only handles 165Mhz.
++			dc_is_hdmi_frl_signal(stream->signal),
+ 			false);
+ 		if (masked_chip_caps == AMD_EXT_DISPLAY_PATH_CAPS__HDMI20_TISN65DP159RSBT) {
+ 			/* DP159, Retimer settings */
+diff --git a/drivers/gpu/drm/amd/display/dc/link/protocols/link_ddc.c b/drivers/gpu/drm/amd/display/dc/link/protocols/link_ddc.c
+index 6123b10977bf..d87f6f377d06 100644
+--- a/drivers/gpu/drm/amd/display/dc/link/protocols/link_ddc.c
++++ b/drivers/gpu/drm/amd/display/dc/link/protocols/link_ddc.c
+@@ -570,6 +570,7 @@ struct ddc *get_ddc_pin(struct ddc_service *ddc_service)
+ 
+ void write_scdc_data(struct ddc_service *ddc_service,
+ 		uint32_t pix_clk,
++		bool is_frl,
+ 		bool lte_340_scramble)
+ {
+ 	bool over_340_mhz = pix_clk > 340000 ? 1 : 0;
+@@ -583,9 +584,10 @@ void write_scdc_data(struct ddc_service *ddc_service,
+ 		(ddc_service->link->local_sink->edid_caps.panel_patch.skip_scdc_overwrite ||
+ 		!ddc_service->link->local_sink->edid_caps.scdc_present))
+ 		return;
+-	hdmi_frl_LTS_clear_Link_Setting(ddc_service);
+-	hdmi_frl_LTS_clear_Update_flag(ddc_service);
+-
++	if (is_frl) {
++		hdmi_frl_LTS_clear_Link_Setting(ddc_service);
++		hdmi_frl_LTS_clear_Update_flag(ddc_service);
++	}
+ 	link_query_ddc_data(ddc_service, slave_address, &offset,
+ 			sizeof(offset), &sink_version, sizeof(sink_version));
+ 	if (sink_version == 1) {
+diff --git a/drivers/gpu/drm/amd/display/dc/link/protocols/link_ddc.h b/drivers/gpu/drm/amd/display/dc/link/protocols/link_ddc.h
+index fdd8a3dce97f..200823954fc6 100644
+--- a/drivers/gpu/drm/amd/display/dc/link/protocols/link_ddc.h
++++ b/drivers/gpu/drm/amd/display/dc/link/protocols/link_ddc.h
+@@ -91,6 +91,7 @@ uint32_t link_get_fixed_vs_pe_retimer_write_address(struct dc_link *link);
+ void write_scdc_data(
+ 		struct ddc_service *ddc_service,
+ 		uint32_t pix_clk,
++		bool is_frl,
+ 		bool lte_340_scramble);
+ 
+ void read_scdc_data(

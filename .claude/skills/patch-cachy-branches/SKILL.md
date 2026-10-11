@@ -4,9 +4,10 @@ description: >
   Refreshes the CachyOS per-branch squashes (0101–0109) from sirlucjan's separated patch directories. Use when the kernel version bumps, when sirlucjan ships updated branch patches, or when a CachyOS branch patch conflicts.
 ---
 
-> Repo is single-package: everything here lives in `sleepy-next/`. Unless a step
-> says otherwise, `cd sleepy-next` first. From the repo root, prefix paths with
-> `sleepy-next/`.
+> Two packages share one patch series: `sleepy-rc/` is the mainline
+> package and `sleepy-next/` is the linux-next preview. These workflows target
+> **`sleepy-rc/`** unless a step says otherwise — `cd sleepy-rc` first, and from
+the repo root prefix paths with `sleepy-rc/`.
 
 # CachyOS Per-Branch Patch Refresh
 

@@ -1,10 +1,10 @@
 # Source access & fetch guide
 
 > **Package location (2026-09-12).** The repo is single-package: everything this
-> skill touches lives in `sleepy-next/`. Unless a step says otherwise, `cd
-> sleepy-next` first so paths like `PKGBUILD`, `patches/...`, `config`,
+> skill touches lives in `sleepy-rc/`. Unless a step says otherwise, `cd
+> sleepy-rc` first so paths like `PKGBUILD`, `patches/...`, `config`,
 > `net-tune/` and `PATCH_SOURCES.md` resolve. From the repo root, prefix them
-> with `sleepy-next/`.
+> with `sleepy-rc/`.
 
 Per-source fetch commands, archive-access workarounds, and extraction
 gotchas. Referenced from `SKILL.md`.
@@ -140,7 +140,7 @@ gotchas. Referenced from `SKILL.md`.
   amdgpu_dm split; the same content on 7.2 lives in the MONOLITHIC
   `amdgpu_dm.c`. Verify `git apply --check` against the right reference tree
   (`repos/linux-next` for the PKGBUILD series, `repos/linux-next@<next-tag>` for
-  the sleepy-next 7.3 preview — the wannabe worktree is gone) BEFORE deciding
+  the sleepy-rc 7.3 preview — the wannabe worktree is gone) BEFORE deciding
   applicability — "No such file" on `amdgpu_dm_connector.c` means the patch is
   7.3-only.
 

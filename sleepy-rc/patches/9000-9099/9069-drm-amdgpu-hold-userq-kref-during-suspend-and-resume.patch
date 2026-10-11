@@ -1,0 +1,105 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Zhu Lingshan <lingshan.zhu@amd.com>
+To: <Alexander.Deucher@amd.com>, <felix.kuehling@amd.com>
+CC: <Ray.Huang@amd.com>, <amd-gfx@lists.freedesktop.org>, Zhu Lingshan <lingshan.zhu@amd.com>
+Subject: [PATCH RESEND 08/10] drm/amdgpu: hold userq kref during suspend and resume
+Date: Mon, 14 Sep 2026 21:07:22 +0800
+Message-ID: <20260914130724.130794-9-lingshan.zhu@amd.com>
+
+The userq suspend and resume handlers walks the doorbell XArray
+but process a user queuewithout holding its kref.
+
+Therefore, a concurrent queue destruction process can free
+a queue before these handlers finish their work, causing
+an use-after-free problem.
+
+This commit fixes this problem by using
+amdgpu_userq_xa_find helper which properly holds the
+kref of a queue in a loop of searching for queues.
+
+Signed-off-by: Zhu Lingshan <lingshan.zhu@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c | 35 +++++++++++++++++++----
+ 1 file changed, 29 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+index 1427ff175dab..0dab395ef0f4 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+@@ -1493,23 +1493,35 @@ int amdgpu_userq_suspend(struct amdgpu_device *adev)
+ 	u32 ip_mask = amdgpu_userq_get_supported_ip_mask(adev);
+ 	struct amdgpu_usermode_queue *queue;
+ 	struct amdgpu_userq_mgr *uqm;
+-	unsigned long queue_id;
++	unsigned long queue_id = 0;
+ 	int r;
+ 
+ 	if (!ip_mask)
+ 		return 0;
+ 
+-	xa_for_each(&adev->userq_doorbell_xa, queue_id, queue) {
++	queue = amdgpu_userq_xa_find(&adev->userq_doorbell_xa, &queue_id);
++	while (queue) {
+ 		uqm = queue->userq_mgr;
+ 		cancel_delayed_work_sync(&uqm->resume_work);
+-		guard(mutex)(&uqm->userq_mutex);
++		mutex_lock(&uqm->userq_mutex);
+ 		if (adev->in_s0ix)
+ 			r = amdgpu_userq_preempt_helper(queue);
+ 		else
+ 			r = amdgpu_userq_unmap_helper(queue);
++		mutex_unlock(&uqm->userq_mutex);
++		amdgpu_userq_put(queue);
++
+ 		if (r)
+ 			return r;
++
++		if (queue_id == ULONG_MAX)
++			break;
++
++		queue_id++;
++		queue = amdgpu_userq_xa_find(&adev->userq_doorbell_xa,
++					     &queue_id);
+ 	}
++
+ 	return 0;
+ }
+ 
+@@ -1518,21 +1530,32 @@ int amdgpu_userq_resume(struct amdgpu_device *adev)
+ 	u32 ip_mask = amdgpu_userq_get_supported_ip_mask(adev);
+ 	struct amdgpu_usermode_queue *queue;
+ 	struct amdgpu_userq_mgr *uqm;
+-	unsigned long queue_id;
++	unsigned long queue_id = 0;
+ 	int r;
+ 
+ 	if (!ip_mask)
+ 		return 0;
+ 
+-	xa_for_each(&adev->userq_doorbell_xa, queue_id, queue) {
++	queue = amdgpu_userq_xa_find(&adev->userq_doorbell_xa, &queue_id);
++	while (queue) {
+ 		uqm = queue->userq_mgr;
+-		guard(mutex)(&uqm->userq_mutex);
++		mutex_lock(&uqm->userq_mutex);
+ 		if (adev->in_s0ix)
+ 			r = amdgpu_userq_restore_helper(queue);
+ 		else
+ 			r = amdgpu_userq_map_helper(queue);
++		mutex_unlock(&uqm->userq_mutex);
++		amdgpu_userq_put(queue);
++
+ 		if (r)
+ 			return r;
++
++		if (queue_id == ULONG_MAX)
++			break;
++
++		queue_id++;
++		queue = amdgpu_userq_xa_find(&adev->userq_doorbell_xa,
++					     &queue_id);
+ 	}
+ 
+ 	return 0;
+-- 
+2.53.0

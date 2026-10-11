@@ -1,0 +1,32 @@
+From 972a8cd8fba199508a7cec4e65d2e6e4c92e0971 Mon Sep 17 00:00:00 2001
+From: Jesse Zhang <Jesse.Zhang@amd.com>
+Date: Thu, 3 Sep 2026 17:36:14 +0800
+Subject: [PATCH] drm/amdgpu/sdma: add detect_hung_queue callback
+
+Add an optional per-IP callback that maps a user queue's doorbell index
+to its HW slot (instance, queue_id). It is needed to reset a hung SDMA
+user queue over MMIO, since struct amdgpu_usermode_queue does not store
+its HW slot.
+
+Signed-off-by: Jesse Zhang <Jesse.Zhang@amd.com>
+Reviewed-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_sdma.h | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_sdma.h b/drivers/gpu/drm/amd/amdgpu/amdgpu_sdma.h
+index 671cfbb67b7a..659836c2c377 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_sdma.h
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_sdma.h
+@@ -59,6 +59,8 @@ struct amdgpu_sdma_funcs {
+ 	int (*stop_kernel_queue)(struct amdgpu_ring *ring);
+ 	int (*start_kernel_queue)(struct amdgpu_ring *ring);
+ 	int (*soft_reset_kernel_queue)(struct amdgpu_device *adev, u32 instance_id);
++	bool (*detect_hung_queue)(struct amdgpu_device *adev, u32 doorbell_index,
++				  u32 *instance_id, u32 *queue_id);
+ };
+ 
+ struct amdgpu_sdma_instance {
+-- 
+2.55.0
+
