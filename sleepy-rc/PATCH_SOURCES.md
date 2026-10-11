@@ -7424,3 +7424,61 @@ virtual is worth watching, since dkms would pick one.
 deliberately: committing it alone would put a state on `main` where the skills
 point at a directory that no longer exists. The reference update belongs in the
 same commit as the rename.
+
+## Version sweep 2026-10-11 — 21 higher revisions, none adoptable
+
+Every carried patch (245) checked against the highest revision posted across all
+20 mirrors. Postings key on the **normalised subject** with the `vN` extracted,
+never on `n/m` — a resized series renumbers every part while subjects stay put,
+which is how ACPI CPPC v7 was missed on an earlier pass.
+
+**21 carried patches have a higher posted revision. All 21 are rejected, by three
+different filters. Net adoptions: zero.**
+
+### Filter 1 — already merged upstream (2 hits)
+
+`2173` (zswap pool `list_add_rcu`) and `2174` (zswap `ever_enabled`): the carried
+`From <sha>` is **present in linux-next**, so the newer mailing-list revision is
+draft history, not an update. Confirmed by `git cat-file -e` against the trees,
+not by subject.
+
+### Filter 2 — code-identical (16 hits)
+
+`1231`, `1232`, `2032`, `2037`, `2039`, `2045`, `2144`, `2154`, `2171`, `2181`,
+`2183`, `2185`, `2197` — the higher `vN` moves the **changelog**, not the code.
+
+**This filter is easy to get wrong and I got it wrong first.** Comparing
+changed-line sets across the *whole mail body* reported real deltas of 1-7 lines
+for five of these. Every one was a **changelog bullet**: a re-post writes its
+notes as a `-`-prefixed list, and a body-wide `+/-` line set scores those as
+removed code. `2039`'s changelog says outright *"No code changes"*. Restricting
+the line set to the region from `diff --git` onward collapses all sixteen to a
+zero delta. **Compare the diff, never the body.**
+
+### Filter 3 — written against a different base (3 hits)
+
+`2302`, `2308`, `2314` — the kbuild/modpost/objtool build-speedup series, v3 ->
+v4, posted 2026-09-23. Real code deltas (3, 51 and 13 lines). Against the
+**series-applied** tree at `v7.3-rc6` (`repos/_audit`, rebuilt fresh — the
+existing one was at rc5 and would have given a wrong answer) neither reverse nor
+forward applies. The v4 is also a **resized series, `/20` -> `/22`**, so its
+parts are not drop-in replacements for the v3 set we carry.
+
+Per the sweep reference: a genuine content delta does not make a revision
+adoptable. Record as bump items; keep what is carried.
+
+They were also spot-checked against the `next-20261009` snapshot: `2314` applies
+clean there and `2308` mostly does, but adopting parts of a resized series into
+a v3-based set is the incoherence the `/20` -> `/22` note warns about.
+
+### Method notes
+
+- **Reverse-applicability is unreliable here and gave a false positive.** With
+  `-F2` five candidates reported "reverse clean" — i.e. *already carried* — while
+  we plainly carry v1 and the newer revision differs. `-F0` then reported **both**
+  directions clean, which is no verdict at all. Only grepping the tree for the
+  exact added lines settled it (they were changelog text, absent from the tree by
+  construction). Counting the identifier a patch introduces remains the
+  authoritative test.
+- `repos/_audit` must be rebuilt after a bump; it is kept by
+  `audit_series.py --keep` and reused by this pass.
