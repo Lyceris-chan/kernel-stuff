@@ -7482,3 +7482,73 @@ a v3-based set is the incoherence the `/20` -> `/22` note warns about.
   authoritative test.
 - `repos/_audit` must be rebuilt after a bump; it is kept by
   `audit_series.py --keep` and reused by this pass.
+
+## Work items + mailing lists, fresh 2026-10-11 (second pass)
+
+### Work items — 71 updated since 2026-10-05; 22 on-target by title
+
+`x-total: 71` on one page, so this is the set, not a page. Comments pulled over
+GraphQL in batches of 10 (complexity cap 200). Of **65 hex tokens** across the 22
+issues, **10 verified as commits** with `git cat-file -t`; the rest were image
+paths and blob ids, matching the documented ~90% noise rate.
+
+**Every one of the 10 is already ours or already in the base. Zero to adopt.**
+
+| Commit | Status |
+|---|---|
+| `63e19ef3ddab` Atomize IRQ register RMW | **already carried as `1159`** |
+| `9981a9b111fe` Serialize HDMI FRL polling | carried as `1171` |
+| `495606b324cd` Skip FRL polling while link down | **carried as `1172`** *and* in the base |
+| `c953b39f9487` Force validation link training | already in the base |
+| `df94112ceebf` Gate FRL polling on link rate | already in the base (`amdgpu_dm_connector.c:3198`) |
+| `d81e52fc61fb` pp_dpm_xxx missing `*` | already in the base |
+| `239d0ccf567c` smu v14 soft clock freq | already in the base |
+| `c764b7af1528` smu **v13** soft clock freq | SMU v13, not our SMU14 — wrong part |
+| `fe9f3ed36c83` Mac FB workaround | in 7.3-fixes; reported against 780M |
+| `7e5760f084d0` HDMI 2.1 Compliance | assessed earlier, not adopted |
+
+**Correction owed.** The 2026-10-09 entry above records `495606b324cd` as
+"not carried — the candidate" and proposes `1233` for it. **It is carried, as
+`1172`** — both FRL polling patches were adopted after that entry. I repeated the
+stale claim earlier today before checking the series. Grep the series before
+repeating a ledger verdict.
+
+**Reverse-applicability failed again**: `df94112ceebf` reverse-failed against the
+snapshot while its change is plainly at `amdgpu_dm_connector.c:3198`. Third
+occurrence of this class today. Grep the identifier, do not reverse-apply.
+
+### Mailing lists — 8 mirrors refreshed, all current to 2026-10-11/12
+
+Scanned by **author date** (`git log --since` filters on commit date, which lore
+mirrors set oddly and which silently returned zero for every mirror last pass).
+
+**Top candidate, not adopted: `[PATCH v4 0/4] drm/amdgpu: user queue query status`**
+(Prike Liang / Alex Deucher, `lore-amdgfx`).
+
+- userq is **not** Kconfig-gated — `amdgpu_userq.o` and `mes_userqueue.o` are in
+  `amdgpu-y` unconditionally — so this is live code on this machine, and we
+  already carry 11 userq patches.
+- **`1/4` (add UAPI) and `2/4` (implement) apply CLEAN** to both `v7.3-rc6` and
+  the `next-20261009` snapshot, under `git apply --check` and `patch --dry-run`.
+  They carry `Reviewed-by: Christian König`, `Sunil Khatri`, `Prike Liang`.
+- **`3/4` and `4/4` do NOT apply** to either base — dated 2026-10-10, written
+  against something newer than the snapshot. They are error-path refinements
+  (invalid VA, reset-in-progress) on top of 1-2.
+
+**Disposition: report, not adopt.** Two reasons, both deliberate. It is a **UAPI
+addition** — a userspace interface commitment, not a fix — and the series is
+**split**, so adopting means knowingly taking the first half of a four-part set
+whose tail is blocked on a base we do not have. That is a decision to make
+explicitly rather than fold into a sweep. The pair is clean and ready if wanted.
+
+**Other new on-target postings, none adopted**: `drm/amdgpu: preempt KFD queues
+before taking the reset domain lock` (v3), `drm/amdgpu/userq: skip restoring
+guilty or VRAM-lost queues`, `amdkfd: fix doorbell allocation race` (now v2),
+`io_uring/io-wq: don't call try_to_wake_up() twice`, and a `[GIT PULL] io_uring
+fixes for 7.3-rc7` — rc7 is imminent but **not tagged** (verified by ls-remote).
+
+Rejected on hardware: `r8169: allow Giga Lite fallback on RTL8168EP` (RTL8168EP,
+not our RTL8125 — same series rejected before), `drm/amdgpu/ras: MP1
+IP_VERSION(13, 0, 12)`, all sched_ext postings (BORE is the live scheduler;
+`kernel/sched/ext/` is the inert one), arm64/nvmem/nvmet.
+
