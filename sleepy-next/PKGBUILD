@@ -444,6 +444,12 @@ source=(
   "patches/2100-2199/2196-mm-zswap-return-enoent-when-the-swap-device-is-gone.patch"
   "patches/2100-2199/2198-mm-filemap-move-lruvec-accounting-outside-the-xarray-lock.patch"
   "patches/2100-2199/2197-mm-slub-refill-prefilled-sheaves-from-the-barn.patch"
+  # New range 27xx: mm/swap (zswap, xswap). The 21xx MM range is full apart from
+  # 2199, and every other gap in it is a VACATED number (the dropped MGLRU batch,
+  # absorbed carries) which must not be reused, so this series opens a new range
+  # rather than splitting across one.
+  "patches/2700-2799/2700-mm-zswap-use-separate-compression-and-decompression-requests.patch"
+  "patches/2700-2799/2701-mm-zswap-use-stack-requests-for-synchronous-decompression.patch"
   "patches/2200-2299/2200-7.2-nap-v0.5.0.patch"
   "patches/2300-2399/2302-kbuild-do-not-allocate-modinfo-in-vmlinux.patch"
   "patches/2300-2399/2303-kallsyms-index-symbols-by-token-to-speed-up.patch"
@@ -1330,6 +1336,8 @@ b2sums=('28569142d3df12ed5ca2b5f477e769e61fcf4da2b988be33cf1b1e3c9a4b540013f0b36
         'd89984aace72f914a1613b6ef9aff57adf7daa1fdc196af78b11fce9b5ce9680d0ff43d2a44d5e378c7aee54ad0e1450d0349fd6e217d6af2131eeb65310e86c'
         '076ee3f72c6bff1038dbc6689587af14e74bdf9ec1d1780fd29d0287ee238df6acdc1136ca1654bd9a423d0e72e1ab177b8a68625b7793b8650e959cbec41bb1'
         '2d5925e96335d566ee2af286afa0b9f2e37faa40ad0621b4aab9e96b9cec92c0cf1e6182746aa6a69673325c105e46ec16c2b544fac01a5e79cf5d58c5329ac6'
+        'b48d508c6086598e4881bfeeb67628468f28350e02f08b107fbe572c5507cb8feb329469656f0ddb0fe5f3574efe09b2b1c803c9c902641f9af81d9a7b73f8c9'
+        '01be15541e2be0ab1d0924ab0a36b2cf1b17f7e5abfca8375778085df6ef4490bb18cd58f7984e010fbb11896ffa97ad44e6d4255bbd4c89afbea779f89f32ee'
         'dc4e862e8f9fa7e8ead895908459757afd1027c24b960ae3d289a7212e29575bce3ce4627d5fd73edf211ee162dfa545e1642c5b16e8156f3dce50af8ef3c256'
         'c57ef0e2d57de6064359a6132ed03138e2b6e65c10699e304901cf4d37f67b25a24fd20553d1b7b99b414d75ddb1f49bbe74cfa694315671026cbdfcb5b19f3c'
         'cf71c48fc7fe12a32f4fe7dd6505df11c4a74ed20abc91ee5bb4cf3688bfd766349fc698a55efd4c2fa6eab7502ec96febf06ee27a823ab13fabd8f148cb3a27'

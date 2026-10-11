@@ -173,7 +173,52 @@ and it stays safe only while `CONFIG_TCP_CONG_BBR` is unset, which it is.
   warned about and handed back to Marie, and the non-Marie path keeps upstream's
   tail behaviour.
 
-### 6. Cmdline
+### 6. Added — `2700`/`2701`, the zswap request-contention series
+
+`[PATCH v2 0/2] mm: zswap: reduce request contention on loads` (Usama Arif).
+Carried in the **preview only**; it does not apply to `v7.3-rc6`, which is why
+`sleepy-rc` does not have it.
+
+| | |
+|---|---|
+| `2700` | *mm: zswap: use separate compression and decompression requests* |
+| `2701` | *mm: zswap: use stack requests for synchronous decompression* |
+
+**v2, not v1.** The ledger originally recorded only the v1 posting (2026-10-05,
+`<20261006002307.2669023-1-usama.arif@linux.dev>`). Usama Arif posted **v2 on
+2026-10-09** (`c98f639a22`, `e9b4a3996d`), with further review from Nhat Pham and
+Sergey Senozhatsky on 2026-10-10. Always check for a later revision before
+carrying a series.
+
+Provenance: `Signed-off-by: Usama Arif <usama.arif@linux.dev>`; `Acked-by: Nhat
+Pham <nphamcs@gmail.com>` on `2701`. Nhat Pham maintains zswap.
+
+The problem, from `2700`'s message: stores and loads serialize on the same
+per-CPU acomp request and mutex, so a low-priority store preempted after the
+codec drops its stream lock keeps holding the mutex, and a higher-priority load
+on that CPU waits. The fix gives compression and decompression their own
+request, completion wait and mutex; synchronous codecs then decompress on an
+on-stack request. **All in-tree software compressors qualify, and zstd is what
+this machine runs.**
+
+**Verified at its real series position, not against a pristine tree.** Eight
+carried patches also touch `mm/zswap.c` (`2173`, `2174`, `2177`, `2190`-`2193`,
+`2196`), so a pristine-tree test would prove nothing. The tree was rebuilt with
+`source=()` indices 0-170 applied, and both patches then pass `git apply
+--check` **and** `patch -p1 --forward -F2 --dry-run` with zero failed hunks.
+The result carries `struct zswap_comp_ctx` and `MAX_SYNC_COMP_REQSIZE`.
+
+**New range `2700-2799`** (mm/swap: zswap, xswap). `21xx` is full apart from
+`2199`, and every other gap in it is a *vacated* number — the dropped MGLRU
+batch (`2131`-`2137`), absorbed carries — which must not be reused, since the
+gap is the evidence that something was tried. The series opens a new range
+rather than splitting across one.
+
+**Also noted in the same thread, not triaged**: `[PATCH v8 14/30] mm: zswap:
+reject high-order swap cache allocations backed by zswap` (Usama Arif), and
+Baoquan He's xswap v4 series.
+
+### 7. Cmdline
 
 `amdgpu.dcdebugmask=0x800` (DC_DISABLE_IPS) is **dropped in the preview only**;
 `sleepy-rc` keeps it. The preview exists to exercise the snapshot's display code
