@@ -24,9 +24,12 @@ log.txt
 grep_output*.txt
 *.bak
 
-# Machine-specific generated configs (keep base 'config' tracked)
+# Machine-specific generated configs (keep base 'config' tracked).
+# The 7.x patterns cover the mainline package; the preview is date-versioned
+# (config-2026.10.09-1-sleepy-next) and escapes them, so match a date prefix too.
 config-7.2.*
 config-7.3.*
+config-[0-9][0-9]*.*
 # Local tool state
 .kiro/
 

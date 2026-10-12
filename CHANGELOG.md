@@ -1,19 +1,73 @@
 # Changelog
 
-Notable changes to `linux-sleepy-next`, the only package in this repository. It
-targets one machine: an AMD Ryzen 7 7700 (Zen 4) with a Radeon RX 9070 XT
+Notable changes to the `linux-sleepy-rc` and `linux-sleepy-next` packages. They
+target one machine: an AMD Ryzen 7 7700 (Zen 4) with a Radeon RX 9070 XT
 (Navi 48 / RDNA 4).
 
-One entry per released package version, newest first. On the mainline line a
-version is `<kernel base>-<pkgrel>-sleepy-next`, which is what `uname -r`
-reports. The earlier linux-next preview releases appended their snapshot date,
-as in `7.2.0-10-sleepy-next-20260828`. The format follows
+One entry per released package version, newest first. A version is what
+`uname -r` reports. `sleepy-rc` uses `<kernel base>-<pkgrel>-sleepy-rc`, as in
+`7.3.0-rc7-1-sleepy-rc`. `sleepy-next` uses
+`<snapshot date>-<pkgrel>-sleepy-next`, as in `2026.10.09-1-sleepy-next` — the
+snapshot's own date, never the mainline `-rc` it happened to be cut from. The
+date is dotted because `depmod` and `mkinitcpio` both reject a release that does
+not begin with dotted decimal notation. The format follows
 [Keep a Changelog](https://keepachangelog.com/).
 
 Two earlier artifacts are summarised at the end under
 [Earlier packages](#earlier-packages): the 7.2 `linux-sleepy` package and the
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
+
+## [2026.10.09-1-sleepy-next (linux-next `next-20261009`)]: 2026-10-12
+
+### Changed — the preview is versioned by its snapshot date
+
+No patch changed; only the way the package names itself.
+
+`sleepy-next` was reporting itself as `7.3.0-rc6-1-sleepy-next`, because the
+snapshot's `Makefile` composes the release from its own base rc — `next-20261009`
+is cut from `v7.3-rc6`. That name was wrong twice over: it was **stale**, since
+the tree carries weeks of work past rc6, and it was **easily confused with
+`sleepy-rc`**, whose `7.3.0-rc7-1-sleepy-rc` is a genuine mainline rc.
+
+The release is now the **snapshot date**:
+
+| | Before | After |
+|---|---|---|
+| `pkgver` | `7.3.0_rc6` | `2026.10.09` |
+| Package | `linux-sleepy-next-7.3.0_rc6-1` | `linux-sleepy-next-2026.10.09-1` |
+| `uname -r` | `7.3.0-rc6-1-sleepy-next` | `2026.10.09-1-sleepy-next` |
+| Module dir | `/usr/lib/modules/7.3.0-rc6-1-sleepy-next` | `/usr/lib/modules/2026.10.09-1-sleepy-next` |
+
+### Why the date is dotted
+
+The obvious form — `20261009-1-sleepy-next` — **does not work**, and the first
+attempt at this change shipped it and broke the install. Both tools that consume
+the release string require it to *begin* with dotted decimal notation:
+
+| Tool | Rule | What broke |
+|---|---|---|
+| `depmod` (kmod 34.2) | needs an `N.N` prefix | `depmod: ERROR: Bad version passed 20261009-1-sleepy-next`; the post-install hook failed and no module dependencies were generated |
+| `mkinitcpio` (42.2) | `kver()` matches `^[[:digit:]]+(\.[[:digit:]]+)+` against the release extracted from the image | `ERROR: invalid kernel specified`; pacman's pre-transaction hook had already deleted the old initramfs, so the kernel was left with **no initramfs at all** |
+
+`2026.10.09` satisfies both. The dots are load-bearing, not decoration.
+
+`prepare()` rewrites `KERNELVERSION` in the snapshot's `Makefile`, and `pkgver`
+is derived from `_srctag` — so a bump cannot move the tag without moving the
+version, and the two can never drift apart.
+
+Only the release *string* moves. `version.h` derives `LINUX_VERSION_CODE` from
+`VERSION`/`PATCHLEVEL`/`SUBLEVEL`, not from `KERNELVERSION`, so those stay
+`7`/`3`/`0` and out-of-tree module version checks are unaffected. The build
+asserts the rewrite landed and aborts if it did not.
+
+### Fixed — package descriptions
+
+Both packages described themselves as *"Sleepy-next kernel: Linux 7.3-rc4"* —
+stale on the version, and wrong about which package it was. `sleepy-rc` now
+reads *"Sleepy-rc kernel: Linux 7.3.0-rc7"* and `sleepy-next` reads
+*"Sleepy-next kernel: linux-next 20261009 snapshot"*, each derived from its own
+variables rather than a hardcoded string.
 
 ## [7.3.0-rc7-1-sleepy-rc]: 2026-10-12
 

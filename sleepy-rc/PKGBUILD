@@ -186,7 +186,7 @@ pkgrel=1
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
-# linux-next snapshot (the 7.3 merge-window content) for the wannabe 7.3 preview
+# mainline rc tag this package builds from
 _srctag=linux-7.3-rc7
 _srcname=${_srctag}
 # Build parallelism. Previously capped at 8 on a diagnosis that did not hold up.
@@ -225,7 +225,7 @@ _srcname=${_srctag}
 # and the machine measured comfortable, not because it is meaningfully faster.
 # Lower it if build-time interactivity suffers while the desktop is busy.
 _jobs=16
-pkgdesc='Sleepy-next kernel: Linux 7.3-rc4 + sleepy hardware merges (CachyOS optimizations included)'
+pkgdesc="Sleepy-rc kernel: Linux ${_major}.${_minor}-${_rcver} + sleepy hardware merges (CachyOS optimizations included)"
 _kernver="$pkgver-$pkgrel"
 _kernuname="${pkgver}-${_pkgsuffix}"
 arch=('x86_64')

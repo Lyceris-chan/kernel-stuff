@@ -17,9 +17,48 @@ moved, so the full ledger is not duplicated here.
 |---|---|
 | Snapshot | `next-20261009`, tag `becb95e45ef0` |
 | Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261009.tar.gz` |
-| Snapshot tree `Makefile` | `7.3.0-rc6` |
-| Kernel release | `7.3.0-rc6-1-sleepy-next` |
-| Package | `linux-sleepy-next-7.3.0_rc6-1` |
+| Snapshot tree `Makefile` | `7.3.0-rc6` — the base rc, **deliberately not used in the release name** |
+| Kernel release | `2026.10.09-1-sleepy-next` |
+| Package | `linux-sleepy-next-2026.10.09-1` |
+
+### Versioning: the snapshot date, not the base rc
+
+`pkgver` is the snapshot date, derived from `_srctag` — `_snapdate=${_srctag#next-}`
+(`20261009`) and `_snapver` respells it dotted (`2026.10.09`) — so a bump cannot
+move the tag without moving the version.
+
+**The dots are load-bearing, not cosmetic.** Both tools that consume the release
+string require it to *begin* with dotted decimal notation:
+
+| Tool | Requirement | Failure without it |
+|---|---|---|
+| `depmod` (kmod 34.2) | an `N.N` prefix; a bare `20261009-1-sleepy-next` is rejected as `Bad version passed` | post-install depmod hook fails, no module dependencies generated |
+| `mkinitcpio` (42.2) | `kver()` validates the release extracted from the image against `^[[:digit:]]+(\.[[:digit:]]+)+` | initramfs build fails — **the kernel is left with no initramfs at all** |
+
+A bare `20261009` therefore cannot be the release name. Dots are legal in
+`pkgver`; only `-` is reserved, as the pkgver/pkgrel separator.
+
+`prepare()` rewrites the snapshot's `Makefile` so `KERNELVERSION = 2026.10.09`.
+Left alone, the tree composes `KERNELVERSION` from
+`VERSION`/`PATCHLEVEL`/`SUBLEVEL`/`EXTRAVERSION` and stamps its **base** rc into
+the name: `next-20261009` is cut from `v7.3-rc6`, so the kernel announced itself
+as `7.3.0-rc6-1-sleepy-next`. That is wrong twice over — stale, because the tree
+carries weeks of work past rc6, and easily mistaken for `linux-sleepy-rc`'s
+genuine `7.3.0-rc7-1-sleepy-rc`.
+
+Only the release *string* moves. `version.h` derives `LINUX_VERSION_CODE` from
+`VERSION`/`PATCHLEVEL`/`SUBLEVEL` (`Makefile`: `filechk_version.h`), **not** from
+`KERNELVERSION`, so those stay `7`/`3`/`0` and out-of-tree version checks keep
+working. `include/generated/utsrelease.h` and every `modules_install` path read
+`KERNELRELEASE`, which is regenerated from `KERNELVERSION`, so `uname -r`, the
+module directory and the packaged paths all agree.
+
+`prepare()` asserts the rewrite landed and aborts the build if it did not, rather
+than shipping a kernel that misreports its own release.
+
+The tree's own `localversion-next` (containing `-next-20261009`) is still
+deleted: the date is already `KERNELVERSION`, so keeping it would print it
+twice.
 
 ## Preview-specific deltas
 

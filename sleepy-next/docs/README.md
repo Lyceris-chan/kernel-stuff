@@ -2,12 +2,19 @@
 
 `linux-sleepy-next` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
-built from **mainline Linux 7.3-rc6** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 245 targeted
+built from a **linux-next snapshot (`next-20261009`)** plus a sanitized
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 241 targeted
 upstream/local patches. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0_rc6-1` · **Artifact:**
-`linux-sleepy-next-7.3.0_rc6-1-x86_64.pkg.tar.zst`
+**Base version:** `2026.10.09-1` · **Artifact:**
+`linux-sleepy-next-2026.10.09-1-x86_64.pkg.tar.zst`
+
+The release is named for the **snapshot date**, not the mainline `-rc` the
+snapshot was cut from — linux-next is a daily tree, and its base rc goes stale
+within days of the cut. The date is dotted (`2026.10.09`) because both `depmod`
+and `mkinitcpio` require the release string to begin with dotted decimal
+notation; a bare `20261009` breaks module dependency generation and the
+initramfs build.
 
 ## Target hardware
 
@@ -116,7 +123,11 @@ fix lands.
 
 ## Patch series
 
-245 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+241 patch entries. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+On a linux-next snapshot a large fraction are skipped rather than failed, since
+the snapshot already carries much of what the series adds — a skip is only safe
+for a self-contained patch, so interdependent groups are excluded outright
+instead.
 
 | Range | Category |
 |---|---|

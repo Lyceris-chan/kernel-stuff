@@ -176,19 +176,37 @@ else
 fi
 
 pkgbase="linux-$_pkgsuffix"
-_major=7.3
-_minor=0
-_rcver=rc6
 
-pkgver=7.3.0_rc6
+# linux-next snapshot for the preview package. The daily tag IS the identity:
+# linux-next is a snapshot, not an -rc, so this package is versioned by the
+# snapshot DATE rather than by whichever mainline rc it happened to be cut
+# from. `_srctag` is defined first because pkgver is derived from it — a bump
+# that moves the tag but not the version is not possible.
+_srctag=next-20261009
+_srcname=${_srctag}
+_snapdate=${_srctag#next-}                                            # 20261009
+# Dotted (2026.10.09), and that is NOT cosmetic. Both tools that consume the
+# release string require it to BEGIN with dotted decimal notation:
+#
+#   depmod (kmod 34.2)  rejects "20261009-1-sleepy-next" outright — "Bad
+#                       version passed", needs an "N.N" prefix. Without it
+#                       the post-install depmod hook fails and no module
+#                       dependencies are generated.
+#   mkinitcpio (42.2)   kver() validates the release extracted from the image
+#                       against ^[[:digit:]]+(\.[[:digit:]]+)+ and fails the
+#                       initramfs build without it — leaving the kernel with
+#                       no initramfs at all.
+#
+# So a bare "20261009" is not a usable release name, however much cleaner it
+# reads. Dots are legal in pkgver; only "-" is reserved, as the pkgver/pkgrel
+# separator.
+_snapver="${_snapdate:0:4}.${_snapdate:4:2}.${_snapdate:6:2}"
+pkgver=${_snapver}
 _tagrel=1
 pkgrel=1
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
-# linux-next snapshot (the 7.3 merge-window content) for the wannabe 7.3 preview
-_srctag=next-20261009
-_srcname=${_srctag}
 # Build parallelism. Previously capped at 8 on a diagnosis that did not hold up.
 #
 # The cap was added after an rc4-7 build thrashed badly — 6 watchdog firings and
@@ -231,7 +249,7 @@ _jobs=16
 # (/usr/local/bin/net-tune.sh, /etc/net-tune.conf and the two units). The
 # preview still builds the service's config, it just does not install it.
 _ship_net_tune=no
-pkgdesc='Sleepy-next kernel: Linux 7.3-rc4 + sleepy hardware merges (CachyOS optimizations included)'
+pkgdesc="Sleepy-next kernel: linux-next ${_srctag#next-} snapshot + sleepy hardware merges (CachyOS optimizations included)"
 _kernver="$pkgver-$pkgrel"
 _kernuname="${pkgver}-${_pkgsuffix}"
 arch=('x86_64')
@@ -687,10 +705,34 @@ ENABLE_LATENCY=yes
 EOF
         fi
     fi
+    # Release string: <snapshot-date>-<pkgrel>-<pkgsuffix>, e.g.
+    # 2026.10.09-1-sleepy-next.
+    #
+    # Point KERNELVERSION at the snapshot date. scripts/setlocalversion emits
+    # "${KERNELVERSION}${file_localversion}${config_localversion}${LOCALVERSION}
+    # ${scm_version}", so this puts the date where a version normally sits and
+    # the localversion files append after it.
+    #
+    # Left alone, the snapshot's own Makefile composes KERNELVERSION from
+    # VERSION/PATCHLEVEL/SUBLEVEL/EXTRAVERSION and stamps its BASE rc into the
+    # name: next-20261009 is cut from v7.3-rc6, so the kernel would announce
+    # itself as 7.3.0-rc6-1-sleepy-next — stale, because the tree carries weeks
+    # of post-rc6 work, and easily mistaken for linux-sleepy-rc's genuine
+    # 7.3.0-rc7-1-sleepy-rc.
+    #
+    # Only the release STRING moves. version.h derives LINUX_VERSION_CODE from
+    # VERSION/PATCHLEVEL/SUBLEVEL (Makefile: filechk_version.h), NOT from
+    # KERNELVERSION, so those stay 7/3/0 and out-of-tree version checks keep
+    # working. utsrelease.h and every modules_install path read KERNELRELEASE,
+    # regenerated from KERNELVERSION, so the whole build agrees on one name.
+    sed -i -e "s|^KERNELVERSION = .*|KERNELVERSION = ${_snapver}|" Makefile
+    [ "$(sed -n 's/^KERNELVERSION = //p' Makefile)" = "${_snapver}" ] \
+        || _die "KERNELVERSION override did not apply; refusing to build a kernel that would misreport its release"
+
     echo "-$pkgrel" > localversion.10-pkgrel
-    # kernel identity: sleepy-next-<nextdate> (single 'next'); the linux-next
-    # tree's localversion-next would otherwise double it (next-YYYYMMDD).
     echo "-${pkgbase#linux-}" > localversion.20-pkgname
+    # The snapshot ships localversion-next ("-next-YYYYMMDD"). The date is
+    # already KERNELVERSION, so keeping the file would print it twice.
     rm -f localversion-next
     
     # Apply the 7.2 sleepy series to next-20260828: dry-run first so a patch
