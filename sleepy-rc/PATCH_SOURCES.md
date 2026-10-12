@@ -7662,3 +7662,118 @@ its author names as least solved lands in a function we already patch. Re-check
 `should_reclaim_retry()` and `mm/filemap.c` for conflicts if it reaches
 linux-next. `2198` also touches `mm/filemap.c`.
 
+
+## Sweep 2026-10-12 (20:40 pass): nothing adoptable, one watch item
+
+A second pass the same day, at the user's 8:40 PM request. **Partial coverage** —
+see *Unrefreshed* below.
+
+### drm/amd work items — queried, zero adoptable
+
+`updated_after=2026-10-11` returned **31** open issues; 161 distinct hex tokens
+extracted from their comments; **16 verified as real commits** (the other 145 are
+image paths and blob ids, as expected). Every checkable one is **already in
+`v7.3-rc7`**:
+
+| sha | subject | cited in | state |
+|---|---|---|---|
+| `63e19ef3ddab` | drm/amd/display: Atomize IRQ register read/modify/write ops | #4763, #5059, #5170, #5214 | already in rc7 |
+| `eaeac1498b28` | drm/amdgpu: implement workaround for sdma dcc corruption | #5663 | already in rc7 |
+| `239d0ccf567c` | drm/amd/pm: fix smu v14 soft clock frequency setting issue | #4753 | already in rc7 |
+| `c764b7af1528` | drm/amd/pm: fix smu v13 soft clock frequency setting issue | #4753 | already in rc7 |
+| `b96150a70696` | drm/amd/display: Should support p-state under dcn21 | #5628 | already in rc7 (wrong chip anyway) |
+| `d5164580a994` | drm/amd/display: Skip Update HDCP Config In Transition State | #5792 | already in rc7 |
+| `261e0fe4e2c9` | drm/amd/display: Resize MST HDCP per-connector arrays to 32 | #5792 | already in rc7 |
+| `a637a140ab86` | drm/amd/display: Allocate DCN32/1 dmub memory to GTT | #5714 | already in rc7 (wrong chip) |
+| `d7d2688bf4ea` | drm/amd/pm: update workload mask after the setting | #3625 | already in rc7 |
+| `d81e52fc61fb` | drm/amd/pm: fix issue of missing '*' on pp_dpm_xxx nodes | #4753 | already in rc7 |
+| `5009628d8509` | drm/amd/display: Remove unnecessary amdgpu_irq_get/put | #3067 | already in rc7 |
+
+`251a01d34b44` ("fix compressed buffer config routine waiting time") exists only
+in the `linux-next` history, not torvalds' — unverifiable there, dated
+2026-05-19, cited in a Phoenix iGPU thread. Not actionable.
+
+**Note on the pageflip/flip_done cluster.** Twelve of the 31 updated issues are
+that family (#5657, #5059, #5792, #5848, #5170, #3067, #4763, #5214, #5800,
+#5799, #5807, #5970). Its most-cited fix, `63e19ef3ddab`, is **already in rc7** —
+recorded here as a fact about the base, per the standing instruction not to
+investigate that bug.
+
+### Mailing lists — 11 mirrors scanned, one watch item
+
+Scanned for mail dated ≥ 2026-10-11 (filtering on `%ad`; `--since` filters on
+commit date and returns zero on these mirrors).
+
+**Watch — `[PATCH v3 0/5] x86/mm: Allow preemption while waiting for kernel TLB
+flushes`**, Chuyi Zhou `<zhouchuyi@bytedance.com>`, 2026-10-12, `lore-mirror`.
+
+- Applies **cleanly and cumulatively** to the series tree (all 5 in order; every
+  part fails individually, which is the ordinary cumulative-series artifact, not
+  a verdict).
+- **Zero `Reviewed-by`/`Acked-by`/`Tested-by` across all five patches.**
+- Not in `linux-next`.
+- **Disposition: watch, do not adopt.** It is a day-old, unreviewed series
+  altering core x86 TLB-flush semantics — the highest-blast-radius code in the
+  tree — and `arch/x86/mm/tlb.c` is not among our target components. A v4 or an
+  upstream merge is the trigger to revisit.
+
+Rejected, with the check that rejected each:
+
+| Candidate | Source | Rejected by |
+|---|---|---|
+| `drm/i915/hdmi` FRL v2 38-56/56 (14 mails) | `lore-dri-devel` | Check 1 — Intel |
+| `PCI: Ignore Immediate Readiness on Samsung 990 PRO NVMe` v2/v3 | `lore-linux-pci`, `lore-mirror` | Check 1 — our NVMe is a Phison E16 |
+| `[syzbot] [nvme?] BUG: corrupted list in nvmet_fc_remove_port` | `lore-linux-nvme` | Check 1 — no NVMe-oF |
+| `nvmem: Add compatible for MSM8952` v5 | `lore-linux-pm` | Check 1 — ARM/Qualcomm SoC |
+| `[Bug 222109] amdgpu Picasso gfxhub UTCL2 SQC permission fault` | `lore-dri-devel` | Check 0 — Picasso is a Zen+ APU |
+| `net/sched: sch_netem`, `cls_flower` | `lore-netdev-new` | Check 1 — not our components |
+| sched_ext idle/affinity, bypass propagation, `SCX_PICK_IDLE_CORE` | `lore-sched-ext`, `lore-mirror` | inert under BORE; also on the `sched_ext/for-7.3-fixes` path, so they arrive upstream anyway |
+| `rust_binder` `[PATCH 6.18.y]` / `[PATCH 7.2.y]` | `lore-mirror` | stable backports of work already upstream |
+
+Not triaged, recorded for a future pass: the `fs/block` freeze series
+(`fs: don't fail fs_bdev_freeze() once a superblock is frozen`, `fs: don't keep a
+device frozen when its freeze is already gone`, `super: don't warn when resume
+thaws a userspace freeze`, `block: release the freeze lockdep maps under
+mq_freeze_lock`) — generic freeze/thaw correctness, not hardware-targeted.
+
+### Not carried, and why — the same answer as this morning
+
+Nothing from this pass was adopted. The tracker's referenced fixes are all
+already in the base, and the mailing lists produced nothing that passes Check 1
+except a series too young to take.
+
+### Unrefreshed this pass — stated, not implied clean
+
+These sources did **not** refresh before the report, so the **tree/branch scan
+(Step 2) and the version sweep were not re-run** in this pass:
+
+`drm-next`, `drm-misc`, `linux-pm`, `sirlucjan-kernel-patches`,
+`cachyos-kernel-patches`, `zen-kernel`, `linux-tkg`, `firelzrd-bore-scheduler`,
+`firelzrd-lru-marie`, `xanmod`, `lore-linux-mm`, `lore-lkml`.
+
+Verified current and scanned: `torvalds` (origin 10-11), `linux-next` (10-12,
+`next-20261012` tag present), `tip`, `agd5f-linux`, `amd-staging-drm-next`,
+`akpm-mm`, and the lore mirrors `amdgfx`, `dri-devel`, `fsdevel-new`,
+`netdev-new`, `linux-block`, `linux-nvme`, `linux-pm`, `sched-ext`, `cgroups`,
+`io-uring`, `linux-pci`, `lore-mirror`.
+
+### Method corrections from this pass
+
+- **A fetch updates `origin/<branch>`; it does not move the local branch.** Every
+  working clone here keeps a stale `master`/`drm-next` while `origin/…` is
+  current. A freshness check that reads `HEAD` reports the whole tree stale; a
+  scan that reads `HEAD` reads old code. **Compare `origin/<branch>` against
+  `git ls-remote`, and scan `origin/<branch>`.**
+- **Three repos use `main`, not `master`** — `firelzrd-bore-scheduler`,
+  `firelzrd-lru-marie`, `xanmod`. `ls-remote refs/heads/master` fails there and
+  reads as a dead remote.
+- **Extracting from a lore mirror: `git show <sha>` diffs the mailbox, not the
+  patch** — it yields `diff --git a/m b/m`, the blob holding the mail. Take the
+  email from `git show <sha>:m` and cut the diff out of its *body*. My first
+  extraction this pass produced five patches that all "targeted" a file called
+  `m`.
+- **An empty extracted patch dry-runs "clean" in both directions** — a false
+  "already carried". Assert the patch is non-empty before reading a verdict.
+- **`git -C <dir> apply <relative-path>` resolves the path against `<dir>`,**
+  not `$PWD` — the same trap as `git worktree add`. Use absolute paths so a
+  missing file cannot masquerade as "series breaks partway".
