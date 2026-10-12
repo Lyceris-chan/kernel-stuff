@@ -1,6 +1,6 @@
 # linux-sleepy-rc: build guide
 
-Build details for `linux-sleepy-rc` (mainline **Linux 7.3-rc6** + the sleepy
+Build details for `linux-sleepy-rc` (mainline **Linux 7.3-rc7** + the sleepy
 series). See `README.md` for what the kernel is; `../../CLAUDE.md` for the
 maintenance rules.
 

@@ -7552,3 +7552,51 @@ not our RTL8125 — same series rejected before), `drm/amdgpu/ras: MP1
 IP_VERSION(13, 0, 12)`, all sched_ext postings (BORE is the live scheduler;
 `kernel/sched/ext/` is the inert one), arm64/nvmem/nvmet.
 
+## Bump 2026-10-12: v7.3-rc6 -> v7.3-rc7
+
+Tag `24a19b953e2a3d0ea5a8c4951a0ab8f32720c907`, Makefile `-rc7`, tarball from
+`https://git.kernel.org/torvalds/t/linux-7.3-rc7.tar.gz` (the cdn mirror lags a
+fresh tag, as documented).
+
+Cumulative apply of the whole series to a clean `v7.3-rc7` worktree: **242 of 245
+applied, 3 failed.**
+
+### Dropped — three carries absorbed upstream
+
+All three were user-approved before removal. Each is **already in v7.3-rc7**,
+verified **by content, not by reverse-apply** — reverse-applicability has given
+false positives and false negatives repeatedly, so the test used was grepping
+the clean rc7 tree for the exact lines each patch introduces.
+
+| Patch | What it did | Proof it is in rc7 |
+|---|---|---|
+| `1174` | direct-scanout alpha | `amdgpu_dm_plane.c:115` already has `*per_pixel_alpha = plane_state->fb->format->has_alpha;` and the old `alpha_formats[]` table is gone |
+| `9078` | userq doorbell BO check | all 6 added lines present in `amdgpu_userq.c` |
+| `9079` | userq `memdup_user()` error | all 3 added lines present in `mes_userqueue.c` |
+
+**245 -> 242 patches.**
+
+### Not regenerated — CachyOS branches
+
+No `01xx` drifted: every one applied cleanly to rc7. Checked sirlucjan for newer
+content and there is none — the repo is current at `753c3849ce8d` and its newest
+`7.3-rc` material is from 2026-09-18, older than what our squashes were built
+from. Nothing to regenerate.
+
+### Verified
+
+Built with Clang/ThinLTO. `242` entries, **0 skipped, 0 errors**, `EXIT=0`.
+`.BTF` (section 16) and `.BTF_ids` (section 17) present in the extracted
+vmlinux; banner `Linux version 7.3.0-rc7-1-sleepy-rc`. `CONFIG_TCP_CONG_BBR3=y`,
+`CONFIG_LRU_MARIE=y`, `CONFIG_SCHED_BORE=y`, `CONFIG_CPU_IDLE_GOV_NAP=y`,
+`CONFIG_DEBUG_INFO_DWARF5=y`, `CONFIG_DEBUG_INFO_BTF=y`, `LOCALVERSION=""`, and
+`CONFIG_TCP_CONG_BBR` still unset.
+
+Installed as `7.3.0_rc7-1`; still the systemd-boot default. `sleepy-next` is
+unchanged at `next-20261009` — no newer snapshot exists — so the two kernel
+releases are now `7.3.0-rc7-1-sleepy-rc` and `7.3.0-rc6-1-sleepy-next`, distinct
+at a glance without renaming either.
+
+`docs/README.md` and `docs/GUIDE.md` carried the old base and patch count; the
+`kernel-verify` commit gate caught both and they are updated.
+

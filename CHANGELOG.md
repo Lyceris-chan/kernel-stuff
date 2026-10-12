@@ -15,6 +15,38 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-rc7-1-sleepy-rc]: 2026-10-12
+
+### Changed — rebased to mainline `v7.3-rc7`
+
+Tag `24a19b953e2a`. The whole series was re-applied to a clean rc7 worktree:
+**242 of 245 applied.**
+
+**`245` -> `242` patches. Three carries absorbed upstream**, each user-approved
+and each verified **by content** rather than by reverse-apply, which has given
+false positives and negatives repeatedly:
+
+| Patch | Landed as |
+|---|---|
+| `1174` direct-scanout alpha | `amdgpu_dm_plane.c:115` already has the `format->has_alpha` form; the old `alpha_formats[]` table is gone |
+| `9078` userq doorbell BO check | all 6 added lines present in `amdgpu_userq.c` |
+| `9079` userq `memdup_user()` error | all 3 added lines present in `mes_userqueue.c` |
+
+No CachyOS branch needed regenerating — all `01xx` applied cleanly, and
+sirlucjan has nothing newer (repo current at `753c3849ce8d`; its newest `7.3-rc`
+material is 2026-09-18).
+
+### Verified
+
+`242` entries, **0 skipped, 0 errors**, `EXIT=0`. `.BTF` and `.BTF_ids` present;
+banner `Linux version 7.3.0-rc7-1-sleepy-rc`. `CONFIG_TCP_CONG_BBR3=y`,
+`CONFIG_LRU_MARIE=y`, `CONFIG_SCHED_BORE=y`, `CONFIG_DEBUG_INFO_DWARF5=y`, and
+`CONFIG_TCP_CONG_BBR` unset as required.
+
+`sleepy-next` is **unchanged** at `next-20261009` — no newer snapshot exists.
+The two kernel releases are now `7.3.0-rc7-1-sleepy-rc` and
+`7.3.0-rc6-1-sleepy-next`.
+
 ## [7.3.0-rc6-1-sleepy-next (linux-next `next-20261009`)]: 2026-10-11
 
 The repository is now **two packages**. `sleepy-next/` became **`sleepy-rc/`** by
