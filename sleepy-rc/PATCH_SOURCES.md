@@ -7600,3 +7600,65 @@ at a glance without renaming either.
 `docs/README.md` and `docs/GUIDE.md` carried the old base and patch count; the
 `kernel-verify` commit gate caught both and they are updated.
 
+## `4c0f3697118e` — Linus MM series proposal, and why it touches us (2026-10-12)
+
+Flagged by the user. **Not a code change**: its tree is byte-identical to its
+parent's, so it is an **empty commit** carrying the **cover letter** for an
+8-patch MM series by **Linus Torvalds**, dated 2026-10-10.
+
+> *mm: read from the page cache without folio references*
+
+**Not merged.** The page flag the series introduces, `PG_rcu_free`, is absent
+from `v7.3-rc7` **and** from `next-20261009`. Base: *"7.3-rc6 plus fixes,
+0c2669a9f4a1"*.
+
+The series (from the cover letter):
+
+1. mm: free PG_rcu_free folios only after an RCU grace period
+2. mm: free folios removed from the page cache only after an RCU grace period
+3. mm: don't defer the free of page cache folios of an inode being evicted
+4. splice: don't steal page cache folios
+5. mm/filemap: read from the page cache without folio references
+6. mm: count pages whose free waits for an RCU grace period
+7. mm: expedite the grace period when a CPU has many deferred frees
+8. mm: make way for the expedite work in the page cache removal loops
+
+Mechanism: a folio removed from the page cache only returns to the allocator
+after an RCU grace period, so a reader under `rcu_read_lock()` can copy straight
+to the user buffer with **no reference, no bounce buffer, no seqcount, and no
+size limit**. Earlier attempts by others validated after copying; this removes
+the need to.
+
+### Why this one matters on this machine
+
+Its own "Known problems" section, problem 1:
+
+> *"The allocator cannot see the waiting pages. They have refcount 0, are not
+> PageBuddy, are on no pcp list and in no counter… `should_reclaim_retry()`
+> computes 'available' from the LRU counters and NR_FREE_PAGES, the waiting
+> pages are in neither, and it decides for the OOM killer while hundreds of MiB
+> wait."*
+
+**`should_reclaim_retry()` is precisely the function MARIE's `2101` rewrites
+here** — the `nr_progress` thrash-aware accounting and the swap-backend-failure
+OOM trigger. Two independent patches would then be deciding the same OOM
+question, from the same counters, for different reasons, with different models
+of what "progress" means. The series also refers to *"a test of the flags, for
+both LRU implementations"*.
+
+Further cautions from the message, stated by its author:
+
+- Its own **swap** test shows the OOM killer taking the large process at 4 and 8
+  CPUs with patches 1-6, fixed only by 7-8.
+- Patches **7 and 8 are the *"least solved"*** part; the 1024-page limit *"is a
+  guess"*; with no idle CPU 177 MiB still waits on average and 870 MiB at peak.
+- `alloc_contig_range()` fails — migration sources are still waiting when
+  `test_pages_isolated()` runs, so it returns `-EBUSY`.
+- Testing is *"a gcc build of one x86-64 config, and running the laptop on it"* —
+  no lockdep, no `DEBUG_ATOMIC_SLEEP`, no KASAN.
+
+**Disposition: watch, do not adopt.** It is an unmerged proposal, and the part
+its author names as least solved lands in a function we already patch. Re-check
+`should_reclaim_retry()` and `mm/filemap.c` for conflicts if it reaches
+linux-next. `2198` also touches `mm/filemap.c`.
+
