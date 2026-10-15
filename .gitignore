@@ -39,3 +39,16 @@ __pycache__/
 
 # Scratch from verification runs (patchwork fetches, diffs)
 .verify-tmp/
+
+# Patch-application leftovers. GNU patch defaults to --backup-if-mismatch, so a
+# hunk that applies with an offset leaves a .orig beside the file, and a failed
+# hunk leaves a .rej. Both have been swept into regenerated patches before.
+*.rej
+*.orig
+*.part
+
+# Claude Code session state. Some of this is also in .git/info/exclude, which is
+# repo-local and does not travel with a clone; these belong in the shared file.
+.claude/scheduled_tasks.lock
+.claude/scheduled_tasks.json
+.claude/settings.local.json

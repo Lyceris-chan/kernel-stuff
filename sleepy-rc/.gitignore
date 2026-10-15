@@ -4,7 +4,10 @@ pkg/
 LLVM-23.1.0-Linux-X64.tar.xz
 next-*.tar.gz
 *.pkg.tar.zst
+# 7.x covers the mainline packages; the preview is date-versioned
 config-7.2.*
+config-7.3.*
+config-[0-9][0-9]*.*
 # Root patch symlinks (auto-created by PKGBUILD)
 /*.patch
 *.part
