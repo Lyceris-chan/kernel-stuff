@@ -7777,3 +7777,161 @@ Verified current and scanned: `torvalds` (origin 10-11), `linux-next` (10-12,
 - **`git -C <dir> apply <relative-path>` resolves the path against `<dir>`,**
   not `$PWD` — the same trap as `git worktree add`. Use absolute paths so a
   missing file cannot masquerade as "series breaks partway".
+
+## Sweep 2026-10-15: full pass, one significant find (LRU-MARIE 0.12.0)
+
+First pass since 10-12. Nothing adopted; one upgrade candidate worth a decision.
+
+### Sources — refreshed vs not
+
+**Refreshed and scanned:** `drm-next` (10-13), `drm-misc` (10-12), `tip` (10-14),
+`sirlucjan-kernel-patches` (10-13), `firelzrd-lru-marie` (10-13), `linux-tkg`
+(10-06), `agd5f-linux` and `amd-staging-drm-next` (current at `fe9f3ed36c83`),
+and the lore mirrors `amdgfx`, `dri-devel`, `fsdevel-new`, `netdev-new`,
+`linux-block`, `linux-nvme`, `linux-pm`, `sched-ext`, `cgroups`, `io-uring`,
+`linux-pci`, `mirror` — all at **2026-10-15**.
+
+**NOT refreshed — unchecked, not clean:** `torvalds` (fetch failed rc=128, and a
+second attempt outlived its own 260 s timeout and had to be killed),
+`lore-linux-mm` (still 10-02), `lore-lkml` (still 09-27), `zen-kernel` (the
+clone has no remote refs at all), `cachyos-kernel-patches` and `linux-pm`
+(unchanged at their old tips), `akpm-mm` (unchanged at 10-02).
+
+**New linux-next snapshots exist: `next-20261013` and `next-20261014`**, both
+fetched, both `7.3.0-rc7`-based (the preview is on `next-20261009`, which is
+`rc6`-based). Not bumped — a sweep reports, it does not adopt.
+
+### The linux-next delta contains no amdgpu code
+
+`next-20261012` → `next-20261014` is 907 files, +28292/−10854. Of those, only
+**12 are under `drivers/gpu/drm/` and not one is amdgpu** — the nine named are
+Intel `xe`. The delta's on-target files are `mm/zswap.c`,
+`drivers/cpufreq/amd-pstate.c`, `arch/x86/kernel/acpi/cppc.c` and
+`drivers/nvme/host/*`. So a preview bump to `next-20261014` would change **no
+GPU or display code at all** — the value would be the rc6→rc7 base move, not
+new amdgpu work.
+
+### LRU-MARIE 0.12.0 is available for 7.3-rc — **the one real find**
+
+`sirlucjan-kernel-patches` gained `7.3-rc/lru-marie-patches-v3/` on 2026-10-12,
+carrying **MARIE 0.12.0** (`MARIE_VERSION "0.12.0"`, 15002 lines,
+`From: Piotr Gorski <lucjan.lucjanov@gmail.com>`, one `Signed-off-by`). We carry
+**0.11.1r2** as `2101` (14918 lines); sirlucjan's own v1/v2 are 0.11.1 and match
+our size, so v3 is the new revision.
+
+It is **not a drop-in**. Forward dry-run over our series tree: 21 hunks seen,
+**14 FAILED**, three reported `Reversed (or previously applied)`. The file list
+also differs — 0.12.0's squash drops `include/linux/swap.h` and
+`scripts/setlocalversion`, which our 0.11.1r2 carries.
+
+**Disposition: upgrade candidate, needs an explicit decision — do not fold in at
+sweep time.** Swapping `2101` means replacing the whole 15k-line squash and
+re-verifying the four rebase fixes we hand-made for rc7
+
+- `__swap_writepage(ctx, folio)` → `__swap_writeout(ctx, folio)`
+- `current->flags |= PF_MEMALLOC | PF_KSWAPD` → `PF_MEMALLOC` only
+- `vma->vm_flags & VM_SPECIAL` → `(VM_PFNMAP | VM_MIXEDMAP)`
+- `should_reclaim_retry()` `bool did_some_progress` → `unsigned long nr_progress`
+
+and re-checking the behaviours `LESSONS.md` records as load-bearing: the
+swappiness clamp staying **on** (it is correct; clearing it caused the livelock)
+and the thrash watchdog staying **armed**. A MARIE bump is a memory-management
+change on a machine that already thrashed once; it wants its own session.
+
+### Candidates triaged — nothing adoptable
+
+| Candidate | Source | Verdict |
+|---|---|---|
+| `net/sched: cake` v6, 4 patches | `lore-netdev-new` | **3/4 fails** — it touches `include/net/sch_generic.h`, `include/net/pkt_sched.h` and `net/core/dev.c` and is written against a newer base. 1/4, 2/4 and 4/4 apply, but taking them without 3/4 is a partially-applied rework. Also net-next (7.4 material), not an rc fix |
+| `drivers/cpufreq/amd-pstate.c`, `cppc` boost by default | `lore-linux-pm` | applies forward, but it is a behaviour default change on a governor we already pin via `amd_pstate.epp_boost=1` on the cmdline — no gain |
+| `mm: zswap: mark the zswap shrinker SHRINKER_NONSLAB` v4 5/5 | `lore-cgroups` | applies forward; part 5 of a 5-part shrinker rework — needs the rest of the series, not one patch |
+| `drm/amdkfd: fix doorbell allocation race` v4 | `lore-amdgfx` | applies forward; **overlaps our carried userq doorbell work (`9062`–`9071`)** — needs a conflict read against those before it could be taken |
+| `drm/amdgpu/gmc_v12_0: fix flushing mmhub by pasid` 2/2 | `lore-amdgfx` | neither direction — it depends on 1/2, which is `gmc_v11_0` (wrong chip). Needs unpicking from its series |
+| `drm/amdgpu: Fix out-of-bounds write in amdgpu_debugfs_gfxoff_count_read()` | `lore-dri-devel` | **already in the base** — the added line `if (size & 0x7 || *pos & 0x7)` is at `amdgpu_debugfs.c:656` and `:708` in the rc7 tree. Verified by content, not by reverse-apply alone |
+| `r8169: RTL8126A (XID 64a) TX packets lost with TSO` | `lore-netdev-new` | Check 1 — RTL8126A, not our RTL8125B |
+| `drm/amdgpu/gfx7,8: remove redundant RLC cleanup`, `gfx8`, VCE/UVD teardown | `lore-amdgfx`, `lore-dri-devel` | Check 0 — gfx7/gfx8 and VCE/UVD are not our silicon (we are `gfx_v12_0_0`) |
+| `drm/amdgpu/vce`, `[PATCH 5.10/5.15]` backports | both | stable backports for kernels we do not run |
+| 75-patch `atomic_create_state` conversion, `vkms`, `Add log when register access is blocked in PTL` | `lore-amdgfx`, `lore-dri-devel` | Check 1 — API conversion churn, vkms, and Panther Lake (Intel) |
+| `io_uring` dmabuf v10/v11 13-patch series | `lore-fsdevel-new`, `lore-io-uring`, `lore-linux-block` | a feature series, still churning v10→v11 within a day; not an rc fix |
+| `[GIT PULL] sched_ext: Fixes for v7.3-rc7` | `lore-sched-ext` | inert under BORE, and it is a pull request — it arrives with the next bump |
+| `nvme-tcp`, `nvmet-fc`, `DH-HMAC-CHAP`, `blktests` | `lore-linux-nvme`, `lore-linux-block` | our NVMe is local (`nvme-pci`); no fabrics, no in-band auth |
+
+### drm/amd work items — 78 updated since 10-12, zero adoptable
+
+230 hex tokens across 78 issues' comments; **21 verified as real commits**, and
+every one is either already in `v7.3-rc7` or wrong-chip (`gfx8`, Mac FB,
+`gfx_v11_0`). Newest findings, all **bug reports with no upstream fix yet**:
+
+- **#5951** `amdgpu_dm`: a modeset of an already-active CRTC leaks one runtime-PM
+  reference. Reporter was told by `agd5f` *"Please send the patch to amd-gfx"* —
+  a patch exists but is not upstream. **Watch**, on-target (DCN 4.0.1 display).
+- **#5975** `amdgpu/drm_sched`: ~1:1 leak of `sync_file` + `drm_sched_fence`,
+  traced to `amdgpu_gem_va_ioctl → amdgpu_vm_update_range → amdgpu_vm_sdma_commit`.
+  No fix posted. **Watch**.
+- **#5759** `amdgpu/mes12`: MES(0) intermittently fails to respond to
+  REMOVE_QUEUE on Navi 48 — and `mes_v12_0_0` **is** our MES block
+  (confirmed via `dmesg`). Reported under VFIO, which we do not use, and the
+  reporter's own 9-day update walks back their `mes_log_enable` workaround.
+  **Watch**.
+- **#5339** RA24 little-endian on RDNA4 — the reporter states the patches
+  *"just need to be submitted upstream"*. Not traceable yet → cannot be carried
+  (Check 4).
+
+The pageflip/flip_done family (#5985, #5872, #5900, #5217, #5807, #5380 and the
+rest) is **not investigated**, per standing instruction. Its most-cited fix,
+`63e19ef3ddab`, is already in rc7.
+
+### Version sweep — nothing to move
+
+Zero carried patches have a higher revision posted since 2026-10-12. This is a
+delta check against the postings that arrived since the last pass; the full
+2026-10-12 sweep compared all 242 against every mirror and found 21 higher
+revisions, none adoptable.
+
+### Method notes
+
+- **`patch`'s exit code lies when it skips.** The cake series reported `rc=0`
+  on every patch while producing **three `.rej` files**. Assert on `.rej` count,
+  not on the exit status — this is the same family as the recorded
+  "`… | head && echo OK` always reports OK" trap.
+- **An empty extracted patch dry-runs clean in *both* directions.** The cake
+  `0/4` cover letter (zero hunks) was reported `ALREADY CARRIED` by a
+  reverse/forward classifier. Assert the patch is non-empty first.
+- **A hunk body is `removed + added + context`, not the new-line count.** A
+  checker comparing body length to `@@ … +N` reported six "mismatched" hunks on
+  a perfectly valid patch.
+- **`git fetch` can outlive its own `timeout`.** `timeout 260 git fetch` returned
+  control but left an orphaned `git-remote-https` running; the job never logged.
+  Kill the transport by PID, and check for orphans rather than trusting `wait`.
+
+### Incident this pass: I corrupted `repos/_audit`, then repaired it
+
+Worth recording because the trap is subtle and `_audit` is consumed by every
+future sweep.
+
+**What happened.** To test the cake series cumulatively I applied the patches to
+`repos/_audit` for real (dry-runs cannot stack), then restored with
+`git checkout -- net/sched/`. But `_audit` is a worktree whose **HEAD is the base
+tag** with all 242 patches present only as *working-tree* modifications — so
+`git checkout -- <path>` does not "undo my test", it **reverts that path to the
+base tree**, destroying whichever series patches touch it.
+
+Two separate kinds of damage, easy to conflate:
+
+| Path | Series patches touching it | Effect of `git checkout --` |
+|---|---|---|
+| `net/sched/sch_cake.c` | 1 (`2045`) | **series change destroyed** |
+| `include/net/sch_generic.h`, `include/net/pkt_sched.h`, `net/core/dev.c` | 0 | harmless — but cake 3/4 had written *partial* changes there that the checkout did not reach, because I only named `net/sched/` |
+
+**Repair.** Re-applied `2045` by hand (0 rejects) and reverted the three
+zero-patch files to base — safe precisely *because* no series patch touches
+them). Verified afterwards per file: `differs-from-base == series-patches` for
+each of the four, 278 files overall differing from base, no `.rej`/`.orig`, and
+MARIE still present in `mm/vmscan.c`.
+
+**The rule to follow instead.** Before any real (non-dry-run) apply into
+`_audit`, check whether the series touches each path you will later restore —
+and never `git checkout` a path a series patch owns. Better: do real-apply tests
+in a throwaway copy, or rebuild with `audit_series.py --keep` afterwards. The
+skill already says `_audit` must be rebuilt before it is trusted; this pass is
+the concrete reason why.
