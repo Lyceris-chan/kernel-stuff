@@ -7998,3 +7998,101 @@ of those being misunderstood once already.
 - **`audit_series.py`'s "Hunk #N" numbers are per-file, not per-patch.** Read them
   against the file named on the following lines, not against the patch's global
   hunk order.
+
+## Sweep 2026-10-15 (evening pass): 98 new amd-staging commits
+
+Second pass today, at 20:58. Nothing adopted — a sweep reports, it does not
+adopt — but this is the largest batch of on-target material in weeks.
+
+### Sources
+
+**Refreshed and scanned:** `agd5f-linux` and `amd-staging-drm-next`
+(`fe9f3ed36c83` → `f307e9d20cc7`, the first movement since 2026-10-07),
+`drm-misc` (`1c01801c393e`), `tip` (`3a7b8bdad4ce`), `sirlucjan-kernel-patches`
+(`9c29aa44556d`), `linux-tkg`, and twelve lore mirrors — all at **2026-10-15**.
+
+**Unrefreshed — unchecked, not clean:** `torvalds` (fetch did not return within
+the pass), `lore-linux-mm` (still 10-02), `lore-lkml` (still 09-27),
+`drm-next`, `linux-pm`, `akpm-mm`, `cachyos-kernel-patches`, `firelzrd-*`,
+`xanmod` (all unchanged at their old tips).
+
+### `next-20261015` is published — and it rewrites BORE's host file
+
+Fetched. It is `7.3.0-rc7`-based, 910 files changed against `next-20261014`,
+and again carries **zero amdgpu changes**. But it changes
+`kernel/sched/fair.c` substantially: `__min_vruntime_update()`,
+`__min_slice_update()`, `__max_slice_update()` and `min_vruntime_copy()` are all
+removed in favour of a new `__min_vruntime()`, and the same diff edits
+**`update_protect_slice()`** — dropping `normalized_sysctl_sched_base_slice`
+from it.
+
+That is the exact function `2419`'s added hunk wraps in
+`#ifdef CONFIG_SCHED_BORE`, added during the *last* bump for precisely this
+reason. **BORE will need re-rebasing again before the preview can move to
+`next-20261015`.** Recorded against the deferred-bump entry above.
+
+### 98 new amd-staging commits — the batch
+
+The first amd-staging movement since 10-07. Triage by silicon, with the
+dry-run verdict against the rc7 series tree:
+
+| Commit | Subject | Verdict |
+|---|---|---|
+| `c4868eebfab4` | **`drm/amdgpu/gfx_v12_0: Remove legacy CP programming`** | **applies** — our exact file |
+| `ea9be90a5558` | `drm/amdgpu/userq: actually validate userq BOs` | applies |
+| `307fdcaf8ae5` | `drm/amdgpu/userq: reject imported dma-bufs as WPTR BO` | applies |
+| `360f6b56b108` | `drm/amdgpu: Enable remote TLB shootdown` | applies |
+| `db39b1236804` | `drm/amdgpu: keep the eviction fence until the last handle is closed` | applies, **but overlaps `1065`/`1066`/`1075`** — needs a conflict read |
+| `0032d5279490` | `drm/amdgpu: free the userptr ranges when a CS fails after parser_bos` | applies, **but see below** |
+| `1c04ab2f6d06` | `drm/amdgpu: reserve SPM VMID on gfx12` | neither — needs its series (`02232367be23`, `cfc61a3e9f94`, `8a9263fc8812`, `1be6ab9c25ee`, `38e07c072833`, `a2810570fc8f`, `afed08816e89`, `315201a7df39`) |
+| `5ac0b4dd2a1f` | `drm/amd/display: Fix FreeSync caps tests after common EDID VSDB switch` | neither — written after the common-EDID-VSDB switch, which rc7 predates |
+
+**`0032d5279490` must not be taken alongside our `9040`.** Both address the
+userptr error path on a failed CS — `9040` releases the still-live ranges,
+while the staging patch adds `struct amdgpu_bo_list_entry *e;` and four
+`goto error_free_user_pages;`. It applies cleanly *on top of* `9040`, and a
+clean apply is not evidence of compatibility: two independent frees on the same
+path is a double-free. Read them together or take neither.
+
+Rejected on Check 0 or Check 1: `2a7344fe3134` and `134fbe762748` (DCN42),
+`408c920be21f`/`1534564fb404`/`fe6fdc89d793` (DCN60), `9e3854634bfa`
+(smu 14.0.2 — we are `smu_v14_0_0`), `e498db2eba5d` (smu_v15_0_8),
+`2ca4f6cfcd8d` (sdma 7.1 VFs — we are `sdma_v7_0`), and the UALink / NBIO /
+large-RAS / NPM-limit families.
+
+### Mailing lists — six new candidates, all applying
+
+| Mail | Subject | Verdict |
+|---|---|---|
+| `fbf645c9` | `drm/amdgpu/userq: commit seq64 BO mapping at queue creation` | applies |
+| `81642031` | `drm/amdkfd: add watch_addresses to set_shader_debugger interface` | applies (1/3) |
+| `b1feb276` | `drm/amdkfd: pass watchpoint addresses to MES for GFX11` | applies (2/3) — wrong chip |
+| `c2578af0` | `drm/amdkfd: pass watchpoint addresses to MES for **GFX12**` | applies (3/3) — on-target |
+| `755b3e48` | `drm/amdkfd: discard interrupts during a GPU reset` (v4) | applies |
+| `754fd2e5` | `drm/amdgpu: Gate VFCT bus fallback on pci=realloc` | applies |
+
+Rejected: `8d630995`/`acb8f7c7` (**gfx 12.1** SDMA MQD — wrong sub-version),
+`7edc945b` (MacBook Pro), the NVMEM-provider v11 series (Qualcomm/ARM),
+`nvme-auth`/`nvme-rdma` (fabrics), `cpufreq: cppc: Enable boost by default`
+(behaviour default; we pin `amd_pstate.epp_boost=1` on the cmdline anyway), and
+`x86/mce/intel: Bound cmci_rediscover()` (Intel).
+
+### drm/amd work items — 11 updated, two new and worth watching
+
+- **#5986** `[REGRESSION] amdgpu: eDP luminance flicker on VRR-capable panel
+  after 3c108046e1d6`. The named commit is *"drm/amd/display: Add power module
+  on Linux"* (Ray Wu, 2025-12-30) — present in linux-next, drm-next and
+  amd-staging, and long since in mainline, so **we already run it**. The report
+  is specifically **eDP** (laptop internal panel) and the symptom persists with
+  VRR disabled. Wrong form factor for this machine, which drives external HDMI
+  and DP — recorded as a watch item, not ours.
+- **#5987** `REG_WAIT timeout in optc3x_disable_crtc at first modeset` on
+  Raphael iGPU + RX 7600 (Navi 33, DCN 3.x) — wrong chip, but the same
+  *symptom family* as the `optc401_disable_crtc` REG_WAIT timeouts this repo
+  records as chronic-and-benign. Worth remembering that the benign verdict is a
+  local observation about DCN 4.0.1, not a general property of the timeout.
+
+### What this pass did not do
+
+No patch was adopted, no PKGBUILD touched, no build run. The candidate set above
+is the follow-up's input.
