@@ -36,3 +36,6 @@ config-[0-9][0-9]*.*
 # Python bytecode and checkpatch scratch
 __pycache__/
 .checkpatch-*
+
+# Scratch from verification runs (patchwork fetches, diffs)
+.verify-tmp/
