@@ -15,7 +15,9 @@ to the author's** (a hard requirement — do not "improve" it).
    `__swap_writeout` → `__swap_writepage`). Keep the change minimal and
    semantically identical to the author's intent.
 4. **Regenerate only the changed file-sections** with
-   `diff -u <pristine-copy> <fixed-file>` — **never hand-edit hunk headers**
+   `diff -u <pristine-copy> <fixed-file>`. `<pristine-copy>` is the **base
+   tag's** version of that host file — `git show <tag>:<path>` — not a copy
+   kept in this repo. **Never hand-edit hunk headers**
    (wrong `@@` counts and literal `\t` vs real tabs are the usual failure) and
    **never `git diff` after `git add -A`** (it duplicates new-file sections).
 5. **Splice** each regenerated section into the patch, replacing the stale one,
