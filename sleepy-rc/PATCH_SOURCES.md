@@ -7935,3 +7935,66 @@ and never `git checkout` a path a series patch owns. Better: do real-apply tests
 in a throwaway copy, or rebuild with `audit_series.py --keep` afterwards. The
 skill already says `_audit` must be rebuilt before it is trusted; this pass is
 the concrete reason why.
+
+## Preview base bump to `next-20261014` — attempted 2026-10-15, DEFERRED
+
+Not shipped. The bump and the LRU-MARIE 0.12.0 upgrade were both staged, measured,
+and reverted, because the combination is not buildable as-is and would have
+failed **silently**.
+
+### What the bump costs: 6 patches
+
+Same series, two bases, measured with `audit_series.py --keep`:
+
+| Base | applies | does not |
+|---|---|---|
+| `next-20261009` (current) | **102** | 139 |
+| `next-20261014` (proposed) | **96** | 145 |
+
+So the newer snapshot costs six patches. `next-20261013`/`next-20261014` are both
+`7.3.0-rc7`-based, where `next-20261009` was `rc6`-based; the series is tuned to
+the latter.
+
+### Why MARIE blocks it
+
+`2101` (LRU-MARIE 0.12.0, from sirlucjan's `7.3-rc/lru-marie-patches-v3`) **does
+not apply cleanly to either base** — 3 of its 119 hunks fail:
+
+| Hunk | File | Anchor |
+|---|---|---|
+| #1 | `mm/Kconfig` | `@@ -1430,6 +1430,78 @@ config LRU_GEN_WALKS_MMU` |
+| #2 | `include/linux/memcontrol.h` | `@@ -903,9 +927,14 @@ unsigned long mem_cgroup_get_zone_lru_size` |
+| #3 | `mm/page_alloc.c` | `@@ -4639,25 +4662,58 @@ bool gfp_pfmemalloc_allowed` |
+
+**These are the same three places our 0.11.1r2 hand-rebase already fixed** — the
+`LRU_GEN_WALKS_MMU` anchor moving, `mem_cgroup_get_zone_lru_size()` being
+rewritten upstream, and the `mm/page_alloc.c` merge. So the fixes are known; the
+work is applying them to 0.12.0's own text.
+
+**Why it must not ship unreconciled.** `prepare()` dry-runs and *skips* a patch
+that does not apply cleanly. A skipped `2101` is not a cosmetic loss: the kernel
+would build with **no LRU-MARIE at all** — no swappiness clamp, no thrash
+watchdog — and it would look like a successful build. `LESSONS.md` records both
+of those being misunderstood once already.
+
+### To resume
+
+1. Rebase `2101` at its position (index 124 of the preview's `source=()`; after
+   `2100` zstd, before `2120`) using the graft method: build the tree at that
+   position, apply 0.12.0, fix the three hunks, regenerate.
+2. Identify and rebase or accept the six patches the base move costs.
+3. Then bump `_srctag`, the snapshot URL, and the `2101` filename together —
+   `pkgver` follows `_srctag` automatically, and `updpkgsums` is required.
+
+### Method notes
+
+- **`git -C <repo> worktree add <relpath>` resolves against `<repo>`, not `$PWD`** —
+  hit again this pass. It created the worktree *inside* `repos/linux-next`, and
+  every patch then failed with `Can't change to directory` while `patch` exited
+  non-zero for the wrong reason. Force absolute paths.
+- **Removing a worktree with `rm -rf` leaves it registered**; the next
+  `worktree add` fails with *"missing but already registered"*. Use
+  `git worktree remove` or `git worktree prune`.
+- **`audit_series.py`'s "Hunk #N" numbers are per-file, not per-patch.** Read them
+  against the file named on the following lines, not against the patch's global
+  hunk order.
