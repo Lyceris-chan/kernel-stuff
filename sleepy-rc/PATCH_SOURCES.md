@@ -8096,3 +8096,107 @@ Rejected: `8d630995`/`acb8f7c7` (**gfx 12.1** SDMA MQD — wrong sub-version),
 
 No patch was adopted, no PKGBUILD touched, no build run. The candidate set above
 is the follow-up's input.
+
+## Bump decision 2026-10-15 (evening): RC needs none; `next` sized and deferred
+
+### sleepy-rc — no bump exists
+
+`v7.3-rc7` is still the newest mainline tag (checked with `ls-remote` against
+torvalds, which avoids the fetch that hangs on this clone). That is exactly what
+`sleepy-rc` is on, so there is nothing to move to. `v7.3-rc8` is not due until
+about 2026-10-18.
+
+### sleepy-next — bumpable, and now precisely sized
+
+Each newer snapshot costs carries, measured with `audit_series.py --keep`
+against the same 241-entry series:
+
+| Base | applies | fails |
+|---|---|---|
+| `next-20261009` (current) | **102** | 139 |
+| `next-20261014` | 96 | 145 |
+| `next-20261015` | **95** | 146 |
+
+**BORE's blocker is exactly one hunk, and the fix is known and verified.**
+`2419` fails on `Hunk #7` — the hunk *we added on 2026-10-12*, `@@ -1142,5
++1171,9 @@`, which wraps `normalized_sysctl_sched_base_slice` in
+`#ifdef CONFIG_SCHED_BORE` inside `update_protect_slice()`. The `next-20261015`
+scheduler rework replaced that function's body: it no longer reads
+`normalized_sysctl_sched_base_slice` at all, calling a new `cfs_rq_min_slice()`
+instead (`__min_vruntime_update()`, `__min_slice_update()`,
+`__max_slice_update()` and `min_vruntime_copy()` are all gone from the same
+delta). The wrapper therefore has nothing left to guard.
+
+**Verified: deleting that one hunk makes `2419` apply to `next-20261015`** —
+dry-ran against a grafted tree at its series position, 0 rejects. Note
+`set_protect_slice()` *does* still read `normalized_sysctl_sched_base_slice`
+(hunk #6), so only hunk #7 goes.
+
+**The deletion is only valid together with the bump.** On `next-20261009` that
+symbol is still read by `update_protect_slice()`, so removing the hunk breaks
+the base we currently build. The two changes must land as one.
+
+**LRU-MARIE is the remaining work** — and it is larger than it looked.
+`sirlucjan`'s `7.3-rc` line still tops out at v3 (`MARIE_VERSION "0.12.0"`);
+there is no newer revision to wait for. Applied at its series position on
+`next-20261015` it produces **six rejects**, up from the three seen on
+`next-20261014`:
+
+```
+mm/Kconfig                  (LRU_GEN_WALKS_MMU anchor)
+include/linux/memcontrol.h  (mem_cgroup_get_zone_lru_size)
+mm/page_alloc.c
+mm/page_alloc.h
+mm/swap.h
+mm/vmscan.c
+```
+
+Six MM hunks, in the component `LESSONS.md` records causing a livelock once
+already, is not something to hand-rebase at the end of a session. Deferred
+deliberately.
+
+**Order for whoever picks this up:** fix all six MARIE rejects at index 124 of
+the preview's `source=()` (graft the tree at that position first — 73 of the
+preceding 125 entries *skip* on this base, so the tree is much thinner than the
+series suggests, and `prepare()` skips the same ones), regenerate `2101`, then
+delete `2419`'s hunk #7, then move `_srctag`, the snapshot URL and the `2101`
+filename together and `updpkgsums`. All three changes are one atomic step.
+
+### Also checked this pass
+
+- **sirlucjan updated today** (`9c29aa44556d`, "Add 7.3-rc line (fixes)" and
+  "Prepare to 7.2.11 (arch)") — no newer MARIE.
+- **No newer BORE upstream.** `firelzrd-bore-scheduler` is unchanged at
+  2026-09-09; our carry is `BORE_VERSION "7.0.0"`, newer than that tip.
+- **`lore-linux-mm` re-cloned** (the documented fix — fetching cannot recover
+  it; the `/0` HEAD is ancient and `fetch +HEAD:master` replaces a good tip
+  with a 2021 one). It had been frozen at 2026-10-02, so MM mail coverage was
+  a genuine gap for two weeks. `lore-lkml` remains stale at 2026-09-27.
+
+### Corrected: lore mirror epochs — `/0` is the OLDEST, not the current
+
+The two mirrors that kept freezing are now explained, and the rule this repo
+recorded for them was **backwards**.
+
+public-inbox splits a large list into numbered **epochs**, and the number runs
+oldest → newest. `repos/lore-linux-mm` and `repos/lore-lkml` had both been
+pointed at `/0`, which is the *first* epoch, frozen years ago:
+
+| List | `/0` tip | current epoch | its tip |
+|---|---|---|---|
+| `linux-mm` | **2021-08-17** | `/2` | 2026-10-15 |
+| `lkml` | **2007-01-22** | `/20` | 2026-10-15 |
+
+That is why they "froze after a fetch": there was nothing newer to fetch. It
+also explains why re-cloning `/0` made things worse — it replaced a usable tip
+with the 2021 one, which is the event recorded as *"`fetch +HEAD:master`
+replaced a usable tip with an ancient one"*. The fetch was not the problem.
+
+**Both re-cloned against their current epoch.** `lore-linux-mm` at `/2` and
+`lore-lkml` at `/20`. MM mail coverage had been a real gap since 2026-10-02 and
+LKML since 2026-09-27; both are current as of this pass.
+
+**To find the current epoch for any lore mirror:** `git ls-remote` each
+`https://lore.kernel.org/<list>/<n>` and take the highest `<n>` that resolves —
+or, for a negative control, note that a working mirror's tip date should be
+within days, not years. The web manifest is 403 to plain `curl`.
