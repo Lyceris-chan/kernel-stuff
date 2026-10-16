@@ -8344,3 +8344,53 @@ on `next-20261009` the old wrapper is still required, and a skipped `2101` build
 a kernel with no LRU-MARIE at all while reporting success. Then `_srctag`, the
 snapshot URL and the `2101` filename move together, `updpkgsums` runs, and the
 build is verified for BTF and the banner as usual.
+
+## URGENT — `1173` un-reverts an AMD revert, on this machine's display path (found 2026-10-16)
+
+**Needs a user decision. Nothing was changed.**
+
+`3b77aacb15e0` (Joshua Aberback, 2026-09-23) —
+*"drm/amd/display: Revert 'avoid to write signal specific for tmds'"* — carries
+`Reviewed-by: Martin Leung`, `Tested-by: Dan Wheeler`, and its stated reason is:
+
+> *"The change regressed HDMI output on the TMDS-to-FRL switch."*
+
+**We carry the reverted change as `1173`.** Verified by content, independently of
+the sweep that found it:
+
+| File | `v7.3-rc7` | our series tree | `next-20261016` |
+|---|---|---|---|
+| `dc/link/protocols/link_ddc.h` | 0 | **1** | 0 |
+| `dc/link/protocols/link_ddc.c` | 0 | **2** | 0 |
+
+`is_frl` is absent from mainline and present only because `1173` puts it there —
+it is the `bool is_frl` argument our patch adds to `write_scdc_data()`.
+
+**Why this is sharp.** `PATCH_SOURCES.md` records the adoption of `1173` at
+line 3884 and its rationale at 3903 — *"this machine drives the MSI MAG251RX over
+HDMI **on FRL**"*. The path AMD reverted the change for, the TMDS-to-FRL switch,
+is this machine's display path. The revert is dated 2026-09-23; our entry is
+dated 2026-09-24. **We adopted it one day after AMD reverted it**, and the ledger
+has no record of the revert at all.
+
+**Why nobody caught it.** `audit_series.py` reports `OK: all 242 patches applied
+cleanly to v7.3-rc7` — because the revert *restored* the context `1173` expects.
+A clean apply is not evidence that a patch should apply. This is the CLAUDE.md
+"applies cleanly, still wrong" class in its least obvious form: not a duplicate
+insertion, but an **un-revert**.
+
+**Do not sweep `1171`/`1172` up with it.** They sit on the same HDMI-FRL polling
+path and were *not* reverted — the revert names only the signal-specific write.
+Removing `1173` requires explicit user approval (CLAUDE.md rule 8), and the
+honest framing is: AMD tested this, it broke HDMI on the FRL switch, they
+reverted it, and we are carrying it anyway.
+
+### Coverage gap found the same pass
+
+`repos/akpm-mm`'s `remote.origin.fetch` was pinned to
+`+refs/heads/master:refs/remotes/origin/master`, so **`git fetch --all` exited 0
+for months while never updating `mm-everything`** — the branch that carries
+essentially all of our swap and MM material. Caught only by comparing against
+`git ls-remote`. Fixed with an explicit `+refs/heads/*:refs/remotes/origin/*`
+refspec; two of the new candidates below came out of it. **Worth checking this
+refspec in every clone**, since success-without-fetching is invisible otherwise.
