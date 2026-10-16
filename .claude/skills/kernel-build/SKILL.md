@@ -4,10 +4,7 @@ description: >
   Builds sleepy-kernel with makepkg and verifies the result — BTF, net-tune, and the built-in cmdline. Use when asked to build the kernel, when a build fails on a patch or hunk, or to verify BTF/vmlinux after a build.
 ---
 
-> Two packages share one patch series: `sleepy-rc/` is the mainline
-> package and `sleepy-next/` is the linux-next preview. These workflows target
-> **`sleepy-rc/`** unless a step says otherwise — `cd sleepy-rc` first, and from
-the repo root prefix paths with `sleepy-rc/`.
+> Targets **`sleepy-rc/`** unless a step says otherwise (see `CLAUDE.md` → Two packages).
 
 # Kernel build
 
@@ -27,22 +24,22 @@ during `prepare()`. The NIC uses the in-kernel `r8169` (no `r8125` package);
 webcams use `uvcvideo`; the build ships the `net-tune` service (CAKE SQM +
 latency tuning).
 
-**Full build runs at the PKGBUILD's `_jobs=8`** (tunable at the top of the
-PKGBUILD; `-j$(nproc)` was 16 and froze the desktop by over-committing RAM).
-(`2300`–`2322`, `pkgrel 3`+). Rebuilds are cheap — prefer rebuilding over
-guessing. Run it in the background and watch for `Finished making` / `ERROR:`.
+**Read `_jobs` from the PKGBUILD** (top of the file) rather than assuming a
+value. Rebuilds are cheap — the build is dominated by its serial stages, so the
+job count is a poor lever; prefer rebuilding over guessing. Run it in the
+background and watch for `Finished making` / `ERROR:`.
 
 Compile flags are fixed: `CC=clang LD=ld.lld LLVM=1 LLVM_IAS=1`. Never
 substitute these (see `reference.md` for why `ld.mold` specifically breaks).
 
 ## How patches apply (important)
 
-ALL patches — including the `90xx` series (`9001`–`9003`, `9006`–`9024`;
-`9000`/`9004`/`9005` merged upstream into rc6 and were dropped; the 14-patch
-retry-fault v3 series lives at `9011`–`9024`) — apply through the normal `patch
--Np1 --forward` loop in `prepare()` (PKGBUILD lines ~533–542). There is **no**
-special `git apply` case for `90xx` patches. If you see a `90xx` patch fail,
-diagnose it exactly like any other patch — do not invent a `git apply` bypass.
+ALL patches — including the `90xx` series (mostly the retry-fault and userq
+lifecycle backports; enumerate them from `patches/9000-9099/` or the ledger,
+never from a list here) — apply through the normal `patch -Np1 --forward` loop
+in `prepare()`. There is **no** special `git apply` case for `90xx` patches. If
+you see a `90xx` patch fail, diagnose it exactly like any other patch — do not
+invent a `git apply` bypass.
 
 **Patch layout (2026-08-11):** patches live in `patches/<range>/NNNN-*.patch`
 folders. makepkg 7.1.0 cannot resolve subdirectory local sources (it strips the
@@ -53,10 +50,10 @@ patch source "not found in the build directory", re-run `updpkgsums` (or source
 the PKGBUILD) — the symlinks may be missing after a fresh clone. Never commit
 root-level `*.patch` files; they are always symlinks.
 
-The only special-case reverse-apply in `prepare()` is for `1101`
-(`drm-amd-display-enable-pstate-for-dcn4-non-emulation-builds.patch`), which is
-reverse-applied with `patch -Np1 --forward -R` to keep `.pstate_enabled =
-false`.
+There is no reverse-apply special case in `prepare()` — every patch, including
+the ones whose net effect is a revert (for example `1164`), is applied forward
+like any other. If a patch needs reverse-apply semantics, that is a sign the
+series order is wrong, not a reason to add a bypass.
 
 ## Audit the full series before building
 

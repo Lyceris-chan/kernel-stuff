@@ -4,10 +4,7 @@ description: >
   Runs the sleepy-kernel verification suite — patch hygiene, checksums, provenance, documented claims, skill-spec compliance, the cumulative apply, plus checkpatch and sparse in the deep tier. Use before committing or releasing, when asked to verify the series or the packaging, or when a change to patches, PKGBUILD, or docs needs checking.
 ---
 
-> Two packages share one patch series: `sleepy-rc/` is the mainline
-> package and `sleepy-next/` is the linux-next preview. These workflows target
-> **`sleepy-rc/`** unless a step says otherwise — `cd sleepy-rc` first, and from
-the repo root prefix paths with `sleepy-rc/`.
+> Targets **`sleepy-rc/`** unless a step says otherwise (see `CLAUDE.md` → Two packages).
 
 # Verify the series and the packaging
 

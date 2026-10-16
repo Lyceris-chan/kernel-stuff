@@ -4,10 +4,7 @@ description: >
   Reconciles the on-disk patch tree with the PKGBUILD source=() array, then removes orphaned patch files and build artifacts. Use when asked to clean up the workspace, remove leftover patch files, or check the series against source=().
 ---
 
-> Two packages share one patch series: `sleepy-rc/` is the mainline
-> package and `sleepy-next/` is the linux-next preview. These workflows target
-> **`sleepy-rc/`** unless a step says otherwise — `cd sleepy-rc` first, and from
-the repo root prefix paths with `sleepy-rc/`.
+> Targets **`sleepy-rc/`** unless a step says otherwise (see `CLAUDE.md` → Two packages).
 
 # Patch Cleanup (post-maintenance-session workspace hygiene)
 
@@ -23,7 +20,7 @@ deferred patches.
   are NOT referenced there may be removed. Deleting an active patch breaks the
   build.
 - **Never remove a patch from `source=()` yourself** — dropping a patch from the
-  build requires explicit user approval (see CLAUDE.md YOU MUST NOT #7). This
+  build requires explicit user approval (CLAUDE.md YOU MUST NOT 8). This
   skill only deletes files whose removal decision was already made.
 - Work from the repository root:
   ```bash

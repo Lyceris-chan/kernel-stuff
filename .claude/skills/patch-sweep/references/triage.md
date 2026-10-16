@@ -72,8 +72,9 @@ is owned by something else here, or the feature is off.
 
 | Subsystem | Status here | Consequence |
 |---|---|---|
-| `tools/sched_ext/*.bpf.c` | userspace samples; this box runs `cake_1.2.1` from the `scx-scheds` package | any `scx_qmap` change is inert |
-| `fair.c` | sched-ext is active via `scx_loader` | core-EEVDF patches are inert; sched-ext patches are not |
+| `tools/sched_ext/*.bpf.c` | userspace samples; `scx_loader` is disabled and BORE owns scheduling | any `scx_*` change is inert |
+| `kernel/sched/ext/` | BORE is the live scheduler since 2026-09-30; sched-ext is compiled but unused | sched-ext patches are inert; `fair.c` patches are not |
+| `fair.c` (EEVDF hunks) | BORE (`CONFIG_SCHED_BORE=y`) wraps the same lines in its own `#ifdef` | the hunk can land in BORE's dead `#else` — see `0110` |
 | MGLRU | inert under LRU-MARIE (`lru_gen_enabled()` false) | `mm/mglru` patches do nothing |
 | xswap writeback | xswap has no backing store | dropbehind/writeback-completion paths unreachable |
 | ASPM | `pcie_aspm=off` on the cmdline | ASPM refactors are inert |

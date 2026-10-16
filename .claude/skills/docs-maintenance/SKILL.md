@@ -4,10 +4,7 @@ description: >
   Updates sleepy-kernel documentation and commits the result after a maintenance session: README, GUIDE, PATCH_SOURCES.md, and CHANGELOG.md. Use when asked to update the docs, record patch provenance, write a commit message, or commit a maintenance result.
 ---
 
-> Two packages share one patch series: `sleepy-rc/` is the mainline
-> package and `sleepy-next/` is the linux-next preview. These workflows target
-> **`sleepy-rc/`** unless a step says otherwise — `cd sleepy-rc` first, and from
-the repo root prefix paths with `sleepy-rc/`.
+> Targets **`sleepy-rc/`** unless a step says otherwise (see `CLAUDE.md` → Two packages).
 
 # Docs maintenance & commit
 
@@ -33,12 +30,16 @@ every commit message. Quick rules that always apply:
 
 The per-patch manifest lives **only** in `PATCH_SOURCES.md` — never duplicate
 per-patch rows into README.md or GUIDE.md. Keep the remaining README sections
-in sync:
+in sync (headings as they actually exist in `sleepy-rc/docs/README.md` — read
+the file, do not trust this list):
 
-- **"Target audience"** — one machine: Ryzen 7 7700 (Zen 4), RX 9070 XT
+- **"Target hardware"** — one machine: Ryzen 7 7700 (Zen 4), RX 9070 XT
   (Navi 48 / RDNA 4), RTL8125B NIC; not a general-purpose distro kernel.
-- **"What this kernel adds"** — subsections "Over vanilla Linux 7.2-rcN" and
-  "Over stock CachyOS", listing every category the series now carries.
+- **"Highlights"** — the one-line summary of every category the series carries.
+  There is no "Over vanilla Linux" / "Over stock CachyOS" subsection; fold that
+  framing into existing bullets instead of re-introducing it.
+- **"Patch series"** — the compact range table; update it when a category range
+  changes.
 
 On any patch add/remove/renumber, update `PATCH_SOURCES.md` (mandatory). Touch
 README.md / GUIDE.md only when a category range changes (their compact "Patch

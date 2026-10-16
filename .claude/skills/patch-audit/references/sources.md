@@ -1,10 +1,6 @@
 # Source access & fetch guide
 
-> **Package location (2026-09-12).** The repo is single-package: everything this
-> skill touches lives in `sleepy-rc/`. Unless a step says otherwise, `cd
-> sleepy-rc` first so paths like `PKGBUILD`, `patches/...`, `config`,
-> `net-tune/` and `PATCH_SOURCES.md` resolve. From the repo root, prefix them
-> with `sleepy-rc/`.
+> Targets **`sleepy-rc/`** unless a step says otherwise (see `CLAUDE.md` → Two packages).
 
 Per-source fetch commands, archive-access workarounds, and extraction
 gotchas. Referenced from `SKILL.md`.
@@ -164,10 +160,9 @@ rule stands unless separately verified.)
 - **Repository**: `https://github.com/sirlucjan/kernel-patches.git`
 - **Location**: `repos/sirlucjan-kernel-patches`
 - **Fetch**: `cd repos/sirlucjan-kernel-patches && git pull`
-- **Audit**: Inspect `7.2/` directories. Current versions to expect:
-  `lru-marie-patches-v12/`, `zstd-dev-patches/`, `block-patches-sep/`,
-  `cachyos-fixes-patches-v10-sep/`, `preempt-ipi-patches-v3-sep/`,
-  `nap-patches/`.
+- **Audit**: Inspect the directory for the current line (for example `7.3-rc/`).
+  List it with `ls` and pick the highest version per branch — do not work from a
+  version list copied here, which goes stale every bump.
 - **Byte-check**: Verify `2000–2004` (block), `2100–2101` (MM) patches match
   source diffs.
 

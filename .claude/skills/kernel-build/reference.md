@@ -30,7 +30,7 @@ scripts/config -d TCP_CONG_BBR -e TCP_CONG_BBR3 -e DEFAULT_BBR3 \
 
 # I/O scheduler, modules this machine needs, bloat removal
 scripts/config -e MQ_IOSCHED_KYBER --set-str DEFAULT_IOSCHED "kyber"
-scripts/config -m USB_VIDEO_CLASS -m I2C_CHARDEV -m R8169
+scripts/config -m USB_VIDEO_CLASS -m I2C_CHARDEV -e R8169 -e REALTEK_PHY
 scripts/config -d DRM_I915 -d DRM_XE -d DRM_NOUVEAU -d DRM_VGEM -d DRM_VMWGFX \
                -d DRM_GMA500 -d DRM_UDL -d DRM_AST -d DRM_MGAG200 -d DRM_QXL \
                -d DRM_VIRTIO_GPU
@@ -57,10 +57,12 @@ scripts/config -e CACHY
 scripts/config -d PCIEASPM_PERFORMANCE -d PCIEASPM_POWERSAVE -d PCIEASPM_POWER_SUPERSAVE
 
 # Built-in cmdline (appended to bootloader params; CMDLINE_OVERRIDE stays off)
-# amdgpu.dcdebugmask=0x800 was dropped in pkgrel 11: it was masking the display
-# "box", which is a COSMIC overlay-plane bug, not an IPS one.
+# amdgpu.dcdebugmask=0x800 (DC_DISABLE_IPS) is present: it covers the clock-gated
+# HUBP flip-pending misread that the MAG251RX flicker traces to. The "box" being a
+# COSMIC bug is true separately and does not retire the mask. See the PKGBUILD
+# comment and sleepy-rc/docs/README.md for the full rationale.
 scripts/config -e CMDLINE_BOOL \
-  --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0" \
+  --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0 amdgpu.dcdebugmask=0x800" \
   -d CMDLINE_OVERRIDE
 
 # BTF and debug. Clang 23 requires DWARF5 explicitly; the toolchain default

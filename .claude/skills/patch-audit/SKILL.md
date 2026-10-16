@@ -4,10 +4,7 @@ description: >
   Ingests or upgrades one named kernel patch — adds a commit or series, swaps a revision, and verifies provenance, symbol existence, and that it applies cleanly. Use when given a specific patch, commit, or series to bring into the tree, or to audit an existing entry. For the periodic all-source sweep, use patch-sweep instead.
 ---
 
-> Two packages share one patch series: `sleepy-rc/` is the mainline
-> package and `sleepy-next/` is the linux-next preview. These workflows target
-> **`sleepy-rc/`** unless a step says otherwise — `cd sleepy-rc` first, and from
-the repo root prefix paths with `sleepy-rc/`.
+> Targets **`sleepy-rc/`** unless a step says otherwise (see `CLAUDE.md` → Two packages).
 
 # Patch Audit & Ingestion
 
@@ -39,7 +36,7 @@ Run these in order. Copy the commands exactly — do not improvise.
 
 1. **Verify Target Hardware**: Confirm candidate patch targets a hardware
    component in `CLAUDE.md`'s target table (Zen 4, RDNA 4/gfx1201/DCN401/SMU14,
-   Realtek RTL8125, Phison E16, sched-ext, NAP). Reject all non-target hardware
+   Realtek RTL8125, Phison E16, BORE, NAP). Reject all non-target hardware
    (i915, xe, nouveau, Intel WiFi, Bluetooth, laptop audio).
 
 2. **Check Symbol Presence**:
@@ -96,18 +93,19 @@ Run these in order. Copy the commands exactly — do not improvise.
    | Prefix | Category |
    |--------|----------|
    | `00xx` | Local / hand-selected (0001–0049) or EDID/display ML (0050–0099) |
-   | `01xx` | CachyOS branch squashes (0101–0109, one per branch) |
+   | `01xx` | CachyOS branch squashes (0101–0113; carried set in `patch-cachy-branches`) |
    | `10xx` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) |
-   | `11xx` | AMD Display (DCN4, DCN42B, FRL, colorops) |
+   | `11xx` | AMD Display (DCN4/DCN401, FRL, colorops) |
    | `12xx` | AMD Power Management (amd-pstate, CPPC) |
    | `20xx` | Block / I/O (bfq, mq-deadline, zram, io_uring) |
-   | `21xx` | Memory management (zstd, LRU-MARIE, MGLRU, gup batching) |
+   | `21xx` | Memory management (zstd, LRU-MARIE, MGLRU, gup batching, zswap) |
    | `22xx` | CPU idle (NAP governor) |
    | `23xx` | Build system / kbuild (the build-speedup series) |
-   | `24xx` | Core scheduler, non-CachyOS |
+   | `24xx` | Core scheduler, non-CachyOS (BORE lives here) |
    | `25xx` | x86 / arch core |
-   | `26xx` | Time / timers |
-   | `90xx` | agd5f staging backports |
+   | `26xx` | Time / timers — reserved, currently empty in both packages |
+   | `27xx` | zswap request stack — `sleepy-next/` preview only |
+   | `90xx` | agd5f staging + userq lifecycle backports |
 
    A new category gets a new range; add it to this table when you create one.
    ```bash
@@ -230,7 +228,7 @@ rm -rf src && makepkg -o
 ```
 
 `makepkg -o` runs the `prepare()` phase only: it verifies the checksums and
-applies the entire series (`0001` → `2200`) in order, stopping at the first
+applies the entire series in `source=()` order, stopping at the first
 failure. If it fails, diagnose per the `kernel-build` skill (read the `.rej`,
 regenerate the shifted patch from source, or report).
 

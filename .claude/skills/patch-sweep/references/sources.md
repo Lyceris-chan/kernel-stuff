@@ -276,9 +276,10 @@ Known recurring classes worth grepping each sweep: `SMU`, `lost from bus`,
   series with `-sep` (separated) and `-all` variants. Version dirs (`-v2`, `-v3`)
   are additive; the newest is the one to read.
 - **CachyOS** — `repos/cachyos-linux`, per-branch squashes.
-- **linux-tkg, firelzrd, Clear** — check for on-target material only. BORE and
-  `-hardened` are not used by this machine (it runs sched-ext), so activity
-  there is usually a no-op for us. Say so rather than listing it as a finding.
+- **linux-tkg, firelzrd, Clear** — check for on-target material only. `-hardened`
+  is not used by this machine, so activity there is usually a no-op for us. Say
+  so rather than listing it as a finding. (firelzrd's `-bore-scheduler` **is**
+  on-target — see the BORE entries in `PATCH_SOURCES.md`.)
 
 ## Repository health
 
