@@ -8442,3 +8442,69 @@ npm package identity verified against the repo before installing
   are *not* installed by REA — deep native analysis needs one of them, and REA
   requires a caller-supplied `jadx-headless-mcp 0.7.1` JAR via
   `REA_JADX_MCP_JAR` rather than downloading one.
+
+## Sweep 2026-10-16 (late): 15 adoptable candidates, nothing adopted
+
+Ran after `1173` was removed. Verdicts are `patch -p1 --forward -F2 --dry-run`
+against the rebuilt series tree. **Caveat: the dry-runs were computed on the
+242-patch tree, i.e. before `1173` came out.** None of these candidates touches
+`link_ddc.*` or `link_dpms.c`, so the verdicts should stand — but re-confirm
+against the 241-patch tree before adopting.
+
+### Top of the list
+
+| Candidate | Author / date | Why it matters |
+|---|---|---|
+| **`f512853e`** | Luigi Lauro, 2026-10-16, amd-gfx | **The fix for drm/amd #5951** — display runtime-PM reference taken only on CRTC activation. Reporter-tested on an RX 9070 XT and `agd5f` asked for the posting. Closes a watch item from 2026-10-14 |
+| **`879ce064`** | Alex Deucher, 2026-10-16 | allow dispatch tunneling on **`gfx_v12_0.c`** — our GC 12.0. **Take 1/2 only**: its sibling `3da4eba4` is `gfx_v12_1.c` |
+| **`3ba149029a43`** | Joerg Roedel, 2026-10-14 | `Revert "iommu/amd: Remove redundant check in irq_remapping_select()"` — an **upstream** revert, post-rc7, stated reason a regression with GPU devices. Note this is the *opposite* direction from `1173`: here adopting the revert is right |
+| `e1a50a2e` | Jesse Zhang, 2026-10-16 | drop the gang-leader reference when freeing a gang job — ref leak |
+| `969fbab5` | Sunil Khatri, 2026-10-16 | userq seq64 BO mapping. **Take this, not `c142a646`** — alternate revisions of the same function, neither a superset |
+| `ea23df46` | Kevin Wang, 2026-10-16 | amd/pm reapply UMD profile state after recovery, `Reviewed-by: Kenneth Feng` |
+| `84b54de9`+`18564da8` | Daniel Huang, 2026-10-17 | KFD SVM bounds validation v2 — chip-agnostic |
+| `01b3f957` | Victor Zhao, 2026-10-16 | MES 64-bit register reads; the `mes_v12_0.c` leg is ours |
+| `5aa3545c`+`9967d8bc` | 2026-10-16 | amdgpu_vm `insert_map` / root-PD pair, order-dependent |
+| `22cd2b50`, `d2b140fb`, `375bc0e9`, `57595a2c`+`c8de2410`+`a0afad8b`, `0d5c18f2` | — | display debugfs `memdup_user_nul`; ANONONLY userptr rejection; KFD wait-for-reset before freeing a BO; the v6 wedged-teardown series; UQ_FW_AREAS copy errors (also the current amd-staging tip, so it lands on the next bump anyway) |
+| MM set | — | `06dccc1615` (v3, truncation removing mapped folios — sits in `mm-hotfixes-unstable`, so rc7-targeted; `mm-4633da0746` is its superseded v2), `e57b299800` (guard pages counted free, Rik van Riel), `094b1af2e8` (`swap_cache_get_folio` off-list folio), `ce2f3b80de` (zonelist slots vs concurrent rebuilds), `70badd4f2c` (swap-cache folios the zap path abandoned) |
+
+### Rejections worth keeping
+
+- **`34fa31c8` (CRIU ctl-stack copy) — wrong chip, proven by the dispatch rather
+  than the filename.** It touches only `kfd_mqd_manager_v9.c`; `kfd_device_queue_manager.c:3339`
+  routes GC >= (12,0,0) to `device_queue_manager_init_v12` → `mqd_manager_init_v12`,
+  and v9 is reachable only for GC >= (9,0,1) and < (10,1,1). **It applies cleanly
+  and does nothing here.**
+- `266c5256`, `48d67c6a`, `60658e7d`, `3da4eba4` — `mes_v12_1.c`/`gfx_v12_1.c`, GC 12.1.
+- `dfee5d45` — fails forward (2/2 of the debugfs pair).
+- The `fair.c` revert `0a94d0ea8d8b` — already in base **by content probe**
+  (`bool curr;` / `curr = (cfs_rq->curr == se);` / `if (curr)` all present);
+  the dry-run failed in *both* directions and gave no verdict at all.
+- All sched_ext patches (inert under BORE), MGLRU items (inert under MARIE),
+  zram items (this box runs zswap + a swapfile).
+- sirlucjan's 2026-10-15 fixes refresh: all three on-target entries are already
+  carried (`0006` = `2420`, `0007` = `0104`, `0013` = `2197`). The `RDSEED` one
+  is a znver5-only path — Zen 4 never reaches it.
+
+### Two recurring shas, resolved
+
+- **`63e19ef3ddab` is already in base.** Six 9070 XT flip_done threads keep being
+  told to retest it; `amdgpu_dm_irq_set()` is present in the series tree. Those
+  reports are **not** explained by it.
+- **Tracker #5988** (280 Hz DP VRR falling to 24 Hz) has no referenced fix —
+  **watch**, it is this machine's exact class.
+
+### Coverage
+
+Refreshed and scanned: torvalds, linux-next (newest tag still `next-20261016`;
+**no `v7.3-rc8` exists**), drm-next, drm-misc (origin only — the secondary `orcz`
+remote is unreachable), tip, linux-pm, akpm-mm (**all branches, `mm-everything`
+force-fetched**), agd5f/amd-staging (unchanged at `f307e9d20cc7`), 14 lore
+mirrors, the drm/amd tracker (32 issues, complete set), cachyos-linux,
+cachyos-kernel-patches, sirlucjan, firelzrd BORE/MARIE, linux-tkg.
+
+**Not checked:** `pixelcluster-kernel` and `cachymod` (outside the documented
+source inventory); `lists.freedesktop.org` archive tarballs (amd-gfx and
+dri-devel are covered by the lore mirrors, which were current).
+
+**Version sweep: zero higher-revision postings since 2026-10-13** — a real
+negative, validated with an all-time control run that returns 338 hits.
