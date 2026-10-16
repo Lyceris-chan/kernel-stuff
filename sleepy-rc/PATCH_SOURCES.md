@@ -8250,3 +8250,48 @@ of 241 carries against 102 on the current base, BORE's blocker is the single
 hunk #7 whose fix is verified, and LRU-MARIE yields six rejects. `next-20261016`
 has not been added to that table; if the bump is taken it should be measured
 against whichever tag is chosen rather than assumed.
+
+### Is `next-20261016` worth moving to? — measured, and the answer is specific
+
+Per-window amdgpu content, which is the whole question:
+
+| Window | amdgpu files | all files |
+|---|---|---|
+| `09` → `12` | 0 | 973 |
+| `12` → `13` | 0 | 336 |
+| `13` → `14` | 0 | 596 |
+| `14` → `15` | 0 | 910 |
+| **`15` → `16`** | **172** | 751 |
+
+**The entire GPU payload arrived in the last window alone** — it is the 98
+amd-staging commits triaged on 2026-10-15, reaching linux-next one day later.
+Verified by content rather than by count: `spm_vmid` is **absent** from
+`amdgpu_ids.c` at `next-20261015` and **present** at `next-20261016`.
+
+**Cost is identical across the newer snapshots.** `audit_series.py --keep`:
+
+| Base | applies |
+|---|---|
+| `next-20261009` (current) | 102 |
+| `next-20261014` | 96 |
+| `next-20261015` | 95 |
+| `next-20261016` | **95** |
+
+**Verdict: if the preview moves at all, it should move to `next-20261016` and
+not to 14 or 15.** Those two cost the same 7 carries and the same two rebases
+while carrying **zero** GPU content. The extra day is the entire difference.
+
+Two things temper it. First, **43 carries touch files that moved in this
+delta** — 15 files, 43 patches — so the 95/241 count understates the rebase
+risk; carries like `1065`/`1066` (`mes_userqueue.c`, `amdgpu_userq.c`), `1058`
+(`amdgpu_vm*`), `9039`/`9055` (`amdgpu_userq_fence.c`) and `9065`
+(`gfx_v12_0.c`) all sit on moved files. (Several of those already fail on
+`next-20261014`, so not all are new.) Second, **the same GPU content is
+available far more cheaply as `90xx` backports**: six of the amd-staging
+patches dry-run clean against the rc7 series tree, and `90xx` is by definition
+the agd5f staging range. That route costs no carries and neither rebase.
+
+So it comes down to what is wanted. The GPU content alone: backport the six.
+The newer base as well — rc7 instead of rc6, 3288 files of upstream work, and
+the preview realigned with the mainline package's rc: take the bump, as one
+atomic step with the BORE hunk and the six MARIE rejects.
