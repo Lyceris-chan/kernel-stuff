@@ -8764,6 +8764,16 @@ against the 255-patch series tree.
   a new `sched_ext` fixes batch and `0a94d0ea8d8b` (already in base by content
   probe).
 
+### Quality check on the 13 new patches
+
+`checkpatch.pl --strict` reads them as patches (no `-f` — with `-f` it parses
+the diff as C source and reports hundreds of bogus errors). It flags
+`ERROR: trailing whitespace` on every one; **all of them are empty context
+lines**, which in a unified diff are a single space and nothing else. The
+decisive check is a byte comparison of the added lines against the raw mail in
+the lore mirror: 68 added lines for `1175`, identical in both, zero with
+trailing whitespace. Extraction is faithful; the flags are a format artifact.
+
 ### Coverage gaps found and closed
 
 - **`akpm-mm`'s `remote.origin.fetch` is still pinned to `master` alone**
