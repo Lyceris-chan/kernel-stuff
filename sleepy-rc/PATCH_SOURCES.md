@@ -8295,3 +8295,52 @@ So it comes down to what is wanted. The GPU content alone: backport the six.
 The newer base as well — rc7 instead of rc6, 3288 files of upstream work, and
 the preview realigned with the mainline package's rc: take the bump, as one
 atomic step with the BORE hunk and the six MARIE rejects.
+
+## `next-20261016` bump: attempted 2026-10-16, reverted — full diagnosis recorded
+
+Not shipped. BORE's fix is verified and the MARIE rejects are all diagnosed, but
+completing it needed more care than the session had left, and a half-applied
+MARIE is the failure mode this ledger exists to prevent.
+
+### BORE — done and verified
+
+Delete hunk #7 (`@@ -1142,5 +1171,9 @@`) from
+`sleepy-next/patches/2400-2499/2419-*.patch`. Verified against a grafted tree at
+`next-20261016`: `2419` then applies with zero rejects. See the entry above for
+why the wrapper is obsolete (`update_protect_slice()` now calls
+`cfs_rq_min_slice()` and no longer reads the symbol).
+
+### LRU-MARIE 0.12.0 at its series position — all six sites located
+
+Baseline: graft `sleepy-next` at index 124 on `next-20261016` (51 applied, 73
+skipped, 0 failed), commit it, then apply `2101`. Six rejects:
+
+| # | Site | What the reject wants | What to do |
+|---|---|---|---|
+| 1 | `include/linux/memcontrol.h` | hooks the **body** of `mem_cgroup_get_zone_lru_size()` | **the body is no longer here** — only prototypes at `:947` and `:1397`. The definition now lives in **`mm/folio.c`**; the hook has to move there, wrapping `return READ_ONCE(mz->lru_zone_size[zone_idx][lru]);` as `size = …; #ifdef CONFIG_LRU_MARIE size = lru_marie_zone_size_read(lruvec, lru, zone_idx, size); #endif return size;` |
+| 2 | `mm/Kconfig` | insert the `config LRU_MARIE` block | anchor moved; insert after the `config LRU_GEN_WALKS_MMU` block's closing `# }` and before `config LOCK_MM_AND_FIND_VMA` |
+| 3 | `mm/page_alloc.c` | `should_reclaim_retry()` — `bool did_some_progress` → `unsigned long nr_progress` plus the refault-treadmill body | anchor is now at `:4645`; signature lines match the reject's `-` lines, so only the body needs splicing |
+| 4 | `mm/page_alloc.h` | add `unsigned long last_refaults;` to `struct alloc_context` | insert after `unsigned int reclaim_compact_order;` (the field upstream added) |
+| 5 | `mm/swap.h` | declare `int kcompressd(void *p);` | the reject names `__swap_writepage`, which **no longer exists** — the tree has `void __swap_writeout(struct swap_io_ctx *ctx, struct folio *folio);` at `:261`. Same anchor, renamed |
+| 6 | `mm/vmscan.c` | wrap the `move_folios_to_lru()` tail | that tail now has the `do_rotate` pair the ledger already records — **both** branches must be wrapped: `lruvec_add_folio_tail()` and `lruvec_add_folio()` at `:2249`/`:2251` |
+
+Five are pure insertions at a located anchor; #1 is a relocation to a different
+file and #6 needs both branches. **`mm/lru_marie/*` itself must stay
+byte-identical to the author's** — only these host hooks get re-anchored.
+
+### Regeneration method that works
+
+Graft → `git add -A` → commit a baseline → apply `2101` → fix the six sites →
+`git add -A && git diff HEAD` → that diff *is* the new `2101`. The baseline
+commit is what keeps `git diff` from swallowing the 51 preceding patches, and
+`git add -A` is what keeps new files (`mm/lru_marie/*`,
+`include/linux/lru_marie.h`) in the diff — without it they vanish silently.
+Delete every `*.orig` and `*.rej` first; GNU patch writes `.orig` on an offset.
+
+### Remaining sequence
+
+BORE hunk deletion and all six MARIE fixes are one atomic change with the bump —
+on `next-20261009` the old wrapper is still required, and a skipped `2101` builds
+a kernel with no LRU-MARIE at all while reporting success. Then `_srctag`, the
+snapshot URL and the `2101` filename move together, `updpkgsums` runs, and the
+build is verified for BTF and the banner as usual.
