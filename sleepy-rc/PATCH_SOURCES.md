@@ -8200,3 +8200,53 @@ LKML since 2026-09-27; both are current as of this pass.
 `https://lore.kernel.org/<list>/<n>` and take the highest `<n>` that resolves —
 or, for a negative control, note that a working mirror's tip date should be
 within days, not years. The web manifest is 403 to plain `curl`.
+
+## `next-20261016` vs our base — the delta is NOT like the previous ones
+
+Checked 2026-10-16. Total delta `next-20261009` → `next-20261016` is **3288
+files, +180412/−61540** — an order of magnitude larger than the two-day windows
+measured earlier (`next-20261012`→`14` was 907 files and `14`→`15` was 910, and
+**both contained zero amdgpu files**).
+
+**This one contains 172 amdgpu/amdkfd files.** The base also moves `rc6` → `rc7`.
+
+### What lands on our silicon
+
+| File | Δ | What it is |
+|---|---|---|
+| **`gfx_v12_0.c`** | **+9 / −135** | the SPM VMID series, and it **removes the legacy CP programming** |
+| **`amdgpu_ids.c`** | **+132 / −28** | SPM VMID + user-queue VMID mask rework |
+| `dcn401_hwseq.c` (DCN 4.0.1) | +23 / −4 | display hwseq |
+| `dcn401_dpp.c` / `.h` / `dcn401_dpp_dscl.c` | +3/−1, +2/−1, +5/−3 | DPP / scaler |
+| `amdgpu_userq.c` | +6 / −4 | userq |
+| `amdgpu_userq_fence.c` | +3 / −1 | userq fences |
+| `amdgpu_seq64.c` | −7 | seq64 |
+| `mes_v12_0.c` | +4 | MES |
+| `amdgpu_ids.h`, `amdgpu_gem.c`, `amdgpu_cs.c`, `amdgpu_ttm.c` | — | VM / CS plumbing |
+
+Not ours, for the record: `gfx_v12_1.c` (2 files), `dcn42` (6), `dcn60` (7),
+`dcn35/351/32` (7), `smu_v15` (5), `sdma_v7_1` (1), and
+`smu_v14_0_2_ppt.c` — 14.0.**2** where we are `smu_v14_0_0`.
+
+### This supersedes part of yesterday's amd-staging triage
+
+`c4868eebfab4` *"gfx_v12_0: Remove legacy CP programming"* was recorded
+yesterday as an adoptable amd-staging backport. It has **already landed** here —
+the diff deletes `gfx_v12_0_cp_gfx_switch_pipe()`,
+`gfx_v12_0_cp_gfx_set_doorbell()` and the `if (!amdgpu_async_gfx_ring)
+gfx_v12_0_cp_gfx_enable(adev, true);` call, and switches the RLC hook to
+`update_spm_vmid(adev, 0, adev->vm_manager.spm_vmid)` with `for_each_uq_gfx_vmid()`.
+The SPM VMID series (`1c04ab2f6d06`, `02232367be23`, `cfc61a3e9f94`,
+`315201a7df39`, `8a9263fc8812`, `1be6ab9c25ee`, `38e07c072833`) has landed with
+it.
+
+**So those should not be backported** — they arrive with the bump, and
+backporting them now would produce the duplicate-insertion trap this ledger
+records for `9060` and `b7d4d57b`-class cases: the hunks' context survives, the
+patch applies, and the tree ends up with two copies.
+
+**The bump sizing recorded yesterday still stands** — `next-20261015` applies 95
+of 241 carries against 102 on the current base, BORE's blocker is the single
+hunk #7 whose fix is verified, and LRU-MARIE yields six rejects. `next-20261016`
+has not been added to that table; if the bump is taken it should be measured
+against whichever tag is chosen rather than assumed.
