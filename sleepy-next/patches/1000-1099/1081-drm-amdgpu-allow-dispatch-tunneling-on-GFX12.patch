@@ -1,0 +1,29 @@
+From Alex Deucher <alexander.deucher@amd.com> Mon Sep 17 00:00:00 2001
+From: Alex Deucher <alexander.deucher@amd.com>
+Date: Fri, 16 Oct 2026 09:16:03 -0400
+Subject: [PATCH] drm/amdgpu: allow dispatch tunneling on GFX12
+Message-ID: <20261016131604.2198664-1-alexander.deucher@amd.com>
+
+Was implemented for older gfx generations, but got missed
+on gfx12.
+
+Suggested-by: Jakub Okoński <jakub@okonski.org>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c b/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c
+index 1ac0d33e62e26..c9e091ea8c5e2 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c
+@@ -3168,7 +3168,8 @@ static int gfx_v12_0_compute_mqd_init(struct amdgpu_device *adev, void *m,
+ 	tmp = REG_SET_FIELD(tmp, CP_HQD_PQ_CONTROL, RPTR_BLOCK_SIZE,
+ 			    (order_base_2(AMDGPU_GPU_PAGE_SIZE / 4) - 1));
+ 	tmp = REG_SET_FIELD(tmp, CP_HQD_PQ_CONTROL, UNORD_DISPATCH, 1);
+-	tmp = REG_SET_FIELD(tmp, CP_HQD_PQ_CONTROL, TUNNEL_DISPATCH, 0);
++	tmp = REG_SET_FIELD(tmp, CP_HQD_PQ_CONTROL, TUNNEL_DISPATCH,
++			    prop->allow_tunneling);
+ 	if (prop->kernel_queue) {
+ 		tmp = REG_SET_FIELD(tmp, CP_HQD_PQ_CONTROL, PRIV_STATE, 1);
+ 		tmp = REG_SET_FIELD(tmp, CP_HQD_PQ_CONTROL, KMD_QUEUE, 1);

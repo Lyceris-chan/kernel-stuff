@@ -1,0 +1,106 @@
+From William Palacek <William.Palacek@amd.com> Mon Sep 17 00:00:00 2001
+From: William Palacek <William.Palacek@amd.com>
+Date: Fri, 16 Oct 2026 11:32:36 -0400
+Subject: [PATCH] drm/amdkfd: wait for a GPU reset before freeing a BO
+Message-ID: <20261016153236.1163913-1-William.Palacek@amd.com>
+
+When a GPU reset takes the reset domain, KFD eviction cannot unmap
+user queues: execute_queues_cpsch() fails its trylock with -EIO, so
+the queues keep running until the ASIC is reset. The TLB flush is also
+skipped while the reset is in progress. If the process unmaps and frees
+a BO in that window, its pages are released while a queue can still
+access them through stale translations.
+
+On MI300X, munmap() then crashes in free_swap_cache() on a small bogus
+page pointer in its mmu_gather batch page:
+
+  BUG: unable to handle page fault for address: 0000000000002900
+  RIP: 0010:free_swap_cache+0x5/0xb0
+  Call Trace:
+   free_pages_and_swap_cache+0x3a/0x60
+   tlb_batch_pages_flush+0x43/0x80
+   tlb_flush_mmu+0x3d/0x110
+   zap_pte_range+0x80d/0xcd0
+   ...
+   do_vmi_align_munmap+0x3e8/0x5b0
+   do_vmi_munmap+0xdf/0x190
+   __vm_munmap+0xad/0x180
+   __x64_sys_munmap+0x1b/0x30
+
+In a traced crash the bogus pointer was the read pointer value of an SDMA
+queue the process had just destroyed, at the read pointer's page offset:
+the queue's writeback landed in its freed rptr page after the page was
+reused as the batch page.
+
+commit f0b4440cdc18 ("drm/amdkfd: Fix mode1 reset crash issue") fixed
+this race on process exit by waiting for the reset to complete before
+freeing the process's BOs. Free through the ioctl has the same race.
+Wait for the reset there too, using the same helper.
+
+Fixes: 9c33e5fd4fb6 ("drm/amdgpu: fix locking scope when flushing tlb")
+Signed-off-by: William Palacek <William.Palacek@amd.com>
+---
+Christian, Felix suggested asking you about a lower-level fix. In the
+traces, the TLB flushes during the reset returned right away without
+flushing, because amdgpu_gmc_flush_gpu_tlb_pasid_xccs() returns 0 when
+it can't take the reset domain lock. So callers free memory the queue
+can still access until the ASIC reset. The SVM munmap path goes through
+the same flush. Felix thought a more general solution may be in
+amdgpu_object.c or amdgpu_ttm.c. amdgpu_bo_release_notify() already adds
+the wipe-on-release fence so TTM delays freeing the BO. Could a fence
+that signals when the reset completes hold the pages the same way, or is
+there a better place?
+
+v5: new approach, replaces "drm/amdkfd: discard interrupts during a GPU
+    reset" (v4) and "drm/amdgpu: preempt KFD queues before taking the
+    reset domain lock" (v1-v3)
+    - v4 did not address the munmap Oops (Felix). Fix the cause instead:
+      BOs freed during a reset while user queues still access them
+    - Reuse kfd_process_wait_gpu_reset_complete() from commit
+      f0b4440cdc18 in the free-memory ioctl; no queue unmap, nothing sent
+      to the GPU during the reset (Christian)
+    - Drop the interrupt discard from v4
+
+ drivers/gpu/drm/amd/amdkfd/kfd_chardev.c | 3 +++
+ drivers/gpu/drm/amd/amdkfd/kfd_priv.h    | 1 +
+ drivers/gpu/drm/amd/amdkfd/kfd_process.c | 2 +-
+ 3 files changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c b/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c
+index b3ebbee76088..0953d823c345 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c
+@@ -1305,6 +1305,9 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
+ 		goto err_unlock;
+ 	}
+ 
++	/* Queues a reset could not stop may still access the buffer */
++	kfd_process_wait_gpu_reset_complete(p);
++
+ 	ret = amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->adev,
+ 				(struct kgd_mem *)mem, pdd->drm_priv, &size);
+ 
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_priv.h b/drivers/gpu/drm/amd/amdkfd/kfd_priv.h
+index 7a365fca68e4..25f57dd59bfd 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_priv.h
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_priv.h
+@@ -1126,6 +1126,7 @@ void kfd_unref_process(struct kfd_process *p);
+ int kfd_process_evict_queues(struct kfd_process *p, uint32_t trigger);
+ int kfd_process_restore_queues(struct kfd_process *p);
+ void kfd_suspend_all_processes(void);
++void kfd_process_wait_gpu_reset_complete(struct kfd_process *p);
+ int kfd_resume_all_processes(void);
+ 
+ struct kfd_process_device *kfd_process_device_data_by_id(struct kfd_process *process,
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_process.c b/drivers/gpu/drm/amd/amdkfd/kfd_process.c
+index e742ef206abd..7750741444ba 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_process.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_process.c
+@@ -1291,7 +1291,7 @@ static void kfd_process_remove_sysfs(struct kfd_process *p)
+ /*
+  * If any GPU is ongoing reset, wait for reset complete.
+  */
+-static void kfd_process_wait_gpu_reset_complete(struct kfd_process *p)
++void kfd_process_wait_gpu_reset_complete(struct kfd_process *p)
+ {
+ 	int i;

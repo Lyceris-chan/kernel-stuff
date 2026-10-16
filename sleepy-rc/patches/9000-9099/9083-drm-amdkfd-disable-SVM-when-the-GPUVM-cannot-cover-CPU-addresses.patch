@@ -1,0 +1,148 @@
+From Daniel Huang <danielhu@amd.com> Mon Sep 17 00:00:00 2001
+From: Daniel Huang <danielhu@amd.com>
+Date: Sat, 17 Oct 2026 01:05:45 +0800
+Subject: [PATCH] drm/amdkfd: disable SVM when the GPUVM cannot cover
+Message-ID: <20261016170546.88570-2-danielhu@amd.com>
+
+KFD SVM maps memory in GPUVM at the same virtual address used by
+the CPU. However, svm_range_map_to_gpu() passes the corresponding
+PFNs to amdgpu_vm_update_range() without checking them against
+vm_manager.max_pfn.
+
+If the GPUVM address range is smaller than the CPU address range,
+the page-table walker can index beyond the allocated root page-table
+entries. Unlike the SVM path, the BO mapping path validates the
+address range through amdgpu_vm_verify_parameters().
+
+An explicit amdgpu.vm_size override can trigger this condition by
+configuring a smaller GPUVM than the driver would normally select.
+
+Reproduced on a Radeon 780M (gfx1103) with amdgpu.vm_size=64.
+Repeated hipMallocManaged() allocations attempted to map CPU
+address 0x74bd48000000, well beyond the 64 GiB GPUVM limit.
+The out-of-bounds root entry contained SLUB poison with
+slub_debug=FZPU and recycled heap data without it, resulting in
+a general protection fault:
+
+  RIP: 0010:amdgpu_vm_cpu_update+0x2f/0x140 [amdgpu]
+   amdgpu_vm_pte_update_flags+0xfa/0x1e0 [amdgpu]
+   amdgpu_vm_ptes_update+0x38b/0xa00 [amdgpu]
+   amdgpu_vm_update_range+0x279/0x930 [amdgpu]
+   svm_range_map_to_gpu+0x13d/0x400 [amdgpu]
+   svm_range_validate_and_map+0x8d3/0xaa0 [amdgpu]
+   svm_ioctl+0x66/0x80 [amdgpu]
+   kfd_ioctl+0x40a/0x650 [amdgpu]
+
+As discussed in [1], rejecting out-of-range PFNs in
+amdgpu_vm_update_range() is too late. SVM must not be initialized
+when the GPUVM cannot represent the required CPU addresses.
+
+Prevent this by disabling KFD SVM support when the GPUVM address
+range is smaller than AMDGPU_GMC_HOLE_START. This prevents
+affected devices from advertising SVM support and excludes them
+from SVM mappings. Warn from kfd_update_svm_support_properties(),
+which runs after the device memory pgmap is registered, so that
+only devices that would otherwise have advertised SVM report the
+loss of the capability.
+
+[1] https://lore.kernel.org/amd-gfx/da43b0e3-5bd9-4aa1-86d3-b733f3bad108@amd.com/
+
+Fixes: f80fe9d3c114 ("drm/amdkfd: map svm range to GPUs")
+Closes: https://github.com/ROCm/legacy-rocm-build/issues/6691
+Cc: stable@vger.kernel.org
+Assisted-by: Claude:claude-opus-5
+Signed-off-by: Daniel Huang <danielhu@amd.com>
+---
+
+Tested on a Radeon 780M (gfx1103, PCI 1002:15bf), kernel
+7.0.0-38-generic, and ROCm 7.13.0-2.
+
+The reproducer performs 24 iterations of hipMallocManaged(1 GiB),
+hipMemset(), and hipFree() per run, with 40 runs per attempt.
+
+With amdgpu.vm_size=64:
+- Stock module: kernel Oops within approximately 2 seconds on
+  every attempt.
+- Patched module: completed 40/40 runs in two attempts, with
+  stock and patched modules tested alternately on the same kernel.
+
+With the default GPUVM size, the patched module preserved SVM
+support, emitted no warning, and completed the same test.
+
+Two questions for maintainers:
+
+1. I interpreted "SVM must fail to initialize" as disabling
+   the SVM capability for affected devices rather than failing
+   KFD initialization or rejecting the vm_size override.
+   Would a different approach be preferable?
+
+2. This check also affects GMC v6/v7/v8, whose GPUVM address
+   ranges cannot reach AMDGPU_GMC_HOLE_START. Although these
+   devices do not register device-private memory, an APU with
+   apu_prefer_gtt can currently advertise SVM support.
+
+   Should the check apply to these devices as well, or should
+   it be limited to explicitly configured amdgpu.vm_size
+   overrides?
+ drivers/gpu/drm/amd/amdkfd/kfd_svm.h      | 18 ++++++++++++++++--
+ drivers/gpu/drm/amd/amdkfd/kfd_topology.c | 14 +++++++++++++-
+ 2 files changed, 29 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_svm.h b/drivers/gpu/drm/amd/amdkfd/kfd_svm.h
+index c7d7adae4476..6235ce0f988e 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_svm.h
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_svm.h
+@@ -203,11 +203,25 @@ struct kfd_process_device *
+ svm_range_get_pdd_by_node(struct svm_range *prange, struct kfd_node *node);
+ void svm_range_list_lock_and_flush_work(struct svm_range_list *svms, struct mm_struct *mm);
+ 
++/*
++ * SVM uses CPU virtual addresses for GPU mappings. Disable SVM if the GPUVM
++ * address range cannot cover the required CPU address range.
++ *
++ * The parameter must be named adev since AMDGPU_GMC_HOLE_START references
++ * adev->vm_manager.max_level.
++ */
++static inline bool kfd_svm_vm_covers_user_va(struct amdgpu_device *adev)
++{
++	return (adev->vm_manager.max_pfn << AMDGPU_GPU_PAGE_SHIFT) >=
++		AMDGPU_GMC_HOLE_START;
++}
++
+ /* SVM API and HMM page migration work together, device memory type
+  * is initialized to not 0 when page migration register device memory.
+  */
+-#define KFD_IS_SVM_API_SUPPORTED(adev) ((adev)->kfd.pgmap.type != 0 ||\
+-					((adev)->apu_prefer_gtt))
++#define KFD_IS_SVM_API_SUPPORTED(adev)					\
++	(((adev)->kfd.pgmap.type != 0 || (adev)->apu_prefer_gtt) &&	\
++	 kfd_svm_vm_covers_user_va(adev))
+ 
+ void svm_range_bo_unref_async(struct svm_range_bo *svm_bo);
+ 
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_topology.c b/drivers/gpu/drm/amd/amdkfd/kfd_topology.c
+index 35b3abe57b80..5de19fa27d12 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_topology.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_topology.c
+@@ -2471,8 +2471,20 @@ void kfd_update_svm_support_properties(struct amdgpu_device *adev)
+ 				sys_props.generation_count++;
+ 			else
+ 				dev_err(adev->dev, "Failed to update SVM support properties. ret=%d\n", ret);
+-		} else
++		} else {
++#if IS_ENABLED(CONFIG_HSA_AMD_SVM)
++			/* Report it rather than letting the capability
++			 * silently vanish from the KFD topology.
++			 */
++			if ((adev->kfd.pgmap.type || adev->apu_prefer_gtt) &&
++			    !kfd_svm_vm_covers_user_va(adev))
++				dev_warn_once(adev->dev,
++					      "GPUVM size 0x%llx is too small for KFD SVM; SVM disabled (amdgpu.vm_size=%d)\n",
++					      adev->vm_manager.max_pfn << AMDGPU_GPU_PAGE_SHIFT,
++					      amdgpu_vm_size);
++#endif
+ 			dev->node_props.capability &= ~HSA_CAP_SVMAPI_SUPPORTED;
++		}
+ 	}
+ 	up_write(&topology_lock);
+ }

@@ -15,16 +15,16 @@ moved, so the full ledger is not duplicated here.
 
 | | |
 |---|---|
-| Snapshot | `next-20261009`, tag `becb95e45ef0` |
-| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261009.tar.gz` |
-| Snapshot tree `Makefile` | `7.3.0-rc6` — the base rc, **deliberately not used in the release name** |
-| Kernel release | `2026.10.09-1-sleepy-next` |
-| Package | `linux-sleepy-next-2026.10.09-1` |
+| Snapshot | `next-20261016`, tag `2efb7a11f1aa` |
+| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261016.tar.gz` |
+| Snapshot tree `Makefile` | `7.3.0-rc7` — the base rc, **deliberately not used in the release name** |
+| Kernel release | `2026.10.16-1-sleepy-next` |
+| Package | `linux-sleepy-next-2026.10.16-1` |
 
 ### Versioning: the snapshot date, not the base rc
 
 `pkgver` is the snapshot date, derived from `_srctag` — `_snapdate=${_srctag#next-}`
-(`20261009`) and `_snapver` respells it dotted (`2026.10.09`) — so a bump cannot
+(`20261016`) and `_snapver` respells it dotted (`2026.10.16`) — so a bump cannot
 move the tag without moving the version.
 
 **The dots are load-bearing, not cosmetic.** Both tools that consume the release
@@ -32,17 +32,17 @@ string require it to *begin* with dotted decimal notation:
 
 | Tool | Requirement | Failure without it |
 |---|---|---|
-| `depmod` (kmod 34.2) | an `N.N` prefix; a bare `20261009-1-sleepy-next` is rejected as `Bad version passed` | post-install depmod hook fails, no module dependencies generated |
+| `depmod` (kmod 34.2) | an `N.N` prefix; a bare `20261016-1-sleepy-next` is rejected as `Bad version passed` | post-install depmod hook fails, no module dependencies generated |
 | `mkinitcpio` (42.2) | `kver()` validates the release extracted from the image against `^[[:digit:]]+(\.[[:digit:]]+)+` | initramfs build fails — **the kernel is left with no initramfs at all** |
 
-A bare `20261009` therefore cannot be the release name. Dots are legal in
+A bare `20261016` therefore cannot be the release name. Dots are legal in
 `pkgver`; only `-` is reserved, as the pkgver/pkgrel separator.
 
 `prepare()` rewrites the snapshot's `Makefile` so `KERNELVERSION = 2026.10.09`.
 Left alone, the tree composes `KERNELVERSION` from
 `VERSION`/`PATCHLEVEL`/`SUBLEVEL`/`EXTRAVERSION` and stamps its **base** rc into
-the name: `next-20261009` is cut from `v7.3-rc6`, so the kernel announced itself
-as `7.3.0-rc6-1-sleepy-next`. That is wrong twice over — stale, because the tree
+the name: `next-20261016` is cut from `v7.3-rc7`, so the kernel announced itself
+as `7.3.0-rc7-1-sleepy-next`. That is wrong twice over — stale, because the tree
 carries weeks of work past rc6, and easily mistaken for `linux-sleepy-rc`'s
 genuine `7.3.0-rc7-1-sleepy-rc`.
 
@@ -56,7 +56,7 @@ module directory and the packaged paths all agree.
 `prepare()` asserts the rewrite landed and aborts the build if it did not, rather
 than shipping a kernel that misreports its own release.
 
-The tree's own `localversion-next` (containing `-next-20261009`) is still
+The tree's own `localversion-next` (containing `-next-20261016`) is still
 deleted: the date is already `KERNELVERSION`, so keeping it would print it
 twice.
 
@@ -79,7 +79,7 @@ an interdependent group, the whole group is excluded instead (see 2).
 `1008`, `1012`, `1013`, `1014` and `1017` are **not listed** in the preview
 `source=()`. All five are retained in full in `sleepy-rc`.
 
-| Patch | Role | Applies to `next-20261009`? |
+| Patch | Role | Applies to `next-20261016`? |
 |---|---|---|
 | `1008` | adds `amdgpu_buffer_funcs::tlb_inv_num_dw` and `amdgpu_emit_tlb_inv()` | no |
 | `1012` | sdma7 TLB-invalidation consumer | yes |
@@ -149,6 +149,10 @@ pristine snapshot `fair.c` leaves no `.rej`, and neither remaining
 `normalized_sysctl_sched_base_slice` use sits outside an `#else` arm.
 
 ### 5. `0101` (BBR3) and `2101` (LRU-MARIE) rebased onto the snapshot
+
+> **Historical — this is the `next-20261009` rebase.** The base has since
+> moved to `next-20261016`, where both were rebased again; see *Base bump to
+> `next-20261016`* at the end of this file. The method notes here still hold.
 
 Both carries failed to apply to this base and were skipped. Both are now rebased
 and apply with **zero failed hunks**. Method for each: reproduce the tree at the
@@ -266,3 +270,136 @@ with IPS left enabled rather than masked off by the 7.3-era workaround.
 ```
 cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0
 ```
+
+## Base bump to `next-20261016` — 2026-10-17
+
+The move staged on 2026-10-15 and reverted on 2026-10-16 is now done, with the
+BORE hunk deletion, the LRU-MARIE rebase and the CachyOS `0101` refresh landed
+as one atomic step, as the earlier entry prescribed.
+
+**Measured cost, full series, `patch -p1 --forward --dry-run` at the series
+position (the same loop `prepare()` runs): 108 applied, 145 skipped, 0 failed**
+— for 253 `source=()` entries. The earlier sizing tables (`next-20261009`: 102
+applied of 241 carries) were taken before the 13 patches adopted on 2026-10-17,
+so the counts are not directly comparable; what matters is `failed=0`, because
+`prepare()` skips rather than fails and a silent skip is the failure mode this
+ledger exists to catch.
+
+### 1. `0101` (bbr3) regenerated for this base
+
+One hunk or the whole squash fails on `include/linux/tcp.h`: the base gained an
+`#ifdef CONFIG_BPF` block (`bpf_tcp_ops_flags`) between `recvmsg_inq : 1` and
+`__cacheline_group_end(tcp_sock_read_txrx)`, so the anchor for the
+`fast_ack_mode:1` bitfield moved. The bitfield was re-spliced into the new
+layout and the squash regenerated from the tree at its series position (the 17
+preceding `00xx` entries), per the `patch-cachy-branches` skill.
+
+**Regenerated from this package's own text, not from sirlucjan.** The source
+(`bbr3-cachyos-patches-sep`, `9c29aa44556d`, unchanged since 2026-10-15) was
+applied fresh at the same position to check, and it reintroduces the
+`net/ipv4/tcp_bbr.c` hunks the previous rebase deliberately dropped — the
+`min_tso_segs` → `tso_segs` conversion this base already has. Re-squashing from
+source would have to re-derive that adaptation; regenerating from the adapted
+text does not.
+
+**Dry-run against a *pristine* tree is not a verdict here.** The failing
+`include/net/tcp.h` hunk (`Hunk #9 FAILED at 1390`) appears only against a
+pristine `next-20261016`; at the real series position the 17 preceding patches
+have already changed that region and it applies. This is the skill's "generate
+the squash against the actual series state" rule, observed live.
+
+### 2. `2419` (BORE) — hunk #7 deleted
+
+The hunk added on 2026-10-12 (`@@ -1142,5 +1171,9 @@`, wrapping
+`normalized_sysctl_sched_base_slice` in `#ifdef CONFIG_SCHED_BORE` inside
+`update_protect_slice()`) is **obsolete on this base**: the scheduler rework
+landed in the 15→16 window and `update_protect_slice()` no longer reads that
+symbol. Verified both directions at `2419`'s position on `next-20261016`:
+
+| Patch | Result |
+|---|---|
+| preview `2419` (hunk #7 deleted) | **0 rejects**, 0 fuzz |
+| `sleepy-rc` `2419` (hunk #7 kept) | **2 rejects** — the hunk has no anchor |
+
+The deletion is still base-specific and must not be copied to `sleepy-rc`:
+`v7.3-rc7` keeps the old `update_protect_slice()`, where the wrapper is still
+required. **This is a live preview-only delta** — if a later `sleepy-rc` bump
+takes the scheduler rework, the same deletion must be applied there.
+
+### 3. `2101` (LRU-MARIE 0.12.0) rebased onto the snapshot — six sites
+
+The `sleepy-rc` copy (the author's own `0.12.0` for `7.3-rc7`) applies to its
+base with zero rejects; this base needs six host hooks re-anchored, exactly the
+set diagnosed on 2026-10-16. Applied at its position in a graft tree, fixed,
+regenerated with `git diff` against a committed baseline.
+
+| # | Site | What was done |
+|---|---|---|
+| 1 | `include/linux/memcontrol.h` | **Correction to the earlier diagnosis:** the body is *not* in `mm/folio.c` — the accessor is a `static inline` in the header itself, rewritten upstream to `long val` + `container_of_const()` + a `WARN_ON_ONCE(val < 0)` guard. MARIE's hook was re-expressed against that body |
+| 2 | `mm/Kconfig` | `LRU_MARIE` / `LRU_MARIE_DEFAULT_ON` / `LRU_MARIE_DEFRAG` block re-anchored after `config LRU_GEN_WALKS_MMU`'s closing `# }`, before `config LOCK_MM_AND_FIND_VMA` |
+| 3 | `mm/page_alloc.c` | `should_reclaim_retry()` — MARIE's `unsigned long nr_progress` + refault-treadmill body merged **with upstream's new `!order_defrag_promoted(order, ac)` term**, which must survive; anchor now at `:4646` |
+| 4 | `mm/page_alloc.h` | `unsigned long last_refaults;` added to `struct alloc_context` after the `reclaim_compact_order` field upstream added |
+| 5 | `mm/swap.h` | `int kcompressd(void *p);` declared after `__swap_writeout()`; the reject's `__swap_writepage` anchor no longer exists in the tree |
+| 6 | `mm/vmscan.c` | `move_folios_to_lru()`'s tail now has the `do_rotate` pair, so **both** branches are wrapped — `lruvec_add_folio_tail()` with `lru_marie_orphan_add(..., true)` and `lruvec_add_folio()` with `..., false` |
+
+**Three more sites only surfaced at compile time, not as rejects.** The
+seven-window churn removes symbols the author's `7.3-rc7` text names, and a hunk
+that references a removed symbol still *applies* — its context is unchanged.
+The build stopped in `mm/page_io.o`; the third would have hit one object later:
+
+| Symbol | Site | Fix |
+|---|---|---|
+| `__swap_writepage()` | `mm/page_io.c`, in the `do_swapout()` Marie adds | renamed to `__swap_writeout()` |
+| `PF_KSWAPD` | `mm/page_io.c`, `kcompressd()`'s flag setup | dropped; upstream's own `kswapd()` now sets only `PF_MEMALLOC` |
+| `VM_SPECIAL` | `mm/lru_marie/walker.c` | the composite macro is gone; spelled out as `VM_IO \| VM_DONTEXPAND \| VM_PFNMAP \| VM_MIXEDMAP`, which is exactly what it expanded to (`VMA_SPECIAL_FLAGS` on `v7.3-rc7`) |
+
+The first two are the ones this ledger already recorded as rebase traps; the
+previous rebase made the identical changes, so the wording of the `PF_KSWAPD`
+comment is reused verbatim. Confirmed by compiling `mm/page_io.o` and the whole
+`mm/lru_marie/` directory (including the four SIMD `.S` files) before the full
+rebuild, rather than by another seven-minute build cycle.
+
+**And then scan the whole patch for symbols the base no longer has.** Every
+function-like identifier the patch's *added* lines call (1014 of them) was
+resolved against the applied tree with `rg -w` — none is undefined — which is
+the check that would have caught all three of the above before the build did.
+Note this must run against the **filesystem**, not `git grep`: the patch creates
+`mm/lru_marie/*` as untracked files in a graft tree, and `git grep` cannot see
+them.
+
+**Running the previous rebase's diff against the new one is the cheapest way to
+find these.** Both the `__swap_writeout` rename and the `PF_KSWAPD` removal were
+already solved once in this package's own history; diffing the old and new
+`2101` showed them immediately.
+
+**The `memcontrol.h` hook needed a const-qualification, as it did on the last
+bump.** The host accessor takes `const struct lruvec *`, MARIE's
+`lru_marie_zone_size_read()` takes `struct lruvec *`, so the declaration in
+`include/linux/memcontrol.h` and both the helper `marie_lruvec_zone_size()` and
+`lru_marie_zone_size_read()` in `mm/lru_marie/core.c` are const-qualified. This
+is the standing exception to "`mm/lru_marie/*` stays byte-identical to the
+author's" — it is a type adaptation to the host, not a change to Marie's
+algorithm, and it has now been applied on two consecutive bumps. `lruvec_pgdat()`
+already takes a const pointer, so nothing else in the helper needed changing.
+
+**Git-diff hygiene:** `git diff HEAD` in a graft tree picks up the `.orig` files
+GNU patch leaves on an offset. One regeneration came out 156 KB instead of
+14 KB with 44 `*.orig` deletions in it. Purge `.orig`/`.rej` **before**
+`git add -A`, and if it is already too late, `git diff HEAD -- . ':(exclude)*.orig'`.
+
+### 4. Dead carries still in `source=()`
+
+Three patches in this package are now **fully absorbed upstream** and skip on
+every build — reverse-applicability confirms the content is in the pristine
+`next-20261016` tree:
+
+| Patch | Subject | Evidence |
+|---|---|---|
+| `1174` | display: Fix direct scanout alpha on some DRM_FORMATs | `amdgpu_dm_plane.c` has `per_pixel_alpha`; reverse-applies |
+| `9078` | userq: only accept doorbell BOs as queue doorbell | reverse-applies; the ledger already recorded the content as present |
+| `9079` | userq: return the `memdup_user()` error | `mes_userqueue.c` has all three `memdup_user()` calls; reverse-applies |
+
+They are **left in place** — removing a patch needs explicit user approval
+(`CLAUDE.md` YOU MUST NOT 8). They cost nothing at build time (they are
+skipped) but they are dead weight in the series, and their numbers could not be
+reused even if they were removed, since a vacated number is evidence.

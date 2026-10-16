@@ -1,0 +1,62 @@
+From Sunil Khatri <sunil.khatri@amd.com> Mon Sep 17 00:00:00 2001
+From: Sunil Khatri <sunil.khatri@amd.com>
+Date: Fri, 16 Oct 2026 08:37:34 +0530
+Subject: [PATCH] drm/amdgpu/userq: commit seq64 BO mapping for userqueues
+Message-ID: <20261016030734.1091829-1-sunil.khatri@amd.com>
+
+The seq64 sync BO's PTE update only ran from the legacy CS path, so
+userqueue-only clients never got it mapped and their fence_drv could
+never signal completion. Commit it in
+amdgpu_userq_vm_validate_and_restore_queue() too, the same way prt_va
+is already handled there, so it covers both queue creation and
+post-eviction restore.
+
+Fixes: ae05e3f3d02b812c ("drm/amdgpu: move amdgpu_vm_bo_update() call into correct location")
+Signed-off-by: Sunil Khatri <sunil.khatri@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+index 4dca1ab48410a..0c92534131b9f 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+@@ -1083,6 +1083,14 @@ amdgpu_userq_vm_validate_and_restore_queue(struct amdgpu_userq_mgr *uq_mgr)
+ 		if (unlikely(ret))
+ 			goto unlock_all;
+ 
++		if (fpriv->seq64_va) {
++			ret = drm_exec_prepare_obj(&exec, &fpriv->seq64_va->base.bo->tbo.base,
++						   TTM_NUM_MOVE_FENCES + 1);
++			drm_exec_retry_on_contention(&exec);
++			if (unlikely(ret))
++				goto unlock_all;
++		}
++
+ 		/*
+ 		 * WPTR BOs are VM-mapped, but each BO has its own reservation
+ 		 * object. Lock them into this drm_exec ww context so the later
+@@ -1140,6 +1148,12 @@ amdgpu_userq_vm_validate_and_restore_queue(struct amdgpu_userq_mgr *uq_mgr)
+ 	if (ret)
+ 		goto unlock_all;
+ 
++	if (fpriv->seq64_va) {
++		ret = amdgpu_vm_bo_update(adev, fpriv->seq64_va, false);
++		if (ret)
++			goto unlock_all;
++	}
++
+ 	key = 0;
+ 	/* Validate User Ptr BOs */
+ 	list_for_each_entry(bo_va, &vm->always_valid.idle, base.vm_status) {
+@@ -1203,6 +1217,10 @@ amdgpu_userq_vm_validate_and_restore_queue(struct amdgpu_userq_mgr *uq_mgr)
+ 	 * it explicitly (as the CS path syncs it) before restarting queues.
+ 	 */
+ 	dma_fence_wait(fpriv->prt_va->last_pt_update, false);
++
++	if (fpriv->seq64_va)
++		dma_fence_wait(fpriv->seq64_va->last_pt_update, false);
++
+ 	dma_fence_wait(vm->last_update, false);
+ 
+ 	xa_for_each(&uq_mgr->userq_xa, tmp_key, queue) {

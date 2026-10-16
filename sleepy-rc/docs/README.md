@@ -3,11 +3,11 @@
 `linux-sleepy-rc` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
 built from **mainline Linux 7.3-rc7** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 242 targeted
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 255 targeted
 upstream/local patches. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0_rc7-1` · **Artifact:**
-`linux-sleepy-rc-7.3.0_rc7-1-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0_rc7-2` · **Artifact:**
+`linux-sleepy-rc-7.3.0_rc7-2-x86_64.pkg.tar.zst`
 
 ## Target hardware
 
@@ -24,8 +24,8 @@ upstream/local patches. It is not a general-purpose kernel.
 
 - **Clang ThinLTO `-O3 -march=znver4`** via the kernel.org pre-built LLVM
   23.1.0.
-- **LRU-MARIE 0.11.1r2** page eviction — the author's `mm/lru_marie/` subsystem
-  carried byte-identical, rebased to this base.
+- **LRU-MARIE 0.12.0** page eviction — the author's `mm/lru_marie/` subsystem
+  carried byte-identical, at its own series position.
 - **`mm/gup` folio batching** (Rik van Riel's series) for mTHP throughput.
 - **BBR3** default + CAKE SQM via `net-tune`; ACPI CPPC hardening + per-core EPP
   boost for `amd-pstate`.
@@ -116,7 +116,7 @@ fix lands.
 
 ## Patch series
 
-242 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+255 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 
 | Range | Category |
 |---|---|
@@ -133,6 +133,7 @@ fix lands.
 | `2400–2499` | Core scheduler (non-CachyOS) |
 | `2500–2599` | x86 / arch core |
 | `2600–2699` | Time / timers |
+| `2800–2899` | Memory / swap follow-ups |
 | `9000–9099` | agd5f staging + userq lifecycle backports |
 
 ## Documentation

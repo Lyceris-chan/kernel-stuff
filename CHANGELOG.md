@@ -18,6 +18,58 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.10.16-1-sleepy-next (linux-next `next-20261016`)]: 2026-10-17
+
+### Changed — the preview moves to `next-20261016`
+
+The bump staged on 2026-10-15 and reverted on 2026-10-16 is done. It was worth
+taking for one reason: **all of the GPU payload of that week arrived in the
+15→16 window** — 172 amdgpu/amdkfd files, the SPM VMID series and the removal of
+the legacy CP programming in `gfx_v12_0.c`. Every earlier window in the same run
+(`09→12`, `12→13`, `13→14`, `14→15`) carried **zero** amdgpu files. The base also
+moves `rc6` → `rc7`, so the two packages finally agree on the base rc.
+
+Cost, measured as the full series applied at its position: **108 applied, 145
+skipped, 0 failed** of 253 entries. Three things had to move with it:
+
+- **`2419` (BORE):** the `update_protect_slice()` wrapper hunk added on
+  2026-10-12 is obsolete — the scheduler rework in this window made that
+  function stop reading `normalized_sysctl_sched_base_slice`. The hunk is
+  deleted **in the preview only**; `v7.3-rc7` still needs it, so the two copies
+  of `2419` now differ deliberately.
+- **`2101` (LRU-MARIE 0.12.0):** rebased onto the snapshot at six host hooks
+  (`memcontrol.h`, `mm/Kconfig`, `page_alloc.c`, `page_alloc.h`, `swap.h`,
+  `vmscan.c`), including a const-qualification of Marie's zone-size helper to
+  match the host accessor's new `const struct lruvec *`.
+- **`0101` (bbr3):** regenerated — the `fast_ack_mode` bitfield's anchor moved
+  behind a new `#ifdef CONFIG_BPF` block in `struct tcp_sock`.
+
+### Added — 13 patches
+
+| | |
+|---|---|
+| `1081` | allow dispatch tunneling on GFX12 — our `gfx_v12_0.c` hard-coded it off |
+| `1082`,`1083` | the `amdgpu_vm_bo_insert_map()` pair Christian König asked for on the seq64 thread |
+| `1084` | drop the gang-leader fence reference when freeing a gang job (leak on every GFX+COMPUTE gang) |
+| `1085` | reject ANONONLY userptrs that span multiple VMAs (restores a check lost in the HMM move) |
+| `1175` | `memdup_user_nul` in the display debugfs handlers (out-of-bounds read) |
+| `1233` | reapply UMD profile state after GPU recovery |
+| `2800` | `mm: memory:` truncation removing mapped folios (a `VM_BUG_ON_FOLIO` on shmem/tmpfs) |
+| `2801` | `mm/swap:` recheck the swap-table slot in `swap_cache_get_folio()` |
+| `9081` | userq: commit the seq64 BO mapping for userqueue-only clients |
+| `9082` | amdkfd: wait for a GPU reset before freeing a BO |
+| `9083`,`9084` | amdkfd: bound SVM mappings by the GPU address limits (`Cc: stable`) |
+
+Range `2800–2899` is new: `2100–2199` is exhausted and every gap in it is a
+vacated number.
+
+### Changed — LRU-MARIE 0.11.1r2 → 0.12.0, both packages
+
+`2101` is now the **author's own 0.12.0 patch for Linux 7.3-rc7** (Masahito S,
+2026-10-12) rather than a repackage of sirlucjan's copy. It needs no hand-rebase
+on `sleepy-rc`'s base at all — zero failed hunks, zero fuzz. The preview carries
+the same file rebased for its snapshot, as it always has.
+
 ## [2026.10.09-1-sleepy-next (linux-next `next-20261009`)]: 2026-10-12
 
 ### Changed — the preview is versioned by its snapshot date
@@ -68,6 +120,41 @@ stale on the version, and wrong about which package it was. `sleepy-rc` now
 reads *"Sleepy-rc kernel: Linux 7.3.0-rc7"* and `sleepy-next` reads
 *"Sleepy-next kernel: linux-next 20261009 snapshot"*, each derived from its own
 variables rather than a hardcoded string.
+
+## [7.3.0-rc7-2-sleepy-rc]: 2026-10-17
+
+`pkgrel` 1 -> 2. Series is 255 patches (was 242).
+
+### Added — 13 patches, and LRU-MARIE 0.11.1r2 -> 0.12.0
+
+Full provenance, review state, and the rejection reasons for everything else the
+sweep considered are in `PATCH_SOURCES.md`.
+
+- **GPU core:** `1081` dispatch tunneling on GFX12 (our `gfx_v12_0.c` hard-coded
+  `TUNNEL_DISPATCH, 0` while GFX10/11 pass `prop->allow_tunneling`), `1082`/`1083`
+  the `amdgpu_vm_bo_insert_map()` pair Christian Koenig asked for on the seq64
+  thread, `1084` a gang-leader fence reference leaked on every gang submission,
+  `1085` an ANONONLY userptr check lost in the move to HMM.
+- **Display:** `1175` `memdup_user_nul` in the debugfs handlers (out-of-bounds
+  reads); 1/2 only - 2/2 does not apply to this base.
+- **PM:** `1233` reapply the UMD profile state after a GPU recovery.
+- **Memory:** `2800` truncation removing mapped folios (`VM_BUG_ON_FOLIO` on
+  shmem/tmpfs), `2801` a recheck in `swap_cache_get_folio()` that prevents
+  touching a folio that left the swap cache. New range `2800-2899`: `2100-2199`
+  is exhausted and every gap in it is a vacated number.
+- **KFD/userq:** `9081` commit the seq64 BO mapping for userqueue-only clients,
+  `9082` wait for a GPU reset before freeing a BO, `9083`/`9084` bound SVM
+  mappings by the GPU address limits.
+- **LRU-MARIE 0.11.1r2 -> 0.12.0**, now the author's own patch for `7.3-rc7`
+  instead of a repackage - it needs no hand-rebase on this base.
+
+### Not carried, with reasons
+
+`01b3f957` (MES 64-bit register reads) applies cleanly but its only consumer is
+a GFX12.1 VF path this machine never runs; `e57b299800` needs
+`debug_guardpage_minorder`; `ce2f3b80de` needs memory hot-add; `0d5c18f2` lands
+in the preview's new snapshot anyway; `34fa31c8` is a GC-12.1 dispatch path. The
+v6 KFD wedged-teardown series is deferred, not rejected.
 
 ## [7.3.0-rc7-1-sleepy-rc]: 2026-10-12
 

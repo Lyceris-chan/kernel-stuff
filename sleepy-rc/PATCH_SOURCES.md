@@ -20,18 +20,33 @@ are supplied by the generator instead, so every row below has a source.
 |---|---|---|
 | `0001–0049` | Handmade local | 12 |
 | `0050–0099` | EDID and display mailing-list patches | 5 |
-| `0101–0113` | CachyOS branch squashes | 5 |
-| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 18 |
-| `1100–1199` | AMD display (DCN4, colorops) | 18 |
-| `1200–1299` | AMD power management (amd-pstate, CPPC) | 26 |
-| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 41 |
-| `2100–2199` | Memory management and swap (zstd, LRU-MARIE, gup, zswap) | 51 |
+| `0101–0113` | CachyOS branch squashes | 6 |
+| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 24 |
+| `1100–1199` | AMD display (DCN4, colorops) | 23 |
+| `1200–1299` | AMD power management (amd-pstate, CPPC) | 27 |
+| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 35 |
+| `2100–2199` | Memory management and swap (zstd, LRU-MARIE, gup, zswap) | 50 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 20 |
-| `2400–2499` | Core scheduler and sched-ext | 4 |
+| `2400–2499` | Core scheduler and sched-ext | 3 |
 | `2500–2599` | x86 and arch core | 1 |
 | `2600–2699` | Time and timers | 0 |
-| `9000–9099` | agd5f staging + userq lifecycle backports | 41 |
+| `2800–2899` | Memory management, second series (mm/swap follow-ups) | 2 |
+| `9000–9099` | agd5f staging + userq lifecycle backports | 46 |
+
+**Total: 255** patch files, all listed in `PKGBUILD`'s `source=()`.
+
+The table above had drifted from the tree for several ranges (it was last
+reconciled on 2026-10-17). The counts are now generated from the patch tree
+itself — `ls <range>/*.patch | wc -l` — so re-derive rather than trusting a
+copy of them: every stale instruction this repo has carried started as a copy
+of a live value (CLAUDE.md).
+
+**`2800–2899` is new (2026-10-17).** `2100–2199` is exhausted — `2199` was used
+by the xswap writeout guard and then vacated, and every other gap in the range
+is likewise a vacated number that must not be reused. The mm/swap follow-ups
+open a new range rather than reusing one. `2700–2799` remains the preview-only
+zswap request stack and is deliberately not used by this package.
 
 **A resolved numbering collision:** two patches used to share the number
 `1140` — Tom Chung's clamp of `force_min_dcfclk` to the dcn42b range (still
@@ -8589,3 +8604,174 @@ the next unused number in the `11xx` display range.
   `worktree prune`) before every re-run.
 - **`git -C <repo> worktree add <relpath>` resolves against `<repo>`, not
   `$PWD`** — hit again; always pass an absolute path.
+
+## Sweep 2026-10-17 — source refresh, 13 adoptions, MARIE 0.12.0
+
+Full three-pass sweep (new sources, version sweep, branch sweep). Every source
+below was refreshed **and verified against its remote** — `git ls-remote` versus
+the local ref, not the local ref alone, because `fetch --all` can exit clean
+while fetching nothing:
+
+| Source | Verified tip |
+|---|---|
+| torvalds | `origin/master` = `70dd4ee72eb2` (2026-10-16) |
+| linux-next | newest tag **`next-20261016`** (`2efb7a11f1aa`) — also the remote's newest |
+| drm-next | `a56b45995b` (2026-10-13) |
+| drm-misc | `509a6256d3` |
+| tip / linux-pm | `e60f2d63fd` / `24a19b953e` |
+| akpm-mm | all six branches, incl. `mm-everything` `c050bec84c` |
+| agd5f / amd-staging | `f307e9d20cc7` (2026-10-15) — **unchanged** since the last sweep |
+| sirlucjan / cachyos-kernel-patches / linux-tkg | `9c29aa4455` / `333b926901` / `22bd2bbb65` |
+| firelzrd lru-marie / bore-scheduler | `8c80547` / `8dcbdd44` |
+| 14 lore mirrors | all at 2026-10-16 |
+
+**`v7.3-rc8` does not exist yet** (`ls-remote` against torvalds), so `sleepy-rc`
+has nothing to move to. 164 commits sit between the `v7.3-rc7` tag and torvalds'
+tip; the only on-target one is `3ba149029a43` — Joerg Roedel's revert of
+*"iommu/amd: Remove redundant check in irq_remapping_select()"*, reverted for a
+regression with GPU devices. **It is not carried: it is already upstream**, so it
+arrives with rc8. Note the direction — this is a revert we *want*, the opposite
+of `1173`.
+
+### Adopted — 13 patches
+
+All dry-ran against the 242-patch series tree first and again as part of the
+255-patch cumulative audit. `apply` below is `patch -p1 --forward -F2
+--dry-run`; every one also passes `git apply --check`.
+
+| # | Subject | Author | Mail sha | Review |
+|---|---|---|---|---|
+| `1081` | drm/amdgpu: allow dispatch tunneling on GFX12 | Alex Deucher | `879ce064` | `Suggested-by:` Jakub Okoński |
+| `1082` | drm/amdgpu: mark all BOs for update in `amdgpu_vm_bo_insert_map()` | Sunil Khatri | `5aa3545c` | requested by Christian König |
+| `1083` | drm/amdgpu: identify the root PD by pointer | Sunil Khatri | `9967d8bc` | same series, 2/2 |
+| `1084` | drm/amdgpu: drop the gang leader reference when freeing | Jesse Zhang | `e1a50a2e` | author SoB, two `Fixes:` |
+| `1085` | drm/amdgpu: reject ANONONLY userptrs spanning multiple VMAs | Jesse Zhang | `d2b140fb` | v3, reworked for Christian |
+| `1175` | drm/amd/display: use `memdup_user_nul` in debugfs | Tvrtko Ursulin | `22cd2b50` | v4, 1/2 only (see below) |
+| `1233` | drm/amd/pm: reapply UMD profile state after recovery | Kevin Wang | `ea23df46` | `Reviewed-by: Kenneth Feng` |
+| `2800` | mm: memory: fix truncation removing mapped folios | Baolin Wang | `06dccc1615` | v3, in `mm-hotfixes-unstable` |
+| `2801` | mm/swap: recheck the swap table slot in `swap_cache_get_folio()` | Jiayuan Chen | `094b1af2e8` | author SoB, `Fixes:` |
+| `9081` | drm/amdgpu/userq: commit seq64 BO mapping for userqueues | Sunil Khatri | `969fbab5` | `Reviewed-by: Alex Deucher` |
+| `9082` | drm/amdkfd: wait for a GPU reset before freeing a BO | William Palacek | `375bc0e9` | v5 |
+| `9083` | drm/amdkfd: disable SVM when the GPUVM cannot cover CPU addresses | Daniel Huang | `84b54de9` | v2, `Cc: stable` |
+| `9084` | drm/amdkfd: validate SVM ranges against the GPU address limits | Daniel Huang | `18564da8` | v2, `Cc: stable` |
+
+**Why these.** `1081` is our exact GC 12.0 file: `gfx_v12_0_compute_mqd_init()`
+hard-coded `TUNNEL_DISPATCH, 0` while `gfx_v10_0.c`/`gfx_v11_0.c` pass
+`prop->allow_tunneling` — the symbol and its setter (`amdgpu_ring.c:849`) are
+present, so this is the missing leg, not a new mechanism. 1/2 only: its sibling
+`3da4eba4` is `gfx_v12_1.c`.
+
+**`1082`/`1083` are the pair Christian König asked for on the seq64 thread**
+(`403487d2`): *"With user queues amdgpu_vm_bo_insert_map() needs to do this for
+all BOs, not just for the always-valid ones. That probably also explains issues
+we have seen after VRAM eviction and/or suspend/resume."* Sunil Khatri posted
+the pair the same day, and 2/2 depends on 1/2's post-image, so they are carried
+in order and must not be split. `1083` narrows `amdgpu_vm_bo_needs_update()`'s
+root-PD test from `ttm_bo_type_kernel && !bo->parent` to the pointer comparison
+`bo == vm_bo->vm->root.bo`, which the author notes also matches unrelated
+parentless kernel BOs.
+
+**`9081` is complementary to `1082`/`1083`, not a duplicate of them.** The
+`amdgpu_vm_bo_insert_map()` fix repairs the root cause in the VM layer; `9081`
+mirrors the existing `prt_va` handling for `fpriv->seq64_va` in
+`amdgpu_userq_vm_validate_and_restore_queue()` — prepare the BO in the
+`drm_exec` ww context, `amdgpu_vm_bo_update()`, then wait on
+`last_pt_update` — so userqueue-only clients get the mapping committed on both
+queue creation and post-eviction restore.
+
+**`9082` does not add a function; it un-statics one.** The triage pass flagged
+`kfd_process_wait_gpu_reset_complete` as already present in the tree
+(`kfd_process.c:1294`) and looked like the duplicate-insertion trap. Reading the
+diff resolved it: the base helper exists as `static`, and the patch changes it to
+`void`, declares it in `kfd_priv.h`, and calls it from
+`kfd_ioctl_free_memory_of_gpu()` so a BO being freed while a reset is in flight
+cannot have its pages reused under a queue that still holds the old translation.
+The crash in its message is MI300X, the fix is chip-agnostic.
+
+**`1175` is 1/2 only.** Its sibling `dfee5d45` (*"Simplify debugfs token
+parsing"*) fails forward against the series tree — the series was written against
+a different debugfs state — so it is not carried. 1/2 is the fix (out-of-bounds
+reads in `parse_write_buffer_into_params()`, which checks for the newline before
+it checks for the end of the buffer) and is self-contained. Nothing else in the
+series touches `amdgpu_dm_debugfs.c`.
+
+### LRU-MARIE 0.11.1r2 → 0.12.0
+
+`2101` is now the **author's own 0.12.0 patch for Linux 7.3-rc7**
+(`firelzrd-lru-marie` `8c80547`, `patches/testing/0001-linux7.3-rc7-lru_marie-0.12.0.patch`,
+Masahito S, 2026-10-12) rather than a repackage. Provisioned after the 0.12.0
+upgrade was staged and reverted with the `next-20261014` bump on 2026-10-15.
+
+**It needs no hand-rebase on this base.** Applied at its series position in a
+graft tree (133 preceding patches at `v7.3-rc7`), it reports **zero failed hunks,
+zero fuzz**, 22 offsets, 46 files — and `git apply --check` agrees. The
+`kvm_types.h` include adaptation the 0.11.1r2 carry needed is already in the
+author's 0.12.0 text. The previous carry differed from the author's 0.11.1r2 by
+exactly one added line, which is the evidence that this series is carried
+verbatim-or-not-at-all.
+
+The preview package needs a **separate rebase** of the same file — see
+`sleepy-next/PATCH_SOURCES.md`. That asymmetry is the standing pattern for
+`2101`: the two packages have always carried the same filename with per-package
+content.
+
+### Rejections worth keeping
+
+Every one was dry-run; the verdict is `patch -p1 --forward -F2 --dry-run`
+against the 255-patch series tree.
+
+- **`01b3f957` `drm/amdgpu/mes: Support 64-bit register reads` (v4 1/2) —
+  rejected as inert, not as wrong.** It applies cleanly. But its **2/2 is
+  `cf5ec9e2` *"Read SMUIO GPU clock on GFX12.1 VF"*** — GC **12.1**, a virtual
+  function path this machine never instantiates. 1/2 adds `amdgpu_mes_rreg64()`
+  and wires `read64Bits` into MES 11/12 with no caller in-tree, so carrying it
+  alone would add a function nothing calls. Rejecting a clean-applying patch
+  because its only consumer is off-target is the *"a patch that applies can
+  still do nothing"* class, one step earlier than usual.
+- **`e57b299800` (`mm/page_alloc`: guard pages counted as free)** — the path
+  only runs with `debug_guardpage_minorder` set, which this kernel does not set.
+  Correct fix, dead code here. Rik van Riel's own measurements are all under
+  `debug_pagealloc=on debug_guardpage_minorder=1`.
+- **`ce2f3b80de` (`mm/page_alloc`: validate zonelist slots)** — reachable only
+  during a concurrent zonelist rebuild, i.e. memory hot-add (virtio-mem, DIMM).
+  This desktop has no hotpluggable memory. Recorded rather than carried.
+- **`70badd4f2c` (`mm/swap`: free swap cache folios the zap path gave up on)**
+  — tagged **`[PATCH mm-next]`**, so 7.4 material, and still under review (three
+  replies across 10-16/10-17). It also touches exactly the files MARIE hooks.
+  Re-check next sweep.
+- **`c142a646` (`userq`: map the seq64 memory when restoring)** — superseded by
+  the approach Christian asked for: same bug, but fixed one layer up in
+  `amdgpu_vm_bo_insert_map()` (`1082`). Carrying both would fix it twice.
+- **`0d5c18f2` (`AMDGPU_INFO_UQ_FW_AREAS` copy errors)** — applies, but it is
+  the current amd-staging tip and lands in `next-20261016` with the preview bump.
+  Backporting it now would insert a second copy in the preview. The SPM VMID
+  reasoning applies unchanged.
+- **`34fa31c8` (`amdkfd`: CRIU ctl-stack copy)** — wrong chip, proven by the
+  dispatch and not the filename: it touches only `kfd_mqd_manager_v9.c`, and
+  `kfd_device_queue_manager.c` routes GC >= (12,0,0) to
+  `mqd_manager_init_v12`. Applies cleanly; does nothing here.
+- **`266c5256`/`48d67c6a`/`60658e7d` (`mes_dbgext` on mes12.1)** and
+  **`3da4eba4`** (`gfx_v12_1.c`) — GC 12.1. All fail forward as well.
+- **`dfee5d45`** — fails forward (see `1175`).
+- **The v6 KFD wedged-teardown series `c8de2410`/`a0afad8b`/`57595a2c`** —
+  applies cleanly, no `Reviewed-by` (only `Cc: Xiaogang Chen`), and it changes
+  KFD process-teardown and migration-fence semantics. `57595a2c` also lands on
+  `kfd_migrate.c`, where our `9060` sits. The bug it fixes needs a device
+  unplug, which this machine cannot do to its dGPU. **Deferred, not rejected** —
+  it is the strongest deferred candidate of the sweep.
+- **sched_ext, MGLRU and zram families** — inert under BORE and MARIE; zram is
+  not the swap stack here (zswap + swapfile). Re-confirmed this pass, including
+  a new `sched_ext` fixes batch and `0a94d0ea8d8b` (already in base by content
+  probe).
+
+### Coverage gaps found and closed
+
+- **`akpm-mm`'s `remote.origin.fetch` is still pinned to `master` alone**
+  (`+refs/heads/master:refs/remotes/origin/master`). Every branch ref matched
+  the remote this pass, so the content is current — but a plain `git fetch --all`
+  updates `master` only, which is how `mm-everything` went stale for months
+  before. Either set `+refs/heads/*:refs/remotes/origin/*` or fetch
+  `mm-everything` explicitly every pass.
+- `lists.freedesktop.org` archive tarballs were not consulted; both lists that
+  matter (amd-gfx, dri-devel) are covered by the lore mirrors, which were
+  current to 2026-10-16.

@@ -1,0 +1,67 @@
+From Jesse Zhang <Jesse.Zhang@amd.com> Mon Sep 17 00:00:00 2001
+From: Jesse Zhang <Jesse.Zhang@amd.com>
+Date: Fri, 16 Oct 2026 15:44:41 +0800
+Subject: [PATCH] drm/amdgpu: drop the gang leader reference when freeing gang
+Message-ID: <20261016074507.3973248-1-Jesse.Zhang@amd.com>
+
+Every job of a gang except the leader holds a reference to the
+scheduled fence of the leader in job->gang_submit. Only
+amdgpu_job_free(), used for jobs which never ran, drops it, so for every
+gang submission which completes the scheduler fence of the leader, and
+with it its hardware fence, is leaked. amdgpu_job_free() in turn checks
+for the leader only after drm_sched_job_cleanup() cleared the scheduler
+fence, so a leader freed there drops a reference it never took.
+
+On navi31, 100 submissions of a GFX + COMPUTE gang grow the slab cache
+drm_sched_fence is merged into by 60 to 180 objects each time, while
+100 GFX only submissions don't.
+
+Drop the reference when the scheduler frees the job as well, and check
+for the leader before the scheduler fence is cleared in both places.
+
+Fixes: 68ce8b242242 ("drm/amdgpu: add gang submit backend v2")
+Fixes: f7d66fb2ea43 ("drm/amdgpu: cleanup scheduler job initialization v2")
+Signed-off-by: Jesse Zhang <Jesse.Zhang@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_job.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_job.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_job.c
+index 0056a93c400a..f8e67c1b5a4c 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_job.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_job.c
+@@ -311,10 +311,19 @@ void amdgpu_job_free_resources(struct amdgpu_job *job)
+ 		amdgpu_ib_free(&job->ibs[i], f);
+ }
+ 
++/* Must be called before drm_sched_job_cleanup() clears the scheduler fence */
++static void amdgpu_job_put_gang(struct amdgpu_job *job)
++{
++	/* The gang leader doesn't hold a reference to itself */
++	if (job->gang_submit != &job->base.s_fence->scheduled)
++		dma_fence_put(job->gang_submit);
++}
++
+ static void amdgpu_job_free_cb(struct drm_sched_job *s_job)
+ {
+ 	struct amdgpu_job *job = to_amdgpu_job(s_job);
+ 
++	amdgpu_job_put_gang(job);
+ 	drm_sched_job_cleanup(s_job);
+ 
+ 	amdgpu_sync_free(&job->explicit_sync);
+@@ -349,13 +358,12 @@ void amdgpu_job_set_gang_leader(struct amdgpu_job *job,
+ 
+ void amdgpu_job_free(struct amdgpu_job *job)
+ {
++	amdgpu_job_put_gang(job);
+ 	if (job->base.entity)
+ 		drm_sched_job_cleanup(&job->base);
+ 
+ 	amdgpu_job_free_resources(job);
+ 	amdgpu_sync_free(&job->explicit_sync);
+-	if (job->gang_submit != &job->base.s_fence->scheduled)
+-		dma_fence_put(job->gang_submit);
+ 
+ 	if (dma_fence_was_initialized(&job->hw_fence->base))
+ 		dma_fence_put(&job->hw_fence->base);

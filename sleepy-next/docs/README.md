@@ -2,8 +2,8 @@
 
 `linux-sleepy-next` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
-built from a **linux-next snapshot (`next-20261009`)** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 240 targeted
+built from a **linux-next snapshot (`next-20261016`)** plus a sanitized
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 253 targeted
 upstream/local patches. It is not a general-purpose kernel.
 
 **Base version:** `2026.10.09-1` · **Artifact:**
@@ -13,7 +13,7 @@ The release is named for the **snapshot date**, not the mainline `-rc` the
 snapshot was cut from — linux-next is a daily tree, and its base rc goes stale
 within days of the cut. The date is dotted (`2026.10.09`) because both `depmod`
 and `mkinitcpio` require the release string to begin with dotted decimal
-notation; a bare `20261009` breaks module dependency generation and the
+notation; a bare `20261016` breaks module dependency generation and the
 initramfs build.
 
 ## Target hardware
@@ -31,7 +31,7 @@ initramfs build.
 
 - **Clang ThinLTO `-O3 -march=znver4`** via the kernel.org pre-built LLVM
   23.1.0.
-- **LRU-MARIE 0.11.1r2** page eviction — the author's `mm/lru_marie/` subsystem
+- **LRU-MARIE 0.12.0** page eviction — the author's `mm/lru_marie/` subsystem
   carried byte-identical, rebased to this base.
 - **`mm/gup` folio batching** (Rik van Riel's series) for mTHP throughput.
 - **BBR3** default + CAKE SQM via `net-tune`; ACPI CPPC hardening + per-core EPP
@@ -123,7 +123,7 @@ fix lands.
 
 ## Patch series
 
-240 patch entries. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+253 patch entries in `source=()` (259 files; six are excluded from the build and four are preview-only). `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 On a linux-next snapshot a large fraction are skipped rather than failed, since
 the snapshot already carries much of what the series adds — a skip is only safe
 for a self-contained patch, so interdependent groups are excluded outright
