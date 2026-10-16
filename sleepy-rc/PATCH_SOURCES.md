@@ -8508,3 +8508,84 @@ dri-devel are covered by the lore mirrors, which were current).
 
 **Version sweep: zero higher-revision postings since 2026-10-13** — a real
 negative, validated with an all-time control run that returns 338 hits.
+
+## Adopted 2026-10-16 — `1174`, the drm/amd #5951 runtime-PM leak (241 -> 242)
+
+`f512853e` on `lore-amdgfx`, **Luigi Lauro `<luigi.lauro@gmail.com>`**,
+2026-10-16 05:16:36 +0200 — *"drm/amd/display: take a runtime PM reference only
+when a CRTC turns on"*. Author `Signed-off-by` only (no `Reviewed-by`); the mail
+carries `Fixes: 97028037a38a` and
+`Closes: https://gitlab.freedesktop.org/drm/amd/-/issues/5951`.
+
+| # | Subject | Mail sha | Review |
+|---|---|---|---|
+| `1174` | take a runtime PM reference only when a CRTC turns on | `f512853e3b9a` | author SoB + `Fixes:`; Alex Deucher asked for the posting |
+
+File: `patches/1100-1199/1174-drm-amd-display-take-runtime-pm-reference-only-when-a-CRTC-turns-on.patch`
+
+### What it fixes, and why it is ours
+
+`amdgpu_dm_commit_streams()` takes a runtime PM reference
+(`pm_runtime_get_noresume()`) for every CRTC that needs a modeset, but
+`amdgpu_dm_atomic_commit_tail()` drops one only per CRTC counted by
+
+```c
+if (old_crtc_state->active && !new_crtc_state->active)
+        crtc_disable_count++;
+```
+
+A modeset of a CRTC that is *already active* — a mode change, an HDR or
+colorspace change — therefore leaks one reference per commit, and the usage
+count never returns to zero again, so the device stops runtime suspending until
+reboot. The patch moves the *get* onto the mirror condition
+(`!active && active`), in the same loop, so each active CRTC holds exactly one
+reference. It also closes the opposite drift: a CRTC that turns on without a
+stream (`Failed to create new stream`) currently takes no reference while its
+turn-off still drops one.
+
+**The leak is present at our base, verified in the source rather than taken from
+the mail** — `amdgpu_dm.c` at `v7.3-rc7`: unconditional get at `:4600`,
+`crtc_disable_count++` gated on active-to-inactive at `:5186`, and the put loop
+over that count at `:5334`.
+
+### Checks
+
+| Check | Result |
+|---|---|
+| 0 — upstream revert | **No revert** of `97028037a38a` (`Grab/put runtime PM references in atomic_commit_tail()`, 2018-06-04) in any tree we track. The one nearby amdgpu runtime-PM revert, `8bd82363e2ee` *"take runtime pm reference when we attach a buffer" v2* (2024-06-05), is a different change. Single posting, no v2, no objection in the thread |
+| 1 — our silicon | `amdgpu_dm.c` is the shared DM glue — `DAL_LIBS = amdgpu_dm dc ...`, built unconditionally, and `.atomic_commit_tail = amdgpu_dm_atomic_commit_tail` is registered for every display generation. The file contains **no** `AMDGPU_FAMILY_GC_11_5_0` / `DCN_VERSION_4_2B` / `dcn42` / `dcn60` gating, so this is not the DCN42B-or-DCN60 dead path. The reporter tested it on an RX 9070 XT over OCuLink |
+| 2 — symbols | Every identifier present at `v7.3-rc7`: `pm_runtime_get_noresume`, `pm_runtime_put_autosuspend`, `crtc_disable_count`, `acrtc->enabled`, `remove_stream`, `mode_set_reset_required`, `set_backlight_level`, `enum amdgpu_dm_pipe_crc_source` |
+| 3 — apply | `patch -p1 --forward -F2 --dry-run` against `repos/_audit` at rc7 + all 241 carries: exit 0, hunk #1 at 4600 (offset -107), hunk #2 at 5179 (offset -111). **Zero** `FAILED`/`Reversed`/`Skipping`/`corrupt` markers, **0** `.rej`. Offsets only, no fuzz |
+| 3 — already applied | `git apply --check -R` **fails**, and the marker text is absent from drm-next, agd5f, amd-staging, linux-next and torvalds. Genuinely new |
+| 4 — attribution | Named human author, matching `Signed-off-by` |
+
+Duplicate pre-check: nothing in `sleepy-rc/patches/` matches its subject, its
+author, or `amdgpu_dm_commit_streams` / `amdgpu_dm_atomic_commit_tail` /
+`crtc_disable_count` — no carry touches either function.
+
+### `1173` is deliberately not reused
+
+`1173` was vacated when the un-revert came out earlier today; this patch takes
+the next unused number in the `11xx` display range.
+
+### Method notes
+
+- The mail is stored as a mirror blob, so the diff had to be cut out of
+  `git show f512853e:m`; the `Signed-off-by` sits above the `diff --git` and the
+  `-- ` signature separator was dropped so the file ends with a newline. The
+  extraction checks out against the mail's own diffstat: 7 insertions,
+  4 deletions, 2 hunks, 1 file.
+- **`repos/_audit` was stale and had to be rebuilt.** It still contained `1173`
+  (`is_frl` present in `link_ddc.c`/`.h`), i.e. it was the pre-removal 242-patch
+  tree. Rebuilt with `audit_series.py --keep`: all 241 applied cleanly, 0 `FAIL`,
+  0 `.rej`.
+- **`audit_series.py --keep` cannot be run twice.** `make_worktree()` resets an
+  existing worktree (`git checkout -- .` + `git clean -fdq`) but then calls
+  `git worktree add` again on a path that is *still registered*, which fails.
+  Net effect: the tree is silently reset to the bare base and the script exits
+  **2** — and if the tree was trusted, it is now a base tree wearing the
+  directory name `_audit`. Remove the registration
+  (`git -C repos/linux-next worktree remove --force <abs path>` then
+  `worktree prune`) before every re-run.
+- **`git -C <repo> worktree add <relpath>` resolves against `<repo>`, not
+  `$PWD`** — hit again; always pass an absolute path.
