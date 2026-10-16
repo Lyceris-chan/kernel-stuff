@@ -348,7 +348,6 @@ source=(
   "patches/1100-1199/1170-drm-amd-display-fix-LSDMA-divide-by-zero.patch"
   "patches/1100-1199/1171-drm-amd-display-serialize-hdmi-frl-status-polling-against-link-detect.patch"
   "patches/1100-1199/1172-drm-amd-display-skip-hdmi-frl-status-polling-while-link-is-down.patch"
-  "patches/1100-1199/1173-drm-amd-display-avoid-to-write-signal-specific-for-tmds.patch"
   "patches/1100-1199/1174-drm-amd-display-fix-direct-scanout-alpha-on-some-DRM_FORMATs.patch"
   "patches/1200-1299/1201-cpufreq-amd-pstate-Update-cppc_req_cached-before-w.patch"
   "patches/1200-1299/1202-cpufreq-amd-pstate-Add-per-core-EPP-boost-for-rec.patch"
@@ -1265,7 +1264,6 @@ b2sums=('28569142d3df12ed5ca2b5f477e769e61fcf4da2b988be33cf1b1e3c9a4b540013f0b36
         '6ff6a43f6eeb288d80d8b4831ea5a94541c5365864080b76e7dae8dd554f533e68f86849598740248b8dd500f9f70e5e9e83abfa323f08e18851d8238025c45c'
         '74d6bbaa6f4dd19c3344f0ea933d48dd51017b61d2a6af375e7241a5fbb77ce2cde784122a28b044eafa057e06bb0799d83fecf2b814dad4605eb0cd6885a1ab'
         'ae6757d7e8f7b2cc462c53a0a4c77f4096938ac69d7dc2fb1276bd2c7820c89256c3fd9347299248455a24fb694b79fb59f325a3eb1099af1e283b847fdcb910'
-        'eb234c082c5c7d9f0621964c1c1c52c8e6b344cbfaddcb20a81d09f1988cef8439dcd9a2b461d055da08fd4eba9c22c948fcdcb61534e9748a5280839e21c73e'
         '60d35b04d46f0bc5684a9fabd9e050fd9b265cad30af55ecba5fea3034efde7e4993fb1d60c48201c88c4861104a980025daec91c9a437ef86f0bccc44edecc1'
         'e9d464ebf525cd8d93d48f1cbedea0197bd9d0142085da7d83ec3dfda0174483a0fea4077055fd7d1ad9180563dc6dfb77e4f52f9bcb023b7c7d7c9fb5c39ece'
         '9d3e36dbc5c9c5342d2991c4665278ed075073196251e59280bd12f1d6812a37d31db58f5cb978b926e2dcd0a32365960a414b69d10f463bd8f68cedbb4bb6ae'

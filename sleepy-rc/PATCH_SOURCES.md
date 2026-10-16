@@ -8394,3 +8394,51 @@ essentially all of our swap and MM material. Caught only by comparing against
 `git ls-remote`. Fixed with an explicit `+refs/heads/*:refs/remotes/origin/*`
 refspec; two of the new candidates below came out of it. **Worth checking this
 refspec in every clone**, since success-without-fetching is invisible otherwise.
+
+## `1173` REMOVED — 2026-10-16, at the user's instruction ("do what AMD did")
+
+The un-revert is gone from **both** packages: deleted from
+`sleepy-rc/patches/1100-1199/` and `sleepy-next/patches/1100-1199/`, removed
+from both `source=()` arrays, root symlinks deleted, `updpkgsums` re-run for
+both, and the documented patch counts in `docs/README.md` corrected. Series is
+now **241** patches (rc) and **240** (preview).
+
+Checked before removing: no other carry touches `link_ddc.c` or `link_ddc.h`,
+and only one touches `link_dpms.c`, so nothing depended on its context.
+
+`3b77aacb15e0` (Joshua Aberback, 2026-09-23) reverted the change upstream because
+it *"regressed HDMI output on the TMDS-to-FRL switch"* — this machine's display
+path — with `Reviewed-by: Martin Leung` and `Tested-by: Dan Wheeler`. We had
+adopted it one day after that revert. Removing it restores the behaviour AMD
+shipped and tested.
+
+**Not swept up with it:** `1171` and `1172` sit on the same HDMI-FRL polling path
+and were *not* reverted; they remain carried.
+
+**The generalisable lesson — this is its second instance.** The series applied
+cleanly to `v7.3-rc7` for the entire period this was wrong, *because the revert
+restored the context the patch expects*. `audit_series.py` reporting "all applied
+cleanly" is not evidence that a patch should apply. The sweep skill's Check 0
+says to grep for `Revert "…"` of anything carried; that check had never been run
+against this series.
+
+## REA (Reverse Engineer Anything) installed — 2026-10-16
+
+`morluto/rea`, MIT, an MCP server + CLI for binary/app reverse engineering.
+npm package identity verified against the repo before installing
+(`rea-agents@6.5.0`, `repository.url = github.com/morluto/rea`).
+
+- **CLI**: not installed globally — `npm i -g` fails `EACCES` on Arch's
+  root-owned `/usr/lib/node_modules`, and installing under pacman's feet is the
+  wrong move. REA's own documented path is `npx -y rea-agents@latest`, and that
+  works. Node v26.11.1 satisfies its requirement.
+- **MCP server**: registered user-level in `~/.claude.json` as
+  `mcpServers.rea = npx -y rea-agents@6.5.0 mcp`; REA's own check reports
+  `claude_code … state: aligned`. Takes effect on the next Claude Code restart.
+  **REA cannot scope a registration to one project** — the target is always the
+  user-level config. That was authorised explicitly for this install.
+- **Providers**: `jadx` (extra) and `jdk-openjdk` (cachyos-znver4) installed from
+  the official repos for Android/APK work. Hopper, Ghidra and IDA are absent and
+  are *not* installed by REA — deep native analysis needs one of them, and REA
+  requires a caller-supplied `jadx-headless-mcp 0.7.1` JAR via
+  `REA_JADX_MCP_JAR` rather than downloading one.
