@@ -429,6 +429,18 @@ symbols are present in the fixed tree. Hooks checked:
 created. Every function-like identifier on the patch's added lines resolves in
 the applied tree.
 
+**Three of the other new carries also skip on this snapshot, for reasons that
+are not absorption:**
+
+| Patch | Why it skips here |
+|---|---|
+| `2046` (nvme clamp revert) | `drivers/nvme/host/pci.c` already calls `dma_max_mapping_size()` — the revert's result is present; only its hunk context drifted, so neither forward nor reverse is clean |
+| `2049` | The snapshot's `struct nvme_uring_cmd_pdu` is `{ req, bio }` only; status/result moved to `io_uring_cmd_set_res32()` in `end_io`. The patch's `pdu->status` propagation needs a semantic port, not a rebase |
+| `2050` | Same API change: the local-IOPOLL path completes via `__io_uring_cmd_done()` and the pdu carries no status/result. Deferred |
+
+`2047`/`2048` apply here, so the request-freeing half of the copyback series
+is live in the preview; the error-propagation half is not.
+
 The zswap range patches `2191`–`2193` are copied from `sleepy-rc`, where they
 were rebased around 1.0.0-rc1's zswap changes; here all three are absorbed by
 the snapshot and skip.
