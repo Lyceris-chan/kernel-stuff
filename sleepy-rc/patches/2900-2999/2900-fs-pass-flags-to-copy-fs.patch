@@ -1,0 +1,55 @@
+From 9cd0df397a119d6b95ad68e2c82b69b4d620694e Mon Sep 17 00:00:00 2001
+From: Christian Brauner <brauner@kernel.org>
+Date: Tue, 13 Oct 2026 00:11:06 +0200
+Subject: [PATCH] fs: pass flags to copy_fs()
+
+Turn the umh boolean into a flags argument. Idle threads need their own
+case in copy_fs() as well and that's nicer than a second boolean.
+
+No functional changes.
+
+Link: https://patch.msgid.link/20261013-work-fs-idle_fs-v1-1-2063d1bcb5aa@kernel.org
+Signed-off-by: Christian Brauner (Amutable) <brauner@kernel.org>
+---
+ kernel/fork.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/kernel/fork.c b/kernel/fork.c
+index eb198c8dfdc7..947136cdd115 100644
+--- a/kernel/fork.c
++++ b/kernel/fork.c
+@@ -1619,7 +1619,12 @@ static int copy_exec_state(u64 clone_flags, struct task_struct *tsk)
+ 	return task_exec_state_copy(tsk);
+ }
+ 
+-static int copy_fs(u64 clone_flags, struct task_struct *tsk, bool umh)
++enum copy_fs_flags_t {
++	COPY_FS_UMH	= (1 << 0),
++};
++
++static int copy_fs(u64 clone_flags, struct task_struct *tsk,
++		   enum copy_fs_flags_t flags)
+ {
+ 	struct fs_struct *fs;
+ 
+@@ -1629,7 +1634,7 @@ static int copy_fs(u64 clone_flags, struct task_struct *tsk, bool umh)
+ 	 * filesystem state, or be started from a non-initial mount
+ 	 * namespace.
+ 	 */
+-	if (umh) {
++	if (flags & COPY_FS_UMH) {
+ 		if (clone_flags & (CLONE_NEWNS | CLONE_FS))
+ 			return -EINVAL;
+ 		if (current->nsproxy->mnt_ns != &init_mnt_ns)
+@@ -2299,7 +2304,7 @@ __latent_entropy struct task_struct *copy_process(
+ 	retval = copy_files(clone_flags, p, args->no_files);
+ 	if (retval)
+ 		goto bad_fork_cleanup_semundo;
+-	retval = copy_fs(clone_flags, p, args->umh);
++	retval = copy_fs(clone_flags, p, args->umh ? COPY_FS_UMH : 0);
+ 	if (retval)
+ 		goto bad_fork_cleanup_files;
+ 	retval = copy_sighand(clone_flags, p);
+-- 
+2.56.0
+

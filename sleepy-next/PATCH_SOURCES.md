@@ -501,11 +501,29 @@ matching section in `sleepy-rc/PATCH_SOURCES.md`). They remain in `source=()`
 and skip at build time — that is the preview's design, and removing them would
 break the shared-series invariant for no runtime gain.
 
+### Fourth pass 2026-10-17 — seven shared additions, six skip here
+
+The seven patches adopted in `sleepy-rc/PATCH_SOURCES.md` (fourth pass) are
+copied here per the shared-series invariant. On the `next-20261016` base:
+
+| # | Preview result |
+|---|---|
+| `1090` | Skipping — the drm_exec fix is already in the snapshot |
+| `1091` | **Applies and builds** — the only new code on this base |
+| `2802` | Skipping — the swap-readahead change is already in the snapshot |
+| `2900` | FAILED context — the snapshot's `copy_fs()` signature already differs; `2901` is detected as applied, so the net change is present |
+| `2901` | Skipping — already in the snapshot |
+| `9087` | Skipping — already in the snapshot |
+| `9088` | FAILED context — the snapshot already has the staging variant of the SDMA padding change; the shared patch's `sdma_v7_0` hunk does not match its `sdma->burst_nop` guard |
+
+`prepare()` skips every non-applying entry, so none of these is a build
+failure. The new range `2900–2999` is the shared VFS/core range.
+
 ### Current shape
 
 | | |
 |---|---|
-| Files in `patches/` | 272 |
-| Entries in `source=()` | 265 |
+| Files in `patches/` | 279 |
+| Entries in `source=()` | 272 |
 | Excluded from `source=()` | 7 — `1008`, `1012`, `1013`, `1014`, `1017`, `9060`, `9040` |
 | Preview-only adds | `2700`, `2701` (zswap request stack) |

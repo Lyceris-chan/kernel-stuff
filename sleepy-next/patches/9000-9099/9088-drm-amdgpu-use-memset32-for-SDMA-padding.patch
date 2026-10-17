@@ -1,0 +1,125 @@
+From cf48bd0a46279f4607956cb17c71bda96ee802e3 Mon Sep 17 00:00:00 2001
+From: Tvrtko Ursulin <tvrtko.ursulin@igalia.com>
+Date: Mon, 14 Sep 2026 15:54:26 +0100
+Subject: [PATCH] drm/amdgpu: Use memset32 for SDMA padding
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Instead of open coding it via the inefficient amdgpu_ring_write(), which
+which the compiler is not able to optimise much, we can add a new
+amdgpu_ring_fill() helper which pads using memset32. We do this by moving
+the existing implementation from amdgpu_ring_insert_nop(), which is used
+by the GFX rings, and then individually convert all the SDMA insert_nop
+implementations.
+
+For SDMA this should have a lesser benefit than for GFX (only SDMA v4.0
+uses the 256 byte ring padding while the rest use 16), but it does not
+harm to be consistent.
+
+Reviewed-by: Alex Deucher <alexander.deucher@amd.com>
+Reviewed-by: Timur Kristóf <timur.kristof@gmail.com>
+Signed-off-by: Tvrtko Ursulin <tvrtko.ursulin@igalia.com>
+Cc: Timur Kristóf <timur.kristof@gmail.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_ring.c | 17 +----------------
+ drivers/gpu/drm/amd/amdgpu/amdgpu_ring.h | 26 ++++++++++++++++++++++++++
+ drivers/gpu/drm/amd/amdgpu/sdma_v7_0.c | 16 ++++++++--------
+ 3 files changed, 35 insertions(+), 24 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_ring.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_ring.c
+index 132ca5ce3a6d..3aea81c75fdd 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_ring.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_ring.c
+@@ -117,22 +117,7 @@ int amdgpu_ring_alloc(struct amdgpu_ring *ring, unsigned int ndw)
+  */
+ void amdgpu_ring_insert_nop(struct amdgpu_ring *ring, uint32_t count)
+ {
+-	uint32_t occupied, chunk1, chunk2;
+-
+-	occupied = ring->wptr & ring->buf_mask;
+-	chunk1 = ring->buf_mask + 1 - occupied;
+-	chunk1 = (chunk1 >= count) ? count : chunk1;
+-	chunk2 = count - chunk1;
+-
+-	if (chunk1)
+-		memset32(&ring->ring[occupied], ring->funcs->nop, chunk1);
+-
+-	if (chunk2)
+-		memset32(ring->ring, ring->funcs->nop, chunk2);
+-
+-	ring->wptr += count;
+-	ring->wptr &= ring->ptr_mask;
+-	ring->count_dw -= count;
++	amdgpu_ring_fill(ring, ring->funcs->nop, count);
+ }
+ 
+ /**
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_ring.h b/drivers/gpu/drm/amd/amdgpu/amdgpu_ring.h
+index 49df2c4745a1..b2040f80b7f2 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_ring.h
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_ring.h
+@@ -539,6 +539,32 @@ static inline void amdgpu_ring_write_multiple(struct amdgpu_ring *ring,
+ 	ring->count_dw -= count_dw;
+ }
+ 
++static inline void amdgpu_ring_fill(struct amdgpu_ring *ring,
++				    u32 val, u32 count)
++{
++	const u32 buf_mask = ring->buf_mask;
++	u32 occupied, chunk1, chunk2;
++	u64 wptr = ring->wptr;
++
++	if (count == 0)
++		return;
++
++	occupied = wptr & buf_mask;
++	chunk1 = buf_mask + 1 - occupied;
++	chunk1 = (chunk1 >= count) ? count : chunk1;
++	chunk2 = count - chunk1;
++
++	if (chunk1)
++		memset32(&ring->ring[occupied], val, chunk1);
++
++	if (chunk2)
++		memset32(ring->ring, val, chunk2);
++
++	wptr += count;
++	ring->wptr = wptr & ring->ptr_mask;
++	ring->count_dw -= count;
++}
++
+ static inline unsigned int amdgpu_ring_get_dw_distance(struct amdgpu_ring *ring,
+ 						       u64 start_wptr, u64 end_wptr)
+ {
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/sdma_v7_0.c b/drivers/gpu/drm/amd/amdgpu/sdma_v7_0.c
+--- a/drivers/gpu/drm/amd/amdgpu/sdma_v7_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/sdma_v7_0.c
+@@ -244,14 +244,14 @@
+ static void sdma_v7_0_ring_insert_nop(struct amdgpu_ring *ring, uint32_t count)
+ {
+ 	struct amdgpu_sdma_instance *sdma = amdgpu_sdma_get_instance_from_ring(ring);
+-	int i;
+-
+-	for (i = 0; i < count; i++)
+-		if (sdma && sdma->burst_nop && (i == 0))
+-			amdgpu_ring_write(ring, ring->funcs->nop |
+-				SDMA_PKT_NOP_HEADER_COUNT(count - 1));
+-		else
+-			amdgpu_ring_write(ring, ring->funcs->nop);
++	const u32 nop = ring->funcs->nop;
++
++	if (count && sdma && sdma->burst_nop) {
++		--count;
++		amdgpu_ring_write(ring, nop | SDMA_PKT_NOP_HEADER_COUNT(count));
++	}
++
++	amdgpu_ring_fill(ring, nop, count);
+ }
+ 
+ /**
+-- 
+2.56.0

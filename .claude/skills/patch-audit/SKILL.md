@@ -105,6 +105,7 @@ Run these in order. Copy the commands exactly — do not improvise.
    | `25xx` | x86 / arch core |
    | `26xx` | Time / timers — reserved, currently empty in both packages |
    | `27xx` | zswap request stack — `sleepy-next/` preview only |
+   | `29xx` | VFS / core filesystem (initramfs pinning, fs_struct) |
    | `90xx` | agd5f staging + userq lifecycle backports |
 
    A new category gets a new range; add it to this table when you create one.

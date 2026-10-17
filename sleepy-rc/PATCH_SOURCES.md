@@ -2,8 +2,8 @@
 
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
-- **Base:** Linux `v7.3-rc3`
-- **Series:** 217 patches
+- **Base:** Linux `v7.3-rc7`
+- **Series:** 277 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -21,20 +21,21 @@ are supplied by the generator instead, so every row below has a source.
 | `0001–0049` | Handmade local | 12 |
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
-| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 28 |
-| `1100–1199` | AMD display (DCN4, colorops) | 24 |
+| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 30 |
+| `1100–1199` | AMD display (DCN4, colorops) | 25 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 27 |
-| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 35 |
+| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 41 |
 | `2100–2199` | Memory management and swap (zstd, LRU-MARIE, gup, zswap) | 50 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 20 |
 | `2400–2499` | Core scheduler and sched-ext | 3 |
-| `2500–2599` | x86 and arch core | 1 |
+| `2500–2599` | x86 and arch core | 2 |
 | `2600–2699` | Time and timers | 0 |
-| `2800–2899` | Memory management, second series (mm/swap follow-ups) | 2 |
-| `9000–9099` | agd5f staging + userq lifecycle backports | 47 |
+| `2800–2899` | Memory management, second series (mm/swap follow-ups) | 3 |
+| `2900–2999` | VFS / core filesystem | 2 |
+| `9000–9099` | agd5f staging + userq lifecycle backports | 50 |
 
-**Total: 261** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 277** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-17). The counts are now generated from the patch tree
@@ -9147,3 +9148,222 @@ block is the bump item already recorded on 2026-09-25 and 2026-10-05: its part
 `scripts/kallsyms.c` against the `_srctag` base because the v4 series is based
 on three unmerged prerequisite series. Re-tested this pass; the v3 carries
 remain correct for this base.
+
+## Sweep 2026-10-17 (fourth pass) — a requested printk fix that is inert here, and the initramfs-pinning fix
+
+Full three-pass sweep plus a broad optimization-keyword pass, requested
+together with a check of `5f339c46f153` ("printk: Postpone kthread startup").
+
+### Source state — every source refreshed and checked against its remote
+
+| Source | Verified state |
+|---|---|
+| torvalds | `58161ead29e5` (10-16) — unchanged, `ls-remote` agrees |
+| linux-next | newest tag `next-20261016` (`2efb7a11f1aa`); no `next-20261017` |
+| mainline tags | no `v7.3-rc8` yet |
+| drm-next / drm-misc | `a56b45995b1e` / `509a6256d3fd` — unchanged |
+| agd5f / amd-staging | `f307e9d20cc7` (10-15); every branch scanned, none newer |
+| tip / linux-pm / akpm | `e60f2d63fdd8` / `24a19b953e2a` / all branches current |
+| lore mirrors (15) | all refreshed; newest mail 14:19Z (lkml/block), amd-gfx 01:47Z |
+| drm/amd tracker | 19 issues updated since 10-16 12:00; the on-target ones read |
+| cachyos-linux | all `7.3/*` tips unchanged (10-05..10-09); no commits since 10-16 |
+| cachymod | `1b5f1b2` (10-17): `0000-linux7.3-rc7-post-fixes.patch` is now the whole `v7.3-rc7..58161ead` window — a cross-check, not a patch to adopt |
+| sirlucjan / cachyos-kernel-patches | `9c29aa44` (10-15) / `333b9269` (handheld only) |
+| firelzrd | MARIE `dba9daf` 1.0.0-rc1; BORE `1e2f57ad7` 7.0.0 — unchanged |
+| linux-tkg | `19231fc` (CI cache only) |
+| pixelcluster | unchanged (no origin ref) |
+| xanmod | **unrefreshed** — `repos/xanmod` is `Lyceris-chan/kernel-stuff`, not XanMod |
+| Clear | not present in `repos/` — **unrefreshed** |
+
+### The requested commit — `5f339c46f153` is inert on this machine
+
+`printk: Postpone kthread startup` (John Ogness, merged by Petr Mladek
+2026-10-16) moves `printk_set_kthreads_ready()` from `early_initcall` to
+`subsys_initcall` so the NBCON printer kthreads start after arch initcalls. It
+is in torvalds `master` but not in `v7.3-rc7` or `next-20261016`. It applies
+cleanly to the series tree (forward exit 0, reverse fails), with author,
+`Signed-off-by` and `Fixes:` intact.
+
+**The kthreads never start here**, so the initcall level changes nothing.
+`printk_kthreads_check_locked()` returns unless a `CON_NBCON` console is
+registered. `/proc/consoles` lists only `tty0`, a legacy console; the
+NBCON-capable console drivers in this tree are 8250 serial, braille, netconsole
+(disabled) and `drm_log`, and `CONFIG_DRM_CLIENT_DEFAULT_FBDEV=y` means
+`drm_log` is never registered; no serial console is on the cmdline. With no
+NBCON console, `have_nbcon_console` is false and the kthreads are never
+created. **No adoption** — a correct fix with no effect on this hardware.
+Revisit only if a serial console or `drm_client_lib.active=log` is enabled.
+
+The adjacent post-rc7 `d8e5fc300229` ("nbcon/reboot: Switch NBCON consoles
+into the emergency mode in emergency_restart()", Petr Mladek, `Reviewed-by:
+John Ogness`) is inert for the same reason; also not adopted.
+
+### New candidate — VFS: don't let idle threads pin the initramfs
+
+Mainline post-rc7 pair by Christian Brauner. Both apply cumulatively to the
+series tree (`9cd0df39` first, then `d2bdb9b6`; the second alone fails because
+the first introduces `copy_fs(u64 ...)` and the `COPY_FS_*` enum):
+
+- `9cd0df397a11` `fs: pass flags to copy_fs()` — applies cleanly.
+- `d2bdb9b61b42` `fs: let idle threads share init_fs` — applies at offsets
+  4/4/4/4/13 after the first, zero rejects.
+
+`fork_idle()` copies PID 1's `fs_struct`, and idle threads are not on the task
+list, so `chroot_fs_refs()` never moves them after systemd's `pivot_root()`.
+The initramfs mount and superblock stay pinned for the life of the machine —
+70–150 MB in the commit's reports. The fix makes idle threads share `init_fs`
+and passes `CLONE_FS` in `fork_idle()`. `next-20261016` already contains it
+(`COPY_FS_IDLE` in `kernel/fork.c`), so **sleepy-next has it in its base and
+only sleepy-rc needs the carry**. Adopted in the follow-up below as `2900`
+and `2901`.
+
+### Optimization sweep — findings and verdicts
+
+The broad pass scanned every tree branch since 2026-09-15, the whole post-rc7
+window (198 commits), all lore mail since 10-16, and the tracker.
+
+- `cf48bd0a4627` `drm/amdgpu: Use memset32 for SDMA padding` (Tvrtko
+  Ursulin, `Reviewed-by: Alex Deucher`, agd5f staging 09-14) — touches
+  `sdma_v7_0.c` and `sdma_v7_1.c`, replacing per-dword `amdgpu_ring_write()`
+  padding with `amdgpu_ring_fill()`. On-target for v7_0, but the commit notes
+  SDMA v7.0 pads 16 dwords (only v4.0 pads 256), so the gain is small. Not in
+  `next-20261016` or mainline. Adopted as `9088` in the follow-up below as a
+  partial port: the common helper plus the on-target `sdma_v7_0` hunk.
+- `blk-mq: add direct dispatch support for mq-deadline` (linux-block, 10-17)
+  — `sda` (Crucial MX500) runs mq-deadline; the root NVMe runs kyber. New and
+  unreviewed. Watch.
+- `mempool: optimize mempool resizing` (linux-mm, 10-17) — generic, new,
+  unreviewed. Watch.
+- `PCI/PM: Skip the suspend_noirq config save if runtime-suspended`
+  (linux-pm, 10-17) — relevant to this box's `mem_sleep_default=deep`, but new
+  and unreviewed. Watch.
+- `mm/swap: submit the last readahead batch before unplugging` (`166dd3c48e`,
+  10-01) is adopted as `2802` in the follow-up below. The related
+  `swap_cache_get_folio()` fix (`96f09a5a6c`, 10-15) is **already carried as
+  `2801`**; the subject match missed it because the file's short name differs
+  from the commit subject.
+- `fs: drop the smp_mb()s that mnt_get_count() made redundant`
+  (`a291a5cf00`, post-rc7) — memory-model cleanup with herd7 proofs; no
+  measurable runtime gain. Skip.
+- **Rejected as inert or wrong silicon:** MGLRU fixes (MARIE owns LRU);
+  sched_ext fixes (BORE owns scheduling); the KVM x86/mmu RFC (`CONFIG_KVM`
+  unset); f2fs large folios (root is ext4, no f2fs mount); r8169 EEE for
+  RTL8168h/8111h (NIC is RTL8125B); SMU 14.0.2 / DCN42 / SDMA3 / UVD3.1 /
+  Navi31 / Navi32 / Phoenix / Renoir / Strix; and the nvme `NVME_CTRL_NEW`
+  revert (`5755f1bd02`), which exists for the Apple transport, not this
+  controller.
+
+### Version sweep — no change from the deferral above
+
+The full-history index was rebuilt over all 15 mirrors and every apparent
+version hit was content-filtered. The result matches the section above:
+`1175` v4, `1231`/`1232` v2, `1233` v2, `2032` v3, `2037` v2, `2039` v3,
+`2045` v4, `2144` v2, `2154` v3, `2171` v7, `2173` v2, `2174` v3, `2181` v2,
+`2183` v7, `2185` v6, `2191`/`2193` v3, `2197` v2, `2800` v3, `9082` v5,
+`9085` v2 are content-identical (the version label is dropped from our
+subjects); `1151`'s v4 is older than the carry; kbuild v4 remains deferred.
+**Re-test of kbuild v4 against clean `v7.3-rc7`: 19/22 apply; `01/22`
+(`include/asm-generic/vmlinux.lds.h`, `scripts/Makefile.vmlinux`), `11/22`
+(`init/Kconfig`) and `12/22` (`scripts/Kconfig.toolchain` absent because 11
+failed) need a deliberate rebase.** Keep v3.
+
+### Tracker
+
+**#5994** (new, 10-17): RX 9070-series Navi 48 resume from S3/s2idle fails
+with `S3 suspend aborted`, a forced MODE1 reset, and a display-core atomic WARN
+(`drm_crtc_vblank_get(new_state->base.crtc) != 0`). No fix referenced yet —
+**track**; it is the only new on-target report this pass. **#5996** is Navi31
+VRAM clocking (wrong chip). **#4906** (idle-optimization stutter) is Navi31 and
+the only workaround is a tracker upload that disables idle optimizations
+entirely; not carried. #5935/#3625 remain SMU 14.0.2-only; #5988 (280 Hz DP
+VRR) did not move; #5985/#5217/#5380/#5170 are still retesting
+`63e19ef3ddab`, which is in the base.
+
+### Coverage notes
+
+- `repos/drm-next`'s branch is `origin/drm-next`, not `origin/master`; verified
+  unchanged at `a56b45995b1e`.
+- `repos/drm-misc` fetches from `repo.or.cz` under an `orcz/` ref namespace;
+  `orcz/drm-misc-next` matches the freedesktop remote at `509a6256d3fd`.
+- `repos/cachyos-linux` still fetches only `7.0/cachy`; `7.3/*` was fetched
+  explicitly again.
+- `repos/xanmod` is not XanMod, and there is no Clear clone. Both are reported
+  as unrefreshed rather than scanned.
+
+## Adopted 2026-10-17 (fourth pass) — seven patches from the rc8 window, the tracker and the optimization sweep
+
+The user asked to carry everything new and relevant and to sweep the work
+items' commits, comments and patches. Seven were adopted. Each passes both
+`git apply --check` and GNU `patch -p1 --forward -F2 --dry-run` against the
+full series tree, and the cumulative audit is clean at 277/277.
+
+| # | Subject | Author | Source | Notes |
+|---|---|---|---|---|
+| `1090` | drm/exec: don't immediately add prelocked obj to array of locked objs | Christian König | torvalds `26401a4999f1`; in `drm-fixes-2026-10-17` | `Fixes: 09593216bff1`, `Cc: stable`, Reported/Reviewed/Tested-by Vitaly Prosyak. Present in `next-20261016`; preview skips |
+| `1091` | drm/amdgpu: wait for pending page table updates before switching a VM to CPU updates | John Fisher | amd-gfx/dri-devel v2, `20261008204517.392180-1-jfisher84@gmail.com` | `Reviewed-by: Christian König`, applied by Alex Deucher 10-16. Closes the `amdgpu_vm_make_compute()` / SDMA-clear race that takes a MODE1 reset with VRAM loss on gfx1201. Applies to both bases |
+| `2802` | mm/swap: submit the last readahead batch before unplugging | Alexandre Ghiti | akpm `166dd3c48eb4` | `Fixes: dda8fb68b590`, `Reviewed-by: Joshua Hahn`, `Reviewed-by: Christoph Hellwig`; 2 lines. Present in `next-20261016`; preview skips |
+| `2900` | fs: pass flags to copy_fs() | Christian Brauner | torvalds `9cd0df397a11` | prerequisite for `2901` |
+| `2901` | fs: let idle threads share init_fs | Christian Brauner | torvalds `d2bdb9b61b42` | stops idle threads pinning the initramfs superblock (70–150 MB). Present in next; preview skips (its `copy_fs()` context differs but `2901` is detected as applied) |
+| `9087` | drm/amdgpu: return copy errors from AMDGPU_INFO_UQ_FW_AREAS | Jesse Zhang | agd5f `f307e9d20cc7` | three `Fixes:`, `Reviewed-by: Christian König`; returns `-EFAULT` instead of 0. Present in next; preview skips |
+| `9088` | drm/amdgpu: Use memset32 for SDMA padding | Tvrtko Ursulin | agd5f `cf48bd0a4627` | `Reviewed-by: Alex Deucher`, `Reviewed-by: Timur Kristóf`. Partial port: keeps `amdgpu_ring.c`/`.h` and the `sdma_v7_0.c` hunk, drops the v2.4–v7.1 files (wrong silicon), adapted to this tree's `sdma &&` null check. Present in next in the staging variant; preview skips |
+
+**Why these.** `1091` is the strongest runtime fix: it closes the window
+between the render node's open and `ACQUIRE_VM` where a queued SDMA
+page-table clear can wipe the KFD trap handler's TBA/TMA entries, producing
+the `GCVM_L2_PROTECTION_FAULT_STATUS 0x008012B1` fault and a MODE1 reset with
+VRAM loss on 7.2.9 (a queue reset on 7.3-rc6). The author reproduced it on a
+gfx1201 Radeon AI PRO R9700; the fix is reviewed and applied. `2900`/`2901`
+free the initramfs superblock that `fork_idle()` otherwise pins through PID 1's
+`fs_struct`; the commit reports 70–150 MB retained. `2802` removes the extra
+separate block request from the final swap-readahead batch. `1090` fixes a
+`drm_exec` reference/slot bug where a prelocked object about to be destroyed is
+added to the locked array, hitting the `BUG_ON()` in the locked-object fence
+path. `9087`/`9088` are the two on-target agd5f staging fixes left after
+triage: a userq info-ioctl error return and the SDMA padding conversion.
+
+**Rejected or deferred in the same pass.** The `drm/amd/display: fix NULL deref
+when opening a closed DDC` patch is not accepted — Alex Hung proposed a
+different fix and the author cannot reproduce. The EDID-override v2 pair
+(`7334fc8b`, `aa598f47`) needs the post-refactor `drm_connector_funcs` layout,
+and targets a Valve Index HMD rather than this machine's display; deferred.
+The HDMI FRL polling fixes (`3e6272b4`, `c396c883`) and the force-validation
+link-training change (`c953b39f`) are drm-next/7.4 material against the
+refactored connector layout; deferred to the next bump. `mq-deadline` direct
+dispatch, `mempool` resizing, the zram v4 redesign (zram0 is unused here) and
+`PCI/PM: Skip the suspend_noirq config save` are new and unreviewed; watch.
+The 10-16 Sunil Khatri VM pair is the same 1/2+2/2 already carried as `1082`
+and `1083`, not a new candidate. The `cpuidle/poll_state` v16 series (idle
+latency, relevant to the NAP governor) and the `[BUG] x86/kaslr`
+vmemmap/amdgpu report are still under discussion and have no adoptable patch
+yet.
+
+The SMU 14.0.2 OD/fan patches remain inert: this board enumerates
+`smu_v14_0_0` from the running kernel's IP discovery, while the reporter's
+RX 9070 XT enumerates 14.0.2.
+
+**Tracker deep sweep.** All 200 issues updated since 2026-10-01 (40 closed)
+were read with every comment; 104 distinct referenced commits were verified
+with `git cat-file`. The on-target open reports are #5994 (Navi 48 S3/s2idle
+resume: `S3 suspend aborted`, MODE1 reset, atomic WARN), #5985 (Navi 48/44
+`gfx_0.0.0` ring timeout), #5961 (9070 XT standby framebuffer corruption,
+bisecting), #5967 (atomic EBUSY / corruption), #5965 (R9700 SMU/hwmon), #5969
+(Odyssey G9 FreeSync/EDID), #5954 (UCLK pinned at idle), #5934 (DCN 4.0.1
+FRL/DSC), #5921 (MODE1 reset on suspend) and #5250 (9060 XT hang; the DCN401
+diagnostic upload is auth-gated). None has a posted fix. The closed fixes are
+already in the base (`63e19ef3ddab`, `eaeac1498b28`) or are wrong-chip. Upload
+links are auth-gated; inline patches were checked (#5980 is eGPU/OCuLink,
+#5663 is the SDMA DCC workaround already in rc7).
+
+**Preview deltas.** The shared series is copied into both packages. In
+`next-20261016`, `1090`, `2802`, `2901`, `9087` and the SDMA change are already
+present; `2900` fails context (the snapshot's `copy_fs()` differs) but `2901`
+is detected as applied; the preview skips all six. `1091` applies to the
+snapshot and is the only new code that builds there. See
+`sleepy-next/PATCH_SOURCES.md` for the preview's own accounting.
+
+**Verification.** Both packages build cleanly with the seven patches in
+`source=()`: `linux-sleepy-rc 7.3.0_rc7-2` (22 MB kernel, 33 MB headers) and
+`linux-sleepy-next 2026.10.16-1` (23 MB / 34 MB). BTF is present in both
+(`.BTF` and `.BTF_ids`, readable by `bpftool`); the config keeps
+`CONFIG_TCP_CONG_BBR` off, `CONFIG_TCP_CONG_BBR3=y`,
+`CONFIG_DEBUG_INFO_DWARF5=y` and `CONFIG_DEBUG_INFO_BTF=y`.
