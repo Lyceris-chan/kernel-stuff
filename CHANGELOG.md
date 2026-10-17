@@ -29,8 +29,8 @@ the legacy CP programming in `gfx_v12_0.c`. Every earlier window in the same run
 (`09→12`, `12→13`, `13→14`, `14→15`) carried **zero** amdgpu files. The base also
 moves `rc6` → `rc7`, so the two packages finally agree on the base rc.
 
-Cost, measured as the full series applied at its position: **108 applied, 145
-skipped, 0 failed** of 253 entries. Three things had to move with it:
+Cost, measured as the full series applied at its position: **109 applied, 147
+skipped, 0 failed** of 256 entries. Three things had to move with it:
 
 - **`2419` (BORE):** the `update_protect_slice()` wrapper hunk added on
   2026-10-12 is obsolete — the scheduler rework in this window made that
@@ -43,6 +43,19 @@ skipped, 0 failed** of 253 entries. Three things had to move with it:
   match the host accessor's new `const struct lruvec *`.
 - **`0101` (bbr3):** regenerated — the `fast_ack_mode` bitfield's anchor moved
   behind a new `#ifdef CONFIG_BPF` block in `struct tcp_sock`.
+
+### Removed — preview-only dead carries, and `9040` from the build list
+
+`1174` (direct-scanout alpha), `9078` and `9079` were preview-only and their
+changes are already in `next-20261016`; all three are deleted (numbers vacated).
+`9040` is excluded from `source=()` — the snapshot's own
+`error_free_user_pages` label supersedes it — but `sleepy-rc` still needs it, so
+the file stays part of the shared series.
+
+81 other carries are also fully present in the snapshot, measured for the first
+time by reverse-applying the whole series. They stay listed: a skipped patch
+contributes nothing to the build, and keeping the shared series intact is what
+the preview is for.
 
 ### Added — 13 patches
 
@@ -123,7 +136,7 @@ variables rather than a hardcoded string.
 
 ## [7.3.0-rc7-2-sleepy-rc]: 2026-10-17
 
-`pkgrel` 1 -> 2. Series is 255 patches (was 242).
+`pkgrel` 1 -> 2. Series is 261 patches (was 242).
 
 ### Added — 13 patches, and LRU-MARIE 0.11.1r2 -> 0.12.0
 
@@ -147,6 +160,13 @@ sweep considered are in `PATCH_SOURCES.md`.
   mappings by the GPU address limits.
 - **LRU-MARIE 0.11.1r2 -> 0.12.0**, now the author's own patch for `7.3-rc7`
   instead of a repackage - it needs no hand-rebase on this base.
+- **Six fixes from the rc8 window**, taken the same day because they are on
+  this machine's user-queue and VM paths: `1086` keep the eviction fence
+  until the last handle closes, `9085` validate userq BOs (evicted-list
+  BOs never got an eviction-fence rearm), `1087` a runtime-PM double-drop
+  in the debugfs GPR read, `1088`/`1089` GEM and sched-entity leaks on
+  error paths, and `1176` a one-line `median3()` bug in DSC rate control
+  (`median3(2,3,1)` returned 3).
 
 ### Not carried, with reasons
 

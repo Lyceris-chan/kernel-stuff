@@ -123,7 +123,7 @@ fix lands.
 
 ## Patch series
 
-253 patch entries in `source=()` (259 files; six are excluded from the build and four are preview-only). `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+256 patch entries in `source=()` (263 files; seven are excluded from the build and two are preview-only). `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 On a linux-next snapshot a large fraction are skipped rather than failed, since
 the snapshot already carries much of what the series adds — a skip is only safe
 for a self-contained patch, so interdependent groups are excluded outright

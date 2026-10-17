@@ -278,8 +278,10 @@ BORE hunk deletion, the LRU-MARIE rebase and the CachyOS `0101` refresh landed
 as one atomic step, as the earlier entry prescribed.
 
 **Measured cost, full series, `patch -p1 --forward --dry-run` at the series
-position (the same loop `prepare()` runs): 108 applied, 145 skipped, 0 failed**
-— for 253 `source=()` entries. The earlier sizing tables (`next-20261009`: 102
+position (the same loop `prepare()` runs): 109 applied, 147 skipped, 0 failed**
+— for 256 `source=()` entries. (The 253/145 figures recorded when the bump
+landed were re-measured after the cleanup at the end of this file; the applied
+count is unchanged because dropping `9040` and adding `1176` cancel out.) The earlier sizing tables (`next-20261009`: 102
 applied of 241 carries) were taken before the 13 patches adopted on 2026-10-17,
 so the counts are not directly comparable; what matters is `failed=0`, because
 `prepare()` skips rather than fails and a silent skip is the failure mode this
@@ -403,3 +405,51 @@ They are **left in place** — removing a patch needs explicit user approval
 (`CLAUDE.md` YOU MUST NOT 8). They cost nothing at build time (they are
 skipped) but they are dead weight in the series, and their numbers could not be
 reused even if they were removed, since a vacated number is evidence.
+
+## Cleanup 2026-10-17 — three dead carries removed, `9040` excluded
+
+The user authorised dropping what upstream has made irrelevant.
+
+### Removed — `1174` (scanout alpha), `9078`, `9079`
+
+All three were **preview-only** (sleepy-rc never carried any of them), and all
+three reverse-apply cleanly against the pristine `next-20261016` tree — the
+snapshot already contains the changes. Deleted from `patches/` and `source=()`.
+Their numbers are **vacated**: `1174` is the runtime-PM patch in `sleepy-rc`
+only, and `9078`/`9079` must not be reused.
+
+### Excluded from `source=()` — `9040`
+
+`9040` (free userptr HMM ranges on the CS error path) is still needed by
+`sleepy-rc`, but this snapshot supersedes it: the base's `amdgpu_cs_ioctl()`
+already has an `error_free_user_pages:` label that frees the ranges and NULLs
+`e->range` before `amdgpu_cs_parser_fini()` runs. Applying `9040` on top adds a
+second free loop that always sees NULL — harmless (`amdgpu_hmm_range_free()`
+returns on NULL) but redundant. The file stays in `patches/` as part of the
+shared series, which is the same treatment `9060` gets.
+
+### Restored — the runtime-PM `1174`
+
+The preview's `1174` was the scanout-alpha patch, a *different* patch from
+`sleepy-rc`'s `1174` (the runtime-PM leak fix adopted on 2026-10-16), so the
+preview had been **missing** the runtime-PM fix since it was adopted — the two
+packages were carrying different files under the same number. With the dead one
+deleted, the rc's `1174` now has its own file here and is listed in `source=()`;
+it applies cleanly to the pristine snapshot. The number is now consistent across
+both packages.
+
+### Everything else stays listed
+
+81 of the preview's carries are already present in the snapshot (see the
+matching section in `sleepy-rc/PATCH_SOURCES.md`). They remain in `source=()`
+and skip at build time — that is the preview's design, and removing them would
+break the shared-series invariant for no runtime gain.
+
+### Current shape
+
+| | |
+|---|---|
+| Files in `patches/` | 263 |
+| Entries in `source=()` | 256 |
+| Excluded from `source=()` | 7 — `1008`, `1012`, `1013`, `1014`, `1017`, `9060`, `9040` |
+| Preview-only adds | `2700`, `2701` (zswap request stack) |

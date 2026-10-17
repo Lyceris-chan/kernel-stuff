@@ -1,0 +1,60 @@
+From 32d0771ef4ca69c30a1db3aefa34dd177cd2a047 Mon Sep 17 00:00:00 2001
+From: Benjamin Cheng <benjamin.cheng@amd.com>
+Date: Fri, 9 Oct 2026 09:31:42 -0400
+Subject: [PATCH] drm/amdgpu/userq: actually validate userq BOs
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This was supposed to loop over the individual evicted list, as the
+kernel and always_valid evicted lists were already handled in
+amdgpu_vm_validate.
+
+Without this, BOs that were created and evicted before a userq was made
+would never end up in an eviction fence rearm.
+
+Also add the missing ref to the BO before drm_exec locks and refs it.
+
+Fixes: 4cdbba5a16aa ("drm/amdgpu: restructure VM state machine v4")
+Signed-off-by: Benjamin Cheng <benjamin.cheng@amd.com>
+Reviewed-by: Christian König <christian.koenig@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+(cherry picked from commit 18decfc9e8cc0fa70b6de9944cc27a37729edfbd)
+Cc: stable@vger.kernel.org
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+index 9316423f9340..b3dc5dd49a64 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+@@ -980,19 +980,21 @@ amdgpu_userq_bo_validate(struct amdgpu_device *adev, struct drm_exec *exec,
+ {
+ 	struct ttm_operation_ctx ctx = { false, false };
+ 	struct amdgpu_bo_va *bo_va;
+-	struct amdgpu_bo *bo;
++	struct amdgpu_bo *bo, *tmp;
+ 	int ret;
+ 
+ 	spin_lock(&vm->individual_lock);
+-	while (!list_empty(&vm->always_valid.evicted)) {
+-		bo_va = list_first_entry(&vm->always_valid.evicted,
++	while (!list_empty(&vm->individual.evicted)) {
++		bo_va = list_first_entry(&vm->individual.evicted,
+ 					 struct amdgpu_bo_va,
+ 					 base.vm_status);
++		bo = bo_va->base.bo;
++		tmp = amdgpu_bo_ref(bo);
+ 		spin_unlock(&vm->individual_lock);
+ 
+-		bo = bo_va->base.bo;
+ 		ret = drm_exec_prepare_obj(exec, &bo->tbo.base,
+ 					   TTM_NUM_MOVE_FENCES + 1);
++		amdgpu_bo_unref(&tmp);
+ 		if (unlikely(ret))
+ 			return ret;
+ 
+-- 
+2.56.0
+

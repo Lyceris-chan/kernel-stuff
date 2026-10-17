@@ -308,6 +308,10 @@ source=(
   "patches/1000-1099/1083-drm-amdgpu-identify-the-root-PD-by-pointer.patch"
   "patches/1000-1099/1084-drm-amdgpu-drop-the-gang-leader-reference-when-freeing.patch"
   "patches/1000-1099/1085-drm-amdgpu-reject-ANONONLY-userptrs-spanning-multiple-VMAs.patch"
+  "patches/1000-1099/1086-drm-amdgpu-keep-the-eviction-fence-until-the-last-handle-is-closed.patch"
+  "patches/1000-1099/1087-drm-amdgpu-dont-drop-the-runtime-PM-reference-twice-in-amdgpu_gpr.patch"
+  "patches/1000-1099/1088-drm-amdgpu-fix-GEM-object-leak-on-ENOMEM-in-userptr-ioctl.patch"
+  "patches/1000-1099/1089-drm-amdgpu-fix-sched-entity-leak-in-ttm-buffer-entity-init.patch"
   "patches/1100-1199/1136-drm-amd-display-update-and-revert-FRL-LT-timeout.patch"
   "patches/1100-1199/1138-drm-amd-display-pull-colorops-into-state-when-recreating-a-plane.patch"
   "patches/1100-1199/1141-drm-amd-display-skip-receiver-power-control-without-AUX.patch"
@@ -331,6 +335,7 @@ source=(
   "patches/1100-1199/1172-drm-amd-display-skip-hdmi-frl-status-polling-while-link-is-down.patch"
   "patches/1100-1199/1174-drm-amd-display-take-runtime-pm-reference-only-when-a-CRTC-turns-on.patch"
   "patches/1100-1199/1175-drm-amd-display-use-memdup_user_nul-in-debugfs.patch"
+  "patches/1100-1199/1176-drm-amd-display-fix-swap-in-median3-for-DSC-rate-control.patch"
   "patches/1200-1299/1201-cpufreq-amd-pstate-Update-cppc_req_cached-before-w.patch"
   "patches/1200-1299/1202-cpufreq-amd-pstate-Add-per-core-EPP-boost-for-rec.patch"
   "patches/1200-1299/1203-Documentation-amd-pstate-Document-the-epp_boost-pa.patch"
@@ -517,6 +522,7 @@ source=(
   "patches/9000-9099/9082-drm-amdkfd-wait-for-a-GPU-reset-before-freeing-a-BO.patch"
   "patches/9000-9099/9083-drm-amdkfd-disable-SVM-when-the-GPUVM-cannot-cover-CPU-addresses.patch"
   "patches/9000-9099/9084-drm-amdkfd-validate-SVM-ranges-against-GPU-address-limits.patch"
+  "patches/9000-9099/9085-drm-amdgpu-userq-actually-validate-userq-BOs.patch"
 )
 
 # makepkg 7.1.0 resolves local sources by basename in the PKGBUILD directory
@@ -691,7 +697,7 @@ EOF
     echo "-${pkgbase#linux-}" > localversion.20-pkgname
     rm -f localversion-next
     
-    # Apply the 7.2 sleepy series to next-20260828: dry-run first so a patch
+    # Apply the sleepy series to the base: dry-run first so a patch
     # that does not apply cleanly (e.g. LRU-MARIE 0.10.5, which needs a 7.3
     # port) is SKIPPED entirely instead of leaving a half-applied tree.
     # 0107-cachy-hdmi is not in source=() — the 7.3 base already has the clean
@@ -1205,6 +1211,10 @@ b2sums=('63b3228343e52f77e8c0c6facb79ffb0c0682ff79cd8391ef8cf3aa994c44b99ee91111
         '9a420643147683992aec64e53aa791f15821846c38eef109d8a75d5e0ef3d5569daa6ae75d68325f4449c60200266272a2aaf1821be003fa5c3529f46cee343d'
         '69c61eb72567346f24089c9bbdc7f76edd7e09590336791ed2d841aa58d52bf8d124138956400c50e9cb1c8841a67e86585a5cd13d439a3e1252d8365e4c2a46'
         'f97729dc5afbf14f0340e140f5e7f974cdc8424ecb2c4c6d4b5155362ec332df5439af650cac635ce50b7f02680fefec794dfe972ddf05ef1ecc2b6cda2cf1c6'
+        '6c2ab72c2c446aec8e42b4b69021a6db7083017985545fd8d82e0fb541f6bc4e2821ce189d3d9f9d08cb49d814320a8339c81bbbc19c4d463d4233d08db9a5c9'
+        'e8be02a4c4509f37b9a43cd830c3a85d6755952917ec18cd3cecc39dbfe050bb7bdf3980ee4aad860607ed524f0b59184ba37d2f2d10841c236cda9096561823'
+        'd6021fcb759940e6e05c7786e04ae690c0e896b62ffc8cd412084d06ec34b5a98b97120ec45c5a72a7a0e2a35dc9fdbd698bb9df62d209ed9015c27a2ad88e42'
+        'b5988f7e38df529eab1edbfafeb3406294dc601324eac5137da86bddfed735345e58aa132a21c194edd3782afb84822bd0117a1887ee99d32b9afa2f78e0129f'
         'b283f440cb0f2679ee81d7da4ea1fecdb1e0146ee6183c6271b8e952ffcaebbbb0decf5b18b69534987601b63289a5c9be0397c5a79eff9cc76dca6a439e1cfa'
         '9f336933bfbf1429081581bf02878e91d7fb383ffdca62b523a18266a94c8229b5510e6ccface38256c2967f9387c2c504e49eda9637f36733431cc6e33f200c'
         '0fb08f727791630b6101b8263b23ce433a8b65f895ff757a4d79b282815be449e7b1932a752635e848b3b3ba8235a775a3bf618cfb933bb80d69f3a38f5e5ead'
@@ -1228,6 +1238,7 @@ b2sums=('63b3228343e52f77e8c0c6facb79ffb0c0682ff79cd8391ef8cf3aa994c44b99ee91111
         'ae6757d7e8f7b2cc462c53a0a4c77f4096938ac69d7dc2fb1276bd2c7820c89256c3fd9347299248455a24fb694b79fb59f325a3eb1099af1e283b847fdcb910'
         '02c0a7e63a5a19541a4ccdf3e5b2a6dac16cc95aa21bed4a00fac1e7ba0ad1e2d8fac064ac876815a4afef33e42cdc19ef52720acbebc2c14490e1e35c754f50'
         '02933b5476f47deeb4d7313db83b35cece82df307c62f6cb48c1b03ff0b830aa0b16e2348b079374b183f456c9bb5de31552789a305feae75d682676745f8116'
+        'a8537c5b664243b43cb24da001372af5bee18fc74cf064e87785b55f0782864ee6ad0fa0f2602ae4e00ad15d3b569b34c2f833f4680ad71dfae21c4e49e839fa'
         'e9d464ebf525cd8d93d48f1cbedea0197bd9d0142085da7d83ec3dfda0174483a0fea4077055fd7d1ad9180563dc6dfb77e4f52f9bcb023b7c7d7c9fb5c39ece'
         '9d3e36dbc5c9c5342d2991c4665278ed075073196251e59280bd12f1d6812a37d31db58f5cb978b926e2dcd0a32365960a414b69d10f463bd8f68cedbb4bb6ae'
         '52fe01328f544e023666eab1fd378ae0a0eb47385d495403a55a933f71beedcf295300767c1e43feb46366915fae8bea3b9137f11d16ed194a1fcf71d95aec0d'
@@ -1413,6 +1424,7 @@ b2sums=('63b3228343e52f77e8c0c6facb79ffb0c0682ff79cd8391ef8cf3aa994c44b99ee91111
         '83b46abf86e89cdd61341201da1353ca34b91507f22b03289d2132dad7ded363ef2608086f2b6fc8a99dc65a570b965a7151aa0c3ad1ef83e1c831522aa3bb18'
         'd15c56c81fef320a35d9e4d3f1bb48717a580fa949f609e6c1f8a881baba2e622ff8d01d1a0ca0b6ae7fb9b11de2bfe99f7137c2f293ac12dd3d434ff9426815'
         'ef2aab905d6682513c53e3682de454930116d518d83cf1e2a99f4e6e83b132d3d5005c5c0b672136d9973dafe805ed80473ea457b08fe09cc7a79ee8607f5e23'
+        '5267bd01f89777a1d101503df6cf6abf43a7f9691b0e770f36406de49ff1f673fb43636b1b6e5a281dc06dd87b256af43a9eea7e10f81f93f663d05194ea4e45'
         '2cdec9daf2eb9d4a8e95f33bcc81e603899db1f2e4f55cde68fa29727972238b5bd544e055a06bd0c94569e222666f6d8bf231db9fa8593b6d5f4fe52b26022a'
         '4cf91dd679c25cb8c7a519f5d77fdf29cc345043bd8a71b6c8e54d1a4179cf489f464108464ad2b1bc8ccffd743707e6fdaae1e33300b29a4fc7b9457b90e6be')
 

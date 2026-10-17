@@ -21,8 +21,8 @@ are supplied by the generator instead, so every row below has a source.
 | `0001–0049` | Handmade local | 12 |
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
-| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 24 |
-| `1100–1199` | AMD display (DCN4, colorops) | 23 |
+| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 28 |
+| `1100–1199` | AMD display (DCN4, colorops) | 24 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 27 |
 | `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 35 |
 | `2100–2199` | Memory management and swap (zstd, LRU-MARIE, gup, zswap) | 50 |
@@ -32,9 +32,9 @@ are supplied by the generator instead, so every row below has a source.
 | `2500–2599` | x86 and arch core | 1 |
 | `2600–2699` | Time and timers | 0 |
 | `2800–2899` | Memory management, second series (mm/swap follow-ups) | 2 |
-| `9000–9099` | agd5f staging + userq lifecycle backports | 46 |
+| `9000–9099` | agd5f staging + userq lifecycle backports | 47 |
 
-**Total: 255** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 261** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-17). The counts are now generated from the patch tree
@@ -8891,3 +8891,70 @@ One issue updated since the morning pass: **#5993** *"[Renoir/DCN 2.1] PSR can
 no longer be enabled since 7.2"* — Renoir is a Zen 2 APU, wrong chip. The
 standing watch item remains **#5988** (280 Hz DP VRR falling to 24 Hz), still
 with no posted fix.
+
+## Adopted 2026-10-17 (second pass) — six rc8-window fixes
+
+The user asked for anything new and relevant, and for anything no longer
+relevant to be dropped. Six of the eight on-target commits that landed in
+torvalds after `v7.3-rc7` were taken; each applies cleanly to the 261-patch
+series and carries `Fixes:` (five also `Cc: stable`).
+
+| # | Subject | Upstream | Author / review |
+|---|---|---|---|
+| `1086` | keep the eviction fence until the last handle is closed | `3c44cbcec5eb` | Jesse Zhang, `Reviewed-by: Christian König` |
+| `1087` | don't drop the runtime PM reference twice in `amdgpu_gpr` | `de9f6bcdb44f` | Jesse Zhang, `Reviewed-by: Alex Deucher` |
+| `1088` | fix GEM object leak on ENOMEM in the userptr ioctl | `3c516a564628` | Perry Yuan, `Reviewed-by: Christian König` |
+| `1089` | fix sched entity leak in ttm buffer entity init | `b5629f4a0869` | Perry Yuan, `Reviewed-by: Christian König` |
+| `1176` | fix swap in `median3()` for DSC rate control | `a016c6f5` (mail) | Keita Morisaki, `Reviewed-by: Roman Li` |
+| `9085` | userq: actually validate userq BOs | `32d0771ef4ca` | Benjamin Cheng, `Reviewed-by: Christian König` |
+
+**Why these.** `1086` and `9085` are both on the user-queue VM/eviction path
+this machine exercises: `1086` keeps the eviction fence attached until the last
+handle to a BO closes (closing one handle of a twice-opened BO detached it while
+the other handle's mappings were live), and `9085` loops the *evicted* list in
+`amdgpu_userq_vm_validate_and_restore_queue()` so BOs created and evicted before
+the queue existed still get an eviction-fence rearm, plus the missing BO ref
+before `drm_exec` locks it. `1087` is a runtime-PM refcount underflow on a bad
+debugfs GPR read — the same refcount class as `1174`. `1088`/`1089` are leaks on
+error paths in the userptr ioctl and the TTM buffer-entity init. `1176` is a
+one-line logic bug: `median3()`'s last swap exchanges `b`/`c` instead of `a`/`b`,
+so `median3(2,3,1)` returns 3; `_do_calc_rc_params()` always passes 0 and ≥12
+first and second, so a negative third argument (bpp above the uncompressed rate)
+sets `first_line_bpg_offset` to 12 instead of 0. The author notes valid DSC
+configurations are unaffected.
+
+**`1176` is the only one not upstream anywhere** — it is mailing-list-only, and
+the buggy line is still in both `v7.3-rc7` and `next-20261016`.
+
+**Rejected from the same window:** `752480ad6296` (sdma3), `a2eae9f4fa1b` (smu
+14.0.2), `800ea86e83e1` (uvd3.1) — wrong silicon; `55a67aa89342` (NULL sink
+deref in the USB4 bandwidth functions) — needs DP tunneling over USB4, which
+this box does not do; `d65a459dbc9a` (`GEM_LIST_HANDLES` alignment reporting) —
+an information-ioctl unit fix with no hardware component; `5b0a459f990b`
+(`mutex_destroy()` pairing in the TTM entity) — **its own message says it is a
+no-op without `CONFIG_DEBUG_MUTEXES`, which is unset in this config**;
+`1b4da805a0ba` (free userptr ranges on a failed CS) — superseded for us by
+`9040`, which fixes the same leak and is still needed on `v7.3-rc7` (see the
+rc8-window note above).
+
+## Finding — 81 preview carries are already in `next-20261016`
+
+While deciding what to drop, the preview's whole series was reverse-applied
+against the pristine snapshot: **81 of its carries are fully present there**,
+including a dozen adopted only yesterday. This is expected for a linux-next
+snapshot and is why `prepare()` skips rather than fails, but it was never
+measured before.
+
+**They stay listed.** The preview's design is to list the shared series and let
+the snapshot's own content skip; a skipped patch contributes nothing to the
+build, so removing them would be pure bookkeeping that has to be re-derived at
+every bump and would break the one-series invariant. The ones that had to go are
+the ones that would *apply* and do something redundant, and the ones that were
+preview-only — see `sleepy-next/PATCH_SOURCES.md`.
+
+**Method note — the scan has to key on reverse-apply, not forward.** The first
+version of the sweep filtered out any patch whose forward dry-run printed
+`Skipping patch`/`Reversed`, which is precisely the signature of an absorbed
+carry — it reported zero. A dead carry is one whose **reverse** dry-run applies
+cleanly with no `FAILED`/`Skipping` markers. Also: `[ -d "$BASE/Makefile" ]` is
+false for a file — the tree-existence assert must use `-f`.
