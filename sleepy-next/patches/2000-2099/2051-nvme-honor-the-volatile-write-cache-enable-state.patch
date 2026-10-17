@@ -1,0 +1,197 @@
+From Erwan Velu <erwanaliasr1@gmail.com> Mon Sep 17 00:00:00 2001
+From: Erwan Velu <erwanaliasr1@gmail.com>
+Date: Fri, 16 Oct 2026 16:12:08 +0200
+Subject: [PATCH] nvme: honor the volatile write cache enable state
+Message-ID: <20261016141208.2641974-1-e.velu@criteo.com>
+
+A controller with a volatile write cache present (NVME_CTRL_VWC_PRESENT)
+but disabled (Volatile Write Cache Enable cleared) is exposed in
+write-back mode, as the driver never reads the Volatile Write Cache
+feature. The block layer then issues flushes and FUA writes for
+nothing, hurting performance.
+
+On a Kioxia CD6-V (KCD6XVUL3T20, HPE firmware GPK8), compliant with
+NVMe 1.4.0 and reporting VWC 0x5 with WCE cleared, 4k random writes with
+an fsync after each write (fio, 30s) give, before (write back) and after
+(write through) this patch:
+
+  job                   | cache   |   IOPS | fsync avg | flushes |  gain
+  ----------------------+---------+--------+-----------+---------+------
+  psync buffered, QD1   | back    |   3885 |   247.6us |  116552 |
+                        | through |  48325 |    15.7us |       0 | x12.4
+  ----------------------+---------+--------+-----------+---------+------
+  io_uring direct, QD1  | back    |   3886 |   238.2us |  116593 |
+                        | through |  41924 |     5.7us |       0 | x10.8
+  ----------------------+---------+--------+-----------+---------+------
+  io_uring direct, QD32 | back    |   5088 |  6173.5us |  117793 |
+                        | through | 140196 |   107.0us |       0 | x27.6
+
+From NVMe 1.4c (sections 5.21.1.6 and 6.8) up to the NVMe Base
+Specification 2.4 (sections 5.2.30.1.4 and 7.2), a Flush command has no
+effect if the volatile write cache is not enabled. The NVMe Base
+Specification 2.3 and 2.4 (sections 5.2.26.1.4 and 5.2.30.1.4) also
+state that user data written to a namespace shall be persistent if the
+volatile write cache is disabled.
+
+Make the driver honor the Volatile Write Cache Enable bit:
+
+- Read the feature in nvme_query_vwc_status() when the controller is
+  identified. The cache is assumed to be enabled unless the controller
+  explicitly reports it disabled, so a failure keeps the current
+  behavior.
+
+- Add the nvme_ctrl_vwc_enabled() helper so that the volatile write
+  cache state is evaluated in a single place, combining both bits,
+  instead of testing NVME_CTRL_VWC_PRESENT on its own as is done today.
+
+  The chosen logic is the following:
+
+    NVME_CTRL_VWC_PRESENT | NVME_FEAT_VWC_ENABLE | Write cache
+    ----------------------+----------------------+--------------
+              0           |     absent/0/1       | write-through
+              1           |        absent        | write-back
+              1           |          0           | write-through
+              1           |          1           | write-back
+
+  This is safe by default: a present volatile write cache is considered
+  enabled, and the namespaces are exposed in write-back mode, until the
+  controller reports the WCE bit cleared.
+
+- Refresh the state and rescan the namespaces in nvme_passthru_end()
+  after a successful Set Features for this feature, so that a change
+  made from userspace (e.g. "nvme set-feature -f 6 --value 1 /dev/nvme0")
+  is applied to the namespaces:
+
+  - if the volatile write cache is now enabled, wait for the rescan to
+    complete, so that the namespaces are back in write-back mode and
+    flushes and FUA writes are issued again before the command returns;
+  - if the volatile write cache is now disabled, do not wait, as
+    flushes sent in the meantime have no effect.
+
+The performance issue is not specific to the drive tested here: any
+controller that reports a volatile write cache with WCE cleared is
+affected, whatever its vendor or product.
+
+Assisted-by: Claude Opus 5.5
+Signed-off-by: Erwan Velu <e.velu@criteo.com>
+---
+ drivers/nvme/host/core.c | 41 +++++++++++++++++++++++++++++++++++++++-
+ drivers/nvme/host/nvme.h | 10 ++++++++++
+ include/linux/nvme.h     |  1 +
+ 3 files changed, 51 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/nvme/host/core.c b/drivers/nvme/host/core.c
+index 531f9bb14bab..5b03bf06b57c 100644
+--- a/drivers/nvme/host/core.c
++++ b/drivers/nvme/host/core.c
+@@ -1278,6 +1278,30 @@ u32 nvme_passthru_start(struct nvme_ctrl *ctrl, struct nvme_ns *ns, u8 opcode)
+ }
+ EXPORT_SYMBOL_NS_GPL(nvme_passthru_start, "NVME_TARGET_PASSTHRU");
+ 
++static void nvme_query_vwc_status(struct nvme_ctrl *ctrl)
++{
++	u32 result;
++	int ret;
++
++	/* Assume the volatile write cache is enabled until proven otherwise */
++	ctrl->vwc_status |= NVME_FEAT_VWC_ENABLE;
++
++	if (!(ctrl->vwc & NVME_CTRL_VWC_PRESENT))
++		return;
++
++	ret = nvme_get_features(ctrl, NVME_FEAT_VOLATILE_WC, 0, NULL, 0,
++			&result);
++	if (ret) {
++		dev_warn(ctrl->device,
++			"failed to get volatile write cache status (%d)\n",
++			ret);
++		return;
++	}
++
++	if (!(result & NVME_FEAT_VWC_ENABLE))
++		ctrl->vwc_status &= ~NVME_FEAT_VWC_ENABLE;
++}
++
+ u32 nvme_passthru_end(struct nvme_ctrl *ctrl, struct nvme_ns *ns, u32 effects,
+ 		       struct nvme_command *cmd, int status)
+ {
+@@ -1313,6 +1337,20 @@ u32 nvme_passthru_end(struct nvme_ctrl *ctrl, struct nvme_ns *ns, u32 effects,
+ 			if (!status)
+ 				nvme_update_keep_alive(ctrl, cmd);
+ 			break;
++		case NVME_FEAT_VOLATILE_WC:
++			/*
++			 * Refresh the volatile write cache state and revalidate
++			 * the namespaces so that flushes and FUA writes are
++			 * issued if the cache was enabled. In that case, wait
++			 * for the revalidation to complete before returning.
++			 */
++			if (!status) {
++				nvme_query_vwc_status(ctrl);
++				nvme_queue_scan(ctrl);
++				if (nvme_ctrl_vwc_enabled(ctrl))
++					flush_work(&ctrl->scan_work);
++			}
++			break;
+ 		default:
+ 			break;
+ 		}
+@@ -2478,7 +2516,7 @@ static int nvme_update_ns_info_block(struct nvme_ns *ns,
+ 				 "not enabling zoned mode");
+ 	}
+ 
+-	if ((ns->ctrl->vwc & NVME_CTRL_VWC_PRESENT) && !info->no_vwc)
++	if (nvme_ctrl_vwc_enabled(ns->ctrl) && !info->no_vwc)
+ 		lim.features |= BLK_FEAT_WRITE_CACHE | BLK_FEAT_FUA;
+ 	else
+ 		lim.features &= ~(BLK_FEAT_WRITE_CACHE | BLK_FEAT_FUA);
+@@ -3679,6 +3717,7 @@ static int nvme_init_identify(struct nvme_ctrl *ctrl)
+ 
+ 	atomic_set(&ctrl->abort_limit, id->acl + 1);
+ 	ctrl->vwc = id->vwc;
++	nvme_query_vwc_status(ctrl);
+ 	if (id->mdts)
+ 		max_hw_sectors = nvme_mps_to_sectors(ctrl, id->mdts);
+ 	else
+diff --git a/drivers/nvme/host/nvme.h b/drivers/nvme/host/nvme.h
+index a8ef62b8e34b..b993ebd457c5 100644
+--- a/drivers/nvme/host/nvme.h
++++ b/drivers/nvme/host/nvme.h
+@@ -399,6 +399,7 @@ struct nvme_ctrl {
+ 	u32 max_namespaces;
+ 	atomic_t abort_limit;
+ 	u8 vwc;
++	u32 vwc_status;
+ 	u32 vs;
+ 	u32 sgls;
+ 	u16 kas;
+@@ -1274,6 +1275,15 @@ static inline void nvme_start_request(struct request *rq)
+ 	blk_mq_start_request(rq);
+ }
+ 
++/*
++ * The volatile write cache status depends on both its presence and its state.
++ */
++static inline bool nvme_ctrl_vwc_enabled(struct nvme_ctrl *ctrl)
++{
++	return (ctrl->vwc & NVME_CTRL_VWC_PRESENT) &&
++		(ctrl->vwc_status & NVME_FEAT_VWC_ENABLE);
++}
++
+ static inline bool nvme_ctrl_sgl_supported(struct nvme_ctrl *ctrl)
+ {
+ 	return ctrl->sgls & (NVME_CTRL_SGLS_BYTE_ALIGNED |
+diff --git a/include/linux/nvme.h b/include/linux/nvme.h
+index 91ce434a7e8d..c7a1fd29bda7 100644
+--- a/include/linux/nvme.h
++++ b/include/linux/nvme.h
+@@ -1402,6 +1402,7 @@ enum {
+ 	NVME_FEAT_WRITE_PROTECT	= 0x84,
+ 	NVME_FEAT_VENDOR_START	= 0xC0,
+ 	NVME_FEAT_VENDOR_END	= 0xFF,
++	NVME_FEAT_VWC_ENABLE	= 1 << 0,
+ 	NVME_LOG_SUPPORTED	= 0x00,
+ 	NVME_LOG_ERROR		= 0x01,
+ 	NVME_LOG_SMART		= 0x02,
+
+base-commit: 2e8e30b3cf9f165e1a1d079331543cb7f2ad0e0c

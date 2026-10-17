@@ -1,0 +1,50 @@
+From 王 颖杰 <x-professor@outlook.com> Mon Sep 17 00:00:00 2001
+From: 王 颖杰 <x-professor@outlook.com>
+Date: Fri, 16 Oct 2026 03:00:59 +0000
+Subject: [PATCH] nvme: report synchronous passthrough copyback failures
+Message-ID: <da6955f4e5702e9322cf639f108be66e0ee49863.1792118770.git.x-professor@outlook.com>
+
+nvme_submit_user_cmd() discards the return from blk_rq_unmap_user().
+For a successful unaligned READ, a failed bounce-buffer copy can
+therefore leave the destination unchanged while the ioctl still reports
+success.
+
+Keep the real controller status for nvme_passthru_end(), then return the
+copyback error only when the command itself succeeded.
+
+A one-block READ into an unaligned PROT_NONE destination returned false
+success in 20/20 runs before this change.  It returned -EFAULT in 20/20
+runs afterward, while writable controls continued to succeed.
+
+Fixes: d29ec8241c10 ("nvme: submit internal commands through the block layer")
+Cc: stable@vger.kernel.org
+Assisted-by: LLM
+Signed-off-by: Yingjie Wang <x-professor@outlook.com>
+---
+ drivers/nvme/host/ioctl.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/nvme/host/ioctl.c b/drivers/nvme/host/ioctl.c
+index e45572bc87d..9b830641a5b 100644
+--- a/drivers/nvme/host/ioctl.c
++++ b/drivers/nvme/host/ioctl.c
+@@ -200,7 +200,7 @@ static int nvme_submit_user_cmd(struct request_queue *q,
+ 	struct request *req;
+ 	struct bio *bio;
+ 	u32 effects;
+-	int ret;
++	int ret, unmap_ret = 0;
+ 
+ 	req = nvme_alloc_user_request(q, cmd, 0, 0);
+ 	if (IS_ERR(req))
+@@ -226,7 +226,9 @@ static int nvme_submit_user_cmd(struct request_queue *q,
+ 	if (effects)
+ 		nvme_passthru_end(ctrl, ns, effects, cmd, ret);
+ 	if (bio)
+-		blk_rq_unmap_user(bio);
++		unmap_ret = blk_rq_unmap_user(bio);
++	if (!ret)
++		ret = unmap_ret;
+ 	return ret;
+ 
+ out_free_req:

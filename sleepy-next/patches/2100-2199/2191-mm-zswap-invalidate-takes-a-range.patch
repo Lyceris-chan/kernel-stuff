@@ -35,21 +35,20 @@ Cc: Yosry Ahmed <yosryahmed@google.com>
  3 files changed, 26 insertions(+), 15 deletions(-)
 
 diff --git a/include/linux/zswap.h b/include/linux/zswap.h
-index 30c193a1207e1..df6cafbe95dc0 100644
 --- a/include/linux/zswap.h
 +++ b/include/linux/zswap.h
-@@ -27,7 +27,7 @@ struct zswap_lruvec_state {
- unsigned long zswap_total_pages(void);
- bool zswap_store(struct folio *folio);
- int zswap_load(struct folio *folio);
+@@ -30,7 +30,7 @@
+ #ifdef CONFIG_LRU_MARIE
+ bool zswap_folio_reused(struct folio *folio);
+ #endif
 -void zswap_invalidate(swp_entry_t swp);
 +void zswap_invalidate(int type, pgoff_t offset, unsigned long nr_entries);
  int zswap_swapon(int type, unsigned long nr_pages);
  void zswap_swapoff(int type);
  void zswap_memcg_offline_cleanup(struct mem_cgroup *memcg);
-@@ -49,7 +49,11 @@ static inline int zswap_load(struct folio *folio)
- 	return -ENOENT;
+@@ -59,7 +59,11 @@
  }
+ #endif
  
 -static inline void zswap_invalidate(swp_entry_t swp) {}
 +static inline void zswap_invalidate(int type, pgoff_t offset,
@@ -61,15 +60,14 @@ index 30c193a1207e1..df6cafbe95dc0 100644
  {
  	return 0;
 diff --git a/mm/swapfile.c b/mm/swapfile.c
-index a8118f095f4d9..2c263563b70eb 100644
 --- a/mm/swapfile.c
 +++ b/mm/swapfile.c
-@@ -1316,10 +1316,8 @@ static void swap_range_free(struct swap_info_struct *si, unsigned long offset,
+@@ -1328,10 +1328,7 @@
  {
  	unsigned long end = offset + nr_entries - 1;
  	void (*swap_slot_free_notify)(struct block_device *, unsigned long);
 -	unsigned int i;
- 
+-
 -	for (i = 0; i < nr_entries; i++)
 -		zswap_invalidate(swp_entry(si->type, offset + i));
 +	zswap_invalidate(si->type, offset, nr_entries);
@@ -77,14 +75,12 @@ index a8118f095f4d9..2c263563b70eb 100644
  	if (si->flags & SWP_BLKDEV)
  		swap_slot_free_notify =
 diff --git a/mm/zswap.c b/mm/zswap.c
-index 15cea0e8ce365..4b8aa503afd1f 100644
 --- a/mm/zswap.c
 +++ b/mm/zswap.c
-@@ -228,10 +228,15 @@ static bool zswap_has_pool;
+@@ -237,10 +237,14 @@
  /* One swap address space for each 64M swap space */
  #define ZSWAP_ADDRESS_SPACE_SHIFT 14
  #define ZSWAP_ADDRESS_SPACE_PAGES (1 << ZSWAP_ADDRESS_SPACE_SHIFT)
-+
 +static inline struct xarray *zswap_tree(int type, pgoff_t offset)
 +{
 +	return &zswap_trees[type][offset >> ZSWAP_ADDRESS_SPACE_SHIFT];
@@ -98,7 +94,7 @@ index 15cea0e8ce365..4b8aa503afd1f 100644
  }
  
  #define zswap_pool_debug(msg, p)			\
-@@ -1656,18 +1661,22 @@ int zswap_load(struct folio *folio)
+@@ -1757,18 +1761,22 @@
  	return 0;
  }
  
@@ -117,18 +113,15 @@ index 15cea0e8ce365..4b8aa503afd1f 100644
 +		tree = zswap_tree(type, offset + i);
  
 -	entry = xa_erase(tree, offset);
--	if (entry)
+-	if (entry && !xa_is_value(entry))
 -		zswap_entry_free(entry);
 +		if (xa_empty(tree))
 +			continue;
 +
 +		entry = xa_erase(tree, offset + i);
-+		if (entry)
++		if (entry && !xa_is_value(entry))
 +			zswap_entry_free(entry);
 +	}
  }
  
  int zswap_swapon(int type, unsigned long nr_pages)
--- 
-2.55.0
-

@@ -8958,3 +8958,192 @@ version of the sweep filtered out any patch whose forward dry-run printed
 carry — it reported zero. A dead carry is one whose **reverse** dry-run applies
 cleanly with no `FAILED`/`Skipping` markers. Also: `[ -d "$BASE/Makefile" ]` is
 false for a file — the tree-existence assert must use `-f`.
+
+## Sweep 2026-10-17 (third pass) — sources unmoved, tracker push is 14.0.2-only, candidates listed
+
+Full three-pass sweep after the morning adoptions, requested with the running
+machine's IP-block list as an explicit keyword set (`gmc_v12_0`, `ih_v7_0`,
+`psp_v14_0`, `smu_v14_0`, `gfx_v12_0`, `dce_v1_0`/dm, `sdma_v7_0`, `vcn_v5_0`,
+`jpeg_v5_0`, `mes_v12_0`). Nothing adopted in the sweep itself; the follow-up
+adoption is recorded in the next section.
+
+### Source state — every source refreshed and checked against its own remote
+
+| Source | Verified state |
+|---|---|
+| torvalds | `58161ead29e5` (10-16) — unchanged, `ls-remote` agrees |
+| linux-next | newest tag `next-20261016` (`2efb7a11f1aa`); **no `next-20261017`** |
+| mainline tags | **no `v7.3-rc8` yet** |
+| drm-next / drm-misc | `a56b45995b1e` / `509a6256d3fd` — unchanged |
+| agd5f / amd-staging | `f307e9d20cc7` (10-15); all 132 branches scanned, none newer |
+| tip / linux-pm | `e60f2d63fdd8` / `24a19b953e2a` — unchanged |
+| akpm-mm | all six branches current; `mm-everything` `11c99b132d5f` (10-16) |
+| lore mirrors (14) | current to 2026-10-17 08:16Z |
+| amd-gfx / dri-devel archives | current to 10-17 01:47Z / 01:43Z, so no list mail after the mirrors |
+| sirlucjan / cachyos-kernel-patches / linux-tkg | `9c29aa44` / `333b9269` (handheld only) / `19231fc` (CI cache only) |
+| cachymod | `6956ee8` (10-16); 7.3-rc7 post-fixes delta is ath9k only — off-target |
+| cachyos-linux | local `7.3/fixes` was stale: remote is `6ac9c0cb`, new commit is i915 DP only. The clone fetches `7.0/cachy` only — **fetch `7.3/*` explicitly each pass** |
+| firelzrd lru-marie | `dba9daf` (10-17): 0.12.0 moved to stable; **1.0.0-rc1** is in testing |
+| firelzrd bore-scheduler | `1e2f57ad7` (10-06) BORE 7.0.0 stable — unchanged; our carry is 7.0.0 |
+| pixelcluster | unchanged (branches 06-16 / 08-17) |
+| xanmod | **not a XanMod clone** — `repos/xanmod` points at `Lyceris-chan/kernel-stuff` (this repo's HEAD). XanMod was not scanned |
+| drm/amd tracker | 18 issues updated since 10-16; 10 on-target threads read comment-by-comment |
+
+**No tree moved since the late pass.** Every new finding below comes from the
+mail mirrors, the tracker, and the two firelzrd branches.
+
+### Candidates — all dry-run against the full `source=()` series tree
+
+`audit_series.py --keep` built the tree; every patch in `source=()` applied
+cleanly (0 fail). Verdicts are `git apply --check` plus GNU
+`patch -p1 --forward -F2 --dry-run`; reverse was tested for each.
+
+| Candidate | Author / source | Apply | Assessment |
+|---|---|---|---|
+| `nvme-pci` revert `3710e2b056cb` (`a13c7a5`) | Christoph Hellwig, nvme list, 10-06 | forward clean | **strongest candidate.** Removes the `dma_opt_mapping_size` clamp that costs up to 15% on large transfers. Tested-by Adrian Huang on 7.3-rc7 (10-16) and not in any tree. One line. |
+| `nvme` passthrough copyback 4/4 (`1d9fc65`, `4ea3dd5`, `af56501`, `f4efaa9`) | Yingjie Wang, 10-16 | forward clean **cumulatively** (2/4 alone depends on 1/4) | Real hangs/false-success on unaligned PROT_NONE copies in passthrough reads; `Fixes:` + `Cc: stable`. No review yet; the hang repro uses an I/O queue depth of two and the IOPOLL run covers 1,280 commands |
+| `x86/boot` + `amdkfd` SRAT validation (`5774953869`, `aea4c86ba0`) | Jiale Yao, lkml, 10-16 | both forward clean | Bounds-checks malformed firmware SRAT subtables (OOB reads). Correct, but this board's SRAT is valid — hardening, not a symptom fix. The reply supplies the `Fixes:` tags |
+| `amd-gpu` SDMA IB enable (`fdc1eccd`) | Yongqiang Sun, amd-gfx, 10-16 | v9/v10/v11/v12 clean; **v12_1 hunk fails** | The v12 hunk is our GC 12.0 file and is the missing `IB_ENABLE` leg. v12_1's context names `sdmax_queuen_ib_cntl` while the base has `sdmax_rlcx_ib_cntl`, and Mukul Joshi already asked for heading/indentation changes — **wait for v2** |
+| `drm/amd/display` DP HDR PQ (`hdr-pq.patch`, #3200 upload) | Melissa Wen, 10-16 | forward clean (offsets −3/−4) | Sets `TRANSFER_FUNC_PQ2084` in the DP FreeSync infopacket when the HDR SDP says PQ, fixing gray-washed HDR on DP. **Tracker-only, not posted to a list**; body has a same-line function brace. Watch for the list posting |
+| MARIE `1.0.0-rc1` (`dba9daf`) | firelzrd, 10-17 | applies at position 139 in a 138-patch graft, zero failed hunks | 19k-line architectural rewrite (flat PFN state array, FSM, SIMD walker, optional defrag). Author kept **0.12.0 as stable**; this is a testing rc. Optional only |
+| `nvme` volatile write cache (`801eb57dd6`) | Erwan Velu, 10-16 | forward clean | Honours WCE; only helps when VWC is present *and* WCE is cleared. This box's PNY CS3040 reports `write_cache = write back`; no measured gain here. Under review (Keith Busch) |
+| zswap `v1 0/8` batching | Kanchana P. Sridhar, linux-mm, 10-08 | parts 1-4 apply; **5-8 fail** | zswap parts are built on mm-unstable and collide with `2101`'s rewrites. Performance series still under review. Deferred |
+
+The `nvme-pci` revert is the only candidate here with a measurable effect on
+this machine; the VWC patch is neutral unless the drive reports WCE cleared.
+The SRAT pair and SDMA IB are correctness work whose trigger this box does not
+exercise today.
+
+### Rejections worth keeping
+
+- **OD restate (`fb71f2e5`, Kenneth Feng, amd-gfx 10-16; pushed as
+  `6c93f645`)** — touches `smu_v14_0_2_ppt.c` only on the SMU14 side. This
+  machine enumerates `smu_v14_0_0` and runs `smu_v14_0_0_ppt.c` +
+  `smu_v14_0.c`; the latter has no `FeatureCtrlMask` logic at all. Same for
+  the two #3625 OD-mask attachments (13.0.0 / 14.0.2). **Wrong SMU file,
+  inert here** — the issue's "SMU 14.0.2" label does not match this board's
+  discovery output.
+- **`drm/amdgpu/gfx 12.1` SDMA MQD pair (`8d630995`, `acb8f7c7`)** — GC 12.1.
+  Wrong chip.
+- **`drm/amdgpu/gmc_v12_0: fix flushing mmhub by pasid` 2/2 (`3f88a605`)** —
+  already recorded at the 2026-09-25 entry: it depends on 1/2, which is
+  `gmc_v11_0`. No new revision.
+- **sched_ext bypass fixes (10-17)** — inert under BORE. **MGLRU NULL-deref
+  fixes (10-16/17)** — inert under MARIE. **zram redesign (10-16)** — not the
+  swap stack here. **io_uring hard-irq waiters** — not PREEMPT_RT; previously
+  rejected.
+- **PCI `v7.3-fixes-6` pull** — Samsung 990 PRO/EVO Plus Immediate Readiness
+  quirks plus `pci_dev_wait()` RRS handling. Not this hardware (PNY
+  CS3040/Phison E16); arrives with rc8 anyway. No carry.
+- **Apple/GMC9/MES 12.1/GFX 12.1/VF/SDMA 7.1/Strix/Renoir/Navi 32 items** —
+  wrong silicon, rejected before anything was downloaded.
+
+### Version sweep — zero higher revisions
+
+Every carried subject that appears in mail since 10-14 is still at the revision
+carried: `1175` v4, `9082` v5, `9083`/`9084` v2, `9081`/`1081`/`1082`/`1083`
+v1, `1233` v2, `2800` v3. The 10-17 01:05 SVM v2 posts are the ones adopted in
+the morning pass, not a v3.
+
+**No revert of carried work** since 10-14. The three reverts found are the
+`iommu/amd` one that arrives with rc8, the `sched/fair` one already in the
+base, and a CachyOS ath9k revert that is not ours.
+
+### Tracker
+
+**#5935** is the only issue updated today (08:05): Kenneth Feng says the OD
+restate change was reviewed and pushed as `6c93f645` — 14.0.2 only, see above.
+**#3625** carries the same 13.0.0/14.0.2 split. **#3200** has Melissa Wen's
+tracker-only HDR PQ patch. **#5951** confirms the form of our `1174`
+(inactive→active reference pairing) and links the 10-16 amd-gfx post.
+**#5985 / #5217 / #5380 / #5170** are all still retesting `63e19ef3ddab`,
+which is in the `_srctag` base. Standing watch item **#5988** (280 Hz DP VRR)
+did not move.
+
+### Coverage notes
+
+- `repos/cachyos-linux`'s fetch refspec is pinned to `7.0/cachy`;
+  `origin/7.3/fixes` sat a commit behind until fetched explicitly. Either widen
+  the refspec or fetch `7.3/*` every pass.
+- `repos/xanmod` is not XanMod — it is a clone of the user's own export repo.
+  XanMod is the one inventory source that could not be queried this pass.
+- The freedesktop archives were consulted directly this time and agree with the
+  lore mirrors to the minute; no gap.
+
+## Adopted 2026-10-17 (third pass) — nine new carries and MARIE 1.0.0-rc1
+
+Follow-up to the sweep above, on request: every candidate except the zswap
+batch series (conflicts with `2101`) and the SDMA IB patch (awaiting v2).
+Each was verified with `git apply --check` and GNU
+`patch -p1 --forward -F2 --dry-run` against the full series tree; the
+cumulative audit was re-run after insertion. Both packages received the same
+nine files (`sleepy-next` rebases `2101` separately).
+
+| # | Subject | Author | Source | Notes |
+|---|---|---|---|---|
+| `2046` | Revert "nvme-pci: clamp max_hw_sectors based on DMA optimized limitation" | Christoph Hellwig | nvme list `a13c7a5`, `20261006120248.147654-1-hch@lst.de` | Reverts `3710e2b056cb`; `Tested-by: Adrian Huang` on 7.3-rc7 (10-16), not in any tree. Measured up to 15% on large transfers |
+| `2047` | nvme: release passthrough resources before user copyback | 王 颖杰 (Yingjie Wang) | nvme list `1d9fc65` | 1/4; `Fixes: d29ec8241c10`, `Cc: stable`, `Assisted-by: LLM` |
+| `2048` | nvme: report synchronous passthrough copyback failures | 王 颖杰 | nvme list `4ea3dd5` | 2/4; depends on `2047` |
+| `2049` | nvme: report io_uring task-work copyback failures | 王 颖杰 | nvme list `af56501` | 3/4; `Fixes: 456cba386e94` |
+| `2050` | nvme: harden local IOPOLL user copyback | 王 颖杰 | nvme list `f4efaa9` | 4/4; `Fixes: f7bc22ca0d55` |
+| `2051` | nvme: honor the volatile write cache enable state | Erwan Velu | nvme list `801eb57dd6`, `20261016141208.2641974-1-e.velu@criteo.com` | Under review (Keith Busch). Neutral on the PNY CS3040 here (`write_cache = write back`) |
+| `2506` | x86/boot: validate SRAT subtables before parsing | Jiale Yao | lkml `5774953869` | Bounds checks against malformed firmware; no trigger on this board's valid SRAT |
+| `9086` | drm/amdkfd: validate SRAT subtables before parsing | Jiale Yao | lkml `aea4c86ba0` | Paired with `2506`; same hardening scope |
+| `1177` | drm/amd/display: set PQ in AMD FreeSync infopacket for DP HDR | Melissa Wen | drm/amd #3200 upload, author commit `1935159495733` | Tracker-only, not yet posted to a list; applies with offsets −3/−4 |
+| `2101` | linux7.3-rc7-lru_marie-1.0.0-rc1 | Masahito S | firelzrd `dba9daf`, author commit `408c89236e42` | Replaces 0.12.0 in place; 0.12.0 was moved to the author's stable directory. Applies at position 139 (138 preceding) with offsets, zero failed hunks |
+
+**Why these.** `2046` is the only candidate with a measurable effect on this
+machine: it removes the `dma_opt_mapping_size` clamp that costs up to 15% on
+large NVMe transfers. The `2047`–`2050` series fixes silent false-success and
+hangs on unaligned `PROT_NONE` copyback in passthrough reads (`nvme-cli` /
+io_uring); it has no review yet, so it is carried on the strength of the
+`Fixes:` tags and the reproduced hang, and the four parts must stay in order
+(`2048` depends on `2047`'s post-image). `2051` is neutral on this drive but is
+correct and under active review; it is carried for completeness. `2506`/`9086`
+are correctness hardening for malformed-firmware SRAT — this board's table is
+valid, so they change nothing at runtime today. `1177` fixes gray-washed HDR on
+DP FreeSync; it is tracker-only, so its provenance is the #3200 upload rather
+than a Message-ID.
+
+`2101` moves to the author's 1.0.0-rc1 testing release. The author kept 0.12.0
+as stable, so this is a deliberate test-side move, not an upstream push; it
+applies cleanly to the `_srctag` base at its position. The preview's copy is a
+separate rebase — see `sleepy-next/PATCH_SOURCES.md`.
+
+### zswap range series rebased around MARIE 1.0.0-rc1 (`2191`–`2193`)
+
+Unlike 0.12.0, 1.0.0-rc1 touches `mm/zswap.c`, which invalidated the
+pre-images of the three zswap range patches that follow it. All three were
+rebased against the post-MARIE tree and verified in both directions (reverse
+then forward, zero rejects):
+
+- **`2191`** — the `zswap_invalidate()` conversion now keeps MARIE's
+  `!xa_is_value(entry)` guard, so an incompressible slot mark is never freed
+  as an entry. The declaration hunk is re-anchored around MARIE's
+  `zswap_folio_reused()` declaration.
+- **`2192`** — content unchanged; applies at offset 100 after `2191`.
+- **`2193`** — the check_old conversion now replaces only the open-coded loop
+  and keeps MARIE's incompressible-mark block, which uses the `type`/`offset`
+  locals; `struct xarray *tree` moves inside the `if (incomp)` block.
+
+The same files are copied into `sleepy-next/`, where all three are absorbed by
+the snapshot and skip.
+
+### Version sweep — the only real update is kbuild v3 → v4, already deferred
+
+All carried subjects were matched against the highest `[PATCH vN]` posting in
+every lore mirror. Twenty-eight version-label hits came back; all but the kbuild
+series are content-identical (changelog bullets or trailer-only differences):
+`1175` v4, `1231`/`1232` v2, `1233` v2, `2032` v3, `2037` v2, `2039` v3,
+`2045` v4, `2144` v2, `2154` v3, `2171` v7, `2173` v2, `2174` v3, `2181` v2,
+`2183` v7, `2185` v6, `2191`/`2193` v3, `2197` v2, `2800` v3, `9082` v5,
+`9085` v2.
+
+The real deltas are in the kbuild build-speedup series: v3 is carried,
+**v4 (2026-09-23) changes `2302`, `2308` and `2314`**, leaves `2313`, `2315`,
+`2317` content-identical, and grows the series from 20 to 22 parts. That v4
+block is the bump item already recorded on 2026-09-25 and 2026-10-05: its part
+01 fails on `include/asm-generic/vmlinux.lds.h` and part 08 on
+`scripts/kallsyms.c` against the `_srctag` base because the v4 series is based
+on three unmerged prerequisite series. Re-tested this pass; the v3 carries
+remain correct for this base.

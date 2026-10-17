@@ -330,6 +330,8 @@ takes the scheduler rework, the same deletion must be applied there.
 
 ### 3. `2101` (LRU-MARIE 0.12.0) rebased onto the snapshot — six sites
 
+> **Historical — superseded by §4 (LRU-MARIE 1.0.0-rc1) below.**
+
 The `sleepy-rc` copy (the author's own `0.12.0` for `7.3-rc7`) applies to its
 base with zero rejects; this base needs six host hooks re-anchored, exactly the
 set diagnosed on 2026-10-16. Applied at its position in a graft tree, fixed,
@@ -389,7 +391,49 @@ GNU patch leaves on an offset. One regeneration came out 156 KB instead of
 14 KB with 44 `*.orig` deletions in it. Purge `.orig`/`.rej` **before**
 `git add -A`, and if it is already too late, `git diff HEAD -- . ':(exclude)*.orig'`.
 
-### 4. Dead carries still in `source=()`
+### 4. `2101` upgraded to LRU-MARIE 1.0.0-rc1 — nine host sites and three compile fixes
+
+The 0.12.0 carry in §3 is superseded. The author's 1.0.0-rc1 patch (against
+7.3-rc7) was applied at the same position — entry 134, 133 preceding — and
+rebased against `next-20261016`. `mm/lru_marie/*` stays byte-identical except
+the standing const fix; everything else is a host hook.
+
+| # | Site | What was done |
+|---|---|---|
+| 1 | `include/linux/memcontrol.h` | declaration const-qualified; `lru_marie_zone_size_read()` call re-expressed against the preview's `long val` + `WARN_ON_ONCE()` body |
+| 2 | `mm/lru_marie/engine/hooks.c` | `marie_lruvec_zone_size()` and `lru_marie_zone_size_read()` const-qualified (the same one-line fix as 0.12.0; the helper moved from `core.c` to `engine/hooks.c`) |
+| 3 | `include/linux/zswap.h` | `zswap_folio_reused()` declaration and `!CONFIG_ZSWAP` stub added around the preview's range-based `zswap_invalidate()` signature |
+| 4 | `mm/Kconfig` | `LRU_MARIE` block re-anchored before `config LOCK_MM_AND_FIND_VMA` |
+| 5 | `mm/page_alloc.h` | `last_refaults` added to `struct alloc_context` after `reclaim_compact_order` |
+| 6 | `mm/swap.h` | `kcompressd()` declared after `__swap_writeout()` (`__swap_writepage` does not exist here) |
+| 7 | `mm/page_alloc.c` | `should_reclaim_retry()` takes `unsigned long nr_progress` and keeps the preview's `!order_defrag_promoted(order, ac)` term |
+| 8 | `mm/vmscan.c` | both `move_folios_to_lru()` putback arms carry the MARIE orphan/tail split (the §3 block reused verbatim) |
+| 9 | `mm/zswap.c` | incompressible-slot logic adapted to the preview's folio-based `zswap_store_page()` and range `zswap_invalidate()`; `zswap_folio_reused()` added after `zswap_store()` |
+
+**Three compile-only fixes, exactly the §3 set.** They apply — the context
+matches — but name symbols this base removed; a targeted grep and the
+added-line identifier scan found them before a build:
+
+| Symbol | Site | Fix |
+|---|---|---|
+| `__swap_writepage()` | `mm/page_io.c`, `do_swapout()` | renamed to `__swap_writeout()` |
+| `PF_KSWAPD` | `mm/page_io.c`, `kcompressd()` | dropped; the comment reuses §3's wording |
+| `VM_SPECIAL` | `mm/lru_marie/engine/walker.c` | spelled out as `VM_IO \| VM_DONTEXPAND \| VM_PFNMAP \| VM_MIXEDMAP` |
+
+**Verified on a fresh `next-20261016` graft:** the 133 preceding entries
+applied with prepare semantics (59 applied, 74 skipped as already present),
+then `2101` applied with **0 failed hunks and 0 `.rej`**; the three compile
+symbols are present in the fixed tree. Hooks checked:
+`lru_marie_zone_size_read` in `memcontrol.h`, `kcompressd` in `swap.h` and
+`page_io.c`, `nr_swap_write_failed` in `page_io.c`, `include/linux/lru_marie.h`
+created. Every function-like identifier on the patch's added lines resolves in
+the applied tree.
+
+The zswap range patches `2191`–`2193` are copied from `sleepy-rc`, where they
+were rebased around 1.0.0-rc1's zswap changes; here all three are absorbed by
+the snapshot and skip.
+
+### 5. Dead carries still in `source=()`
 
 Three patches in this package are now **fully absorbed upstream** and skip on
 every build — reverse-applicability confirms the content is in the pristine
@@ -449,7 +493,7 @@ break the shared-series invariant for no runtime gain.
 
 | | |
 |---|---|
-| Files in `patches/` | 263 |
-| Entries in `source=()` | 256 |
+| Files in `patches/` | 272 |
+| Entries in `source=()` | 265 |
 | Excluded from `source=()` | 7 — `1008`, `1012`, `1013`, `1014`, `1017`, `9060`, `9040` |
 | Preview-only adds | `2700`, `2701` (zswap request stack) |

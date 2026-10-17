@@ -1,0 +1,43 @@
+From 王 颖杰 <x-professor@outlook.com> Mon Sep 17 00:00:00 2001
+From: 王 颖杰 <x-professor@outlook.com>
+Date: Fri, 16 Oct 2026 03:01:02 +0000
+Subject: [PATCH] nvme: report io_uring task-work copyback failures
+Message-ID: <4f896744665ecf7034e4c52fa310f4de7fe1566b.1792118770.git.x-professor@outlook.com>
+
+nvme_uring_task_cb() discards the return from blk_rq_unmap_user().  A
+successful data-in command can therefore post CQE 0 even when bounce
+data was not copied to the requested userspace destination.
+
+Preserve an earlier NVMe or block error and otherwise report the unmap
+error in the CQE.
+
+A real NVMe READ into an unaligned PROT_NONE mapping posted false
+success in 20/20 runs before this change and -EFAULT in 20/20 runs
+afterward.  Writable controls continued to succeed.
+
+Fixes: 456cba386e94 ("nvme: wire-up uring-cmd support for io-passthru on char-device.")
+Cc: stable@vger.kernel.org
+Assisted-by: LLM
+Signed-off-by: Yingjie Wang <x-professor@outlook.com>
+---
+ drivers/nvme/host/ioctl.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/nvme/host/ioctl.c b/drivers/nvme/host/ioctl.c
+index 9b830641a5b..06c3f3232ba 100644
+--- a/drivers/nvme/host/ioctl.c
++++ b/drivers/nvme/host/ioctl.c
+@@ -439,9 +439,12 @@ static void nvme_uring_task_cb(struct io_tw_req tw_req, io_tw_token_t tw)
+ {
+ 	struct io_uring_cmd *ioucmd = io_uring_cmd_from_tw(tw_req);
+ 	struct nvme_uring_cmd_pdu *pdu = nvme_uring_cmd_pdu(ioucmd);
++	int ret = 0;
+ 
+ 	if (pdu->bio)
+-		blk_rq_unmap_user(pdu->bio);
++		ret = blk_rq_unmap_user(pdu->bio);
++	if (!pdu->status)
++		pdu->status = ret;
+ 	io_uring_cmd_done32(ioucmd, pdu->status, pdu->result,
+ 			    IO_URING_CMD_TASK_WORK_ISSUE_FLAGS);
+ }
