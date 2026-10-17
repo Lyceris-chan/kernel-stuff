@@ -8785,3 +8785,109 @@ trailing whitespace. Extraction is faithful; the flags are a format artifact.
 - `lists.freedesktop.org` archive tarballs were not consulted; both lists that
   matter (amd-gfx, dri-devel) are covered by the lore mirrors, which were
   current to 2026-10-16.
+
+## Sweep 2026-10-17 (late pass) — the rc8 window opens; nothing adopted
+
+Second sweep of the day, after the morning's adoptions and the preview bump.
+Every source refreshed and verified against its remote; only `torvalds` had
+moved.
+
+| Source | State |
+|---|---|
+| torvalds | `70dd4ee72eb2` → **`58161ead29e5`** (67 commits) |
+| linux-next | newest tag still **`next-20261016`** — no `next-20261017` published |
+| mainline tags | **no `v7.3-rc8` yet** |
+| drm-next / drm-misc / tip / linux-pm | unchanged |
+| amd-staging / agd5f | unchanged at `f307e9d20cc7` |
+| akpm-mm | all branches unchanged (10-15 tips) |
+| sirlucjan / cachyos-kernel-patches / firelzrd / linux-tkg | unchanged (linux-tkg: CI cache only) |
+| 13 lore mirrors | all current to 2026-10-17 |
+
+### The rc8 window is filling with amdgpu work — do not backport it
+
+67 commits landed in torvalds since the morning pass. On-target among them:
+`3c44cbcec5eb` (eviction fence until the last handle is closed — the
+`db39b1236804` triaged on 10-15), `32d0771ef4ca` (userq BO validation,
+`ea9be90a5558`), `1b4da805a0ba` (userptr ranges on a failed CS — `0032d5279490`),
+`de9f6bcdb44f` (double runtime-PM drop in `amdgpu_gpr`), `3c516a564628` (GEM
+object leak on ENOMEM), `5b0a459f990b`/`b5629f4a0869` (TTM buffer entity),
+`d65a459dbc9a` (GEM_LIST_HANDLES alignment), `55a67aa89342` (NULL sink deref in
+the USB4 bandwidth functions — needs USB4 DP tunneling, which this box does not
+have).
+
+**Verdict: carry none of them.** `v7.3-rc8` is due within a day and every one
+arrives with it; backporting now buys hours and risks the duplicate-insertion
+trap. Two interactions were read ahead of that bump:
+
+1. **`1b4da805a0ba` vs our `9040` — same ranges, same error path, and it is
+   safe.** Upstream's new `error_free_user_pages:` label frees the ranges and
+   NULLs `e->range` before `amdgpu_cs_parser_fini()` runs our loop; and
+   `amdgpu_hmm_range_free()` returns immediately on NULL
+   (`amdgpu_hmm.c:282`). So the duplicate is harmless, but **`9040` becomes
+   redundant at the rc8 bump and should be dropped then** — not now, since
+   `v7.3-rc7` still needs it.
+2. **`3c44cbcec5eb` vs our `1075`** — upstream touches
+   `amdgpu_gem_object_close()`, our patch touches `amdgpu_gem_object_open()`.
+   Same file, different functions; both stay.
+
+### Candidates — all dry-run clean against the 255-patch series tree
+
+| Candidate | Author | Verdict |
+|---|---|---|
+| `a016c6f5` drm/amd/display: Fix swap in median3() for DSC rate control | Keita Morisaki | **adoptable** |
+| `d50203bbc5` mm: unqueue deferred split folios outside the lruvec lock (v2) | Joanne Koong | **defer** |
+| `809c286` io_uring/wait: wake real-time waiters from hard interrupt context | Austin Schuh | **inert here** |
+| `c1cc93e1` drm/amdkfd: Bump KFD ioctl version (1.24, SVM no access) | David Yat Sin | **reject** |
+| `34d27c9f` [PATCH 7.2.y] drm/ttm bulk_move fix | Dave Airlie / Greg KH | **already in base** |
+
+**`a016c6f5` is the one worth taking.** `median3()`'s last compare-and-swap
+swaps `b` and `c` instead of `a` and `b`, so when `c` is the smallest it returns
+`max(a,b)` instead of `min(a,b)` — `median3(2,3,1) == 3`. `_do_calc_rc_params()`
+always passes 0 first and never below 12 second, so a negative third argument
+sets `first_line_bpg_offset` to 12 instead of 0. The author states it does not
+affect valid DSC configurations (the third argument is negative only when bpp
+exceeds the uncompressed rate). One line, `Reviewed-by: Roman Li` on 2026-10-16,
+and **absent from torvalds, drm-next, drm-misc, agd5f, amd-staging and
+linux-next** — it is still mailing-list-only, and the buggy line is present in
+both `v7.3-rc7` and `next-20261016`. Not adopted in this pass: a sweep reports,
+it does not adopt.
+
+**`d50203bbc5` is deferred, not rejected.** It moves
+`folio_unqueue_deferred_split()` out of the lruvec lock in
+`move_folios_to_lru()`, `folio_batch_move_lru()` and `folios_put_refs()` —
+measured as the cost in the mTHP deferred-split discussion (lruvec lock wait
+491 s → 38 s). It is a performance change with no `Fixes:`, and
+`move_folios_to_lru()` is exactly the function MARIE's `2101` rewrites and wraps
+in the preview. Re-read after the rc8 bump, in a session of its own.
+
+**`809c286` is inert on this kernel.** It marks io_uring's CQ-wait hrtimer hard
+only for real-time waiters, to avoid the PREEMPT_RT `ktimers` thread. This
+kernel runs `_preempt=full`, not PREEMPT_RT, where hrtimers already expire in
+hard interrupt context — the change adds a branch and nothing else. Applies
+cleanly; does nothing here.
+
+**`c1cc93e1` must not be carried alone.** It bumps `KFD_IOCTL_MINOR_VERSION`
+to 1.24 to advertise *"SVM no access attributes"* — a feature series we do not
+carry (our `9083`/`9084` are the address-limit fixes, a different change). The
+bump alone would tell userspace a capability exists that the kernel does not
+have.
+
+**`34d27c9f` is a stable-tree backport request.** The fix
+(`3db7d7d58341`, 2026-09-09, plus `fcfe64715b42`) predates `v7.3-rc7` and the
+code is already in our base (`ttm_resource_del_bulk_move()` carries the
+`!ttm_resource_unevictable(res, bo)` condition). The 10-17 mail is Dave Airlie
+and Greg KH agreeing on the 7.2.y commit id.
+
+### Version sweep — zero higher-revision postings
+
+Every carried-patch subject that appears in mail since 2026-10-13 is the posting
+already carried: `9083`/`9084` at v2, `2800` at v3, `2801` at v1, `9082` at v5,
+`9081`/`1082` at v1, `1175` at v4, `1085` at v3, `1233` at v2. No v3 of the SVM
+series, no v2 of the VM pair.
+
+### Tracker
+
+One issue updated since the morning pass: **#5993** *"[Renoir/DCN 2.1] PSR can
+no longer be enabled since 7.2"* — Renoir is a Zen 2 APU, wrong chip. The
+standing watch item remains **#5988** (280 Hz DP VRR falling to 24 Hz), still
+with no posted fix.
