@@ -2347,3 +2347,32 @@ patches, agreeing with the compiler.
 **Count the thing that actually breaks, not something correlated with it.** The
 build does not fail on a duplicated macro or a prototype; it fails on a second
 function body.
+
+## A successful build is not an installed kernel (2026-10-18)
+
+The fourth-pass ledger entry was accurate and still misleading. It said both
+packages "build cleanly with the seven patches in `source=()`", citing
+`7.3.0_rc7-2` / `2026.10.16-1`. That was true — disassembling the packaged
+`amdgpu.ko` from the 16:49 artifact shows `dma_fence_wait_timeout`, the `1091`
+form. But `pacman -Qi` reported Build Date 10:43/10:49 and Install Date 10:55:
+the *installed* packages were the morning builds, and the installed module
+still calls `amdgpu_bo_sync_wait`. The running kernel had none of the 16
+patches adopted that afternoon.
+
+**The build artifact and the installed artifact are different objects.** The
+ledger, the package mtime and a successful `makepkg` log all describe the
+former. Check the latter directly:
+
+- `pacman -Qi <pkg>` — Build Date vs Install Date, and the version.
+- Probe the installed module: decompress
+  `/usr/lib/modules/$(uname -r)/kernel/.../amdgpu.ko.zst` and disassemble the
+  function the patch changes. A source marker is not available: the headers
+  package's `build/` tree ships headers and build metadata, not `.c` files, so
+  `rg` against it returns empty for a reason that has nothing to do with the
+  patch.
+
+Timestamp reasoning was tried first and gave the wrong answer: `.BUILDINFO`'s
+`builddate` is the build start, the PKGBUILD's mtime was later, and the
+inference "the build saw the old source list" was false — the package does
+contain `1091`. Only the disassembly settled it. **Check the artifact that
+runs, not the one that was built.**

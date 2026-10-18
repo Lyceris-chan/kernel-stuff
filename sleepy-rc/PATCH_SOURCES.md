@@ -29,13 +29,13 @@ are supplied by the generator instead, so every row below has a source.
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 20 |
 | `2400–2499` | Core scheduler and sched-ext | 3 |
-| `2500–2599` | x86 and arch core | 2 |
+| `2500–2599` | x86 and arch core | 3 |
 | `2600–2699` | Time and timers | 0 |
 | `2800–2899` | Memory management, second series (mm/swap follow-ups) | 3 |
 | `2900–2999` | VFS / core filesystem | 2 |
 | `9000–9099` | agd5f staging + userq lifecycle backports | 50 |
 
-**Total: 277** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 278** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-17). The counts are now generated from the patch tree
@@ -9367,3 +9367,100 @@ snapshot and is the only new code that builds there. See
 (`.BTF` and `.BTF_ids`, readable by `bpftool`); the config keeps
 `CONFIG_TCP_CONG_BBR` off, `CONFIG_TCP_CONG_BBR3=y`,
 `CONFIG_DEBUG_INFO_DWARF5=y` and `CONFIG_DEBUG_INFO_BTF=y`.
+
+## Sweep 2026-10-18 — release-window check; `2508` adopted
+
+Full three-pass sweep ahead of the 7.3 release window. The `v7.3-rc8` tag had
+not been cut when the sweep ran (12:40 CEST; kernel.org still listed
+`7.3-rc7`), so this release carries `2508` explicitly; the bump will absorb it
+if the tag lands.
+
+### Source state — every source refreshed and checked against its remote
+
+| Source | Verified state |
+|---|---|
+| torvalds | `origin/master` = `32c52ec87d62`; **one** non-merge commit since the 10-17 snapshot (`58161ead..32c52ec`, the UMIP fix below). No `v7.3-rc8` or `v7.3` tag yet |
+| linux-next | newest tag still `next-20261016` (`2efb7a11f1aa`); no weekend snapshot |
+| drm-next / drm-misc | `a56b45995b1e` unchanged / freedesktop `5780281c4588`, 7 commits since `509a6256d3fd`, all gpuvm/msm/panthor/xe — **none for amdgpu** |
+| agd5f / amd-staging | `f307e9d20cc7` (10-15), every branch scanned, none newer |
+| linux-pm / akpm / tip | `24a19b953e2a` (rc7) / `mm-everything` `11c99b13` / `aacd2a9507b9`; only the UMIP fix is new |
+| sirlucjan / cachyos-kernel-patches | `9c29aa44` (10-15) / `333b9269` unchanged; every CachyOS `7.3/*` tip unchanged |
+| firelzrd | MARIE `dba9daf` 1.0.0-rc1 and BORE `1e2f57ad7` 7.0.0 — both already carried |
+| linux-tkg / pixelcluster / cachymod | the first two unchanged; cachymod `ea4ffd0` reverts `no_run_to_parity` in its own `0260`, which this series does not carry |
+| xanmod / Clear | **unrefreshed** — `repos/xanmod` is not XanMod and there is no Clear clone |
+
+### Adopted — `2508`, the UMIP segment-index fix
+
+**`2508`, not `2507`:** `2500`–`2507` were the 2026-09-16 x86 PAT group; only
+`2505`/`2506` survive, so `2507` is a vacated number and cannot be reused.
+
+`32c52ec87d62` *x86/insn-eval: Fix shadowed segment index in
+get_seg_reg_override_idx()* (Lukas Zobernig; merged by Linus 2026-10-16 with
+`Acked-by` Peter Zijlstra and Borislav Petkov). `for_each_insn_prefix()`
+declares its own `idx`, and `get_seg_reg_override_idx()` writes its result into
+a local of the same name. With a CS prefix the loop never terminates; the UMIP
+`#GP` path then spins in the kernel with a SIGKILL that is never delivered, so
+any user can tie up CPUs. FS/GS overrides write the emulated result to the
+wrong address. **On-target:** `CONFIG_X86_UMIP=y`.
+
+Forward-clean with both `git apply --check` and GNU `patch -p1 --forward` on a
+pristine `v7.3-rc7` and on both series trees; reverse fails, so it is not
+already present. It will be in the `v7.3-rc8` base when the tag is cut — drop
+it at the bump (the audit will report it as already applied). It applies to the
+preview base too, where it is also absent.
+
+### Candidates considered and not adopted
+
+- **zswap v4** (`[PATCH v4 0/3] mm: zswap: reduce request contention on loads`,
+  Usama Arif, 10-17, `Acked-by` Nhat Pham / Herbert Xu / Yosry Ahmed). Still the
+  strongest unadopted mm series, and still **blocked by a base mismatch**: it
+  is written against the mm tree's `zswap_compress(struct folio *, long)`
+  signature, which neither `v7.3-rc7` nor torvalds master has (hunk 10 of 1/3
+  fails; 11 of 12 apply). The preview base already contains the v3 form and
+  the preview-only `2700`/`2701` skip there, so v4 changes nothing that builds.
+  Keep for the base that carries the folio conversion.
+- **io_uring** — four 10-17/18 postings: drain-flag clear (1 of 5 hunks fails
+  against our ring-release series), net recv length clamp (clean), waitid
+  `-EAGAIN` (clean), RT hrtimer wake (inert: `CONFIG_PREEMPT_RT` is unset).
+  All hours old with no review; watch, do not carry.
+- **blk-mq direct dispatch for mq-deadline** (10-17, still under review;
+  `sda` runs mq-deadline). Applies cleanly; watch the review, do not carry yet.
+- **`drm/amd/display: restore vblank state across GPU reset`** (AMD, 10-17,
+  no review). Applies cleanly and targets page-flip timeouts during reset, but
+  it is unreviewed and changes the DM reset path; watch.
+- **`drm/amdkfd: enable SDMA indirect buffers`** (AMD, in review; the v12_1
+  hunk already fails). Watch for v2.
+- **`optc_underflow_enable` 1/3** — only the ATOM header field was posted;
+  2/3 and 3/3 are not in the mirror. Nothing to carry.
+- **`drm/amd/display: Use separate iterator for preferred mode lookup`** —
+  `Reviewed-by: Alex Hung`, but "No functional change intended"; skip.
+- **zram v5 (13 patches)** — no zram device or service on this machine; inert.
+- **ioprio lockless annotation** — KCSAN-only, explicitly harmless; skip.
+- **sched_ext for-7.4, nvme-tcp per-queue sysfs, nvmet-fc UAF, MGLRU,
+  hugetlb/UFFD, QCOM/Intel PM** — inert here or wrong subsystem.
+- **Tracker** — 19 open issues updated since 2026-10-17 00:00Z; every one of
+  the 96 comments was fetched over GraphQL and every commit-like token checked.
+  The only real commit is `6c93f6452134` (Kenneth Feng, *"restate all
+  customized OD features on every table upload for smu 13.0.0/smu 14.0.2"*) in
+  #5935 — **SMU 14.0.2/13.0.0 only; this board is 14.0.0**, so inert. On-target
+  reports with no fix: #5994 (S3 resume, MODE1 reset), #6002 (7.3-rc7 boot DP
+  loss; user logs only), #5585 (9070 XT power-state artifacts; MCLK pinning is
+  the only workaround, no commit), #5846 (pageflip timeouts, 7000-series; a
+  RADV debug workaround). #5665 is a KWin color-pipeline bug — KWin 6.8.1
+  re-disables the feature by default (`01222b41cb2b`), not a kernel defect. The
+  rest are wrong-chip: Navi31/7900 XTX, Phoenix, Cezanne DCN 2.1, Granite
+  Ridge RDNA2 iGPU, RX 580, laptop panels.
+- **Version sweep** — the only new higher-version posting is zswap v4 above;
+  the other 49 hits are the known content-identical resends and the deferred
+  kbuild v4. `2700`/`2701` stay at v2: the preview base has the series, and v4
+  is neither forward- nor reverse-clean against it.
+
+### Build status
+
+The installed packages are the 2026-10-17 10:43/10:49 builds and contain
+neither the nine third-pass nor the seven fourth-pass patches. The 16:49/16:55
+artifacts on disk do contain them — verified by disassembling the packaged
+`amdgpu.ko` (installed calls `amdgpu_bo_sync_wait`; packaged calls
+`dma_fence_wait_timeout`, the `1091` form). This release rebuilds both packages
+as `7.3.0_rc7-3` / `2026.10.16-2` so the adopted patches and `2508` are
+actually installed.

@@ -147,6 +147,7 @@ section of `LESSONS.md`. Read that section before repeating the mistake.
 - **Before calling a patch new, grep the series** for its subject, author and the function it changes — the fix may sit in a patch whose *subject* says otherwise. → *Dead carries, kind 3*.
 - **A tunable can be set, readable, and still not used** — grep the series for the sysctl name. → *A tunable you set can be silently overridden*.
 - **A README claim is not evidence, including ours.** → *A README claim is not evidence, even in this repo*.
+- **A build is not an install** — the ledger, package mtime and build log describe the artifact; `pacman -Qi` and the installed module decide what runs. → *A successful build is not an installed kernel*.
 - **Disabling a detector is a claim about the detector** — prove its *inputs* are misread, not that another metric looks fine. → *CORRECTION: the watchdog was right*.
 - **Attribute by measurement, not narrative**, and check whether a "fix" coincides with the symptom worsening. → *"The logs disprove it" beats "the mechanism fits"*.
 - **A scan whose input is missing reports success** — assert the tree exists before any dry-run loop. → *A scan whose input is missing reports success*.

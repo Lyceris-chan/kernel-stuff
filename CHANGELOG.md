@@ -18,6 +18,68 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.10.16-2-sleepy-next (linux-next `next-20261016`)]: 2026-10-18
+
+`pkgrel` 1 -> 2. The snapshot base is unchanged: linux-next published no
+weekend tag, so `next-20261016` is still the newest. This rebuild installs the
+shared carries added after the 2026.10.16-1 build and the UMIP fix.
+
+### Added — nine shared carries that apply on this base
+
+`1091` (wait for pending page-table updates before `amdgpu_vm_make_compute()`;
+the SDMA-clear race that takes a MODE1 reset with VRAM loss on gfx1201),
+`1177` (PQ in the FreeSync infopacket for DP HDR), `2047`/`2048` (nvme
+passthrough copyback), `2051` (nvme volatile write cache state), the preview's
+rebased `2101` (LRU-MARIE 1.0.0-rc1), `2506`/`9086` (SRAT bounds checks) and
+`2508` (x86/insn-eval UMIP segment-index spin).
+
+The rest of the 2026-10-17 shared additions are already in the snapshot and
+skip (`1090`, `2046`, `2802`, `2901`, `9087`), or their hunk context has
+drifted and `prepare()` skips them (`2049`, `2050`, `2900`, `9088`). Full
+accounting in `PATCH_SOURCES.md`.
+
+## [7.3.0-rc7-3-sleepy-rc]: 2026-10-18
+
+`pkgrel` 2 -> 3. Series is 278 patches (was 261 in the rc7-2 build). This is
+the first release that installs the 16 patches adopted on 2026-10-17 after
+that morning's build, plus one merged mainline fix.
+
+### Added — the 2026-10-17 carries
+
+The rc7-2 and 2026.10.16-1 packages installed at 10:55 on 10-17 came from
+10:43/10:49 builds; the nine third-pass and seven fourth-pass carries were
+added later that day and never reached an installed kernel. They ship here:
+
+- **GPU/VM:** `1090` drm_exec prelocked-object fix; `1091` waits for pending
+  page-table updates before switching a VM to CPU updates (closes the
+  SDMA-clear race that takes a MODE1 reset with VRAM loss on gfx1201);
+  `9087` returns copy errors from `AMDGPU_INFO_UQ_FW_AREAS`; `9088` memset32
+  SDMA padding.
+- **NVMe:** `2046` reverts the `max_hw_sectors` DMA clamp (up to 15% on large
+  transfers); `2047`-`2050` passthrough copyback fixes; `2051` volatile write
+  cache state.
+- **Memory/VFS:** `2802` submits the last swap-readahead batch before
+  unplugging; `2900`/`2901` stop idle threads pinning the initramfs
+  superblock (70-150 MB).
+- **Hardening and other:** `2506`/`9086` SRAT bounds checks; `1177` PQ in the
+  FreeSync infopacket for DP HDR; `2101` LRU-MARIE 1.0.0-rc1.
+
+### Added — `2508`, the UMIP segment-index fix
+
+`32c52ec87d62` x86/insn-eval: a CS-prefixed SGDT/SIDT/SMSW takes the UMIP `#GP`
+path and spins in the kernel, with a SIGKILL that is never delivered; FS/GS
+overrides write the emulated result to the wrong address. Merged by Linus on
+2026-10-16 with Peter Zijlstra's and Borislav Petkov's `Acked-by`. It applies
+cleanly to `v7.3-rc7` and to both series trees. `CONFIG_X86_UMIP=y` here.
+
+### Note — the previous artifacts were built but never installed
+
+`PATCH_SOURCES.md`'s fourth-pass "Verification" paragraph describes the 16:49
+build correctly, but that build was never installed. The installed kernels
+remained the morning ones: the packaged `amdgpu.ko` from 16:49 calls
+`dma_fence_wait_timeout` (the `1091` form) while the installed module calls
+`amdgpu_bo_sync_wait`. This release supersedes both installed packages.
+
 ## [2026.10.16-1-sleepy-next (linux-next `next-20261016`)]: 2026-10-17
 
 ### Changed — the preview moves to `next-20261016`

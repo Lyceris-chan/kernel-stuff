@@ -182,7 +182,7 @@ _rcver=rc7
 
 pkgver=7.3.0_rc7
 _tagrel=1
-pkgrel=2
+pkgrel=3
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -489,6 +489,7 @@ source=(
   "patches/2400-2499/2420-sched-fair-do-not-scan-twice-in-detach_tasks.patch"
   "patches/2500-2599/2505-x86-pat-fix-effective-RW-in-lookup_address.patch"
   "patches/2500-2599/2506-x86-boot-validate-SRAT-subtables-before-parsing.patch"
+  "patches/2500-2599/2508-x86-insn-eval-fix-shadowed-segment-index.patch"
   "patches/9000-9099/9011-drm-amdgpu-Respect-noretry-flag-for-retry-faults-on-GFX12.1.patch"
   "patches/9000-9099/9012-drm-amdgpu-gfxhub-Enable-retry-fault-interrupts-when-needed.patch"
   "patches/9000-9099/9013-drm-amdgpu-ih-Dont-perturb-HW-registers-when-accessing-soft-IH.patch"
@@ -1407,6 +1408,7 @@ b2sums=('63b3228343e52f77e8c0c6facb79ffb0c0682ff79cd8391ef8cf3aa994c44b99ee91111
         '2dd42e38ee5cb8d5413ef45c1a6684445661030e3b813635632e4f62dc94f677cd011afdc74593d28ada0ae00bee597b196c39a0da728703c993880b9564ae9d'
         'c0fa0cef861fa3d0748f805430f41b7c8918554588d05d2a6eae502981ec3b74e6cbec8bc72641b190b7c123c67bb3c8732f1859fc80c620a79dfa1e34bdb6fc'
         '9065ec476686e7fbbf4efdaffeff9e0edf9a0fb802c6749bcfe443102595fbaaadda0bde6fab5cfb3ead598035d40fa1fa9392ff69b1cf1b745d648e4b78d5d8'
+        '67e596a87e125c3c934d777e0e1aee63c122bfaad644fe2bd83d1b981eb1ace9d181d42ab5f58f89221d2d11a6d0f8dbbc72afcddeef4a7bccc109ac2ef84c70'
         '39ade2a62477babf59b762e07e4a08213716b1c952de5df2ff290b4dc58a5202c7131b709fef253e7864cbaa280d66083984041b541531241a164bb5c82af89b'
         '0d75eae660d1cdf8a4d9272560aa5639f17221cedca66164fe6456b8a920d994904ec3cafec982fcb1caa29cb7468ffc98a48797ccc5794310acb80e75fd5573'
         '4350f0fec14d2560240efd36937214f7279b2348a1a61e3ffbc1fcdb80a89413f8e5a5fd949bafe41f5d12ac97fd4a805f8dfd315902a1a014ef0c35766ccc21'

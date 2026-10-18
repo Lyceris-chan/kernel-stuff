@@ -519,11 +519,20 @@ copied here per the shared-series invariant. On the `next-20261016` base:
 `prepare()` skips every non-applying entry, so none of these is a build
 failure. The new range `2900–2999` is the shared VFS/core range.
 
+### 2026-10-18 — shared addition `2508`
+
+`2508` (x86/insn-eval: fix shadowed segment index in
+`get_seg_reg_override_idx()`, torvalds `32c52ec87d62`) is copied here per the
+shared-series invariant. It applies cleanly to the `next-20261016` series tree —
+forward clean with both `git apply --check` and GNU `patch`, reverse fails — so
+the preview builds it too. It is absent from the snapshot's own `insn.h`.
+(`2507` is not used: it belonged to the vacated September x86 PAT group.)
+
 ### Current shape
 
 | | |
 |---|---|
-| Files in `patches/` | 279 |
-| Entries in `source=()` | 272 |
+| Files in `patches/` | 280 |
+| Entries in `source=()` | 273 |
 | Excluded from `source=()` | 7 — `1008`, `1012`, `1013`, `1014`, `1017`, `9060`, `9040` |
 | Preview-only adds | `2700`, `2701` (zswap request stack) |
