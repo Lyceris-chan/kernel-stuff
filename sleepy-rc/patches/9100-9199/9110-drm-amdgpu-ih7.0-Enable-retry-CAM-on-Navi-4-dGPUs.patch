@@ -1,0 +1,48 @@
+From Timur Kristóf <timur.kristof@gmail.com> Mon Sep 17 00:00:00 2001
+From: Timur Kristóf <timur.kristof@gmail.com>
+Date: Fri, 28 Aug 2026 13:41:13 +0200
+Subject: [PATCH] drm/amdgpu/ih7.0: Enable retry CAM on Navi 4 dGPUs
+Message-ID: <20260828114113.13523-12-timur.kristof@gmail.com>
+
+The retry CAM can filter interrupts which occur repeatedly,
+such as page fault interrupts when retry faults are enabled.
+This makes processing those interrupts much more efficient,
+because the CPU won't have to deal with processing the same
+interrupt repeatedly.
+
+Also change the doorbell range to actually enable the
+doorbell for the retry CAM.
+
+Signed-off-by: Timur Kristóf <timur.kristof@gmail.com>
+---
+ drivers/gpu/drm/amd/amdgpu/ih_v7_0.c     | 3 ++-
+ drivers/gpu/drm/amd/amdgpu/nbif_v6_3_1.c | 2 +-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/ih_v7_0.c b/drivers/gpu/drm/amd/amdgpu/ih_v7_0.c
+index 741fcef3cfa1..58d5156a44db 100644
+--- a/drivers/gpu/drm/amd/amdgpu/ih_v7_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/ih_v7_0.c
+@@ -395,7 +395,8 @@ static int ih_v7_0_irq_init(struct amdgpu_device *adev)
+ 
+ 	pci_set_master(adev->pdev);
+ 
+-	if (amdgpu_ip_version(adev, OSSSYS_HWIP, 0) == IP_VERSION(7, 1, 0)) {
++	if (!(adev->flags & AMD_IS_APU) ||
++	    amdgpu_ip_version(adev, OSSSYS_HWIP, 0) == IP_VERSION(7, 1, 0)) {
+ 		/* Allocate the doorbell for IH Retry CAM */
+ 		adev->irq.retry_cam_doorbell_index = (adev->doorbell_index.ih + 2) << 1;
+ 		WREG32_SOC15(OSSSYS, 0, regIH_DOORBELL_RETRY_CAM,
+diff --git a/drivers/gpu/drm/amd/amdgpu/nbif_v6_3_1.c b/drivers/gpu/drm/amd/amdgpu/nbif_v6_3_1.c
+index cea08134d4c2..a74b17a47fd2 100644
+--- a/drivers/gpu/drm/amd/amdgpu/nbif_v6_3_1.c
++++ b/drivers/gpu/drm/amd/amdgpu/nbif_v6_3_1.c
+@@ -300,7 +300,7 @@ static void nbif_v6_3_1_ih_doorbell_range(struct amdgpu_device *adev,
+ 		ih_doorbell_range = REG_SET_FIELD(ih_doorbell_range,
+ 						  GDC_S2A0_S2A_DOORBELL_ENTRY_1_CTRL,
+ 						  S2A_DOORBELL_PORT1_RANGE_SIZE,
+-						  2);
++						  8);
+ 		ih_doorbell_range = REG_SET_FIELD(ih_doorbell_range,
+ 						  GDC_S2A0_S2A_DOORBELL_ENTRY_1_CTRL,
+ 						  S2A_DOORBELL_PORT1_AWADDR_31_28_VALUE,

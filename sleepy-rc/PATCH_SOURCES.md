@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
 - **Base:** Linux `v7.3`
-- **Series:** 272 patches
+- **Series:** 270 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -33,9 +33,10 @@ are supplied by the generator instead, so every row below has a source.
 | `2600–2699` | Time and timers | 0 |
 | `2800–2899` | Memory management, second series (mm/swap follow-ups) | 3 |
 | `2900–2999` | VFS / core filesystem | 0 |
-| `9000–9099` | agd5f staging + userq lifecycle backports | 49 |
+| `9000–9099` | agd5f staging + userq lifecycle backports | 36 |
+| `9100–9199` | Retry-fault handling v4 (agd5f staging) | 11 |
 
-**Total: 272** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 270** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-19). The counts are now generated from the patch tree
@@ -1448,6 +1449,9 @@ that catches this, and the audit does not run it per-patch.
 **Removal candidate.** Needs explicit approval per CLAUDE.md.
 
 #### The retry-fault carry (9011–9024) is a superseded design
+
+**Resolved 2026-10-19:** the v1 series was removed and upstream v4 adopted as
+`9100`–`9110`. See "Retry-fault v1 → v4 replacement" in the 7.3 bump notes.
 
 Ours is the **v1** posting (2026-07-01, 14 patches). Upstream took **v4**
 (2026-08-28, `[PATCH 00/11]`, merged 2026-09-02) — eleven patches, not fourteen.
@@ -9473,9 +9477,9 @@ actually installed.
 
 Linux 7.3 was tagged on 2026-10-18 (`v7.3`, commit `c03c1a14507d`). The base
 moves from `linux-7.3-rc7` to `linux-7.3`, the package version from
-`7.3.0_rc7-3` to `7.3.0-1`, and the series from 278 to 272 patches. The
-272-patch series applies cleanly to the release: `audit_series.py --repo
-repos/torvalds --tag v7.3` reports 272/272.
+`7.3.0_rc7-3` to `7.3.0-1`, and the series from 278 to 270 patches. The
+270-patch series applies cleanly to the release: `audit_series.py --repo
+repos/torvalds --tag v7.3` reports 270/270.
 
 ### Source state
 
@@ -9536,8 +9540,9 @@ real delta, only `1084` v2 is an update:
 - `1063`, `1070`, `9046`, `9075` and `9088` are comment, whitespace or the
   documented partial port; `9075` is byte-identical to its merged commit.
 - `1090` and `1151` are newer in our tree than in the posting.
-- `9011`–`9024` remain the known v1 → v4 retry-fault redesign. Removing the v1
-  carries needs approval, so the redesign stays open.
+- `9011`–`9024` were replaced by upstream v4 (`9100`–`9110`) on 2026-10-19.
+  The v1 series is removed; the v4 series applies cleanly after the other 259
+  patches.
 
 ### Candidates considered and not adopted
 
@@ -9575,7 +9580,7 @@ items the subject scan did not.
 route (`/-/uploads/...` redirects to sign-in), but
 `/api/v4/projects/drm%2Famd/uploads/<secret>/<file>` redirects to a signed S3
 object and downloads. The patch is `drm/amd/display: don't blank display when
-minimal transition fails`, 3.4 KB, and applies to both the 272-patch series tree
+minimal transition fails`, 3.4 KB, and applies to both the 270-patch series tree
 and `next-20261016`. It commits the target context directly when
 `commit_minimal_transition_state()` fails, and adds diagnostic logging. **Not
 carried:** its only identity is `AMD Display <noreply@amd.com>` — no named human
@@ -9599,7 +9604,7 @@ is inert here (`CONFIG_KUNIT` is unset).
 `CalculatePrefetchSchedule` `fa0300333db0`). Four are absent from `v7.3`
 (`dispclk/dppclk` `f48124ff3535`, MES v12 `5ec4cc917083`, debugfs lockdown
 `17ac73b24006`, PSP TA buffer length `473f99e4a262`) but **none applies to the
-272-patch tree** — they are 6.18 backports with 7.4 context. Defer to the next
+270-patch tree** — they are 6.18 backports with 7.4 context. Defer to the next
 base.
 
 **Coverage limits.** The GitLab merge-request API returns 403 for
@@ -9609,3 +9614,38 @@ from the archive but present in the mirrors). The `lore-stable` mirror's epoch 0
 is stale (latest mail 2022), so the stable-queue check is inconclusive; no
 `linux-7.3.y` branch exists yet. `drm-misc`'s orcz remote failed again; the
 freedesktop remote is current.
+
+### Retry-fault v1 → v4 replacement (2026-10-19)
+
+Upstream's v4 series (`[PATCH 00/11] drm/amdgpu: Improve retry fault handling
+(v4)`, Timur Kristóf, 2026-08-28, cover
+`<20260828114113.13523-1-timur.kristof@gmail.com>`) replaced our v1 carry. The
+v4 series was merged to amd-staging on 2026-09-02. The user authorized the
+swap because upstream's design is authoritative.
+
+**Removed — 13 v1 patches:** `9011`–`9016` and `9018`–`9024`. (`9017` was never
+used.) `9014` (the `retry_cam_ack` IH function pointer), `9021` and `9022` (the
+MMIO-ACK implementations) are dropped entirely; v4 replaces that mechanism with
+the doorbell design.
+
+**Added — 11 v4 patches in a new `91xx` range:**
+
+| New | Subject | Replaces |
+|---|---|---|
+| `9100` | Respect noretry flag for retry faults on GFX12.1 | `9011` |
+| `9101` | gfxhub: Enable retry fault interrupts in `L2_PROTECTION_FAULT_CNTL2` | `9012` |
+| `9102` | ih: Don't perturb HW registers when accessing soft IH ring | `9013` |
+| `9103` | ih6.1: Use `IH_SW_RING_SIZE` for soft IH ring | `9015` |
+| `9104` | ih7.0: Use `IH_SW_RING_SIZE` for soft IH ring | `9016` |
+| `9105` | gmc11: Pass `cam_index` to retry fault handler | **new in v4** |
+| `9106` | gmc12: Pass `cam_index` to retry fault handler | `9018` |
+| `9107` | gmc12: Use `AMDGPU_PTE_IS_PTE` for `init_pte_flags` | `9019` |
+| `9108` | vm: Use init PTE flags in `amdgpu_vm_handle_fault()` | `9020` (v4 drops the `NOALLOC` hunk) |
+| `9109` | ih6.0: Enable retry CAM on Navi 3 dGPUs | `9023` (rewritten) |
+| `9110` | ih7.0: Enable retry CAM on Navi 4 dGPUs | `9024` (rewritten) |
+
+**Apply evidence.** A fresh `v7.3` tree with the other 259 patches applied, then
+all 11 v4 patches, applies with zero failures under GNU `patch --forward -F2`.
+The full series audit reports **270/270 clean**. `9109` is Navi 3 (wrong chip
+for this machine) but stays because it is part of the upstream series; the
+machine-relevant piece is `9110` (IH 7.0, Navi 4).

@@ -485,19 +485,6 @@ source=(
   "patches/2400-2499/2420-sched-fair-do-not-scan-twice-in-detach_tasks.patch"
   "patches/2500-2599/2505-x86-pat-fix-effective-RW-in-lookup_address.patch"
   "patches/2500-2599/2506-x86-boot-validate-SRAT-subtables-before-parsing.patch"
-  "patches/9000-9099/9011-drm-amdgpu-Respect-noretry-flag-for-retry-faults-on-GFX12.1.patch"
-  "patches/9000-9099/9012-drm-amdgpu-gfxhub-Enable-retry-fault-interrupts-when-needed.patch"
-  "patches/9000-9099/9013-drm-amdgpu-ih-Dont-perturb-HW-registers-when-accessing-soft-IH.patch"
-  "patches/9000-9099/9014-drm-amdgpu-ih-Add-retry_cam_ack-IH-function-pointer.patch"
-  "patches/9000-9099/9015-drm-amdgpu-ih6.1-Use-IH_SW_RING_SIZE-for-soft-IH-ring.patch"
-  "patches/9000-9099/9016-drm-amdgpu-ih7.0-Use-IH_SW_RING_SIZE-for-soft-IH-ring.patch"
-  "patches/9000-9099/9018-drm-amdgpu-gmc12-Pass-cam_index-to-retry-fault-handler.patch"
-  "patches/9000-9099/9019-drm-amdgpu-gmc12-Use-AMDGPU_PTE_IS_PTE-flag-for-init_pte_flags.patch"
-  "patches/9000-9099/9020-drm-amdgpu-vm-Use-init-PTE-flags-and-NOALLOC-in-handle_fault.patch"
-  "patches/9000-9099/9021-drm-amdgpu-ih6.0-Use-MMIO-ACK-for-retry-CAM-on-IH-6.0.patch"
-  "patches/9000-9099/9022-drm-amdgpu-ih7.0-Use-MMIO-ACK-instead-of-doorbell-for-retry-CAM.patch"
-  "patches/9000-9099/9023-drm-amdgpu-ih6.0-Enable-retry-CAM-on-Navi-3-dGPUs.patch"
-  "patches/9000-9099/9024-drm-amdgpu-ih7.0-Enable-retry-CAM-on-Navi-4-dGPUs.patch"
   "patches/9000-9099/9034-drm-amdgpu-fix-VM-update-overrun-on-non-4K-page-kernels.patch"
   "patches/9000-9099/9035-drm-amdgpu-add-the-BO-va-mapping-offset-when-kmapping-an-IB.patch"
   "patches/9000-9099/9038-drm-amdgpu-reject-PRT-mappings-as-user-queue-buffer-VAs.patch"
@@ -534,6 +521,17 @@ source=(
   "patches/9000-9099/9087-drm-amdgpu-return-copy-errors-from-AMDGPU_INFO_UQ_FW_AREAS.patch"
   "patches/9000-9099/9088-drm-amdgpu-use-memset32-for-SDMA-padding.patch"
   "patches/9000-9099/9089-drm-amdkfd-split-vram_pages-of-SVM-ranges-prefetched.patch"
+  "patches/9100-9199/9100-drm-amdgpu-Respect-noretry-flag-for-retry-faults-on-GFX12.1.patch"
+  "patches/9100-9199/9101-drm-amdgpu-gfxhub-Enable-retry-fault-interrupts-in-L2_PROTECTION_FAULT_CNTL2.patch"
+  "patches/9100-9199/9102-drm-amdgpu-ih-Dont-perturb-HW-registers-when-accessing-soft-IH-ring.patch"
+  "patches/9100-9199/9103-drm-amdgpu-ih6.1-Use-IH_SW_RING_SIZE-for-soft-IH-ring.patch"
+  "patches/9100-9199/9104-drm-amdgpu-ih7.0-Use-IH_SW_RING_SIZE-for-soft-IH-ring.patch"
+  "patches/9100-9199/9105-drm-amdgpu-gmc11-Pass-cam_index-to-retry-fault-handler.patch"
+  "patches/9100-9199/9106-drm-amdgpu-gmc12-Pass-cam_index-to-retry-fault-handler.patch"
+  "patches/9100-9199/9107-drm-amdgpu-gmc12-Use-AMDGPU_PTE_IS_PTE-flag-for-init_pte_flags.patch"
+  "patches/9100-9199/9108-drm-amdgpu-vm-Use-init-PTE-flags-in-amdgpu_vm_handle_fault.patch"
+  "patches/9100-9199/9109-drm-amdgpu-ih6.0-Enable-retry-CAM-on-Navi-3-dGPUs.patch"
+  "patches/9100-9199/9110-drm-amdgpu-ih7.0-Enable-retry-CAM-on-Navi-4-dGPUs.patch"
 )
 
 # makepkg 7.1.0 resolves local sources by basename in the PKGBUILD directory
@@ -1398,19 +1396,6 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         '2dd42e38ee5cb8d5413ef45c1a6684445661030e3b813635632e4f62dc94f677cd011afdc74593d28ada0ae00bee597b196c39a0da728703c993880b9564ae9d'
         'c0fa0cef861fa3d0748f805430f41b7c8918554588d05d2a6eae502981ec3b74e6cbec8bc72641b190b7c123c67bb3c8732f1859fc80c620a79dfa1e34bdb6fc'
         '9065ec476686e7fbbf4efdaffeff9e0edf9a0fb802c6749bcfe443102595fbaaadda0bde6fab5cfb3ead598035d40fa1fa9392ff69b1cf1b745d648e4b78d5d8'
-        '39ade2a62477babf59b762e07e4a08213716b1c952de5df2ff290b4dc58a5202c7131b709fef253e7864cbaa280d66083984041b541531241a164bb5c82af89b'
-        '0d75eae660d1cdf8a4d9272560aa5639f17221cedca66164fe6456b8a920d994904ec3cafec982fcb1caa29cb7468ffc98a48797ccc5794310acb80e75fd5573'
-        '4350f0fec14d2560240efd36937214f7279b2348a1a61e3ffbc1fcdb80a89413f8e5a5fd949bafe41f5d12ac97fd4a805f8dfd315902a1a014ef0c35766ccc21'
-        '526fc9fedccb6287269fb2fde8fdb126ca26114f77d7bec6d8364f90967bf1b5c75265fa68315421d4acaf8c17e805740ea662045ac2723437b3f7a2799d1698'
-        'e1e49c26f1d88e004fea6ba246f16bfa9131950616fd8c1d6206d9a337b73f9f8e6787f06dca8da9d104040739eda7c2a5c926f5f2c011030e6c86fae1cb7bd3'
-        '9bae7fb52f8bd520ab28d806a16863186566cf0a447c1f8dda17bb99f83ea7125a451cfce97260c57fbcd10e2df8bb51bd779259272656a26ec9b74cb69b7115'
-        '46347a324f811fce5b4a319b1d8690358d9f2eee9d9ca58aeeea4f6087e68522890c5647c310259e7a543e9e3f4b31e919c1526d28beb0250ba96a1e15ec9caa'
-        '385b6b87c191fec40a13de2ecfadb89413900d5803c07d69339e517a9090144f04b93f7946d8891d83d4fe5fe61547398e5b8f7c9943c8271f7319476cc816cf'
-        '9bd48a23364a960fa934707dec4740302c0b2c80aaa63a46390d267b5c772912f0f2e9e1e1fdc74023da8591a8af02fa53b7efce484f000d87a16d93442f2914'
-        'f32156af3fae87d5bd5e4075204f5a4aa29505314ac9a4b05c1618abb57a94c7e9cff88b8fc4b0be2fd6ce2c935ab222c480cee4033de036212cc06062491796'
-        '4bfc5ddb1430ce36ffbccf5eaeb077b27e9469c3f628ac08f220b4c4434bbd7636df9e922745fad634badbcd3996b58df4eb45ee5a3a80722439c9ffcbf3d4c1'
-        '208cb3392d3efa55597e1a40cd3400ef6985c769404dcd27f68a7b21400ffb7d0437154035bd3c3a5d507354a76beabf9f3db6dd63bee5783f2217c056060cc1'
-        'f69217780f6f73c75f93e1c70d51d36d8d93b05d8fe5c390ad6095e70aef32b9f81aed15affde8ab2511b1a18992689bbb77cf6d69742e930d2e0514b1b89178'
         '0c25491212274500756b31955cafa5f757480985f21d616ab179df8773f1d8a869ab5eb319add233c5f998ec286e12e0fbaf40c1f01cc4f6d577c799cd0a40a7'
         '2f6ecc84e0141cbee5ce379a2959550cb4830e923afa3d5275283d74d69b8e3bba51f84af96df329d1ea30af0a26f320678907833b40172cbff4a751de3682a7'
         '203bd93e310b0795acf2d04a03de10bcfa4ee653b490c5cc3fb2f377119ce373dbf32c4ab4c8674d246ea8d8518d1a26ddd46f8c3dff085aa08022fa28d5144c'
@@ -1447,6 +1432,17 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         'add0be25132fd8a3a11e0bc41816c3540cdaf5393906acce015c93e43b1ce8e947b724d3a726ab1edcb1a634848a9c7a7cc073afd42a28600b07b84f70baeb08'
         'b390ca58ae68f4cacbeafcab8d238ed90f29bc50a120905fae29ac426307b527e0d8bd75221cb48f0c29888b601001becdad55e16f89e5ef2151c6ec4c92878a'
         '522c769379f6ea061f6c717603d13fb73bd3206723ba46c67ed45677f3f703b181e99011bd4698ec396ebb1695e9cc1f4b0d55368a517cf1e8a06004eb73e798'
+        '7d255aa0a36601e07706af4e88fd24a3e100e205d58e40ea7cb0e935454bda0cb60c0a84eef6561ab52e136cecb4b8969aca83dcca1ee083c06558bb2644ae78'
+        '373d04ee9f5fe3782345fd73d2840e9e35a20f8462f6806fd16828d6ea13e5fcf7f79f708b083537a81a27508b113dba9996ded8a18c6e675e043bf38f218484'
+        '4d23de88c074df4d266e90a9ab07700628d307995656b1f723525eae4e19919cefa3cf2931ffce51ff9916dd1296deb4744403d0672e557b3d98ac5c60fb5ad5'
+        '962f1f02a3879ab56fc7c6d67df9aa79b373295088f97f49dbbaec01e41d17b42d859c965e9793509ffed689378abd11ae4250f59d2a8f57ce4b4e01beabb842'
+        '9df2febd0c7bbae7af6a4cd417163dd1b8772d939af4c531d1c14756325e5b72a3f47cdcee361e2e7b2fc75492a148b618d8d133fdfdd8d00438d7885778ce19'
+        'b010332c5d41740170ad80deb793cb22bf23ef185687f7e6a85af43af631c902fd0d83e57477ac192a1363ad5cb3750869f07e4d9c15fdf63e2c019dc2e1d0df'
+        '01d7694d5e7d06e06051be5944d56e3c6aa4f1bc9fdbd299813fa516226d9f1d88bca31d25ec6ffac3c349a966f3934f50e22f1e838daf37e6aeceb05035a366'
+        '67a35f87945ad53a166e141e10a60e52c4cdea88bade6e80708e133b4113b4d80ba27b0f48b55b9f66fe894254a360a2c131ccd95a99ffe4cabf9afbb19e14cd'
+        '840a7398ba7bd658038b40ba90d12da76709a296a6dab27a29d959c5c303a0bf572ab55376e38af749b649ebd9bcb1b0fa40f927aa636db0b58ad2824daea158'
+        'f78d409734e9810f448e564aae9bdad28af03193913053f25deee0eebaa8b999cbf135e6e0c27e5c5ffe9bac5918fd0ddf9a73307a67d8e1be2876d8b99b1646'
+        '5a986874cf6e64a32b084a25147132d21d32dce0378f91f63e8a918e91bd0e18423e96ef3dc6fb319c3ae0663f6326edcebe8b9a1e08d7d318295ddda21ac4bb'
         '2cdec9daf2eb9d4a8e95f33bcc81e603899db1f2e4f55cde68fa29727972238b5bd544e055a06bd0c94569e222666f6d8bf231db9fa8593b6d5f4fe52b26022a'
         '4cf91dd679c25cb8c7a519f5d77fdf29cc345043bd8a71b6c8e54d1a4179cf489f464108464ad2b1bc8ccffd743707e6fdaae1e33300b29a4fc7b9457b90e6be')
 

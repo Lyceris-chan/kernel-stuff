@@ -532,8 +532,8 @@ the preview builds it too. It is absent from the snapshot's own `insn.h`.
 
 | | |
 |---|---|
-| Files in `patches/` | 283 |
-| Entries in `source=()` | 276 |
+| Files in `patches/` | 281 |
+| Entries in `source=()` | 274 |
 | Excluded from `source=()` | 7 — `1008`, `1012`, `1013`, `1014`, `1017`, `9060`, `9040` |
 | Preview-only adds | `2700`, `2701` (zswap request stack) |
 | Preview-only carries after the 7.3 bump | `1086`–`1090`, `2508`, `2900`, `2901`, `9085` |
@@ -570,3 +570,10 @@ reflect the new package contents.
 `9082` (amdkfd: wait for a GPU reset before freeing a BO) was removed from both
 packages on 2026-10-19 after Christian König's NAK. See the governance finding
 in `sleepy-rc/PATCH_SOURCES.md`. The number is vacated.
+
+### Retry-fault v1 → v4 (2026-10-19)
+
+The shared series now carries upstream v4 (`9100`–`9110`) in place of the v1
+series (`9011`–`9016`, `9018`–`9024`). The preview follows the rc ledger's
+replacement section; `prepare()` applies or skips the v4 patches on this
+snapshot exactly as it does the rest of the series.

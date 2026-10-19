@@ -1,9 +1,8 @@
-From nobody Mon Sep 17 00:00:00 2001
-From: timur.kristof at gmail.com (=?UTF-8?q?Timur=20Krist=C3=B3f?=)
-Date: Wed,  1 Jul 2026 18:17:16 +0200
-Subject: [PATCH 09/14] drm/amdgpu/gmc12: Use AMDGPU_PTE_IS_PTE flag for
- init_pte_flags on GFX12.0
-Message-ID: <20260701161721.85681-10-timur.kristof@gmail.com>
+From Timur Kristóf <timur.kristof@gmail.com> Mon Sep 17 00:00:00 2001
+From: Timur Kristóf <timur.kristof@gmail.com>
+Date: Fri, 28 Aug 2026 13:41:10 +0200
+Subject: [PATCH] drm/amdgpu/gmc12: Use AMDGPU_PTE_IS_PTE flag for init_pte_flags on GFX12.0
+Message-ID: <20260828114113.13523-9-timur.kristof@gmail.com>
 
 This flag seems to work around a "fault priority problem"
 and is necessary for handling faults on GFX12.
@@ -15,16 +14,16 @@ amdgpu_vm_pte_update_flags() that explains the problem
 svm_range_get_pte_flags() that uses the flag on GFX12
 
 Signed-off-by: Timur Kristóf <timur.kristof@gmail.com>
-
+Reviewed-by: Christian König <christian.koenig@amd.com>
 ---
- drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c b/drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c
-index 299fe960b99e..c210e2463a27 100644
+index 988dc74642b6..18511e7995ef 100644
 --- a/drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c
 +++ b/drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c
-@@ -644,11 +644,12 @@ static int gmc_v12_0_early_init(struct amdgpu_ip_block *ip_block)
+@@ -644,6 +644,8 @@ static int gmc_v12_0_early_init(struct amdgpu_ip_block *ip_block)
  		adev->gmc.xgmi.connected_to_cpu =
  			adev->smuio.funcs->is_host_gpu_xgmi_supported(adev);
  
@@ -33,11 +32,3 @@ index 299fe960b99e..c210e2463a27 100644
  	switch (amdgpu_ip_version(adev, GC_HWIP, 0)) {
  	case IP_VERSION(12, 1, 0):
  		gmc_v12_1_set_gmc_funcs(adev);
- 		gmc_v12_1_set_irq_funcs(adev);
--		adev->gmc.init_pte_flags = AMDGPU_PTE_IS_PTE;
- 		break;
- 	default:
- 		gmc_v12_0_set_gmc_funcs(adev);
--- 
-2.54.0
-

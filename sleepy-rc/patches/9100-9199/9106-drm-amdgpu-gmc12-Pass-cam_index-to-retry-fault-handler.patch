@@ -1,20 +1,19 @@
-From nobody Mon Sep 17 00:00:00 2001
-From: timur.kristof at gmail.com (=?UTF-8?q?Timur=20Krist=C3=B3f?=)
-Date: Wed,  1 Jul 2026 18:17:15 +0200
-Subject: [PATCH 08/14] drm/amdgpu/gmc12: Pass cam_index to retry fault handler
-Message-ID: <20260701161721.85681-9-timur.kristof@gmail.com>
+From Timur Kristóf <timur.kristof@gmail.com> Mon Sep 17 00:00:00 2001
+From: Timur Kristóf <timur.kristof@gmail.com>
+Date: Fri, 28 Aug 2026 13:41:09 +0200
+Subject: [PATCH] drm/amdgpu/gmc12: Pass cam_index to retry fault handler
+Message-ID: <20260828114113.13523-8-timur.kristof@gmail.com>
 
 This is necessary if we want to make use of the filter CAM.
 
 Signed-off-by: Timur Kristóf <timur.kristof@gmail.com>
 Reviewed-by: Tvrtko Ursulin <tvrtko.ursulin@igalia.com>
-
 ---
  drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c | 5 ++++-
  1 file changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c b/drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c
-index 84c93364d220..299fe960b99e 100644
+index 3add79c474f3..988dc74642b6 100644
 --- a/drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c
 +++ b/drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c
 @@ -99,6 +99,7 @@ static int gmc_v12_0_process_interrupt(struct amdgpu_device *adev,
@@ -36,6 +35,3 @@ index 84c93364d220..299fe960b99e 100644
  							write_fault);
  		/* Returning 1 here also prevents sending the IV to the KFD */
  		if (ret == 1)
--- 
-2.54.0
-

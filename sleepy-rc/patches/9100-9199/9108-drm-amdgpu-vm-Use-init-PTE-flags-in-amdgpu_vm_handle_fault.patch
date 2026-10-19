@@ -1,0 +1,41 @@
+From Timur Kristóf <timur.kristof@gmail.com> Mon Sep 17 00:00:00 2001
+From: Timur Kristóf <timur.kristof@gmail.com>
+Date: Fri, 28 Aug 2026 13:41:11 +0200
+Subject: [PATCH] drm/amdgpu/vm: Use init PTE flags in amdgpu_vm_handle_fault()
+Message-ID: <20260828114113.13523-10-timur.kristof@gmail.com>
+
+PTE_IS_PTE seems necessary for handling retry faults on GFX12.
+
+For reference see:
+amdgpu_vm_pte_update_flags() that explains the problem
+svm_range_get_pte_flags() that uses the flag on GFX12
+
+Signed-off-by: Timur Kristóf <timur.kristof@gmail.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+index 88249aa89ee3..c5353c74f87a 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+@@ -3050,7 +3050,8 @@ bool amdgpu_vm_handle_fault(struct amdgpu_device *adev, u32 pasid,
+ 	}
+ 
+ 	addr /= AMDGPU_GPU_PAGE_SIZE;
+-	flags = AMDGPU_PTE_VALID | AMDGPU_PTE_SNOOPED |
++	flags = adev->gmc.init_pte_flags |
++		AMDGPU_PTE_VALID | AMDGPU_PTE_SNOOPED |
+ 		AMDGPU_PTE_SYSTEM;
+ 
+ 	if (is_compute_context) {
+@@ -3063,8 +3064,7 @@ bool amdgpu_vm_handle_fault(struct amdgpu_device *adev, u32 pasid,
+ 		/* Redirect the access to the dummy page */
+ 		value = adev->dummy_page_addr;
+ 		flags |= AMDGPU_PTE_EXECUTABLE | AMDGPU_PTE_READABLE |
+-			AMDGPU_PTE_WRITEABLE;
+-
++			 AMDGPU_PTE_WRITEABLE;
+ 	} else {
+ 		/* Let the hw retry silently on the PTE */
+ 		value = 0;

@@ -1,9 +1,8 @@
-From nobody Mon Sep 17 00:00:00 2001
-From: timur.kristof at gmail.com (=?UTF-8?q?Timur=20Krist=C3=B3f?=)
-Date: Wed,  1 Jul 2026 18:17:12 +0200
-Subject: [PATCH 05/14] drm/amdgpu/ih6.1: Use IH_SW_RING_SIZE for soft IH ring
- instead of PAGE_SIZE
-Message-ID: <20260701161721.85681-6-timur.kristof@gmail.com>
+From Timur Kristóf <timur.kristof@gmail.com> Mon Sep 17 00:00:00 2001
+From: Timur Kristóf <timur.kristof@gmail.com>
+Date: Fri, 28 Aug 2026 13:41:06 +0200
+Subject: [PATCH] drm/amdgpu/ih6.1: Use IH_SW_RING_SIZE for soft IH ring instead of PAGE_SIZE
+Message-ID: <20260828114113.13523-5-timur.kristof@gmail.com>
 
 When there are a lot of retry faults happening, the soft IH ring
 can fill up really quickly and possibly overflow. PAGE_SIZE was
@@ -12,13 +11,13 @@ are doing.
 
 Signed-off-by: Timur Kristóf <timur.kristof@gmail.com>
 Reviewed-by: Tvrtko Ursulin <tvrtko.ursulin@igalia.com>
-
+Reviewed-by: Christian König <christian.koenig@amd.com>
 ---
  drivers/gpu/drm/amd/amdgpu/ih_v6_1.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/amd/amdgpu/ih_v6_1.c b/drivers/gpu/drm/amd/amdgpu/ih_v6_1.c
-index 9dbc20131410..f6fdb3a950e0 100644
+index 6bbf89d048e7..0fc348010ac7 100644
 --- a/drivers/gpu/drm/amd/amdgpu/ih_v6_1.c
 +++ b/drivers/gpu/drm/amd/amdgpu/ih_v6_1.c
 @@ -590,7 +590,7 @@ static int ih_v6_1_sw_init(struct amdgpu_ip_block *ip_block)
@@ -30,6 +29,3 @@ index 9dbc20131410..f6fdb3a950e0 100644
  	if (r)
  		return r;
  
--- 
-2.54.0
-
