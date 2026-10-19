@@ -1,0 +1,45 @@
+From yaolu@kylinos.cn Mon Sep 17 00:00:00 2001
+From: yaolu@kylinos.cn
+Date: Thu, 15 Oct 2026 10:20:24 +0800
+Subject: [PATCH] drm/amdgpu: Fix out-of-bounds write in amdgpu_debugfs_gfxoff_count_read()
+Message-ID: <20261015022024.49233-1-yaolu@kylinos.cn>
+
+From: Lu Yao <yaolu@kylinos.cn>
+
+amdgpu_debugfs_gfxoff_count_read() stores a 64-bit GFXOFF entry count with
+put_user(), but advances buf/pos/size by 4 bytes per iteration.
+
+Fixes: 0ad7347a64ac ("drm/amd: Add detailed GFXOFF stats to debugfs")
+Signed-off-by: Lu Yao <yaolu@kylinos.cn>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_debugfs.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_debugfs.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_debugfs.c
+index ab7ccfaea22a..aa44a3f0cdc4 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_debugfs.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_debugfs.c
+@@ -1451,7 +1451,7 @@ static ssize_t amdgpu_debugfs_gfxoff_count_read(struct file *f, char __user *buf
+ 	ssize_t result = 0;
+ 	int r;
+ 
+-	if (size & 0x3 || *pos & 0x3)
++	if (size & 0x7 || *pos & 0x7)
+ 		return -EINVAL;
+ 
+ 	r = pm_runtime_get_sync(adev_to_drm(adev)->dev);
+@@ -1471,10 +1471,10 @@ static ssize_t amdgpu_debugfs_gfxoff_count_read(struct file *f, char __user *buf
+ 		if (r)
+ 			goto out;
+ 
+-		result += 4;
+-		buf += 4;
+-		*pos += 4;
+-		size -= 4;
++		result += 8;
++		buf += 8;
++		*pos += 8;
++		size -= 8;
+ 	}
+ 
+ 	r = result;

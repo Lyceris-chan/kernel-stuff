@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
 - **Base:** Linux `v7.3`
-- **Series:** 270 patches
+- **Series:** 271 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -21,7 +21,7 @@ are supplied by the generator instead, so every row below has a source.
 | `0001–0049` | Handmade local | 12 |
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
-| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 26 |
+| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 27 |
 | `1100–1199` | AMD display (DCN4, colorops) | 27 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 27 |
 | `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 41 |
@@ -36,7 +36,7 @@ are supplied by the generator instead, so every row below has a source.
 | `9000–9099` | agd5f staging + userq lifecycle backports | 36 |
 | `9100–9199` | Retry-fault handling v4 (agd5f staging) | 11 |
 
-**Total: 270** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 271** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-19). The counts are now generated from the patch tree
@@ -7867,7 +7867,7 @@ change on a machine that already thrashed once; it wants its own session.
 | `mm: zswap: mark the zswap shrinker SHRINKER_NONSLAB` v4 5/5 | `lore-cgroups` | applies forward; part 5 of a 5-part shrinker rework — needs the rest of the series, not one patch |
 | `drm/amdkfd: fix doorbell allocation race` v4 | `lore-amdgfx` | applies forward; **overlaps our carried userq doorbell work (`9062`–`9071`)** — needs a conflict read against those before it could be taken |
 | `drm/amdgpu/gmc_v12_0: fix flushing mmhub by pasid` 2/2 | `lore-amdgfx` | neither direction — it depends on 1/2, which is `gmc_v11_0` (wrong chip). Needs unpicking from its series |
-| `drm/amdgpu: Fix out-of-bounds write in amdgpu_debugfs_gfxoff_count_read()` | `lore-dri-devel` | **already in the base** — the added line `if (size & 0x7 || *pos & 0x7)` is at `amdgpu_debugfs.c:656` and `:708` in the rc7 tree. Verified by content, not by reverse-apply alone |
+| `drm/amdgpu: Fix out-of-bounds write in amdgpu_debugfs_gfxoff_count_read()` | `lore-dri-devel` | **WRONG — corrected 2026-10-19.** The `size & 0x7` guard at `amdgpu_debugfs.c:656`/`:708` belongs to other gfxoff handlers, not `count_read()`; `count_read()` still has `0x3`/`+= 4` in `v7.3`. The fix applies cleanly and is now `1093` |
 | `r8169: RTL8126A (XID 64a) TX packets lost with TSO` | `lore-netdev-new` | Check 1 — RTL8126A, not our RTL8125B |
 | `drm/amdgpu/gfx7,8: remove redundant RLC cleanup`, `gfx8`, VCE/UVD teardown | `lore-amdgfx`, `lore-dri-devel` | Check 0 — gfx7/gfx8 and VCE/UVD are not our silicon (we are `gfx_v12_0_0`) |
 | `drm/amdgpu/vce`, `[PATCH 5.10/5.15]` backports | both | stable backports for kernels we do not run |
@@ -9477,9 +9477,9 @@ actually installed.
 
 Linux 7.3 was tagged on 2026-10-18 (`v7.3`, commit `c03c1a14507d`). The base
 moves from `linux-7.3-rc7` to `linux-7.3`, the package version from
-`7.3.0_rc7-3` to `7.3.0-1`, and the series from 278 to 270 patches. The
-270-patch series applies cleanly to the release: `audit_series.py --repo
-repos/torvalds --tag v7.3` reports 270/270.
+`7.3.0_rc7-3` to `7.3.0-1`, and the series from 278 to 271 patches. The
+271-patch series applies cleanly to the release: `audit_series.py --repo
+repos/torvalds --tag v7.3` reports 271/271.
 
 ### Source state
 
@@ -9518,11 +9518,11 @@ others skip there.
 
 | # | Subject | Author | Source | Verdict |
 |---|---|---|---|---|
-| `1092` | drm/amdgpu: keep PRT mappings off the VM state lists again | Jesse Zhang | `<20261019014711.1486757-1-Jesse.Zhang@amd.com>` | Fixes `3a1abd9743c2`, the commit our `1082` carries. `1082` removed the `amdgpu_vm_is_bo_always_valid()` guard, so a PRT `bo_va` with no BO reaches `amdgpu_vm_handle_moved()` and dereferences NULL. Applies on the series tree after `1082` and on `next-20261016`; no review yet. |
+| `1092` | drm/amdgpu: keep PRT mappings off the VM state lists again | Jesse Zhang | `<20261019014711.1486757-1-Jesse.Zhang@amd.com>` | Fixes `3a1abd9743c2`, the commit our `1082` carries. `1082` removed the `amdgpu_vm_is_bo_always_valid()` guard, so a PRT `bo_va` with no BO reaches `amdgpu_vm_handle_moved()` and dereferences NULL. Applies on the series tree after `1082` and on `next-20261016`; `Reviewed-by: Christian König` (2026-10-19). |
 | `1178` | drm/amd/display: Fix NULL deref in `dcn401_update_clocks_update_dtb_dto` | Roman Demidov | `<20261019072938.10074-1-roman.demidov.nn@gmail.com>` | On-target DCN 4.0.1. `ASSERT()` only warns, so the NULL dereference is real; the fix mirrors the `dcn60_*` guard. Applies to both bases; no review yet. |
 | `1179` | drm/amd/display: set `allow_freesync` before validating a new stream | Mikhail Gavrilov | `<20261018221726.27259-1-mikhail.v.gavrilov@gmail.com>` | Sets `allow_freesync` in `amdgpu_dm_get_freesync_config_for_crtc()`, so validation sees it before the first flip. Generic DMUB SubVP, HW-sequencer and DML2.1 readers use the field, not just DCN32. Applies to both bases; no review yet. |
 | `9089` | drm/amdkfd: split `vram_pages` of SVM ranges prefetched without a GPU mapping | Jesse Zhang | `<20261019020859.1493373-1-Jesse.Zhang@amd.com>` | v2 incorporates Philip Yang's review. Fixes the VRAM accounting underflow after a prefetch; ROCm/SVM only. Applies to both bases. |
-| `1084` | drm/amdgpu: drop the gang leader reference when freeing gang jobs | Jesse Zhang | `<20261019014938.1487609-1-Jesse.Zhang@amd.com>` | **v1 → v2.** Christian König asked for `amdgpu_job_free()` and `_free_cb()` to be unified; v2 does that and fixes the IB-free placement. Reverse v1, then forward v2, is clean on the series tree. |
+| `1084` | drm/amdgpu: drop the gang leader reference when freeing gang jobs | Jesse Zhang | `<20261019014938.1487609-1-Jesse.Zhang@amd.com>` | **v1 → v2.** Christian König asked for `amdgpu_job_free()` and `_free_cb()` to be unified; v2 does that and fixes the IB-free placement. Reverse v1, then forward v2, is clean on the series tree. **v3 pending:** Christian's review asks only to drop misleading comments (Jesse confirmed v3 will do that). |
 
 ### Version sweep — content, not version labels
 
@@ -9580,7 +9580,7 @@ items the subject scan did not.
 route (`/-/uploads/...` redirects to sign-in), but
 `/api/v4/projects/drm%2Famd/uploads/<secret>/<file>` redirects to a signed S3
 object and downloads. The patch is `drm/amd/display: don't blank display when
-minimal transition fails`, 3.4 KB, and applies to both the 270-patch series tree
+minimal transition fails`, 3.4 KB, and applies to both the 271-patch series tree
 and `next-20261016`. It commits the target context directly when
 `commit_minimal_transition_state()` fails, and adds diagnostic logging. **Not
 carried:** its only identity is `AMD Display <noreply@amd.com>` — no named human
@@ -9604,7 +9604,7 @@ is inert here (`CONFIG_KUNIT` is unset).
 `CalculatePrefetchSchedule` `fa0300333db0`). Four are absent from `v7.3`
 (`dispclk/dppclk` `f48124ff3535`, MES v12 `5ec4cc917083`, debugfs lockdown
 `17ac73b24006`, PSP TA buffer length `473f99e4a262`) but **none applies to the
-270-patch tree** — they are 6.18 backports with 7.4 context. Defer to the next
+271-patch tree** — they are 6.18 backports with 7.4 context. Defer to the next
 base.
 
 **Coverage limits.** The GitLab merge-request API returns 403 for
@@ -9649,3 +9649,22 @@ all 11 v4 patches, applies with zero failures under GNU `patch --forward -F2`.
 The full series audit reports **270/270 clean**. `9109` is Navi 3 (wrong chip
 for this machine) but stays because it is part of the upstream series; the
 machine-relevant piece is `9110` (IH 7.0, Navi 4).
+
+### Adopted `1093` — the gfxoff debugfs out-of-bounds write
+
+The 2026-10-15 posting (`<20261015022024.49233-1-yaolu@kylinos.cn>`, Lu Yao,
+`Fixes: 0ad7347a64ac`) fixes `amdgpu_debugfs_gfxoff_count_read()`. The function
+stores a u64 with `put_user()` but advances `buf`, `pos` and `size` by 4 bytes,
+and its alignment guard accepts 4-byte reads. A 4-byte read therefore writes
+4 bytes past the caller's buffer.
+
+The earlier sweep marked this "already in the base" by matching the
+`size & 0x7` guard at `amdgpu_debugfs.c:656` and `:708`. Those guards belong to
+other gfxoff handlers; `count_read()` at line 1439 still has `0x3` and `+= 4`
+in both `v7.3` and `next-20261016`. **That verdict was wrong; the fix is now
+carried as `1093`.**
+
+It applies cleanly to both bases. Christian König's review calls it "a good
+catch" but questions the binary, multiple-read interface; Lu Yao is considering
+a seq_file conversion. The minimal fix is carried and should be replaced if a
+seq_file v2 lands.

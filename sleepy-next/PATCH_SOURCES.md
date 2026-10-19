@@ -532,8 +532,8 @@ the preview builds it too. It is absent from the snapshot's own `insn.h`.
 
 | | |
 |---|---|
-| Files in `patches/` | 281 |
-| Entries in `source=()` | 274 |
+| Files in `patches/` | 282 |
+| Entries in `source=()` | 275 |
 | Excluded from `source=()` | 7 — `1008`, `1012`, `1013`, `1014`, `1017`, `9060`, `9040` |
 | Preview-only adds | `2700`, `2701` (zswap request stack) |
 | Preview-only carries after the 7.3 bump | `1086`–`1090`, `2508`, `2900`, `2901`, `9085` |
@@ -577,3 +577,7 @@ The shared series now carries upstream v4 (`9100`–`9110`) in place of the v1
 series (`9011`–`9016`, `9018`–`9024`). The preview follows the rc ledger's
 replacement section; `prepare()` applies or skips the v4 patches on this
 snapshot exactly as it does the rest of the series.
+
+`1093` (the gfxoff debugfs out-of-bounds write) is copied here too; it applies
+to the pristine snapshot base. The earlier "already in the base" verdict was
+wrong — the `0x7` guard it matched belongs to other gfxoff handlers.

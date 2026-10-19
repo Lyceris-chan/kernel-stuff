@@ -310,6 +310,7 @@ source=(
   "patches/1000-1099/1085-drm-amdgpu-reject-ANONONLY-userptrs-spanning-multiple-VMAs.patch"
   "patches/1000-1099/1091-drm-amdgpu-wait-for-pending-page-table-updates.patch"
   "patches/1000-1099/1092-drm-amdgpu-keep-PRT-mappings-off-the-VM-state-lists-again.patch"
+  "patches/1000-1099/1093-drm-amdgpu-Fix-out-of-bounds-write-in-amdgpu_debugfs_gfxoff_count_read.patch"
   "patches/1100-1199/1136-drm-amd-display-update-and-revert-FRL-LT-timeout.patch"
   "patches/1100-1199/1138-drm-amd-display-pull-colorops-into-state-when-recreating-a-plane.patch"
   "patches/1100-1199/1141-drm-amd-display-skip-receiver-power-control-without-AUX.patch"
@@ -1222,6 +1223,7 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         'f97729dc5afbf14f0340e140f5e7f974cdc8424ecb2c4c6d4b5155362ec332df5439af650cac635ce50b7f02680fefec794dfe972ddf05ef1ecc2b6cda2cf1c6'
         '2ca8b91a4f23d9f2f8f6ecd9fee1ceb46f54eaf0138be0d0bd11c7aad5c259ad53b8f21abf7f1df31b4f5411b654cf964ad0a9742aaa3a3cbdd6c93ddadc0a62'
         'cf59145882c0a87dd9c968da99d3d7d041360377da39cd69b85119ae33643b2bdc14101eafcf1dbc584d7bbc59f6e812b14bf6977fdf9af53ecada9b0959b874'
+        '3f80f24880d3dd37480cc56c98bca853cc63823cdf6e5cdf3b3f3ece481e10e6199ad2cce8870114caf5ae22320a6ac90f23e8ce2ab48289a42c7fcbb917dba8'
         'b283f440cb0f2679ee81d7da4ea1fecdb1e0146ee6183c6271b8e952ffcaebbbb0decf5b18b69534987601b63289a5c9be0397c5a79eff9cc76dca6a439e1cfa'
         '9f336933bfbf1429081581bf02878e91d7fb383ffdca62b523a18266a94c8229b5510e6ccface38256c2967f9387c2c504e49eda9637f36733431cc6e33f200c'
         '0fb08f727791630b6101b8263b23ce433a8b65f895ff757a4d79b282815be449e7b1932a752635e848b3b3ba8235a775a3bf618cfb933bb80d69f3a38f5e5ead'
