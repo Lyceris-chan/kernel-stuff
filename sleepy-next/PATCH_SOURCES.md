@@ -532,8 +532,8 @@ the preview builds it too. It is absent from the snapshot's own `insn.h`.
 
 | | |
 |---|---|
-| Files in `patches/` | 284 |
-| Entries in `source=()` | 277 |
+| Files in `patches/` | 283 |
+| Entries in `source=()` | 276 |
 | Excluded from `source=()` | 7 — `1008`, `1012`, `1013`, `1014`, `1017`, `9060`, `9040` |
 | Preview-only adds | `2700`, `2701` (zswap request stack) |
 | Preview-only carries after the 7.3 bump | `1086`–`1090`, `2508`, `2900`, `2901`, `9085` |
@@ -566,3 +566,7 @@ Four shared additions are copied here:
 snapshot does **not** contain v1, and the v2 patch applies cleanly to the
 pristine base, so the preview builds v2 as well. `pkgrel` moves from 2 to 3 to
 reflect the new package contents.
+
+`9082` (amdkfd: wait for a GPU reset before freeing a BO) was removed from both
+packages on 2026-10-19 after Christian König's NAK. See the governance finding
+in `sleepy-rc/PATCH_SOURCES.md`. The number is vacated.

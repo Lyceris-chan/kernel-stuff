@@ -570,7 +570,6 @@ source=(
   "patches/9000-9099/9076-drm-amdgpu-fix-ip-discovery-table-validation.patch"
   "patches/9000-9099/9077-drm-amdgpu-userq-fix-reading-the-WPTR-at-a-non-zero-BO-offset.patch"
   "patches/9000-9099/9081-drm-amdgpu-userq-commit-seq64-BO-mapping.patch"
-  "patches/9000-9099/9082-drm-amdkfd-wait-for-a-GPU-reset-before-freeing-a-BO.patch"
   "patches/9000-9099/9083-drm-amdkfd-disable-SVM-when-the-GPUVM-cannot-cover-CPU-addresses.patch"
   "patches/9000-9099/9084-drm-amdkfd-validate-SVM-ranges-against-GPU-address-limits.patch"
   "patches/9000-9099/9085-drm-amdgpu-userq-actually-validate-userq-BOs.patch"
@@ -1516,7 +1515,6 @@ b2sums=('db5410b9510a21a9f5050ad1b6496952808d426b16c09f97749f1f390c1cabb8d69c420
         '28fcf1738fb0b5179065174d82c0512988ed53bddb94891cd3fd45238995941741279272df1fcc96e07afcbd9fe895ca02ea64fb93b8448a114625998baba8f9'
         'a3420cb6d1214eb53d1fb21e0e28d1c814409dae2fabe7c05e88819ad25061b2426ca97d494bd8bd6f7c467e818ddf18704b7157be43e41428cb86368e3a0dbb'
         '2ab97bf49572cf6c51d826d6536cc26142be0ef2c82cbeb35a90e9f246a7efaa2d5e02a93245b2d1a830fee16fce21a66851eef7f4d986cb4daba0f8db645e9e'
-        '83b46abf86e89cdd61341201da1353ca34b91507f22b03289d2132dad7ded363ef2608086f2b6fc8a99dc65a570b965a7151aa0c3ad1ef83e1c831522aa3bb18'
         'd15c56c81fef320a35d9e4d3f1bb48717a580fa949f609e6c1f8a881baba2e622ff8d01d1a0ca0b6ae7fb9b11de2bfe99f7137c2f293ac12dd3d434ff9426815'
         'ef2aab905d6682513c53e3682de454930116d518d83cf1e2a99f4e6e83b132d3d5005c5c0b672136d9973dafe805ed80473ea457b08fe09cc7a79ee8607f5e23'
         '5267bd01f89777a1d101503df6cf6abf43a7f9691b0e770f36406de49ff1f673fb43636b1b6e5a281dc06dd87b256af43a9eea7e10f81f93f663d05194ea4e45'

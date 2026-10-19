@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
 - **Base:** Linux `v7.3`
-- **Series:** 273 patches
+- **Series:** 272 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -33,9 +33,9 @@ are supplied by the generator instead, so every row below has a source.
 | `2600–2699` | Time and timers | 0 |
 | `2800–2899` | Memory management, second series (mm/swap follow-ups) | 3 |
 | `2900–2999` | VFS / core filesystem | 0 |
-| `9000–9099` | agd5f staging + userq lifecycle backports | 50 |
+| `9000–9099` | agd5f staging + userq lifecycle backports | 49 |
 
-**Total: 273** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 272** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-19). The counts are now generated from the patch tree
@@ -8363,6 +8363,10 @@ build is verified for BTF and the banner as usual.
 
 ## URGENT — `1173` un-reverts an AMD revert, on this machine's display path (found 2026-10-16)
 
+**Resolved on 2026-10-16: removed in commit `4137211`.** The reverted change
+(`write_scdc_data()`'s `is_frl` argument) is not in the current series, and the
+revert is not carried. The analysis below is retained as the incident record.
+
 **Needs a user decision. Nothing was changed.**
 
 `3b77aacb15e0` (Joshua Aberback, 2026-09-23) —
@@ -9469,9 +9473,9 @@ actually installed.
 
 Linux 7.3 was tagged on 2026-10-18 (`v7.3`, commit `c03c1a14507d`). The base
 moves from `linux-7.3-rc7` to `linux-7.3`, the package version from
-`7.3.0_rc7-3` to `7.3.0-1`, and the series from 278 to 273 patches. The
-273-patch series applies cleanly to the release: `audit_series.py --repo
-repos/torvalds --tag v7.3` reports 273/273.
+`7.3.0_rc7-3` to `7.3.0-1`, and the series from 278 to 272 patches. The
+272-patch series applies cleanly to the release: `audit_series.py --repo
+repos/torvalds --tag v7.3` reports 272/272.
 
 ### Source state
 
@@ -9557,5 +9561,51 @@ real delta, only `1084` v2 is an update:
 Christian König rejected the exact v5 patch we carry in both packages on
 2026-10-19 (`<dd0d869d-7a13-4a6a-b046-f8961a82051c@amd.com>`): "Absolutely
 clear NAK to that approach here as well, that is just horrible racy. The root
-cause is clearly that trylock." The patch stays in place pending explicit
-approval to remove it (CLAUDE.md YOU MUST NOT 8).
+cause is clearly that trylock." **Removed from both packages on 2026-10-19**
+after explicit user authorization to drop patches upstream disagrees with.
+The number `9082` is vacated and must not be reused.
+
+### Deep sweep 2026-10-19 — what the first passes missed
+
+A second, body-level pass over the fresh freedesktop archives and every lore
+mirror, plus the GitLab merge-request API and the stable queue, found these
+items the subject scan did not.
+
+**`#5380` attachment retrieved.** The tracker upload is auth-gated over the web
+route (`/-/uploads/...` redirects to sign-in), but
+`/api/v4/projects/drm%2Famd/uploads/<secret>/<file>` redirects to a signed S3
+object and downloads. The patch is `drm/amd/display: don't blank display when
+minimal transition fails`, 3.4 KB, and applies to both the 272-patch series tree
+and `next-20261016`. It commits the target context directly when
+`commit_minimal_transition_state()` fails, and adds diagnostic logging. **Not
+carried:** its only identity is `AMD Display <noreply@amd.com>` — no named human
+author, no `Message-ID`, no upstream commit. It also changes a global failure
+path in `dc_commit_streams()` on the strength of one reported configuration.
+
+**Wang Jiang's `Don't ignore dc_commit_streams() failures`** (2026-10-08,
+`<tencent_...@qq.com>`, `Signed-off-by`) is the conservative counterpart: log
+the failure and stop programming stream/plane state, rather than forcing the
+target context. It applies to both bases, but has no review and is not in any
+fetched tree. **Watch.**
+
+**The TMDS revert is already handled.** `Revert "avoid to write signal specific
+for tmds"` (AMD, 2026-10-02) targets `8be7aa94fe09`; the change was carried as
+`1173` and removed on 2026-10-16 in `4137211`. The current series has no
+`write_scdc_data()` `is_frl` argument; no action. The KUnit macro revert series
+is inert here (`CONFIG_KUNIT` is unset).
+
+**AUTOSEL batch.** The on-target originals that are in `v7.3` need no action
+(`gfx12 KMD_QUEUE` `9fe5745f9d8e`, `svm_range_is_valid` `aa7e29cf9a37`,
+`CalculatePrefetchSchedule` `fa0300333db0`). Four are absent from `v7.3`
+(`dispclk/dppclk` `f48124ff3535`, MES v12 `5ec4cc917083`, debugfs lockdown
+`17ac73b24006`, PSP TA buffer length `473f99e4a262`) but **none applies to the
+272-patch tree** — they are 6.18 backports with 7.4 context. Defer to the next
+base.
+
+**Coverage limits.** The GitLab merge-request API returns 403 for
+`drm/amdgpu/kernel` without auth, so MRs are unrefreshed. The fd.o monthly
+archives lag the lore mirrors by hours (the 10-19 evening posts are missing
+from the archive but present in the mirrors). The `lore-stable` mirror's epoch 0
+is stale (latest mail 2022), so the stable-queue check is inconclusive; no
+`linux-7.3.y` branch exists yet. `drm-misc`'s orcz remote failed again; the
+freedesktop remote is current.

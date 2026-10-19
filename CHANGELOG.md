@@ -21,7 +21,7 @@ full entries remain in git history.
 ## [7.3.0-1-sleepy-rc (Linux 7.3 final)]: 2026-10-19
 
 The base moves from `v7.3-rc7` to the 7.3 release (`v7.3`,
-`c03c1a14507d`). `pkgrel` resets to 1 and the series moves from 278 to 273
+`c03c1a14507d`). `pkgrel` resets to 1 and the series moves from 278 to 272
 patches.
 
 ### Dropped — nine patches the release absorbed
@@ -44,6 +44,12 @@ stream validation. `9089` fixes SVM VRAM accounting after a prefetch.
 `1084` moves to v2: `amdgpu_job_free()` and `_free_cb()` are unified, as
 Christian König asked on the v1 review.
 
+### Dropped after review
+
+`9082` (amdkfd: wait for a GPU reset before freeing a BO) is removed from both
+packages. Christian König NAK'd the exact v5 approach as "horribly racy" and
+pointed at the misplaced trylock as the root cause. The number is vacated.
+
 ### Version check
 
 A content-based sweep over every carried subject found one real update
@@ -59,6 +65,7 @@ explicit approval to remove it.
 update. It also keeps the nine patches that `sleepy-rc` dropped at the 7.3
 bump: `1086`–`1090` and `9085` are already in the snapshot and skip, `2508`
 still applies, and `2900` fails context because `2901` is already present.
+`9082` is removed from the preview as well, after Christian König's NAK.
 
 ## [2026.10.16-2-sleepy-next (linux-next `next-20261016`)]: 2026-10-18
 
