@@ -9668,3 +9668,96 @@ It applies cleanly to both bases. Christian König's review calls it "a good
 catch" but questions the binary, multiple-read interface; Lu Yao is considering
 a seq_file conversion. The minimal fix is carried and should be replaced if a
 seq_file v2 lands.
+
+## Sweep 2026-10-19 (second pass) — next-20261019 is out; SDMA candidates; nothing adopted
+
+Linux 7.3 was released on 2026-10-18, and the first post-release linux-next,
+`next-20261019`, was tagged on 2026-10-19 (`13f2fb693de7`, tip
+`3d229ce89862`). The preview package remains on `next-20261016`. Nothing was
+adopted: every new candidate is hours old and unreviewed, or belongs to the
+7.4 cycle.
+
+### Source state
+
+| Source | State |
+|---|---|
+| torvalds | `v7.3` `c03c1a14507d` (10-18); unchanged |
+| linux-next | **`next-20261019`** `13f2fb693de7` (tip `3d229ce89862`); new since 10-16 |
+| drm-next / drm-misc | `a56b45995b1e` (10-13) / `origin/drm-misc-next` `e6bb593b8008` (10-19) |
+| agd5f / amd-staging | `f307e9d20cc7` (10-15); every ref checked, none newer |
+| linux-pm / akpm / tip | `24a19b953e2a` / `mm-everything 5e5b34a474ee` / `c803a3f002ec` |
+| lore mirrors (16) | refreshed; newest amd-gfx mail 2026-10-19 19:06 UTC |
+| CachyOS | no commits since 10-17; `7.3/base` and `7.3/fixes` unchanged |
+| sirlucjan | the **7.3 line landed 10-19** (`7.3/` replaces `7.3-rc/`); a 7.2 lru-marie line was added |
+| firelzrd | MARIE `1.0.0-rc1` and BORE `7.0.0` — both carried |
+| linux-tkg | Gentoo Kconfig update only |
+| xanmod | no valid clone: the remote is `Lyceris-chan/kernel-stuff`, whose `main` mirrors our own commits |
+| tracker | 44 open and 7 closed issues updated since 10-17 |
+
+### next-20261019
+
+The tag's delta against `next-20261016` contains no new AMD GPU content: the
+only AMD/DRM change is one line in `drivers/gpu/drm/drm_panic.c`. The rest is
+the 7.3 release baseline plus scheduler and nvme updates. AMD's first 7.4 pull
+is not in drm-next yet (`a56b45995b1e`, 10-13), so it is absent here too.
+
+A preview audit (`audit_series.py --pkgbuild sleepy-next/PKGBUILD --tag
+next-20261019`) reports **117 clean, 101 absorbed/skipped, 57 failures** out of
+275 patches. The skipped set includes the retry-fault v4 series (`9100`–`9108`),
+whose upstream form is now in the base; `9109` and `9110` fail their hunks. The
+57 failures include the preview-only HDMI/VRR set (`0050`–`0061`), the ACPI
+CPPC `12xx` group and much of the `2xxx` mm/block set. **A preview bump is a
+drop-and-rebase task, not a tag change.** It is not part of this sweep.
+
+### Candidates
+
+| Patch | Author, source | Verdict |
+|---|---|---|
+| `[PATCH 4/5] drm/amdgpu/sdma7: don't access registers in MQD setup` | Alex Deucher, `<20261019190659.2773961-4-alexander.deucher@amd.com>` | On-target SDMA 7.0. Forward-applies (2 hunks, +21 offset). The other four parts are SDMA 5/5.2/6/7.1 (wrong chips). Unreviewed; watch. Next free `10xx`: `1094`. |
+| `[PATCH] drm/amdgpu/sdma: explicitly set SWITCH_INSIDE_IB` | Alex Deucher, `<20261019190540.2773908-1-alexander.deucher@amd.com>` | Applies (1 hunk, -6 offset). Its own message calls the bit the hardware default; it is no-op hardening. Skip. |
+| `[PATCH] drm/amdkfd: Enable SDMA IB processing` | Yongqiang Sun, `<20261019175807.970192-1-Yongqiang.Sun@amd.com>` | Real fix: user-mode SDMA MQDs never set `IB_ENABLE`, so INDIRECT packets are ignored. `Reviewed-by: Mukul Joshi`, `Acked-by: Alex Deucher`; the review asks only for a message rewrite, so a v2 is expected. The v12 hunk applies; the v12_1 hunk (GC 12.1, not this machine) fails. Watch for v2, then port the v12 hunk. |
+| `[PATCH] drm/amdgpu: call hw_fini for IP blocks whose hw_init failed` | Leo Liu, `<20261019174039.9771-1-leo.liu@amd.com>` (v2; v1 `20261019153942.4067-1`) | Applies cleanly (4 hunks). Fixes a use-after-free when a block's `hw_init()` fails and its idle work fires after `sw_fini()`. Reported on MI355X; no review. Defensive, generic amdgpu core. Watch. |
+| `[PATCH net-next v7 0/4] net/sched: cap the accounted backlog before it can wrap` | Jamal Hadi Salim, `<QDISC-BA27.v7.r0.20261019115505@mojatatu.com>` | **v7 now applies cumulatively and cleanly** to the 271-patch tree (v6 failed 3/4). `Reviewed-by: Victor Nogueira` on all four; `Acked-by: Toke Høiland-Jørgensen` on 2/4. net-next 7.4 material, not an rc fix: defer to the 7.4/next bump. |
+| userq engine-reset `13/13` series | Jesse Zhang, cover `20261019083402.2033724-1-...` | New feature series: reset the user queues of one engine, with an engine reset when that fails. 7.4 material, under review. Watch. |
+
+Rejected or no change:
+
+- **x86/mce v3, cache hierarchy errors** — Intel/Zhaoxin only. AMD already
+  reports only memory-controller errors, so the patch is inert here and targets
+  silicon this machine does not have. Reject.
+- **AUTOSEL 10-19 batch** — 6.18 stable backports. The one on-target original
+  absent from `v7.3` (MES v12 `5ec4cc917083`) is the same non-applying patch
+  the earlier pass deferred; the rest are already in `v7.3`. No action.
+- **GPU recovery `10/10`** — unchanged from the earlier pass: six apply, four
+  fail, several target wrong silicon. Watch.
+- **Gang leader v3** — not posted. `1084` v2 (adopted today) remains current.
+- **Tracker** — the new on-target reports `#6010` (DCN 4.0.1/Navi 48 INBOX0
+  lock), `#6004` (gfx1201 white-noise, the vupdate_no_lock revert thread) and
+  `#5994` (Navi 48 suspend) carry no fix commit. No tracker comment points to
+  a missing fix.
+
+### Version sweep
+
+A subject-indexed check of every posting since 2026-10-17 across the 16 lore
+mirrors matched two carried subjects at a higher revision: `1084` v2 and `9089`
+v2. Both were adopted earlier today. No other carried patch has an unadopted
+newer revision.
+
+### CachyOS and sirlucjan
+
+sirlucjan's 7.3 line was published on 10-19. Our squashes need no regeneration:
+
+- `0101` bbr3 and `0102` kbuild have the same net content as the 7.3 files.
+  The bbr3 pair differs only by the intermediate `.name = "bbr"` line that a
+  squash folds away.
+- `0103` is deliberately different: it carries the `MZEN4` choice that the
+  PKGBUILD selects (`scripts/config -d GENERIC_CPU -e MZEN4`), while
+  sirlucjan's 7.3 `cpu-isa` patch carries `X86_64_ISA_LEVEL` and extra
+  vectorization guards. Both apply; ours is the one the config needs.
+
+### Coverage limits
+
+The GitLab merge-request API still returns 403 without auth. `lore-stable`'s
+epoch 0 is stale (latest mail 2022), and no `linux-7.3.y` branch exists yet.
+`drm-misc`'s orcz remote failed with a connection reset; the freedesktop origin
+is current. The fd.o monthly archives lag the lore mirrors.
