@@ -6,7 +6,7 @@ target one machine: an AMD Ryzen 7 7700 (Zen 4) with a Radeon RX 9070 XT
 
 One entry per released package version, newest first. A version is what
 `uname -r` reports. `sleepy-rc` uses `<kernel base>-<pkgrel>-sleepy-rc`, as in
-`7.3.0-rc7-1-sleepy-rc`. `sleepy-next` uses
+`7.3.0-1-sleepy-rc`. `sleepy-next` uses
 `<snapshot date>-<pkgrel>-sleepy-next`, as in `2026.10.09-1-sleepy-next` — the
 snapshot's own date, never the mainline `-rc` it happened to be cut from. The
 date is dotted because `depmod` and `mkinitcpio` both reject a release that does
@@ -17,6 +17,48 @@ Two earlier artifacts are summarised at the end under
 [Earlier packages](#earlier-packages): the 7.2 `linux-sleepy` package and the
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
+
+## [7.3.0-1-sleepy-rc (Linux 7.3 final)]: 2026-10-19
+
+The base moves from `v7.3-rc7` to the 7.3 release (`v7.3`,
+`c03c1a14507d`). `pkgrel` resets to 1 and the series moves from 278 to 273
+patches.
+
+### Dropped — nine patches the release absorbed
+
+`1086`–`1090` (amdgpu eviction fence, runtime PM, GEM leak, sched entity leak,
+drm_exec prelocked object), `2508` (UMIP segment index), `2900`/`2901` (idle
+threads sharing `init_fs`) and `9085` (userq BO validation). Each
+reverse-applies to `v7.3`; the upstream commits are recorded in
+`PATCH_SOURCES.md`.
+
+### Added — four patches
+
+`1092` keeps PRT mappings off the VM update lists; it fixes the NULL
+dereference introduced by our `1082`. `1178` adds the missing NULL check in
+`dcn401_update_clocks_update_dtb_dto()`. `1179` sets `allow_freesync` before
+stream validation. `9089` fixes SVM VRAM accounting after a prefetch.
+
+### Changed
+
+`1084` moves to v2: `amdgpu_job_free()` and `_free_cb()` are unified, as
+Christian König asked on the v1 review.
+
+### Version check
+
+A content-based sweep over every carried subject found one real update
+(`1084` v2). The kbuild v4 and zswap v4 series remain deferred on base
+mismatches; the retry-fault v1 → v4 redesign remains approval-gated. The
+`9082` NAK is recorded in `PATCH_SOURCES.md` and stays in place pending
+explicit approval to remove it.
+
+## [2026.10.16-3-sleepy-next (linux-next `next-20261016`)]: 2026-10-19
+
+`pkgrel` 2 -> 3. The snapshot base is unchanged. This rebuild carries the four
+2026-10-19 shared additions (`1092`, `1178`, `1179`, `9089`) and the `1084` v2
+update. It also keeps the nine patches that `sleepy-rc` dropped at the 7.3
+bump: `1086`–`1090` and `9085` are already in the snapshot and skip, `2508`
+still applies, and `2900` fails context because `2901` is already present.
 
 ## [2026.10.16-2-sleepy-next (linux-next `next-20261016`)]: 2026-10-18
 

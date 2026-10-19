@@ -7,7 +7,7 @@ Two packages share one patch series:
 
 | Directory | Package | Base |
 |---|---|---|
-| [`sleepy-rc/`](sleepy-rc/) | `linux-sleepy-rc` | mainline **`v7.3-rc6`** |
+| [`sleepy-rc/`](sleepy-rc/) | `linux-sleepy-rc` | mainline **`v7.3`** |
 | [`sleepy-next/`](sleepy-next/) | `linux-sleepy-next` | linux-next snapshot **`next-20261009`** |
 
 They are deliberately installable **side by side**: each sets its own

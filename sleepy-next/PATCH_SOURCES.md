@@ -532,7 +532,37 @@ the preview builds it too. It is absent from the snapshot's own `insn.h`.
 
 | | |
 |---|---|
-| Files in `patches/` | 280 |
-| Entries in `source=()` | 273 |
+| Files in `patches/` | 284 |
+| Entries in `source=()` | 277 |
 | Excluded from `source=()` | 7 — `1008`, `1012`, `1013`, `1014`, `1017`, `9060`, `9040` |
 | Preview-only adds | `2700`, `2701` (zswap request stack) |
+| Preview-only carries after the 7.3 bump | `1086`–`1090`, `2508`, `2900`, `2901`, `9085` |
+
+## 2026-10-19 — 7.3 bump: nine preview-only carries, four shared additions, `1084` v2
+
+`sleepy-rc` moved to `Linux 7.3` final and dropped nine patches that the release
+absorbed. The preview base is unchanged (`next-20261016`), so those nine stay
+in this package. The rc-bump section in `sleepy-rc/PATCH_SOURCES.md` records
+their upstream commits.
+
+| # | Result on this base |
+|---|---|
+| `1086`–`1090` | Already in the snapshot; `prepare()` skips them |
+| `2508` | Applies; the snapshot's `insn.h` still lacks the fix |
+| `2900` | Context failure; the snapshot's `copy_fs()` already differs |
+| `2901` | Detected as applied; the net change is present |
+| `9085` | Already in the snapshot; skips |
+
+Four shared additions are copied here:
+
+| # | Result on this base |
+|---|---|
+| `1092` | Applies after `1082`; both are in `source=()` in numeric order |
+| `1178` | Applies |
+| `1179` | Applies |
+| `9089` | Applies |
+
+`1084` moved from v1 to v2 (Christian König's requested unification). The
+snapshot does **not** contain v1, and the v2 patch applies cleanly to the
+pristine base, so the preview builds v2 as well. `pkgrel` moves from 2 to 3 to
+reflect the new package contents.

@@ -1,0 +1,39 @@
+From Jesse Zhang <Jesse.Zhang@amd.com> Mon Sep 17 00:00:00 2001
+From: Jesse Zhang <Jesse.Zhang@amd.com>
+Date: Mon, 19 Oct 2026 09:46:51 +0800
+Subject: [PATCH] drm/amdgpu: keep PRT mappings off the VM state lists again
+Message-ID: <20261019014711.1486757-1-Jesse.Zhang@amd.com>
+
+Since amdgpu_vm_bo_insert_map() moves all BOs to needs_update, it moves
+the PRT bo_va, which has no BO, there as well. amdgpu_vm_bo_update()
+leaves it there, so the next amdgpu_vm_handle_moved() dereferences the
+NULL BO.
+
+A CS after mapping a PRT range:
+
+  BUG: kernel NULL pointer dereference, address: 0000000000000158
+  RIP: 0010:amdgpu_vm_handle_moved+0x17a/0x200 [amdgpu]
+   amdgpu_cs_ioctl+0x1579/0x2510 [amdgpu]
+
+Only move bo_vas with a BO to needs_update.
+
+Fixes: 3a1abd9743c2 ("drm/amdgpu: fix amdgpu_vm_bo_insert_map to let bo gets update")
+Signed-off-by: Jesse Zhang <Jesse.Zhang@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+index c79a673d9d2e..9d6f93d4ff38 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+@@ -1832,7 +1832,8 @@ static void amdgpu_vm_bo_insert_map(struct amdgpu_device *adev,
+ 	if (mapping->flags & AMDGPU_VM_PAGE_PRT)
+ 		amdgpu_vm_prt_get(adev);
+ 
+-	if (!bo_va->base.moved)
++	/* PRT mappings have no BO and are kept off the state lists */
++	if (bo_va->base.bo && !bo_va->base.moved)
+ 		amdgpu_vm_bo_needs_update(&bo_va->base);
+ 
+ 	trace_amdgpu_vm_bo_map(bo_va, mapping);

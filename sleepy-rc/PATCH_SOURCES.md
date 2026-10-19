@@ -2,8 +2,8 @@
 
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
-- **Base:** Linux `v7.3-rc7`
-- **Series:** 277 patches
+- **Base:** Linux `v7.3`
+- **Series:** 273 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -21,24 +21,24 @@ are supplied by the generator instead, so every row below has a source.
 | `0001–0049` | Handmade local | 12 |
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
-| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 30 |
-| `1100–1199` | AMD display (DCN4, colorops) | 25 |
+| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 26 |
+| `1100–1199` | AMD display (DCN4, colorops) | 27 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 27 |
 | `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 41 |
 | `2100–2199` | Memory management and swap (zstd, LRU-MARIE, gup, zswap) | 50 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 20 |
 | `2400–2499` | Core scheduler and sched-ext | 3 |
-| `2500–2599` | x86 and arch core | 3 |
+| `2500–2599` | x86 and arch core | 2 |
 | `2600–2699` | Time and timers | 0 |
 | `2800–2899` | Memory management, second series (mm/swap follow-ups) | 3 |
-| `2900–2999` | VFS / core filesystem | 2 |
+| `2900–2999` | VFS / core filesystem | 0 |
 | `9000–9099` | agd5f staging + userq lifecycle backports | 50 |
 
-**Total: 278** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 273** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
-reconciled on 2026-10-17). The counts are now generated from the patch tree
+reconciled on 2026-10-19). The counts are now generated from the patch tree
 itself — `ls <range>/*.patch | wc -l` — so re-derive rather than trusting a
 copy of them: every stale instruction this repo has carried started as a copy
 of a live value (CLAUDE.md).
@@ -9464,3 +9464,98 @@ artifacts on disk do contain them — verified by disassembling the packaged
 `dma_fence_wait_timeout`, the `1091` form). This release rebuilds both packages
 as `7.3.0_rc7-3` / `2026.10.16-2` so the adopted patches and `2508` are
 actually installed.
+
+## Bump to 7.3 final and sweep 2026-10-19 — nine absorbed drops, four additions, `1084` v2
+
+Linux 7.3 was tagged on 2026-10-18 (`v7.3`, commit `c03c1a14507d`). The base
+moves from `linux-7.3-rc7` to `linux-7.3`, the package version from
+`7.3.0_rc7-3` to `7.3.0-1`, and the series from 278 to 273 patches. The
+273-patch series applies cleanly to the release: `audit_series.py --repo
+repos/torvalds --tag v7.3` reports 273/273.
+
+### Source state
+
+| Source | State |
+|---|---|
+| torvalds | `v7.3` `c03c1a14507d` (10-18) |
+| linux-next | newest tag `next-20261016` (`ad304bc4f861`); no newer snapshot |
+| drm-next / drm-misc | `a56b45995b1e` / fd `5780281c4588` — unchanged |
+| agd5f / amd-staging | `f307e9d20cc7` (10-15); every ref checked, none newer |
+| linux-pm / akpm / tip | `24a19b953e2a` / `mm-everything 5e5b34a474ee` / `c803a3f002ec` |
+| lore mirrors (16) | refreshed; 116 amd-gfx/dri-devel messages since 10-17 |
+| CachyOS / sirlucjan | `7.3/base 4a01eeb1d794` / `9c29aa44556d` — unchanged |
+| firelzrd | MARIE `dba9daf09673` 1.0.0-rc1, BORE `1e2f57ad74e8` 7.0.0 — both carried |
+| linux-tkg / cachymod | MuQSS-only update; cachymod's BORE edits are hunk-offset rebases |
+| xanmod / Clear | unrefreshed — no valid clone |
+
+### Dropped — nine patches that 7.3 absorbed
+
+Each reverse-applies to `v7.3`, and each upstream commit is reachable from the
+tag. They stay in `sleepy-next/`: the preview still needs `2508`, and the
+others skip there.
+
+| # | Upstream | Change |
+|---|---|---|
+| `1086` | `3c44cbcec5eb` | keep the eviction fence until the last handle is closed |
+| `1087` | `de9f6bcdb44f` | don't drop the runtime PM reference twice in `amdgpu_gpr` |
+| `1088` | `3c516a564628` | fix GEM object leak on ENOMEM in the userptr ioctl |
+| `1089` | `b5629f4a0869` | fix sched entity leak in ttm buffer entity init |
+| `1090` | `26401a4999f1` | drm_exec: don't immediately add prelocked obj |
+| `2508` | `32c52ec87d62` | x86/insn-eval UMIP segment-index fix |
+| `2900` | — | prerequisite of `2901`; `v7.3` already has `copy_fs_flags_t` |
+| `2901` | `d2bdb9b61b42` | fs: let idle threads share init_fs |
+| `9085` | `32d0771ef4ca` | userq: actually validate userq BOs |
+
+### Added — four patches, and `1084` moved to v2
+
+| # | Subject | Author | Source | Verdict |
+|---|---|---|---|---|
+| `1092` | drm/amdgpu: keep PRT mappings off the VM state lists again | Jesse Zhang | `<20261019014711.1486757-1-Jesse.Zhang@amd.com>` | Fixes `3a1abd9743c2`, the commit our `1082` carries. `1082` removed the `amdgpu_vm_is_bo_always_valid()` guard, so a PRT `bo_va` with no BO reaches `amdgpu_vm_handle_moved()` and dereferences NULL. Applies on the series tree after `1082` and on `next-20261016`; no review yet. |
+| `1178` | drm/amd/display: Fix NULL deref in `dcn401_update_clocks_update_dtb_dto` | Roman Demidov | `<20261019072938.10074-1-roman.demidov.nn@gmail.com>` | On-target DCN 4.0.1. `ASSERT()` only warns, so the NULL dereference is real; the fix mirrors the `dcn60_*` guard. Applies to both bases; no review yet. |
+| `1179` | drm/amd/display: set `allow_freesync` before validating a new stream | Mikhail Gavrilov | `<20261018221726.27259-1-mikhail.v.gavrilov@gmail.com>` | Sets `allow_freesync` in `amdgpu_dm_get_freesync_config_for_crtc()`, so validation sees it before the first flip. Generic DMUB SubVP, HW-sequencer and DML2.1 readers use the field, not just DCN32. Applies to both bases; no review yet. |
+| `9089` | drm/amdkfd: split `vram_pages` of SVM ranges prefetched without a GPU mapping | Jesse Zhang | `<20261019020859.1493373-1-Jesse.Zhang@amd.com>` | v2 incorporates Philip Yang's review. Fixes the VRAM accounting underflow after a prefetch; ROCm/SVM only. Applies to both bases. |
+| `1084` | drm/amdgpu: drop the gang leader reference when freeing gang jobs | Jesse Zhang | `<20261019014938.1487609-1-Jesse.Zhang@amd.com>` | **v1 → v2.** Christian König asked for `amdgpu_job_free()` and `_free_cb()` to be unified; v2 does that and fixes the IB-free placement. Reverse v1, then forward v2, is clean on the series tree. |
+
+### Version sweep — content, not version labels
+
+A content-based check over all 280 carried subjects (16 mirrors, postings since
+2026-08-01) matched 218 patches. 189 are content-identical. Of the 29 with a
+real delta, only `1084` v2 is an update:
+
+- `2700`/`2701` v4 are blocked by the `zswap_compress(struct folio *, long)`
+  signature, which this base does not have.
+- `2302`–`2321` kbuild v4 is deferred for a newer base.
+- `2191`/`2193` already carry the newer `xa_is_value()` checks.
+- `2045` already contains both v4 halves (`fix shaper stall` and `validate
+  transport header offset`).
+- `1172`'s delta is a KUnit test line only.
+- `1063`, `1070`, `9046`, `9075` and `9088` are comment, whitespace or the
+  documented partial port; `9075` is byte-identical to its merged commit.
+- `1090` and `1151` are newer in our tree than in the posting.
+- `9011`–`9024` remain the known v1 → v4 retry-fault redesign. Removing the v1
+  carries needs approval, so the redesign stays open.
+
+### Candidates considered and not adopted
+
+- **vupdate_no_lock revert `0/3`** (gfx1201 white-noise, issue `#6004`): the
+  `1/3` and `3/3` patches do not apply to `v7.3`; there is no maintainer reply.
+  A revert of upstream display code needs AMD's blessing. Watch.
+- **GPU recovery `10/10` series** (Prike Liang): only six patches apply; `01`,
+  `03`, `07` and `10` fail, and several target wrong silicon. Watch.
+- **VFCT bus-match patches** (Mario Limonciello): still in review; a single-GPU
+  machine cannot select the wrong VFCT entry. Watch.
+- **`optc_underflow_enable` v2**: still only the ATOM header field, with no
+  consumer.
+- **zswap v4**, **io_uring**, **blk-mq mq-deadline**, **restore vblank state**:
+  known watch-only items; no change.
+- **Tracker**: 30 open and 5 closed issues updated since 10-17, 344 comments
+  fetched over GraphQL, and all 24 real commit tokens resolve in `v7.3` or are
+  staging duplicates. No tracker comment points to a missing fix.
+
+### Governance finding — `9082` was NAK'd
+
+Christian König rejected the exact v5 patch we carry in both packages on
+2026-10-19 (`<dd0d869d-7a13-4a6a-b046-f8961a82051c@amd.com>`): "Absolutely
+clear NAK to that approach here as well, that is just horrible racy. The root
+cause is clearly that trylock." The patch stays in place pending explicit
+approval to remove it (CLAUDE.md YOU MUST NOT 8).
