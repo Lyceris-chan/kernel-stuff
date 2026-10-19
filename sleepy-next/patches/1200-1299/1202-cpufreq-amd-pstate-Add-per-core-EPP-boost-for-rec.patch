@@ -168,7 +168,7 @@ index 5d7debb5a35c..771a74e04f86 100644
 +		return;
 +
 +	cached &= ~AMD_CPPC_EPP_PERF_MASK;
-+	cached |= FIELD_PREP(AMD_CPPC_EPP_PERF_MASK, AMD_CPPC_EPP_PERFORMANCE);
++	cached |= FIELD_PREP(AMD_CPPC_EPP_PERF_MASK, 0);
 +
 +	wrmsrq(MSR_AMD_CPPC_REQ, cached);
 +}
@@ -422,10 +422,10 @@ index 99532595150e..0408fc331633 100644
   *
   * The amd_cpudata is key private data for each CPU thread in AMD P-State, and
   * represents all the attributes and goals that AMD P-State requests at runtime.
-@@ -139,6 +146,13 @@ struct amd_cpudata {
- 	enum platform_profile_option current_profile;
- 	struct device *ppdev;
+@@ -150,6 +150,13 @@
  	char *profile_name;
+ 
+ 	enum x86_topology_cpu_type cpu_type;
 +
 +	/* per-core EPP boost (active mode, MSR systems only) */
 +	struct	update_util_data epp_boost_update_util;
@@ -436,6 +436,3 @@ index 99532595150e..0408fc331633 100644
  };
  
  /*
--- 
-2.53.0
-

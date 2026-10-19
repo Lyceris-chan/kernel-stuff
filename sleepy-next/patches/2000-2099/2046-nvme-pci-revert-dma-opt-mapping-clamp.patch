@@ -19,12 +19,10 @@ diff --git a/drivers/nvme/host/pci.c b/drivers/nvme/host/pci.c
 index 5440cf18b55b..82e308fe4f4c 100644
 --- a/drivers/nvme/host/pci.c
 +++ b/drivers/nvme/host/pci.c
-@@ -3747,7 +3747,7 @@ static struct nvme_dev *nvme_pci_alloc_dev(struct pci_dev *pdev,
- 	 */
+@@ -3748,5 +3748,5 @@ static struct nvme_dev *nvme_pci_alloc_dev(struct pci_dev *pdev,
  	dev->ctrl.max_hw_sectors = min_t(u32,
  			NVME_MAX_BYTES >> SECTOR_SHIFT,
--			dma_opt_mapping_size(&pdev->dev) >> 9);
-+			dma_max_mapping_size(&pdev->dev) >> 9);
+-			dma_max_opt_mapping_size(&pdev->dev) >> SECTOR_SHIFT);
++			dma_max_mapping_size(&pdev->dev) >> SECTOR_SHIFT);
  	dev->ctrl.max_segments = NVME_MAX_SEGS;
  	dev->ctrl.max_integrity_segments = 1;
- 	return dev;

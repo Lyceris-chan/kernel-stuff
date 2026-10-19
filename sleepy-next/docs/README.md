@@ -2,18 +2,18 @@
 
 `linux-sleepy-next` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
-built from a **linux-next snapshot (`next-20261016`)** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 273 targeted
+built from a **linux-next snapshot (`next-20261019`)** plus a sanitized
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 129 targeted
 upstream/local patches. It is not a general-purpose kernel.
 
-**Base version:** `2026.10.16-2` · **Artifact:**
-`linux-sleepy-next-2026.10.16-2-x86_64.pkg.tar.zst`
+**Base version:** `2026.10.19-1` · **Artifact:**
+`linux-sleepy-next-2026.10.19-1-x86_64.pkg.tar.zst`
 
-The release is named for the **snapshot date**, not the mainline `-rc` the
-snapshot was cut from — linux-next is a daily tree, and its base rc goes stale
-within days of the cut. The date is dotted (`2026.10.16`) because both `depmod`
-and `mkinitcpio` require the release string to begin with dotted decimal
-notation; a bare `20261016` breaks module dependency generation and the
+The release is named for the **snapshot date**, not the mainline release the
+snapshot was cut from — linux-next is a daily tree, and its base release goes
+stale within days of the cut. The date is dotted (`2026.10.19`) because both
+`depmod` and `mkinitcpio` require the release string to begin with dotted
+decimal notation; a bare `20261019` breaks module dependency generation and the
 initramfs build.
 
 ## Target hardware

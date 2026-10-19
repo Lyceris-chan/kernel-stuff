@@ -125,10 +125,10 @@ index 69cb89298a3e..03f1d4da3a3c 100644
  }
  
  /**
-@@ -1145,18 +1155,22 @@ static void sdma_v7_0_vm_set_pte_pde(struct amdgpu_ib *ib,
- static void sdma_v7_0_ring_pad_ib(struct amdgpu_ring *ring, struct amdgpu_ib *ib)
+@@ -1153,18 +1153,22 @@
  {
  	struct amdgpu_sdma_instance *sdma = amdgpu_sdma_get_instance_from_ring(ring);
+ 	const bool burst_nop = sdma->burst_nop;
 +	u32 *ptr = &ib->ptr[ib->length_dw];
  	u32 pad_count;
  	int i;
@@ -138,7 +138,7 @@ index 69cb89298a3e..03f1d4da3a3c 100644
 +		return;
 +
  	for (i = 0; i < pad_count; i++)
- 		if (sdma && sdma->burst_nop && (i == 0))
+ 		if (i == 0 && burst_nop)
 -			ib->ptr[ib->length_dw++] =
 -				SDMA_PKT_COPY_LINEAR_HEADER_OP(SDMA_OP_NOP) |
 -				SDMA_PKT_NOP_HEADER_COUNT(pad_count - 1);

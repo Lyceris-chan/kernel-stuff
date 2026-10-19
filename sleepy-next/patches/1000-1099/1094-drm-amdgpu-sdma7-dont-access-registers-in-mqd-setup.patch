@@ -1,0 +1,39 @@
+From Alex Deucher <alexander.deucher@amd.com> Mon Sep 17 00:00:00 2001
+From: Alex Deucher <alexander.deucher@amd.com>
+Date: Mon, 19 Oct 2026 15:06:58 -0400
+Subject: [PATCH 4/5] drm/amdgpu/sdma7: don't access registers in MQD setup
+Message-ID: <20261019190659.2773961-4-alexander.deucher@amd.com>
+
+No need to read the register state from the hardware, just
+program the settings explicitly.  This could also cause
+problems when gfx is powered off.
+
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/sdma_v7_0.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/sdma_v7_0.c b/drivers/gpu/drm/amd/amdgpu/sdma_v7_0.c
+index 62d432b23cbc6..2c61ab015982f 100644
+--- a/drivers/gpu/drm/amd/amdgpu/sdma_v7_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/sdma_v7_0.c
+@@ -867,6 +867,7 @@ static int sdma_v7_0_mqd_init(struct amdgpu_device *adev, void *mqd,
+ {
+ 	struct v12_sdma_mqd *m = mqd;
+ 	uint64_t wb_gpu_addr;
++	u32 tmp;
+ 
+ 	m->sdmax_rlcx_rb_cntl =
+ 		order_base_2(prop->queue_size / 4) << SDMA0_QUEUE0_RB_CNTL__RB_SIZE__SHIFT |
+@@ -885,8 +886,9 @@ static int sdma_v7_0_mqd_init(struct amdgpu_device *adev, void *mqd,
+ 	m->sdmax_rlcx_rb_rptr_addr_lo = lower_32_bits(wb_gpu_addr);
+ 	m->sdmax_rlcx_rb_rptr_addr_hi = upper_32_bits(wb_gpu_addr);
+ 
+-	m->sdmax_rlcx_ib_cntl = RREG32_SOC15_IP(GC, sdma_v7_0_get_reg_offset(adev, 0,
+-							regSDMA0_QUEUE0_IB_CNTL));
++	tmp = REG_SET_FIELD(0, SDMA0_QUEUE0_IB_CNTL, IB_ENABLE, 1);
++	tmp = REG_SET_FIELD(tmp, SDMA0_QUEUE0_IB_CNTL, SWITCH_INSIDE_IB, 1);
++	m->sdmax_rlcx_ib_cntl = tmp;
+ 
+ 	m->sdmax_rlcx_doorbell_offset =
+ 		prop->doorbell_index << SDMA0_QUEUE0_DOORBELL_OFFSET__OFFSET__SHIFT;

@@ -68,6 +68,58 @@ mismatches; the retry-fault v1 → v4 redesign remains approval-gated. The
 `9082` NAK is recorded in `PATCH_SOURCES.md` and stays in place pending
 explicit approval to remove it.
 
+## [2026.10.19-1-sleepy-next (linux-next `next-20261019`)]: 2026-10-19
+
+The preview moves to the first post-7.3 snapshot. `next-20261019` is cut from
+v7.3 final and carries the opening of the 7.4 merge window, including the
+`amd-drm-next-7.4-2026-10-08` pull. Instead of leaving the series to skip at
+build time, every entry was tested against the new base in both directions and
+confirmed with a content probe. The series drops from 275 to 129 patches; all
+129 apply in order with no skips.
+
+### Dropped — 153 patches the snapshot absorbed or superseded
+
+Of these, 115 reverse-apply or report `Skipping patch` against the pristine
+base, and 38 are superseded by a newer implementation or explicitly absorbed:
+the CPPC hardening (`1210`–`1229`), the zswap rework (`2173`–`2196`,
+`2700`/`2701`), the kbuild toolchain moves (`2302`–`2312`), the display
+FRL/VRR set (`0050`–`0061`, `1136`–`1172`), the retry-fault v4 series
+(`9100`–`9108`), the io_uring set, and the nvme copyback/API work (`2018`,
+`2048`–`2050`).
+
+### Added — seven ready patches
+
+`1094` (SDMA 7.0 MQD setup without register reads), `1095` (call `hw_fini()`
+for IP blocks whose `hw_init()` failed), `1096` (amdkfd SDMA IB processing;
+`Reviewed-by`/`Acked-by`, partial port of the v12 hunk) and `2052`–`2055`
+(CAKE v7: classifier result, split-GSO iterator, backlog cap, hash before
+segmenting).
+
+### Rebased — seven patches for the new base
+
+`1058`, `1070`, `1202`, `2036`, `2037`, `2046` and `9069`. The details and the
+full drop list are in `PATCH_SOURCES.md`. Two patches needed compile fixes the
+apply audit cannot see: `2419` (BORE) now branches in the snapshot's new
+`update_protect_slice()`, and `1202` uses the CPPC performance value directly
+because the base removed `AMD_CPPC_EPP_PERFORMANCE`.
+
+A post-build audit restored five patches whose added lines also occur in other
+functions of the same file: `0034`, `1018`, `1142`, `9057` and `9071`. Their
+intended fixes were still missing from the base, and all five apply; the series
+is 129 patches.
+
+### Changed — sched_ext disabled for this snapshot
+
+`CONFIG_SCHED_CLASS_EXT` and `CONFIG_EXT_SUB_SCHED` are off in the preview:
+next-20261019's sched_ext tree calls an undefined
+`scx_reenq_wait_dispatching()` and uses the pre-rename `dsq->pcpu`. BORE is the
+live scheduler and sched_ext is unused; the RC package keeps it enabled.
+
+### Still excluded
+
+The TLB-invalidation group (`1008`, `1012`, `1013`, `1014`, `1017`), `9040` and
+`9060`; the reasons are unchanged.
+
 ## [2026.10.16-3-sleepy-next (linux-next `next-20261016`)]: 2026-10-19
 
 `pkgrel` 2 -> 3. The snapshot base is unchanged. This rebuild carries the four

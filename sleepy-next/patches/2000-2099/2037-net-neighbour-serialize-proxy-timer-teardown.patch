@@ -74,20 +74,18 @@ diff --git a/net/core/neighbour.c b/net/core/neighbour.c
 index 1349c0eedb642..1ea794a541efb 100644
 --- a/net/core/neighbour.c
 +++ b/net/core/neighbour.c
-@@ -471,10 +471,13 @@ static int __neigh_ifdown(struct neigh_table *tbl, struct net_device *dev,
+@@ -471,8 +471,11 @@ static int __neigh_ifdown(struct neigh_table *tbl, struct net_device *dev,
  	spin_unlock_bh(&tbl->lock);
  
  	pneigh_ifdown(tbl, dev, skip_perm);
 +	/* The callback does not take this lock, so sync deletion can wait for it. */
 +	spin_lock_bh(&tbl->proxy_timer_lock);
- 	pneigh_queue_purge(&tbl->proxy_queue, dev ? dev_net(dev) : NULL,
- 			   tbl->family);
+ 	pneigh_queue_purge(&tbl->proxy_queue, tbl->family);
  	if (skb_queue_empty_lockless(&tbl->proxy_queue))
  		timer_delete_sync(&tbl->proxy_timer);
 +	spin_unlock_bh(&tbl->proxy_timer_lock);
  	return 0;
  }
- 
 @@ -1729,6 +1732,7 @@ void pneigh_enqueue(struct neigh_table *tbl, struct neigh_parms *p,
  	NEIGH_CB(skb)->sched_next = sched_next;
  	NEIGH_CB(skb)->flags |= LOCALLY_ENQUEUED;

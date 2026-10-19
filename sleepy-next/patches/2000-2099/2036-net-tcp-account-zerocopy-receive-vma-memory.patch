@@ -230,21 +230,12 @@ index 562752352afe..5cc2bfc8a90d 100644
  static skb_frag_t *skb_advance_to_frag(struct sk_buff *skb, u32 offset_skb,
  				       u32 *offset_frag)
  {
-@@ -2173,7 +2269,7 @@ static struct vm_area_struct *find_tcp_vma(struct mm_struct *mm,
- 	struct vm_area_struct *vma = lock_vma_under_rcu(mm, address);
+@@ -2186,7 +2186,7 @@
+ 	if (!vma)
+ 		return NULL;
  
- 	if (vma) {
--		if (vma->vm_ops != &tcp_vm_ops) {
-+		if (!tcp_zc_vma_valid(vma, mm)) {
- 			vma_end_read(vma);
- 			return NULL;
- 		}
-@@ -2183,7 +2279,7 @@ static struct vm_area_struct *find_tcp_vma(struct mm_struct *mm,
- 
- 	mmap_read_lock(mm);
- 	vma = vma_lookup(mm, address);
--	if (!vma || vma->vm_ops != &tcp_vm_ops) {
-+	if (!vma || !tcp_zc_vma_valid(vma, mm)) {
- 		mmap_read_unlock(mm);
+-	if (vma->vm_ops != &tcp_vm_ops) {
++	if (!tcp_zc_vma_valid(vma, mm)) {
+ 		vma_end_read(vma);
  		return NULL;
  	}

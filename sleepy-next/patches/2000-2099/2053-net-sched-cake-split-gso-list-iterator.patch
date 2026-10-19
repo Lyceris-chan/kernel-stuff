@@ -1,0 +1,60 @@
+From Jamal Hadi Salim <jhs@mojatatu.com> Mon Sep 17 00:00:00 2001
+From: Jamal Hadi Salim <jhs@mojatatu.com>
+Date: Mon, 19 Oct 2026 12:00:33 -0400
+Subject: [PATCH net-next v7 2/4] net/sched: cake: use a dedicated split-GSO list iterator
+Message-ID: <QDISC-BA27.v7.r0.20261019115505-2@mojatatu.com>
+
+skb_list_walk_safe(segs, segs, nskb) reuses the list head as the walk
+cursor, so segs no longer names the segment list once the walk finishes.
+Use a separate seg cursor to keep the head and the walker distinct. No
+behaviour change.
+
+Reviewed-by: Victor Nogueira <victor@mojatatu.com>
+Signed-off-by: Jamal Hadi Salim <jhs@mojatatu.com>
+---
+ net/sched/sch_cake.c | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/net/sched/sch_cake.c b/net/sched/sch_cake.c
+index 6432d10c992e..0d13c4b0bfe3 100644
+--- a/net/sched/sch_cake.c
++++ b/net/sched/sch_cake.c
+@@ -1810,7 +1810,7 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
+ 		WRITE_ONCE(b->max_skblen, len);
+ 
+ 	if (qdisc_pkt_segs(skb) > 1 && q->config->rate_flags & CAKE_FLAG_SPLIT_GSO) {
+-		struct sk_buff *segs, *nskb;
++		struct sk_buff *segs, *nskb, *seg;
+ 		netdev_features_t features = netif_skb_features(skb);
+ 		unsigned int slen = 0, numsegs = 0;
+ 
+@@ -1818,19 +1818,19 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
+ 		if (IS_ERR_OR_NULL(segs))
+ 			return qdisc_drop(skb, sch, to_free);
+ 
+-		skb_list_walk_safe(segs, segs, nskb) {
+-			skb_mark_not_on_list(segs);
+-			qdisc_skb_cb(segs)->pkt_len = segs->len;
+-			qdisc_skb_cb(segs)->pkt_segs = 1;
+-			cobalt_set_enqueue_time(segs, now);
+-			get_cobalt_cb(segs)->adjusted_len = cake_overhead(q,
+-									  segs);
+-			flow_queue_add(flow, segs);
++		skb_list_walk_safe(segs, seg, nskb) {
++			skb_mark_not_on_list(seg);
++			qdisc_skb_cb(seg)->pkt_len = seg->len;
++			qdisc_skb_cb(seg)->pkt_segs = 1;
++			cobalt_set_enqueue_time(seg, now);
++			get_cobalt_cb(seg)->adjusted_len = cake_overhead(q,
++									 seg);
++			flow_queue_add(flow, seg);
+ 
+ 			qdisc_qlen_inc(sch);
+ 			numsegs++;
+-			slen += segs->len;
+-			q->buffer_used += segs->truesize;
++			q->buffer_used += seg->truesize;
++			slen += seg->len;
+ 			WRITE_ONCE(b->packets, b->packets + 1);
+ 		}
+ 

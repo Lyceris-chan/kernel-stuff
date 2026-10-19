@@ -1,0 +1,85 @@
+From Leo Liu <leo.liu@amd.com> Mon Sep 17 00:00:00 2001
+From: Leo Liu <leo.liu@amd.com>
+Date: Mon, 19 Oct 2026 13:40:39 -0400
+Subject: [PATCH] drm/amdgpu: call hw_fini for IP blocks whose hw_init failed
+Message-ID: <20261019174039.9771-1-leo.liu@amd.com>
+
+When an IP block's hw_init() fails, amdgpu_device_ip_fini_early() skips
+its hw_fini() because status.hw was never set.  For VCN, UVD, VCE, and
+JPEG this leaves their idle work queued after sw_fini() frees the adev
+state the handler touches, causing a use-after-free.
+
+The bug was reported on MI355X after unloading GIM then loading amdgpu.
+GIM's teardown resets the GPU, leaving VCN unresponsive.
+amdgpu_vcn_enc_ring_test_ring() calls amdgpu_ring_commit() — which
+schedules the idle work — before polling rptr.  The poll times out
+(-ETIMEDOUT), hw_init() fails, hw_fini() is skipped, and the idle work
+handler fires after sw_fini() against freed state.
+
+The ticket (Link below) suggests cancelling the idle work on all
+failed-probe/sw_fini paths.  This patch takes a different approach: the
+idle work cancel belongs in hw_fini(), which is already the correct
+counterpart to hw_init() for hardware-domain cleanup.  Rather than
+scattering cancel calls across sw_fini() or every IP's hw_init() error
+path, we ensure hw_fini() is invoked for any block whose hw_init() was
+attempted but failed.
+
+Add status.hw_init_attempted, set it in amdgpu_device_ip_hw_init_phase2()
+on hw_init() failure, and check it alongside status.hw in
+amdgpu_device_ip_fini_early().  This causes fini_early() to call hw_fini()
+for the failed block in its correct reverse-order position — a single
+change in one file that covers all IP types without touching any per-IP
+code.
+
+Link: https://github.com/ROCm/amdgpu/issues/234
+Fixes: 416e1fab4752 ("drm/amdgpu: drop redundant cancel_delayed_work_sync call")
+Cc: stable@vger.kernel.org
+Assisted-by: Claude:Claude-Sonnet-4.6
+Signed-off-by: Leo Liu <leo.liu@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_device.c | 5 ++++-
+ drivers/gpu/drm/amd/amdgpu/amdgpu_ip.h     | 1 +
+ 2 files changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
+index b74f9136aa2e..66e24bd0859a 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
+@@ -2233,6 +2233,7 @@ static int amdgpu_device_ip_hw_init_phase2(struct amdgpu_device *adev)
+ 			dev_err(adev->dev,
+ 				"hw_init of IP block <%s> failed %d\n",
+ 				adev->ip_blocks[i].version->funcs->name, r);
++			adev->ip_blocks[i].status.hw_init_attempted = true;
+ 			return r;
+ 		}
+ 		adev->ip_blocks[i].status.hw = true;
+@@ -2850,6 +2851,7 @@ static void amdgpu_ip_block_hw_fini(struct amdgpu_ip_block *ip_block)
+ 	}
+ 
+ 	ip_block->status.hw = false;
++	ip_block->status.hw_init_attempted = false;
+ }
+ 
+ /**
+@@ -2902,7 +2904,8 @@ static int amdgpu_device_ip_fini_early(struct amdgpu_device *adev)
+ 	amdgpu_device_smu_fini_early(adev);
+ 
+ 	for (i = adev->num_ip_blocks - 1; i >= 0; i--) {
+-		if (!adev->ip_blocks[i].status.hw)
++		if (!adev->ip_blocks[i].status.hw &&
++		    !adev->ip_blocks[i].status.hw_init_attempted)
+ 			continue;
+ 
+ 		amdgpu_ip_block_hw_fini(&adev->ip_blocks[i]);
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_ip.h b/drivers/gpu/drm/amd/amdgpu/amdgpu_ip.h
+index 5dd6273982c4..bfa27ca05dbe 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_ip.h
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_ip.h
+@@ -99,6 +99,7 @@ struct amdgpu_ip_block_status {
+ 	bool valid;
+ 	bool sw;
+ 	bool hw;
++	bool hw_init_attempted;
+ 	bool late_initialized;
+ 	bool hang;
+ };

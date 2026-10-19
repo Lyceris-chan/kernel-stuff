@@ -15,16 +15,16 @@ moved, so the full ledger is not duplicated here.
 
 | | |
 |---|---|
-| Snapshot | `next-20261016`, tag `2efb7a11f1aa` |
-| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261016.tar.gz` |
-| Snapshot tree `Makefile` | `7.3.0-rc7` — the base rc, **deliberately not used in the release name** |
-| Kernel release | `2026.10.16-1-sleepy-next` |
-| Package | `linux-sleepy-next-2026.10.16-1` |
+| Snapshot | `next-20261019`, tag `13f2fb693de7` (tip `3d229ce89862`) |
+| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261019.tar.gz` |
+| Snapshot tree `Makefile` | `7.3.0` — the base release, **deliberately not used in the release name** |
+| Kernel release | `2026.10.19-1-sleepy-next` |
+| Package | `linux-sleepy-next-2026.10.19-1` |
 
 ### Versioning: the snapshot date, not the base rc
 
 `pkgver` is the snapshot date, derived from `_srctag` — `_snapdate=${_srctag#next-}`
-(`20261016`) and `_snapver` respells it dotted (`2026.10.16`) — so a bump cannot
+(`20261019`) and `_snapver` respells it dotted (`2026.10.19`) — so a bump cannot
 move the tag without moving the version.
 
 **The dots are load-bearing, not cosmetic.** Both tools that consume the release
@@ -32,19 +32,19 @@ string require it to *begin* with dotted decimal notation:
 
 | Tool | Requirement | Failure without it |
 |---|---|---|
-| `depmod` (kmod 34.2) | an `N.N` prefix; a bare `20261016-1-sleepy-next` is rejected as `Bad version passed` | post-install depmod hook fails, no module dependencies generated |
+| `depmod` (kmod 34.2) | an `N.N` prefix; a bare `20261019-1-sleepy-next` is rejected as `Bad version passed` | post-install depmod hook fails, no module dependencies generated |
 | `mkinitcpio` (42.2) | `kver()` validates the release extracted from the image against `^[[:digit:]]+(\.[[:digit:]]+)+` | initramfs build fails — **the kernel is left with no initramfs at all** |
 
-A bare `20261016` therefore cannot be the release name. Dots are legal in
+A bare `20261019` therefore cannot be the release name. Dots are legal in
 `pkgver`; only `-` is reserved, as the pkgver/pkgrel separator.
 
-`prepare()` rewrites the snapshot's `Makefile` so `KERNELVERSION = 2026.10.09`.
+`prepare()` rewrites the snapshot's `Makefile` so `KERNELVERSION = 2026.10.19`.
 Left alone, the tree composes `KERNELVERSION` from
-`VERSION`/`PATCHLEVEL`/`SUBLEVEL`/`EXTRAVERSION` and stamps its **base** rc into
-the name: `next-20261016` is cut from `v7.3-rc7`, so the kernel announced itself
-as `7.3.0-rc7-1-sleepy-next`. That is wrong twice over — stale, because the tree
-carries weeks of work past rc6, and easily mistaken for `linux-sleepy-rc`'s
-genuine `7.3.0-rc7-1-sleepy-rc`.
+`VERSION`/`PATCHLEVEL`/`SUBLEVEL`/`EXTRAVERSION` and stamps its **base** release
+into the name: `next-20261019` is cut from `v7.3`, so the kernel would announce
+itself as `7.3.0-1-sleepy-next` — the same upstream release as
+`linux-sleepy-rc`'s genuine `7.3.0-1-sleepy-rc`, colliding with it in tools that
+compare only the upstream version.
 
 Only the release *string* moves. `version.h` derives `LINUX_VERSION_CODE` from
 `VERSION`/`PATCHLEVEL`/`SUBLEVEL` (`Makefile`: `filechk_version.h`), **not** from
@@ -56,7 +56,7 @@ module directory and the packaged paths all agree.
 `prepare()` asserts the rewrite landed and aborts the build if it did not, rather
 than shipping a kernel that misreports its own release.
 
-The tree's own `localversion-next` (containing `-next-20261016`) is still
+The tree's own `localversion-next` (containing `-next-20261019`) is still
 deleted: the date is already `KERNELVERSION`, so keeping it would print it
 twice.
 
@@ -65,9 +65,11 @@ twice.
 ### 1. Patches that do not apply are SKIPPED, not failed
 
 `prepare()` dry-runs every patch and skips it outright when it does not apply, so
-a snapshot that has moved past the series still produces a build. A linux-next
-snapshot is not a stable base: it already contains much of what the 7.3-rc6-era
-series adds, so a large fraction of the series is skipped.
+a snapshot that has moved past the series still produces a build. The series is
+reconciled on every snapshot bump: on `next-20261019`, **129 patches apply in
+order** and the absorbed or superseded carries are no longer listed (see *Base
+bump to `next-20261019`* at the end of this file). The skip mechanism remains as
+a safety net for a snapshot that moves again before the next reconciliation.
 
 Skipping is only safe for a **self-contained** patch. A patch that *declares* a
 symbol another patch *uses* must not be skipped while its consumer applies —
@@ -79,17 +81,17 @@ an interdependent group, the whole group is excluded instead (see 2).
 `1008`, `1012`, `1013`, `1014` and `1017` are **not listed** in the preview
 `source=()`. All five are retained in full in `sleepy-rc`.
 
-| Patch | Role | Applies to `next-20261016`? |
+| Patch | Role | Applies to `next-20261019`? |
 |---|---|---|
-| `1008` | adds `amdgpu_buffer_funcs::tlb_inv_num_dw` and `amdgpu_emit_tlb_inv()` | no |
+| `1008` | adds `amdgpu_buffer_funcs::tlb_inv_num_dw` and `amdgpu_emit_tlb_inv()` | no (1 of 2 hunks fails) |
 | `1012` | sdma7 TLB-invalidation consumer | yes |
 | `1013` | core TLB-invalidation helper | yes |
-| `1014` | further gmc tlb-inv helpers | yes |
+| `1014` | further gmc tlb-inv helpers | no (fails both directions) |
 | `1017` | gmc12 TLB-invalidation consumer | yes |
 
-`1008` no longer applies while `1012`/`1013` do — and those consume exactly the
-struct member and helper that `1008` introduces. Carrying the group partially
-does not compile:
+`1008` still does not apply, while `1012`/`1013`/`1017` do — and those consume
+exactly the struct member and helper that `1008` introduces. Carrying the group
+partially does not compile:
 
 ```
 drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c:2634:42: error: no member named
@@ -270,6 +272,20 @@ with IPS left enabled rather than masked off by the 7.3-era workaround.
 ```
 cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0
 ```
+
+### 8. sched_ext disabled on `next-20261019`
+
+`CONFIG_SCHED_CLASS_EXT` and `CONFIG_EXT_SUB_SCHED` are disabled in the preview
+for this snapshot. The snapshot's sched_ext tree has two merge gaps:
+
+- `free_dsq_irq_workfn()` in `kernel/sched/ext/ext.c` uses `dsq->pcpu`, but the
+  field is `pcpu_user` in `include/linux/sched/ext.h`.
+- `scx_reenq_wait_dispatching()` is called in `ext.c` but defined nowhere in the
+  tree.
+
+BORE is the live scheduler on this machine and sched_ext is unused, so the
+preview builds without it; `sleepy-rc` keeps `CONFIG_SCHED_CLASS_EXT=y`.
+Re-enable when a later snapshot's sched_ext tree is consistent.
 
 ## Base bump to `next-20261016` — 2026-10-17
 
@@ -532,11 +548,11 @@ the preview builds it too. It is absent from the snapshot's own `insn.h`.
 
 | | |
 |---|---|
-| Files in `patches/` | 282 |
-| Entries in `source=()` | 275 |
+| Files in `patches/` | 136 |
+| Entries in `source=()` | 129 |
 | Excluded from `source=()` | 7 — `1008`, `1012`, `1013`, `1014`, `1017`, `9060`, `9040` |
-| Preview-only adds | `2700`, `2701` (zswap request stack) |
-| Preview-only carries after the 7.3 bump | `1086`–`1090`, `2508`, `2900`, `2901`, `9085` |
+| Preview-only adds | none; the zswap request stack (`2700`/`2701`) is absorbed by this snapshot |
+| Preview-only carries | none; the 7.3-bump carries are absorbed and removed (see *Base bump to `next-20261019`*) |
 
 ## 2026-10-19 — 7.3 bump: nine preview-only carries, four shared additions, `1084` v2
 
@@ -581,3 +597,142 @@ snapshot exactly as it does the rest of the series.
 `1093` (the gfxoff debugfs out-of-bounds write) is copied here too; it applies
 to the pristine snapshot base. The earlier "already in the base" verdict was
 wrong — the `0x7` guard it matched belongs to other gfxoff handlers.
+
+## Base bump to `next-20261019` — 2026-10-19
+
+Linux 7.3 was released on 2026-10-18 and the first post-release snapshot,
+`next-20261019`, is cut from `v7.3`. The package moves from `2026.10.16-3` to
+`2026.10.19-1`, and the series is reconciled against the new base rather than
+left to skip at build time.
+
+### Method
+
+Test every entry in the 275-patch preview series against a pristine
+`next-20261019` worktree in both directions with GNU `patch -F2`, then confirm
+every apparent absorption with a content probe: the `+` lines a patch introduces
+must be present in the base. The final series applies in order: **129/129
+clean**.
+
+The reverse test alone is not authoritative. `1093` reverse-applied at a
+different `gfxoff` handler, the same wrong-function match that misled the
+2026-10-15 sweep; the identifier probe kept it. The content-probe fraction
+alone also misclassified it: its added lines (`size & 0x7`, `buf += 8`) exist in
+the other `gfxoff` handlers, so the fraction was high while `count_read()` still
+had `0x3` and `+= 4`. The function-specific check kept it. `9109`/`9110`
+reported `Skipping patch` individually but failed in sequence on the old audit;
+the individual content probe showed their merged form in the base, so they are
+dropped.
+
+### Dropped — 153 patches
+
+| Group | Count | Reason |
+|---|---|---|
+| Reverse-applies to the base | 89 | the change is already in `next-20261019` |
+| Forward `Skipping patch` | 26 | same; GNU patch detected the post-image |
+| Content ≥ 85 % present | 16 | superseded by the base's newer form of the same change |
+| Explicit supersession / absorption | 22 | listed below |
+
+The absorbed set includes most of the 7.4 AMD DRM pull (`8e2d7e8d7580`,
+`amd-drm-next-7.4-2026-10-08`): the retry-fault v4 `9100`–`9108`, the display
+HDMI/VRR set (`0050`, `0055`, `0058`, `0059`, `0061`, `1136`, `1152`, `1154`,
+`1165`, `1168`, `1171`, `1172`), and the userq lifecycle fixes. The base's
+`pm` tree carries the merged CPPC hardening (`1210`–`1229`); its `mm` tree
+carries the zswap rework (`2173`, `2174`, `2177`, `2190`–`2196`, `2700`,
+`2701`) and the GUP/khugepaged changes; its `kbuild` tree carries the
+toolchain and kallsyms work (`2302`–`2312`). The preview-only absorbed carries
+`1086`–`1090`, `2508`, `2700`/`2701`, `2900`/`2901` and `9085` are gone too.
+
+Patches superseded by a newer implementation, rather than absorbed verbatim:
+`2009` (`__bh_submit` already has the `bh->b_folio` guard), `2018`
+(`io_req_put_file()` unification), `2048`–`2050` (the 7.4 nvme/io_uring
+completion API no longer has `pdu->status`/`pdu->result`), `2140` (the base
+clears `__GFP_DIRECT_RECLAIM` for costly `__GFP_NORETRY` callers), `2150`
+(`has_deposited_pgtable()` is gone), `2182` (`mod_ct++` already present),
+`2311`/`2312` (the base has `init/Kconfig.toolchain` and the
+`CONFIG_CC_OPT_WNO_*` form), `2400` (the trace placement is already in
+`sched/core.c`), `9038` and `9072` (the checks and the SDMA callback moved to
+`amdgpu_sdma_types.h`).
+
+### Audit correction — five drops restored
+
+A second pass checked every dropped patch for the change in its **intended
+function**, not just for its added lines somewhere in the file. Four patches
+had those lines in other functions of the same file and were wrongly classified
+as absorbed:
+
+| Patch | Fix that was still missing |
+|---|---|
+| `0034` | `dcn401_resource_destruct()` destroys the IRQ service inside the plane loop; the fix moves it after the loop. |
+| `1018` | `amdgpu_discovery_set_ip_blocks()` still initializes Display before GC; the fix puts GC first. |
+| `1142` | The DCE I2C setup-failure path did not close the DDC or clear `dce_i2c_hw->ddc`. |
+| `9057` | `amdgpu_vm_clear_freed()` frees the mapping before checking the update result; the fix keeps it on `vm->freed` for a retry. |
+| `9071` | `amdgpu_userq_create()` still publishes the queue with `xa_alloc()` without an extra kref, leaving a concurrent free able to race. |
+
+All five apply to the base and are restored. The series is 129 patches.
+
+### Added — seven patches
+
+| # | Subject | Author, source | Evidence |
+|---|---|---|---|
+| `1094` | sdma7: don't access registers in MQD setup | Alex Deucher, `<20261019190659.2773961-4-alexander.deucher@amd.com>` | On-target SDMA 7.0; applies (2 hunks, offsets +21). The other four parts of the series target SDMA 5/5.2/6/7.1 and are not carried. |
+| `1095` | call hw_fini for IP blocks whose hw_init failed (v2) | Leo Liu, `<20261019174039.9771-1-leo.liu@amd.com>` | Applies (4 hunks). Fixes a use-after-free when a block's `hw_init()` fails and its idle work fires after `sw_fini()`. |
+| `1096` | Enable SDMA IB processing | Yongqiang Sun, `<20261019175807.970192-1-Yongqiang.Sun@amd.com>` | The thread has `Reviewed-by: Mukul Joshi` (conditional on a commit-message rewrite) and `Acked-by: Alex Deucher`; the carried patch keeps the original message. Partial port of the v12 hunk only (GC 12.0); the v12_1 hunk fails and targets GC 12.1. |
+| `2052`–`2055` | cake v7: classifier result, split-GSO iterator, backlog cap, hash before segmenting | Jamal Hadi Salim, cover `<QDISC-BA27.v7.r0.20261019115505@mojatatu.com>` | `Reviewed-by: Victor Nogueira` on all four; `Acked-by: Toke Høiland-Jørgensen` on 2/4. Applies cumulatively in this order. net-next 7.4 content, so this snapshot is the right base. |
+
+Considered and not adopted: `SWITCH_INSIDE_IB` (its own message says the bit is
+the hardware default; no-op hardening), the userq engine-reset `13/13` series
+(no review yet), and the x86/mce cache-hierarchy patch (Intel/Zhaoxin only).
+
+### Rebased — seven patches
+
+| Patch | Change |
+|---|---|
+| `1058` | call site now passes `p->adev` and uses `p->vm`/`p->adev` locals; the base's signature already takes `adev`. |
+| `1070` | `sdma_v7_0_ring_pad_ib()` now uses `const bool burst_nop`; the pointer-emission rewrite was ported onto it. |
+| `1202` | the per-core EPP fields were appended after the new `cpu_type` member of `struct amd_cpudata`. |
+| `2036` | `find_tcp_vma()` now uses `vma_start_read_unlocked()` and one check; the `tcp_zc_vma_valid()` replacement was ported. |
+| `2037` | `pneigh_queue_purge()` lost the `net` argument; the lock now wraps the base's two-argument call. |
+| `2046` | the base uses `dma_max_opt_mapping_size()`; the revert now targets `dma_max_mapping_size()`. |
+| `9069` | suspend/resume were rewritten on the base's function bodies with `amdgpu_userq_xa_find()`/`amdgpu_userq_put()`. |
+
+### Compile fixes the apply audit cannot see
+
+Two patches applied cleanly but failed to compile on the new base, the failure
+mode an apply-only audit cannot detect:
+
+- `2419` (BORE): the snapshot's new `update_protect_slice()` uses
+  `normalized_sysctl_sched_base_slice`, which BORE's `#else` block removes.
+  The patch now gives that function the same `CONFIG_SCHED_BORE` branch as
+  `set_protect_slice()`.
+- `1202` (per-core EPP boost): the base removed `AMD_CPPC_EPP_PERFORMANCE`.
+  The patch now writes the CPPC EPP performance value (`0`) directly.
+
+The first build also exposed the snapshot's sched_ext merge gaps (see section
+8 above), which the config override handles.
+
+### Still excluded from `source=()`
+
+`1008`, `1012`, `1013`, `1014` and `1017` (the TLB-invalidation rework; `1008`
+and `1014` still do not apply), `9040` (the base's `error_free_user_pages` label
+already covers it; applying adds a redundant free loop), and `9060` (absorbed
+upstream; applying would redefine `svm_range_window_resident()`).
+
+### Reverts and revisions
+
+No `Revert "..."` in `next-20261019` targets a carried patch. The only subject
+match is `2046` itself, which is our revert of the nvme-pci clamp and is kept.
+
+A full version re-check over the 16 lore mirrors (postings since 2026-01-01)
+found higher-numbered postings for ten kept subjects. All but two are
+content-identical resends or comment-only changes: `1175` v4, `1233` v2,
+`2037` v2, `2313`/`2315`/`2317` v4 and `9063` V2. `2314` v4's additions
+(`add_asm_ksymtab` and the CRC dependency emission) are already present in the
+tree; `2316` v4, a 90-line relocation-cache rework, does not apply to this
+base; and the `1151` v4 posting is dated 2026-02-16, older than our carried
+2026-09-01 revision. No carried patch needs a newer revision.
+
+### Verification
+
+A pristine `next-20261019` worktree with the 129 patches applied in order
+reports no failures, no `Skipping patch` and no `Reversed` hunk under GNU
+`patch -p1 --forward -F2`. The build follows.

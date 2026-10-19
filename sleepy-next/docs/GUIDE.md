@@ -1,8 +1,8 @@
 # linux-sleepy-next: build guide
 
-Build details for `linux-sleepy-next` (mainline **Linux 7.3-rc3** + the sleepy
-series). See `README.md` for what the kernel is; `../../CLAUDE.md` for the
-maintenance rules.
+Build details for `linux-sleepy-next` (linux-next **`next-20261019`**, cut from
+mainline **Linux 7.3** + the sleepy series). See `README.md` for what the kernel
+is; `../../CLAUDE.md` for the maintenance rules.
 
 ## Toolchain
 
