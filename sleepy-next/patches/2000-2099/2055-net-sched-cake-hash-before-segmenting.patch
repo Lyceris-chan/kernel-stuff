@@ -1,8 +1,8 @@
 From Jamal Hadi Salim <jhs@mojatatu.com> Mon Sep 17 00:00:00 2001
 From: Jamal Hadi Salim <jhs@mojatatu.com>
-Date: Mon, 19 Oct 2026 12:00:35 -0400
-Subject: [PATCH net-next v7 4/4] net/sched: cake: hash before segmenting and reject an overlong split
-Message-ID: <QDISC-BA27.v7.r0.20261019115505-4@mojatatu.com>
+Date: Tue, 20 Oct 2026 12:57:30 -0400
+Subject: [PATCH net-next v8 4/4] net/sched: cake: hash before segmenting and reject an overlong split
+Message-ID: <QDISC-BA27.v8.r0.20261020063241-4@mojatatu.com>
 
 The Fix:
 with CAKE_FLAG_SPLIT_GSO, cake computes the flow/host hash keys, then
@@ -20,9 +20,7 @@ admitted. Move the split-GSO path ahead of the resolution: sum the
 segment list, test the total against the ceiling before linking any
 segment, and drop the whole list on rejection so no persistent state is
 committed. The list is deferred to to_free so the tail segment's
-sock_wfree() never runs under the qdisc lock; a fraglist GSO, where
-skb_segment_list() returns the original skb as the head, drops the
-caller's reference and queues the list once instead of self-linking it.
+sock_wfree() never runs under the qdisc lock.
 
 Tag every deferred segment with QDISC_DROP_OVERLIMIT: __skb_gso_segment()
 keeps SKB_GSO_CB at cb offset 32, aliasing tc_skb_cb.drop_reason, and
@@ -41,20 +39,22 @@ extract keys in one mode and resolve them in another.
 Link: https://lore.kernel.org/netdev/179231933068.3135.80340792633077986@kernel.org/
 Reviewed-by: Victor Nogueira <victor@mojatatu.com>
 Signed-off-by: Jamal Hadi Salim <jhs@mojatatu.com>
+
 ---
-v6 -> v7: the split-GSO reject path now sets QDISC_DROP_OVERLIMIT on
-every deferred segment, not only on the head/original skb; the GSO cb
-aliases tc_skb_cb.drop_reason and is copied into every segment, so
-untagged segments carried GSO scratch as their drop reason. The
-flow_mode is likewise snapshotted once with READ_ONCE() and passed to
-both cake_hash_keys() and cake_hash_resolve(). (Sashiko nipa v6
-review, gpt-6-astra-2-5, gpt-6-astra-5-9)
+
+v7 -> v8: the original skb is consumed unconditionally right after a
+successful split -- the caller's reference; a fraglist GSO takes the
+list's own reference on the same skb in skb_segment_list() -- so the
+reject branch tags every deferred segment and drops the whole list with
+qdisc_drop_all(), the admitted path no longer consumes the skb after the
+walk, and both special-case comments are gone.  (Toke
+Høiland-Jørgensen, v7 review)
 ---
- net/sched/sch_cake.c | 130 ++++++++++++++++++++++++++++++++-----------
- 1 file changed, 99 insertions(+), 31 deletions(-)
+ net/sched/sch_cake.c | 123 +++++++++++++++++++++++++++++++------------
+ 1 file changed, 90 insertions(+), 33 deletions(-)
 
 diff --git a/net/sched/sch_cake.c b/net/sched/sch_cake.c
-index 91c33295b30b..730c90af14bd 100644
+index 91c33295b30b..79d6f6f76dbc 100644
 --- a/net/sched/sch_cake.c
 +++ b/net/sched/sch_cake.c
 @@ -706,19 +706,28 @@ static u16 cake_get_flow_quantum(struct cake_tin_data *q,
@@ -187,7 +187,7 @@ index 91c33295b30b..730c90af14bd 100644
  
  	/* Classify first: a terminal TC action consumes the packet. */
  	if (cake_tcf_classify(sch, skb, &flow_override, &host_override, &ret)) {
-@@ -1784,12 +1811,59 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
+@@ -1784,12 +1811,49 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
  					 QDISC_DROP_OVERLIMIT);
  	}
  
@@ -202,12 +202,16 @@ index 91c33295b30b..730c90af14bd 100644
 +	cake_hash_keys(skb, flow_mode, flow_override, host_override, &keys);
 +
 +	if (qdisc_pkt_segs(skb) > 1 && q->config->rate_flags & CAKE_FLAG_SPLIT_GSO) {
-+		struct sk_buff *nskb, *seg;
 +		netdev_features_t features = netif_skb_features(skb);
++		struct sk_buff *nskb, *seg;
 +
 +		segs = skb_gso_segment(skb, features & ~NETIF_F_GSO_MASK);
 +		if (IS_ERR_OR_NULL(segs))
 +			return qdisc_drop(skb, sch, to_free);
++
++		/* we never use the original skb after splitting */
++		consume_skb(skb);
++		skb = NULL;
 +
 +		/* The split path accounts the segment sum, not the
 +		 * stab-adjusted qdisc_pkt_len(), so check it here.
@@ -225,33 +229,19 @@ index 91c33295b30b..730c90af14bd 100644
 +			skb_list_walk_safe(segs, seg, nskb)
 +				tcf_set_qdisc_drop_reason(seg,
 +							  QDISC_DROP_OVERLIMIT);
-+			/* skb_gso_segment() moved sock_wfree to the tail
-+			 * segment, so defer the list to to_free rather
-+			 * than free it under the qdisc lock.
-+			 *
-+			 * Fraglist GSO returns the original skb as head
-+			 * (segs == skb), so drop our ref first.
-+			 */
-+			if (unlikely(segs == skb)) {
-+				consume_skb(skb);
-+				return qdisc_drop_all(segs, sch, to_free);
-+			}
-+			__qdisc_drop_all(segs, to_free);
-+			return qdisc_drop_reason(skb, sch, to_free,
-+						 QDISC_DROP_OVERLIMIT);
++
++			return qdisc_drop_all(segs, sch, to_free);
 +		}
 +	}
 +
-+	/* Admitted: resolve the flow. The mode is read once above, so
-+	 * extraction and resolution agree if cake_change() intervenes.
-+	 */
++	/* Admitted: resolve the flow. */
 +	idx = cake_hash_resolve(b, &keys, flow_mode);
  	tin = (u32)(b - q->tins);
 -	idx--;
  	flow = &b->flows[idx];
  
  	/* ensure shaper state isn't stale */
-@@ -1816,14 +1890,9 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
+@@ -1816,14 +1880,9 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
  	if (unlikely(len > b->max_skblen))
  		WRITE_ONCE(b->max_skblen, len);
  
@@ -269,7 +259,7 @@ index 91c33295b30b..730c90af14bd 100644
  
  		skb_list_walk_safe(segs, seg, nskb) {
  			skb_mark_not_on_list(seg);
-@@ -1837,7 +1906,6 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
+@@ -1837,7 +1896,6 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
  			qdisc_qlen_inc(sch);
  			numsegs++;
  			q->buffer_used += seg->truesize;
@@ -277,3 +267,14 @@ index 91c33295b30b..730c90af14bd 100644
  			WRITE_ONCE(b->packets, b->packets + 1);
  		}
  
+@@ -1849,9 +1907,8 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
+ 		WRITE_ONCE(b->backlogs[idx], b->backlogs[idx] + slen);
+ 
+ 		qdisc_tree_reduce_backlog(sch, 1-numsegs, len-slen);
+-		consume_skb(skb);
+ 	} else {
+-		/* not splitting */
++		/* not splitting - skb pointer still valid */
+ 		int ack_pkt_len = 0;
+ 
+ 		cobalt_set_enqueue_time(skb, now);

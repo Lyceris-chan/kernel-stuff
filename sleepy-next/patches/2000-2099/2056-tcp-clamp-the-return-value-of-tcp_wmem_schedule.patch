@@ -1,0 +1,57 @@
+From Octavian Purdila <tavip@google.com> Mon Sep 17 00:00:00 2001
+From: Octavian Purdila <tavip@google.com>
+Date: Tue, 20 Oct 2026 16:38:34 +0000
+Subject: [PATCH net v2 1/2] tcp: clamp return value of tcp_wmem_schedule() to non-negative
+Message-ID: <20261020163835.4076594-2-tavip@google.com>
+
+When sk_wmem_schedule(sk, copy) fails under TCP memory pressure and
+sk->sk_wmem_queued already reaches or exceeds sysctl_tcp_wmem[0],
+tcp_wmem_schedule() returns min(copy, sk->sk_forward_alloc).
+
+However, sk->sk_forward_alloc is a signed int that can transiently
+become negative when tcp_collapse() re-packs partially read or high
+payload-to-truesize SKBs in the receive queue and charges newly
+allocated SKBs via sk_mem_charge() before freeing the original SKB.
+
+If tcp_wmem_schedule() returns a negative value, tcp_sendmsg_locked()
+passes that negative copy length to skb_copy_to_page_nocache() ->
+copy_from_iter_full() -> check_copy_size(), where it is converted to an
+unsigned size_t > INT_MAX, triggering a WARN_ON_ONCE(bytes > INT_MAX)
+in production and returning -EFAULT instead of waiting for memory or
+returning -EAGAIN:
+
+  WARNING: CPU: 1 PID: 939331 at include/linux/thread_info.h:249 tcp_sendmsg+0x10c1/0x1530
+  Call Trace:
+   <TASK>
+   __sys_sendmsg+0x292/0x490
+   do_syscall_64+0x88/0x340
+   entry_SYSCALL_64_after_hwframe+0x76/0x7e
+
+Clamp the return value of tcp_wmem_schedule() to [0, copy] so callers
+treat negative sk_forward_alloc as 0 available bytes.
+
+Fixes: 849b425cd091 ("tcp: fix possible freeze in tx path under memory pressure")
+Assisted-by: LLM
+Signed-off-by: Octavian Purdila <tavip@google.com>
+Reviewed-by: Kuniyuki Iwashima <kuniyu@google.com>
+Reviewed-by: Eric Dumazet <edumazet@kernel.org>
+---
+v2:
+- Add production warning trace to the commit message.
+
+ net/ipv4/tcp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/net/ipv4/tcp.c b/net/ipv4/tcp.c
+index 87ef6d5cbfeba..0e062fcd94a6c 100644
+--- a/net/ipv4/tcp.c
++++ b/net/ipv4/tcp.c
+@@ -1037,7 +1037,7 @@ int tcp_wmem_schedule(struct sock *sk, int copy)
+ 	left = READ_ONCE(sock_net(sk)->ipv4.sysctl_tcp_wmem[0]) - sk->sk_wmem_queued;
+ 	if (left > 0)
+ 		sk_forced_mem_schedule(sk, min(left, copy));
+-	return min(copy, sk->sk_forward_alloc);
++	return clamp(sk->sk_forward_alloc, 0, copy);
+ }
+ 
+ void tcp_free_fastopen_req(struct tcp_sock *tp)

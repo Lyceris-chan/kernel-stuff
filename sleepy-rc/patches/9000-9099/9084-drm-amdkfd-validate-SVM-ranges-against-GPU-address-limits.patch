@@ -1,11 +1,11 @@
 From Daniel Huang <danielhu@amd.com> Mon Sep 17 00:00:00 2001
 From: Daniel Huang <danielhu@amd.com>
-Date: Sat, 17 Oct 2026 01:05:46 +0800
-Subject: [PATCH] drm/amdkfd: validate SVM ranges against the target GPU
-Message-ID: <20261016170546.88570-3-danielhu@amd.com>
+Date: Tue, 20 Oct 2026 21:29:01 +0800
+Subject: [PATCH v3 2/2] drm/amdkfd: bound SVM ranges by the smallest GPU address limit
+Message-ID: <20261020132901.23157-3-danielhu@amd.com>
 
 KFD SVM maps memory in GPUVM at the same virtual address used by the
-CPU, but nothing bounds that address against what the target GPU can
+CPU, but nothing bounds that address against what the GPU can
 represent. kfd_ioctl_svm() checks only page alignment and a non-zero
 size, so the PFNs reach amdgpu_vm_update_range() unvalidated. Unlike
 the SVM path, the BO mapping path validates the address range through
@@ -13,74 +13,80 @@ amdgpu_vm_verify_parameters().
 
 Disabling SVM when the GPUVM cannot cover AMDGPU_GMC_HOLE_START closes
 the case where the GPUVM is globally too small, but it compares the
-GPUVM against the GPU's own address hole. When the CPU address space
-is larger than the GPU's, the comparison succeeds and SVM stays
-enabled while individual addresses can still fall outside the GPUVM.
+GPUVM against the GPU's own address hole. When the CPU address space is
+larger than the GPU's, the comparison succeeds and SVM stays enabled
+while individual addresses can still fall outside the GPUVM.
 
 On a 5-level paging CPU with a 4-level GPU, mmap() returns addresses
-above the GPU limit when userspace passes a hint above
+above the GPU limit when user space passes a hint above
 DEFAULT_MAP_WINDOW. Passing such an address to KFD SVM indexes beyond
 the allocated root page-table entries in amdgpu_vm_pt_descendant().
 
 This gap was found by the Sashiko AI review bot, during review of the
 first patch in this series.
 
-Validate every range against the limits of the GPU it is being mapped
-on, using both vm_manager.max_pfn and the GPUVM address hole, and
-check the end of the range rather than only its start.
+Determine the smallest GPUVM among the SVM capable GPUs of the process
+in svm_range_list_init(), where the pdds are already final, and store
+it in svm_range_list as the first CPU page index that cannot be mapped.
+Reuse shared_resources.gpuvm_size, which the KFD already derives from
+vm_manager.max_pfn and the GPUVM address hole, and reports to user
+space as pdd->gpuvm_limit.
 
-GPUs in one process can have different address limits, so the range is
-checked per GPU. svm_range_validate_and_map() skips the GPUs that
-cannot represent the range instead of failing the whole mapping,
-matching how it already skips GPUs outside the XGMI hive.
-svm_range_map_to_gpu() keeps a hard check so that no out-of-range PFN
+Validate against that limit where ranges are created, so that an
+address the GPUs cannot map is rejected as early as possible and never
+results in a range that is silently left unmapped:
+
+ - svm_range_is_valid() rejects out of range set_attr and get_attr
+   ioctls with -EINVAL, before any range is allocated.
+ - svm_range_create_unregistered_range() rejects an out of range fault
+   address, which svm_range_restore_pages() reports as -EFAULT. The
+   range boundaries widen the fault address to the granularity, so the
+   widened range is clamped rather than the fault refused.
+
+svm_range_map_to_gpu() keeps a hard check so that no out of range PFN
 can reach amdgpu_vm_update_range() through any caller.
 
-Page fault recovery is rejected early in svm_range_restore_pages(), and
-svm_range_unmap_from_gpu() skips ranges that were never mappable rather
-than returning an error, since unmap also runs on the eviction and
-process teardown paths.
+A process wide minimum makes a GPU with a larger GPUVM unusable above
+the smallest limit in the process, even for ranges only that GPU would
+map. Every SVM capable GMC generation uses a 4-level, 48-bit GPUVM
+except one gfx12 variant, so the minimum is uniform in practice.
 
 Link: https://sashiko.dev/#/patchset/20261016145129.69645-1-danielhu%40amd.com
-Fixes: f80fe9d3c114 ("drm/amdkfd: map svm range to GPUs")
-Cc: stable@vger.kernel.org
 Assisted-by: Claude:claude-opus-5
 Signed-off-by: Daniel Huang <danielhu@amd.com>
 ---
- drivers/gpu/drm/amd/amdkfd/kfd_svm.c | 42 ++++++++++++++++++++++++++++
- drivers/gpu/drm/amd/amdkfd/kfd_svm.h | 27 ++++++++++++++++++
- 2 files changed, 69 insertions(+)
+ drivers/gpu/drm/amd/amdkfd/kfd_priv.h |  4 +++
+ drivers/gpu/drm/amd/amdkfd/kfd_svm.c  | 44 +++++++++++++++++++++++++--
+ drivers/gpu/drm/amd/amdkfd/kfd_svm.h  |  8 +++++
+ 3 files changed, 53 insertions(+), 3 deletions(-)
 
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_priv.h b/drivers/gpu/drm/amd/amdkfd/kfd_priv.h
+index b9a31489b1c8..a800515baf4a 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_priv.h
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_priv.h
+@@ -907,6 +907,10 @@ struct svm_range_list {
+ 	atomic_t			drain_pagefaults;
+ 	struct delayed_work		restore_work;
+ 	DECLARE_BITMAP(bitmap_supported, MAX_GPU_INSTANCE);
++	/* First CPU page index beyond the smallest GPUVM supported by the
++	 * SVM capable GPUs of this process. Zero if none support SVM.
++	 */
++	uint64_t			max_va_pfn;
+ 	struct task_struct		*faulting_task;
+ 	/* check point ts decides if page fault recovery need be dropped */
+ 	atomic64_t			checkpoint_ts[MAX_GPU_INSTANCE];
 diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c b/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
-index cfb428c72686..c3e4f0367522 100644
+index cfb428c72686..3fa0d6ff7236 100644
 --- a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
 +++ b/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
-@@ -1427,6 +1427,16 @@ svm_range_unmap_from_gpu(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+@@ -1504,6 +1504,15 @@ svm_range_map_to_gpu(struct kfd_process_device *pdd, struct svm_range *prange,
  		return -EINVAL;
  	}
  
-+	/* Such a range was rejected by svm_range_map_to_gpu() and so was
-+	 * never mapped. Skip it rather than failing, since unmap is also
-+	 * used on the eviction and process teardown paths.
++	/* Backstop before amdgpu_vm_update_range() walks the page tables.
++	 * Ranges are bounded when created, so this is not expected to trigger.
 +	 */
-+	if (!kfd_svm_range_fits_gpu(adev, start, last)) {
-+		pr_debug("CPU[0x%llx 0x%llx] exceeds GPUVM, skipping unmap\n",
-+			 start, last);
-+		return 0;
-+	}
-+
- 	return amdgpu_vm_update_range(adev, vm, false, true, true, false, NULL, gpu_start,
- 				      gpu_end, init_pte_value, 0, 0, NULL, NULL,
- 				      fence);
-@@ -1504,6 +1514,16 @@ svm_range_map_to_gpu(struct kfd_process_device *pdd, struct svm_range *prange,
- 		return -EINVAL;
- 	}
- 
-+	/* Last line of defence before amdgpu_vm_update_range() walks the
-+	 * page tables with these PFNs.
-+	 */
-+	if (npages && !kfd_svm_range_fits_gpu(adev, last_start,
-+					      last_start + npages - 1)) {
++	if (npages && last_start + npages - 1 >= kfd_svm_gpu_va_limit_pfn(pdd)) {
 +		pr_debug("CPU[0x%lx 0x%lx] exceeds GPUVM, canceling map\n",
 +			 last_start, last_start + npages - 1);
 +		return -EINVAL;
@@ -89,75 +95,76 @@ index cfb428c72686..c3e4f0367522 100644
  	for (i = offset; i < offset + npages; i++) {
  		uint64_t gpu_start;
  		uint64_t gpu_end;
-@@ -1604,6 +1624,20 @@ svm_range_map_to_gpus(struct svm_range *prange, unsigned long offset,
- 			continue;
- 		}
+@@ -2960,6 +2969,15 @@ svm_range *svm_range_create_unregistered_range(struct kfd_node *node,
+ 					   &is_heap_stack))
+ 		return NULL;
  
-+		/* GPUs in the same process can have different address limits.
-+		 * Skip the ones that cannot represent this range instead of
-+		 * failing the whole mapping.
-+		 */
-+		if (npages && !kfd_svm_range_fits_gpu(pdd->dev->adev,
-+						      prange->start + offset,
-+						      prange->start + offset +
-+						      npages - 1)) {
-+			pr_debug("device idx %d cannot map CPU[0x%lx 0x%lx]\n",
-+				 gpuidx, prange->start + offset,
-+				 prange->start + offset + npages - 1);
-+			continue;
++	if (p->svms.max_va_pfn) {
++		if (addr >= p->svms.max_va_pfn) {
++			pr_debug("fault address 0x%llx exceeds GPUVM limit 0x%llx\n",
++				 addr, p->svms.max_va_pfn);
++			return NULL;
 +		}
-+
- 		set_bit(gpuidx, prange->bitmap_mapped);
- 
- 		r = svm_range_map_to_gpu(pdd, prange, offset, npages, readonly,
-@@ -3096,6 +3130,14 @@ svm_range_restore_pages(struct amdgpu_device *adev, unsigned int pasid,
- 		return -EFAULT;
- 	}
- 
-+	/* addr is a CPU page index here. Reject faults the GPUVM cannot
-+	 * represent before any range is looked up or migrated.
-+	 */
-+	if (!kfd_svm_range_fits_gpu(adev, addr, addr)) {
-+		pr_debug("fault address 0x%llx exceeds GPUVM\n", addr);
-+		return -EFAULT;
++		last = min_t(unsigned long, last, p->svms.max_va_pfn - 1);
 +	}
 +
- 	p = kfd_lookup_process_by_pasid(pasid, NULL);
- 	if (!p) {
- 		pr_debug("kfd process not founded pasid 0x%x\n", pasid);
+ 	r = svm_range_check_vm(p, start, last, &bo_s, &bo_l);
+ 	if (r != -EADDRINUSE)
+ 		r = svm_range_check_vm_userptr(p, start, last, &bo_s, &bo_l);
+@@ -3410,9 +3428,18 @@ int svm_range_list_init(struct kfd_process *p)
+ 	INIT_LIST_HEAD(&svms->criu_svm_metadata_list);
+ 	spin_lock_init(&svms->deferred_list_lock);
+ 
+-	for (i = 0; i < p->n_pdds; i++)
+-		if (KFD_IS_SVM_API_SUPPORTED(p->pdds[i]->dev->adev))
+-			bitmap_set(svms->bitmap_supported, i, 1);
++	/* The ranges of this process must fit in every GPU that can map them,
++	 * so bound them by the smallest GPUVM among the SVM capable GPUs.
++	 */
++	for (i = 0; i < p->n_pdds; i++) {
++		struct kfd_process_device *pdd = p->pdds[i];
++
++		if (!KFD_IS_SVM_API_SUPPORTED(pdd->dev->adev))
++			continue;
++		bitmap_set(svms->bitmap_supported, i, 1);
++		svms->max_va_pfn = min_not_zero(svms->max_va_pfn,
++						kfd_svm_gpu_va_limit_pfn(pdd));
++	}
+ 
+ 	 /* Value of default granularity cannot exceed 0x1B, the
+ 	  * number of pages supported by a 4-level paging table
+@@ -3511,6 +3538,17 @@ svm_range_is_valid(struct kfd_process *p, uint64_t start, uint64_t size)
+ 	if (check_add_overflow(start, size << PAGE_SHIFT, &end))
+ 		return -EOVERFLOW;
+ 
++	/* Reject up front what the GPUs of this process cannot map, rather
++	 * than letting the mapping fail later on.
++	 */
++	if (p->svms.max_va_pfn &&
++	    (end - 1) >> PAGE_SHIFT >= p->svms.max_va_pfn) {
++		pr_debug("CPU[0x%lx 0x%lx] exceeds GPUVM limit 0x%llx\n",
++			 start_unchg, (end - 1) >> PAGE_SHIFT,
++			 p->svms.max_va_pfn);
++		return -EINVAL;
++	}
++
+ 	do {
+ 		vma = vma_lookup(p->mm, start);
+ 		if (!vma || (vma->vm_flags & device_vma))
 diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_svm.h b/drivers/gpu/drm/amd/amdkfd/kfd_svm.h
-index 6235ce0f988e..57d4d79a6266 100644
+index f61030408f45..268a545302bd 100644
 --- a/drivers/gpu/drm/amd/amdkfd/kfd_svm.h
 +++ b/drivers/gpu/drm/amd/amdkfd/kfd_svm.h
-@@ -216,6 +216,33 @@ static inline bool kfd_svm_vm_covers_user_va(struct amdgpu_device *adev)
+@@ -213,6 +213,14 @@ static inline bool kfd_svm_vm_covers_user_va(struct amdgpu_device *adev)
  		AMDGPU_GMC_HOLE_START;
  }
  
-+/*
-+ * A range is mappable on adev only if it lies below both the page table
-+ * limit and the GPUVM address hole. start and last are CPU page indices
-+ * and are inclusive, matching svm_range.start and svm_range.last.
-+ *
-+ * Each GPU is checked against its own limits, so a range that only some
-+ * GPUs can represent is rejected for those GPUs alone.
-+ *
-+ * The parameter must be named adev since AMDGPU_GMC_HOLE_START references
-+ * adev->vm_manager.max_level.
++/* First CPU page index that this GPU's GPUVM cannot represent. An SVM range
++ * is mappable on pdd only if its last page lies below this.
 + */
-+static inline bool kfd_svm_range_fits_gpu(struct amdgpu_device *adev,
-+					  uint64_t start, uint64_t last)
++static inline uint64_t kfd_svm_gpu_va_limit_pfn(struct kfd_process_device *pdd)
 +{
-+	uint64_t limit;
-+
-+	/* Rejects empty and wrapped ranges, so last bounds start as well. */
-+	if (start > last)
-+		return false;
-+
-+	/* First CPU page the GPUVM cannot represent. */
-+	limit = min(adev->vm_manager.max_pfn << AMDGPU_GPU_PAGE_SHIFT,
-+		    AMDGPU_GMC_HOLE_START) >> PAGE_SHIFT;
-+
-+	return last < limit;
++	return pdd->dev->kfd->shared_resources.gpuvm_size >> PAGE_SHIFT;
 +}
 +
  /* SVM API and HMM page migration work together, device memory type

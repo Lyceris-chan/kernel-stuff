@@ -1,0 +1,59 @@
+From Joshua Hahn <joshua.hahnjy@gmail.com> Mon Sep 17 00:00:00 2001
+From: Joshua Hahn <joshua.hahnjy@gmail.com>
+Date: Tue, 20 Oct 2026 09:56:26 -0700
+Subject: [PATCH] mm/memcontrol: publish null pointer before dropping css reference
+Message-ID: <20261020165627.1599959-1-joshua.hahnjy@gmail.com>
+
+struct memcg_stock_pcp hold references to cgroups that it tracks to make
+sure that the memcg never gets freed with unaccounted charges still
+living in the stock. The cached stock can be cleared either via
+drain_stock() or consume_stock(), which drop the reference if the
+stock goes to 0, and then clears the pointer from the stock.
+
+If that was the last reference, the memcg is freed after an RCU grace
+period, but this can happen while the pointer still points to the
+to-be-freed memcg. Then a reader that enters its read-side critical
+section after the grace period has started is not waited for, and then
+can dereference it after the memcg gets freed.
+
+In practice, this is very rare and I have not been able to reproduce
+the issue in my own testing.
+
+Switch the order of the reference drop and the publishing so that
+we first publish the NULL pointer, then drop the reference.
+
+This is based on a report from Sashiko, who found this pre-existing
+issue in my page_counter_stock series [1].
+
+[1] https://sashiko.dev/#/patchset/20260928192349.3432886-1-joshua.hahnjy%40gmail.com
+
+Fixes: e1a366be5cb4 ("mm: memcontrol: switch to rcu protection in drain_all_stock()")
+Signed-off-by: Joshua Hahn <joshua.hahnjy@gmail.com>
+---
+ mm/memcontrol.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/mm/memcontrol.c b/mm/memcontrol.c
+index e7d7db5718f9a..a05d9a8baa1b6 100644
+--- a/mm/memcontrol.c
++++ b/mm/memcontrol.c
+@@ -2172,8 +2172,8 @@ static bool consume_stock(struct mem_cgroup *memcg, unsigned int nr_pages)
+ 			stock_pages -= nr_pages;
+ 			WRITE_ONCE(stock->nr_pages[i], stock_pages);
+ 			if (!stock_pages) {
+-				css_put(&memcg->css);
+ 				WRITE_ONCE(stock->cached[i], NULL);
++				css_put(&memcg->css);
+ 			}
+ 			ret = true;
+ 		}
+@@ -2209,8 +2209,8 @@ static void drain_stock(struct memcg_stock_pcp *stock, int i)
+ 		WRITE_ONCE(stock->nr_pages[i], 0);
+ 	}
+ 
+-	css_put(&old->css);
+ 	WRITE_ONCE(stock->cached[i], NULL);
++	css_put(&old->css);
+ }
+ 
+ static void drain_stock_fully(struct memcg_stock_pcp *stock)

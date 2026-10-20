@@ -1,0 +1,57 @@
+From Yuanhe Shu <xiangzao@linux.alibaba.com> Mon Sep 17 00:00:00 2001
+From: Yuanhe Shu <xiangzao@linux.alibaba.com>
+Date: Tue, 20 Oct 2026 14:44:52 +0800
+Subject: [PATCH 2/2] io_uring: add a schedule point in __io_req_caches_free()
+Message-ID: <20261020064452.3633250-3-xiangzao@linux.alibaba.com>
+
+The request cache can grow to the workload's in-flight high-water
+mark.  __io_req_caches_free() drains it with one
+kmem_cache_free() per request under ctx->uring_lock, with no
+scheduling point in between.  With debug features like KASAN or
+kmemleak enabled, each free gets expensive, and draining a large
+cache can hold the CPU well beyond the soft lockup threshold.
+
+Reproduced on mainline v7.3-rc7 on a 192-CPU debug kernel
+(preempt=none), with a test that submits 32K requests per
+ring and then kills the rings.  Killing 48 rings at once made one
+drain take up to 13 seconds with no scheduling point, with 8
+kworkers each stuck for over 12 seconds; a separate run with 96
+rings produced 97 soft lockup warnings during teardown, of the
+form:
+
+  watchdog: BUG: soft lockup - CPU#2 stuck for 12s! [kworker/u769:5]
+  Workqueue: iou_exit io_ring_exit_work
+  Call Trace:
+    stack_trace_save
+    kasan_save_stack
+    kmem_cache_free+0x3cf/0x6a0
+    __io_req_caches_free+0x196/0x4f0
+    io_ring_exit_work+0x287/0x880
+    process_one_work
+
+Regardless of the per-free cost, the loop has no bound other than
+the workload's in-flight high-water mark, so it belongs with the
+other potentially long io_uring loops.
+
+Insert a cond_resched() in the drain loop.  The function is __cold;
+all callers run in process context and hold only ctx->uring_lock,
+a mutex, so scheduling is allowed.
+
+Assisted-by: LLM
+Signed-off-by: Yuanhe Shu <xiangzao@linux.alibaba.com>
+---
+ io_uring/io_uring.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/io_uring/io_uring.c b/io_uring/io_uring.c
+index 26cd91a91aa2..dffce8ce55d5 100644
+--- a/io_uring/io_uring.c
++++ b/io_uring/io_uring.c
+@@ -2142,6 +2142,7 @@ static __cold void __io_req_caches_free(struct io_ring_ctx *ctx)
+ 		io_poison_req(req);
+ 		kmem_cache_free(req_cachep, req);
+ 		nr++;
++		cond_resched();
+ 	}
+ 	if (nr) {
+ 		ctx->nr_req_allocated -= nr;

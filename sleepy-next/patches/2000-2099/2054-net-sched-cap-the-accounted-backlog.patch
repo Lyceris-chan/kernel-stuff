@@ -1,48 +1,58 @@
 From Jamal Hadi Salim <jhs@mojatatu.com> Mon Sep 17 00:00:00 2001
 From: Jamal Hadi Salim <jhs@mojatatu.com>
-Date: Mon, 19 Oct 2026 12:00:34 -0400
-Subject: [PATCH net-next v7 3/4] net/sched: cap the accounted backlog before it can wrap
-Message-ID: <QDISC-BA27.v7.r0.20261019115505-3@mojatatu.com>
+Date: Tue, 20 Oct 2026 12:57:29 -0400
+Subject: [PATCH net-next v8 3/4] net/sched: cap the accounted backlog before it can wrap
+Message-ID: <QDISC-BA27.v8.r0.20261020063241-3@mojatatu.com>
 
 This is a followup of commit 709f34f7c28d ("net/sched: fq: add overflow
 bounds to quantum and initial quantum") as reported by Sashiko.
 
-The issue: fq_codel, cake, codel, pie, fq_pie, dualpi2, RED, pfifo, plug
-and (non-WRED) gred account every enqueued packet's stab-adjusted length
-into the 32-bit sch->qstats.backlog, which the AQM logic reads back (for
-non-WRED gred it is the reported stats and the dequeue-side subtractions
-that go wrong instead). A crafted tc size table inflates qdisc_pkt_len()
-up to QDISC_PKT_LEN_MAX (1 MiB), and a dodgy GSO skb can account even more
-through qdisc_pkt_len_segs_init(), so a few thousand packets wrap the
-counter mod 2^32. The AQM then reads a small backlog and makes the wrong
-drop decision, and the dequeue-side subtractions leave it corrupt. In
-fq_codel a wrapped per-flow backlog can also make fq_codel_drop()'s scan
-pick an empty flow, dereferencing a NULL flow->head.
+The issue: fq_codel, cake, codel, pie, fq_pie, dualpi2, RED, pfifo,
+plug and (non-WRED) gred account every enqueued packet's stab-adjusted
+length into the 32-bit sch->qstats.backlog. A crafted tc size table
+inflates qdisc_pkt_len() up to QDISC_PKT_LEN_MAX (1 MiB), and a dodgy
+GSO skb can account even more through qdisc_pkt_len_segs_init(), so a
+few thousand packets wrap the counter mod 2^32.
+
+The AQM then reads a small backlog and makes the wrong drop decision,
+and the dequeue-side subtractions leave it corrupt (for non-WRED gred
+it is the reported stats and the dequeue-side subtractions that go
+wrong instead). In fq_codel a wrapped per-flow backlog can also make
+fq_codel_drop()'s scan pick an empty flow, dereferencing a NULL
+flow->head.
 
 The Fix: drop at enqueue once the stored backlog cannot represent the
-incoming packet's accounted length. Ordinary packets (qdisc_pkt_len() at
-most QDISC_PKT_LEN_MAX) are covered by a standing ceiling: drop once the
-backlog is within QDISC_MAX_BACKLOG (U32_MAX - QDISC_PKT_LEN_MAX) of the
-wrap point, the largest backlog one more 1 MiB packet cannot wrap, so
-there is no per-enqueue 64-bit add. A larger wire estimate is checked
-against the space that actually remains (len > U32_MAX - backlog):
-qdisc_pkt_len_segs_init() adds the headers replicated on every output
-segment, so a supported small-MSS BIG TCP aggregate can carry a wire
-estimate above 1 MiB while its raw length stays within GSO_MAX_SIZE, and
-such traffic must pass on an empty queue. qdisc_pkt_len() itself stays
-truthful for every input: it is not clamped and the initializer keeps
-succeeding, so BPF __sk_buff.wire_len, act_police and the HTB/TBF shapers
-read the real length, and sch_handle_ingress() -- which ignores the
-initializer's return value and reads pkt_segs for packet statistics --
-keeps complete metadata. Cover sch_plug and non-WRED sch_gred too: plug
-admits on skb->len while qdisc_enqueue_tail() adds qdisc_pkt_len(), and
-gred bounds each virtual queue but adds every VQ into the one aggregate.
-pfifo is included because RED reads a grafted child's backlog into
-red_calc_qavg(); it can be reached standalone or as the default child of
-SFB. In RED, account the packet to the aggregate before handing it to the
-child, because a duplicating netem child re-enqueues its clone at the root
-while the stored backlog is still un-updated -- one guard check must not
-authorize two additions.
+incoming packet's accounted length.
+
+Ordinary packets (qdisc_pkt_len() at most QDISC_PKT_LEN_MAX) are
+covered by a standing ceiling: drop once the backlog is within
+QDISC_MAX_BACKLOG (U32_MAX - QDISC_PKT_LEN_MAX) of the wrap point, the
+largest backlog one more 1 MiB packet cannot wrap, so there is no
+per-enqueue 64-bit add.
+
+A larger wire estimate is checked against the space that actually
+remains (len > U32_MAX - backlog): qdisc_pkt_len_segs_init() adds the
+headers replicated on every output segment, so a supported small-MSS
+BIG TCP aggregate can carry a wire estimate above 1 MiB while its raw
+length stays within GSO_MAX_SIZE, and such traffic must pass on an
+empty queue.
+
+qdisc_pkt_len() itself stays truthful for every input: it is not
+clamped and the initializer keeps succeeding, so BPF
+__sk_buff.wire_len, act_police and the HTB/TBF shapers read the real
+length, and sch_handle_ingress() -- which ignores the initializer's
+return value and reads pkt_segs for packet statistics -- keeps
+complete metadata.
+
+Cover sch_plug and non-WRED sch_gred too: plug admits on skb->len
+while qdisc_enqueue_tail() adds qdisc_pkt_len(), and gred bounds each
+virtual queue but adds every VQ into the one aggregate. pfifo is
+included because RED reads a grafted child's backlog into
+red_calc_qavg(); it can be reached standalone or as the default child
+of SFB. In RED, account the packet to the aggregate before handing it
+to the child, because a duplicating netem child re-enqueues its clone
+at the root while the stored backlog is still un-updated -- one guard
+check must not authorize two additions.
 
 The guard bounds each qdisc's own enqueue path: a child that segments a
 GSO skb (tbf, netem) can still grow a parent's aggregate through
@@ -68,18 +78,15 @@ Link: https://lore.kernel.org/netdev/87a4oottcj.fsf@toke.dk/
 Link: https://lore.kernel.org/netdev/87pkxks68f.fsf@toke.dk/
 Link: https://lore.kernel.org/netdev/179231932946.3135.7497478990186385688@kernel.org/
 Reviewed-by: Victor Nogueira <victor@mojatatu.com>
+Reviewed-by: Toke Høiland-Jørgensen <toke@toke.dk>
 Signed-off-by: Jamal Hadi Salim <jhs@mojatatu.com>
+
 ---
-v6 -> v7: qdisc_pkt_len_segs_init() no longer clamps the shared
-qdisc_pkt_len(); it stays truthful for every input, including the wire
-estimates above QDISC_PKT_LEN_MAX that a small-MSS BIG TCP aggregate
-legitimately carries. The overflow protection is enqueue admission
-instead: each affected qdisc drops a packet once the stored backlog
-cannot represent its accounted length -- the standing QDISC_MAX_BACKLOG
-ceiling covers ordinary packets, and a per-packet representability check
-covers the larger wire estimates -- so BPF __sk_buff.wire_len,
-act_police and the HTB/TBF shapers read the real length and the ingress
-path keeps complete pkt_segs metadata. (Sashiko nipa v6 review, main-2-6)
+
+v7 -> v8: fq_codel keeps its original classify shape (0001 no longer
+refactors it); the guard is placed between idx-- and
+codel_set_enqueue_time() so a dropped packet cannot touch flow state.
+(Toke Høiland-Jørgensen, v7 review)
 ---
  include/net/pkt_sched.h   |  1 -
  include/net/sch_generic.h | 20 ++++++++++++++++++++
@@ -87,13 +94,13 @@ path keeps complete pkt_segs metadata. (Sashiko nipa v6 review, main-2-6)
  net/sched/sch_codel.c     | 16 +++++++++-------
  net/sched/sch_dualpi2.c   |  1 +
  net/sched/sch_fifo.c      |  6 ++++++
- net/sched/sch_fq_codel.c  |  8 ++++++++
+ net/sched/sch_fq_codel.c  |  9 +++++++++
  net/sched/sch_fq_pie.c    |  3 ++-
  net/sched/sch_gred.c      |  9 +++++++++
  net/sched/sch_pie.c       |  3 ++-
  net/sched/sch_plug.c      |  9 ++++++++-
  net/sched/sch_red.c       | 23 ++++++++++++++++++-----
- 12 files changed, 90 insertions(+), 16 deletions(-)
+ 12 files changed, 91 insertions(+), 16 deletions(-)
 
 diff --git a/include/net/pkt_sched.h b/include/net/pkt_sched.h
 index 90d3e7943b19..18a419cd9d94 100644
@@ -222,24 +229,25 @@ index 1b6388d50967..16c8d4f74e7e 100644
  		return qdisc_enqueue_tail(skb, sch);
  
 diff --git a/net/sched/sch_fq_codel.c b/net/sched/sch_fq_codel.c
-index 011b8fc54d84..f708ae56b7e3 100644
+index e6c87a32950f..a83f20534be1 100644
 --- a/net/sched/sch_fq_codel.c
 +++ b/net/sched/sch_fq_codel.c
-@@ -218,6 +218,14 @@ static int fq_codel_enqueue(struct sk_buff *skb, struct Qdisc *sch,
- 		__qdisc_drop(skb, to_free);
- 		return ret;
+@@ -201,6 +201,15 @@ static int fq_codel_enqueue(struct sk_buff *skb, struct Qdisc *sch,
  	}
-+
-+	/* Drop before hashing so a dropped packet cannot create a flow. */
+ 	idx--;
+ 
++	/* Drop before the flow is touched, so a dropped packet cannot
++	 * create or update flow state.
++	 */
 +	if (unlikely(qdisc_backlog_overflow(sch, skb))) {
 +		q->drop_overlimit++;
 +		return qdisc_drop_reason(skb, sch, to_free,
 +					 QDISC_DROP_OVERLIMIT);
 +	}
 +
- 	if (do_hash)
- 		idx = fq_codel_hash(q, skb) + 1;
- 	idx--;
+ 	codel_set_enqueue_time(skb);
+ 	flow = &q->flows[idx];
+ 	flow_queue_add(flow, skb);
 diff --git a/net/sched/sch_fq_pie.c b/net/sched/sch_fq_pie.c
 index 5982847df8f8..9f927a08b7bc 100644
 --- a/net/sched/sch_fq_pie.c

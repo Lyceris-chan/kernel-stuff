@@ -6,8 +6,8 @@ built from **mainline Linux 7.3** plus a sanitized
 [CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 271 targeted
 upstream/local patches. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0-1` · **Artifact:**
-`linux-sleepy-rc-7.3.0-1-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0-2` · **Artifact:**
+`linux-sleepy-rc-7.3.0-2-x86_64.pkg.tar.zst`
 
 ## Target hardware
 
@@ -116,7 +116,7 @@ fix lands.
 
 ## Patch series
 
-271 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+282 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 
 | Range | Category |
 |---|---|

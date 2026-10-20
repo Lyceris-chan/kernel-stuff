@@ -18,6 +18,56 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-2-sleepy-rc (Linux 7.3)]: 2026-10-20
+
+A patch-only refresh; the base stays at `v7.3`. The series moves from 271 to
+282 patches.
+
+### Added — eleven patches
+
+GPU: `1097` re-enables GFXOFF for compute on GFX12 because the MES workaround
+that disabled it is no longer needed; `1098` keeps the CS user-fence BO in GTT
+so the GART address handed to the GPU is valid. Display: `1180` keeps the
+nominal vtotal while VRR is inactive, avoiding the integer-refresh round trip
+that can shift the vblank rate; `1181` and `1182` fix `drm_crtc` fence lifetime
+and the `::get_driver_name()` race.
+
+Block, I/O and network: `2056` clamps `tcp_wmem_schedule()` to non-negative;
+`2057` restores the iterator when a misaligned bio is rejected; `2058` clears a
+stale `BLK_MQ_S_INACTIVE` flag when an hctx is reused; `2059` and `2060` add
+schedule points to the io_uring completion-freeing loops. Memory: `2803`
+publishes the null memcg stock pointer before dropping its reference.
+
+### Changed — three revisions
+
+`1084` moves to v3 (drops the review comments; no code change), `9083` to v3 1/2
+(comment cleanup) and `9084` to v3 2/2 (bounds SVM ranges by the smallest GPUVM
+limit).
+
+### Not adopted
+
+`1095` stays until Leo Liu's reviewed cancel-idle replacement settles. The CS
+SPM VMID patch, the KFD SVM restore pair and the EEVDF idle-group fix are
+watched, not carried; the CPPC v6 ordering series does not apply to this base.
+
+## [2026.10.19-2-sleepy-next (linux-next `next-20261019`)]: 2026-10-20
+
+A patch-only refresh; the snapshot stays at `next-20261019` because
+`next-20261020` adds no AMD GPU content and would need one drop and two
+rebases. The series moves from 129 to 139 patches.
+
+### Added — ten shared patches
+
+`1097`, `1098`, `1180`, `1181`, `1182`, `2056`, `2058`, `2059`, `2060` and
+`2803`, the same carries as `7.3.0-2-sleepy-rc`. `2057` is omitted because the
+snapshot already contains the block fix.
+
+### Changed
+
+`1084`, `9083` and `9084` move to their v3 postings. CAKE moves v7 → v8:
+`2052` becomes cake-only, `fq_codel` keeps its original classify shape, and the
+backlog guard moves inline into `2054`.
+
 ## [7.3.0-1-sleepy-rc (Linux 7.3 final)]: 2026-10-19
 
 The base moves from `v7.3-rc7` to the 7.3 release (`v7.3`,

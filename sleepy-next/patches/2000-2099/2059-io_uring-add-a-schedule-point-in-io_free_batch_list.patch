@@ -1,0 +1,62 @@
+From Yuanhe Shu <xiangzao@linux.alibaba.com> Mon Sep 17 00:00:00 2001
+From: Yuanhe Shu <xiangzao@linux.alibaba.com>
+Date: Tue, 20 Oct 2026 14:44:51 +0800
+Subject: [PATCH 1/2] io_uring: add a schedule point in io_free_batch_list()
+Message-ID: <20261020064452.3633250-2-xiangzao@linux.alibaba.com>
+
+Completed requests accumulate in submit_state.compl_reqs - deferred
+completions queued by task_work handlers via io_req_complete_defer(),
+plus everything io_do_iopoll() reaps - and are then all freed in one
+io_free_batch_list() pass under ctx->uring_lock.  The loop has no
+scheduling point.
+
+Each iteration does real work: io_clean_op() freeing request
+payloads, file, task and rsrc puts.  With debug features like KASAN
+or kmemleak enabled, that work gets expensive enough that a large
+batch can hold the CPU well beyond the soft lockup threshold.
+
+Caught by io stress testing (stress-ng -a 1 --class io -t 7h) on a
+384 CPU machine running a v6.6-based debug kernel (KASAN, kmemleak,
+lockdep; CONFIG_PREEMPT_NONE=y): a stress-ng worker was looping
+here past the watchdog threshold, entered from exit-time task_work,
+until the machine panicked on "softlockup: hung tasks".  Frames
+from the dump:
+
+    io_clean_op
+    io_free_batch_list
+    __io_submit_flush_completions
+    ctx_flush_and_put
+    tctx_task_work
+    task_work_run
+    get_signal
+
+The same test later caught a completion fallback work item holding
+uring_lock for 671 seconds in this same loop ("BUG: soft lockup -
+CPU#61 stuck for 671s").
+
+Also measured on mainline v7.3-rc7 (192-CPU debug kernel with the
+same debug features): a single pass freeing a 32K completion batch
+took 443ms with no scheduling point in between.
+
+Insert a cond_resched() in the loop, like other potentially long
+io_uring loops already have.  The loop runs in process context with
+ctx->uring_lock held, which is a mutex, so scheduling is allowed.
+
+Assisted-by: LLM
+Signed-off-by: Yuanhe Shu <xiangzao@linux.alibaba.com>
+---
+ io_uring/io_uring.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/io_uring/io_uring.c b/io_uring/io_uring.c
+index cf5218d100d9..26cd91a91aa2 100644
+--- a/io_uring/io_uring.c
++++ b/io_uring/io_uring.c
+@@ -1123,6 +1123,7 @@ static void io_free_batch_list(struct io_ring_ctx *ctx,
+ 
+ 		node = req->comp_list.next;
+ 		io_req_add_to_cache(req, ctx);
++		cond_resched();
+ 	} while (node);
+ }
+ 

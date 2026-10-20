@@ -1,8 +1,8 @@
 From Jesse Zhang <Jesse.Zhang@amd.com> Mon Sep 17 00:00:00 2001
 From: Jesse Zhang <Jesse.Zhang@amd.com>
-Date: Mon, 19 Oct 2026 09:48:59 +0800
-Subject: [PATCH] drm/amdgpu: drop the gang leader reference when freeing gang jobs
-Message-ID: <20261019014938.1487609-1-Jesse.Zhang@amd.com>
+Date: Tue, 20 Oct 2026 09:42:41 +0800
+Subject: [PATCH v3] drm/amdgpu: drop the gang leader reference when freeing gang jobs
+Message-ID: <20261020014336.2319937-1-Jesse.Zhang@amd.com>
 
 Every job of a gang except the leader holds a reference to the
 scheduled fence of the leader in job->gang_submit. Only
@@ -28,17 +28,19 @@ directly. Free them with the hardware fence or right away, never with
 the scheduler fence, which nobody signals for jobs aborted after
 drm_sched_job_arm(), like a CS returning -EAGAIN.
 
-v2: unify amdgpu_job_free() and amdgpu_job_free_cb() (Christian)
+v2: unify amdgpu_job_free() and amdgpu_job_free_cb() (Christian), don't
+    free the remaining IBs with the scheduler fence
+v3: drop the comments (Christian)
 
 Fixes: 68ce8b242242 ("drm/amdgpu: add gang submit backend v2")
 Fixes: f7d66fb2ea43 ("drm/amdgpu: cleanup scheduler job initialization v2")
 Signed-off-by: Jesse Zhang <Jesse.Zhang@amd.com>
 ---
- drivers/gpu/drm/amd/amdgpu/amdgpu_job.c | 47 ++++++++++++++-----------
- 1 file changed, 27 insertions(+), 20 deletions(-)
+ drivers/gpu/drm/amd/amdgpu/amdgpu_job.c | 33 ++++++++++---------------
+ 1 file changed, 13 insertions(+), 20 deletions(-)
 
 diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_job.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_job.c
-index 0056a93c400a..c5c8cb7d6669 100644
+index 0056a93c400a..f8a81f0a607b 100644
 --- a/drivers/gpu/drm/amd/amdgpu/amdgpu_job.c
 +++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_job.c
 @@ -313,22 +313,7 @@ void amdgpu_job_free_resources(struct amdgpu_job *job)
@@ -65,7 +67,7 @@ index 0056a93c400a..c5c8cb7d6669 100644
  }
  
  void amdgpu_job_set_gang_leader(struct amdgpu_job *job,
-@@ -349,14 +334,36 @@ void amdgpu_job_set_gang_leader(struct amdgpu_job *job,
+@@ -349,14 +334,22 @@ void amdgpu_job_set_gang_leader(struct amdgpu_job *job,
  
  void amdgpu_job_free(struct amdgpu_job *job)
  {
@@ -73,31 +75,17 @@ index 0056a93c400a..c5c8cb7d6669 100644
 -		drm_sched_job_cleanup(&job->base);
 +	struct dma_fence *f = NULL;
 +	unsigned int i;
- 
--	amdgpu_job_free_resources(job);
--	amdgpu_sync_free(&job->explicit_sync);
-+	/*
-+	 * The IBs of jobs pushed to the scheduler were already freed with the
-+	 * scheduler fence before that. The remaining ones only got to the
-+	 * hardware when submitted directly. Don't use the scheduler fence
-+	 * here, it never signals for jobs aborted after drm_sched_job_arm().
-+	 */
++
 +	if (dma_fence_was_initialized(&job->hw_fence->base))
 +		f = &job->hw_fence->base;
 +	for (i = 0; i < job->num_ibs; ++i)
 +		amdgpu_ib_free(&job->ibs[i], f);
-+
-+	/*
-+	 * The gang leader doesn't hold a reference to itself. Check before
-+	 * drm_sched_job_cleanup() clears the scheduler fence.
-+	 */
+ 
+-	amdgpu_job_free_resources(job);
+-	amdgpu_sync_free(&job->explicit_sync);
  	if (job->gang_submit != &job->base.s_fence->scheduled)
  		dma_fence_put(job->gang_submit);
  
-+	/*
-+	 * Not job->base.entity, the scheduler clears that for the jobs it
-+	 * picked up.
-+	 */
 +	if (job->base.s_fence)
 +		drm_sched_job_cleanup(&job->base);
 +

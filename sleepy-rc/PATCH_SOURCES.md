@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
 - **Base:** Linux `v7.3`
-- **Series:** 271 patches
+- **Series:** 282 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -21,22 +21,22 @@ are supplied by the generator instead, so every row below has a source.
 | `0001–0049` | Handmade local | 12 |
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
-| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 27 |
-| `1100–1199` | AMD display (DCN4, colorops) | 27 |
+| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 29 |
+| `1100–1199` | AMD display (DCN4, colorops) | 30 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 27 |
-| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 41 |
+| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 46 |
 | `2100–2199` | Memory management and swap (zstd, LRU-MARIE, gup, zswap) | 50 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 20 |
 | `2400–2499` | Core scheduler and sched-ext | 3 |
 | `2500–2599` | x86 and arch core | 2 |
 | `2600–2699` | Time and timers | 0 |
-| `2800–2899` | Memory management, second series (mm/swap follow-ups) | 3 |
+| `2800–2899` | Memory management, second series (mm/swap follow-ups) | 4 |
 | `2900–2999` | VFS / core filesystem | 0 |
 | `9000–9099` | agd5f staging + userq lifecycle backports | 36 |
 | `9100–9199` | Retry-fault handling v4 (agd5f staging) | 11 |
 
-**Total: 271** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 282** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-19). The counts are now generated from the patch tree
@@ -9901,3 +9901,57 @@ exists yet (checked through the gregkh mirror; git.kernel.org became
 unreachable after the tree fetches). `lore-rust-for-linux` last moved on
 09-24. `xanmod` is not an independent source. The fd.o monthly archives lag the
 lore mirrors.
+
+## Adopted 2026-10-20 — eleven carries, three revisions, CAKE v8 for the preview
+
+The 2026-10-20 sweep adopted the candidates that are on-target, apply to both
+series trees, and do not depend on 7.4-only infrastructure. The kernel release
+stays at `v7.3` / `next-20261019`: `next-20261020` adds no AMD GPU content, and
+a preview bump would cost one drop (`2046`) and two rebases (`0101`, `2419`) for
+nothing this machine executes.
+
+### Added — core and display
+
+| Patch | Subject | Author | Source | Note |
+|---|---|---|---|---|
+| `1097` | drm/amdgpu: re-enable GFXOFF for compute on GFX12 | Harkirat Gill | `<20261020160316.2411569-1-harkirat.gill@amd.com>` | Removes the GC 12 arm of the compute-idle workaround (`Fixes: 2affe2bbc997`); the `== 12` condition is in `v7.3`. On-target gfx12.0. Unreviewed at adoption. |
+| `1098` | drm/amdgpu: keep the CS user fence BO in GTT | Jesse Zhang | `<20261020083804.2777099-2-Jesse.Zhang@amd.com>` | The CS ioctl handed the GPU the GART address of a user fence that could sit in VRAM; validates the fence BO like the other CS BOs. Applies to both bases. |
+| `1180` | drm/amd/display: Keep the nominal vtotal while VRR is inactive | Matthew Schwartz | `<20261020025157.2700490-1-matthew.schwartz@linux.dev>` | Replaces the integer-refresh-rate round trip with `stream->timing.v_total` in `mod_freesync_handle_v_update()` (`Fixes: 33c995709121`). The faulty code is in `v7.3`. Unreviewed at adoption. |
+| `1181` | drm/drm_crtc: ensure dma_fence_ops remain valid during device unbind | André Draszik | drm-misc commit `3be436cbd3d2` | Flushes the device-link work before the CRTC fence can outlive its ops. Generic DRM CRTC path used by amdgpu DM. |
+| `1182` | drm/drm_crtc: fix race with dma_fence_signal() in `::get_driver_name()` | André Draszik | drm-misc commit `cb104d395da4` | Same fence-lifetime family; the `BUG_ON()` in `fence_to_crtc()` fires when the ops are detached before `sync_file_get_name()`. |
+
+### Added — block, I/O, network and memory
+
+| Patch | Subject | Author | Source | Note |
+|---|---|---|---|---|
+| `2056` | tcp: clamp return value of `tcp_wmem_schedule()` to non-negative | Octavian Purdila | `<20261020163835.4076594-2-tavip@google.com>` | One-line fix (`Fixes: 849b425cd091`); `Reviewed-by` Eric Dumazet and Kuniyuki Iwashima. |
+| `2057` | block: restore the iterator when rejecting a misaligned bio | Andrew Morton | `<20261020170250.014BD1F000C9@smtp.kernel.org>` | **rc only** — the fix is already in the preview base (reverse-applies). Restores `*iter` on the rejected-bio path; quoted `---`/`+++` names were normalised from the -mm tree's `~`-suffixed form. |
+| `2058` | blk-mq: clear stale `BLK_MQ_S_INACTIVE` on hctx reuse | Nirmoy Das | `<20261020125129.430600-1-nirmoyd@nvidia.com>` | One-line fix; a parked hctx reused at an online CPU kept the flag and could sleep forever in `blk_mq_get_tag()`. |
+| `2059` | io_uring: add a schedule point in `io_free_batch_list()` | Yuanhe Shu | `<20261020064452.3633250-2-xiangzao@linux.alibaba.com>` | `cond_resched()` in the completion-freeing loop; debug-kernel softlockup only. |
+| `2060` | io_uring: add a schedule point in `__io_req_caches_free()` | Yuanhe Shu | `<20261020064452.3633250-3-xiangzao@linux.alibaba.com>` | Companion to `2059`. |
+| `2803` | mm/memcontrol: publish null pointer before dropping css reference | Joshua Hahn | `<20261020165627.1599959-1-joshua.hahnjy@gmail.com>` | Two-line ordering fix for a rare RCU use-after-free in `memcg_stock_pcp`. **Numbered `2803`, not `2199`**: `2199` is a vacated xswap number and must not be reused (see the note above). |
+
+### Revised in place
+
+| Patch | Revision | Note |
+|---|---|---|
+| `1084` | v2 → **v3** (2026-10-20) | Comment-only: v3 drops the comments Christian König asked about; the code is identical. |
+| `9083` | v1 → **v3 1/2** (2026-10-20) | Comment-only code delta plus a rewritten message; the check still needs an explicit `amdgpu.vm_size` override, so it is inert on this machine. |
+| `9084` | v2 → **v3 2/2** (2026-10-20) | The companion was already carried; v3 bounds ranges by the smallest GPUVM limit instead of per-GPU limits. Applies after `9083` v3. |
+| `2052`–`2055` | CAKE v7 → **v8** (2026-10-20, **preview only**) | `fq_codel` keeps its original classify shape and its backlog guard moves inline into `2054` (Toke Høiland-Jørgensen's v7 review). Verified as a cumulative four-patch swap on a CAKE-less preview tree. |
+
+### Not carried, and why
+
+- `1095` stays for now. Leo Liu's `cancel idle work in hw_init failure paths`
+  is the maintainer-approved replacement, but it is still under review (a PG
+  question from David Wu) and touches `vcn_v5_0_2`, which is not this IP.
+  Replace `1095` when that thread settles.
+- The CS `SPM VMID` patch targets `amdgpu_vmid_free_spm()`, absent from `v7.3`
+  (7.4 only). Its sibling's mail was malformed; the series is not carried yet.
+- The KFD SVM restore backoff/mmap pair and the `sched/eevdf` idle-group fix are
+  unreviewed lock and scheduler changes. Watch.
+- The CPPC v6 ordering rework is part of a series whose later patches do not
+  apply to `v7.3`; defer to the next base.
+- `dma-buf IOVA`, drm/sched priority, zswap runtime-enable, the SMU 14.0.2
+  energy gates, the ring-array resizes and the KCSAN annotations are inert or
+  non-functional here. The full rejection list is in the 2026-10-20 sweep.

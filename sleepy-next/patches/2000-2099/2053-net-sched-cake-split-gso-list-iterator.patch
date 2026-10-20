@@ -1,8 +1,8 @@
 From Jamal Hadi Salim <jhs@mojatatu.com> Mon Sep 17 00:00:00 2001
 From: Jamal Hadi Salim <jhs@mojatatu.com>
-Date: Mon, 19 Oct 2026 12:00:33 -0400
-Subject: [PATCH net-next v7 2/4] net/sched: cake: use a dedicated split-GSO list iterator
-Message-ID: <QDISC-BA27.v7.r0.20261019115505-2@mojatatu.com>
+Date: Tue, 20 Oct 2026 12:57:28 -0400
+Subject: [PATCH net-next v8 2/4] net/sched: cake: use a dedicated split-GSO list iterator
+Message-ID: <QDISC-BA27.v8.r0.20261020063241-2@mojatatu.com>
 
 skb_list_walk_safe(segs, segs, nskb) reuses the list head as the walk
 cursor, so segs no longer names the segment list once the walk finishes.

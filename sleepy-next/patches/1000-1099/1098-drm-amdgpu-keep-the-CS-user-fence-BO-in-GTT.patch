@@ -1,0 +1,89 @@
+From Jesse Zhang <Jesse.Zhang@amd.com> Mon Sep 17 00:00:00 2001
+From: Jesse Zhang <Jesse.Zhang@amd.com>
+Date: Tue, 20 Oct 2026 16:37:09 +0800
+Subject: [PATCH 2/3] drm/amdgpu: keep the CS user fence BO in GTT
+Message-ID: <20261020083804.2777099-2-Jesse.Zhang@amd.com>
+
+The CS ioctl hands the GPU the GART address of the user fence BO, but
+since the BO keeps its own preferred and allowed domains, it no longer
+makes sure the BO is in GTT. A user fence in a VRAM BO, which only needs
+to be a page in size, gets its address from amdgpu_bo_gpu_offset(), which
+warns about non-contiguous VRAM. On navi31, a CS with a user fence in a
+4K VRAM BO, or in one created with AMDGPU_GEM_CREATE_VM_ALWAYS_VALID:
+
+  WARNING: amdgpu_object.c:1531 at amdgpu_bo_gpu_offset+0x86/0xb0 [amdgpu], CPU#11: cs_gem_checks/18393
+  RIP: 0010:amdgpu_bo_gpu_offset+0x86/0xb0 [amdgpu]
+  Call Trace:
+   <TASK>
+   amdgpu_cs_parser_bos.isra.0+0x4eb/0x850 [amdgpu]
+   amdgpu_cs_ioctl+0x97e/0x2510 [amdgpu]
+   drm_ioctl_kernel+0xac/0x110 [drm]
+   drm_ioctl+0x2c6/0x5b0 [drm]
+   __x64_sys_ioctl+0xa0/0xf0
+   do_syscall_64+0xa3/0x4d0
+   entry_SYSCALL_64_after_hwframe+0x76/0x7e
+
+and BOs which can't be in GTT at all, like GWS or OA ones of a page in
+size, pass the checks as well.
+
+Only take BOs which can be in GTT as user fence and validate them only
+there, like before, along with the other BOs of the CS. Validate the
+user fence BO explicitly as well, a per VM BO shares the reservation of
+the root PD and so isn't one of the locked objects of the CS.
+
+Fixes: 1ea863fd736e ("drm/amdgpu: keep the prefered/allowed domains in the BO")
+Signed-off-by: Jesse Zhang <Jesse.Zhang@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c
+index abd8a756779e..62758866378e 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c
+@@ -153,6 +153,9 @@ static int amdgpu_cs_p1_user_fence(struct amdgpu_cs_parser *p,
+ 	if (amdgpu_ttm_tt_get_usermm(p->uf_bo->tbo.ttm))
+ 		return -EINVAL;
+ 
++	if (!(p->uf_bo->allowed_domains & AMDGPU_GEM_DOMAIN_GTT))
++		return -EINVAL;
++
+ 	*offset = data->offset;
+ 	return 0;
+ }
+@@ -823,6 +826,14 @@ static int amdgpu_cs_bo_validate(void *param, struct amdgpu_bo *bo)
+ 	uint32_t domain;
+ 	int r;
+ 
++	/* The GPU writes the user fence through the GART */
++	if (bo == p->uf_bo) {
++		if (bo->tbo.pin_count)
++			return bo->tbo.resource->mem_type == TTM_PL_TT ? 0 : -EINVAL;
++		domain = AMDGPU_GEM_DOMAIN_GTT;
++		goto retry;
++	}
++
+ 	if (bo->tbo.pin_count)
+ 		return 0;
+ 
+@@ -858,7 +869,8 @@ static int amdgpu_cs_bo_validate(void *param, struct amdgpu_bo *bo)
+ 	    amdgpu_res_cpu_visible(adev, bo->tbo.resource))
+ 		p->bytes_moved_vis += ctx.bytes_moved;
+ 
+-	if (unlikely(r == -ENOMEM) && domain != bo->allowed_domains) {
++	if (unlikely(r == -ENOMEM) && domain != bo->allowed_domains &&
++	    bo != p->uf_bo) {
+ 		domain = bo->allowed_domains;
+ 		goto retry;
+ 	}
+@@ -992,6 +1004,10 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
+ 	}
+ 
+ 	if (p->uf_bo) {
++		r = amdgpu_cs_bo_validate(p, p->uf_bo);
++		if (unlikely(r))
++			goto out_free_user_pages;
++
+ 		r = amdgpu_ttm_alloc_gart(&p->uf_bo->tbo);
+ 		if (unlikely(r))
+ 			goto out_free_user_pages;

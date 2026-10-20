@@ -18,8 +18,8 @@ moved, so the full ledger is not duplicated here.
 | Snapshot | `next-20261019`, tag `13f2fb693de7` (tip `3d229ce89862`) |
 | Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261019.tar.gz` |
 | Snapshot tree `Makefile` | `7.3.0` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.10.19-1-sleepy-next` |
-| Package | `linux-sleepy-next-2026.10.19-1` |
+| Kernel release | `2026.10.19-2-sleepy-next` |
+| Package | `linux-sleepy-next-2026.10.19-2` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -66,7 +66,7 @@ twice.
 
 `prepare()` dry-runs every patch and skips it outright when it does not apply, so
 a snapshot that has moved past the series still produces a build. The series is
-reconciled on every snapshot bump: on `next-20261019`, **129 patches apply in
+reconciled on every snapshot bump: on `next-20261019`, **139 patches apply in
 order** and the absorbed or superseded carries are no longer listed (see *Base
 bump to `next-20261019`* at the end of this file). The skip mechanism remains as
 a safety net for a snapshot that moves again before the next reconciliation.
@@ -548,8 +548,8 @@ the preview builds it too. It is absent from the snapshot's own `insn.h`.
 
 | | |
 |---|---|
-| Files in `patches/` | 136 |
-| Entries in `source=()` | 129 |
+| Files in `patches/` | 146 |
+| Entries in `source=()` | 139 |
 | Excluded from `source=()` | 7 — `1008`, `1012`, `1013`, `1014`, `1017`, `9060`, `9040` |
 | Preview-only adds | none; the zswap request stack (`2700`/`2701`) is absorbed by this snapshot |
 | Preview-only carries | none; the 7.3-bump carries are absorbed and removed (see *Base bump to `next-20261019`*) |
@@ -736,3 +736,37 @@ base; and the `1151` v4 posting is dated 2026-02-16, older than our carried
 A pristine `next-20261019` worktree with the 129 patches applied in order
 reports no failures, no `Skipping patch` and no `Reversed` hunk under GNU
 `patch -p1 --forward -F2`. The build follows.
+
+## 2026-10-20 — ten shared carries, CAKE v8, `2057` stays rc-only
+
+The 2026-10-20 sweep adopted the same safe carries as `sleepy-rc`, minus the one
+the snapshot already contains, and brought the preview-only CAKE set to v8. The
+snapshot does **not** move: `next-20261020` adds no AMD GPU content, and a bump
+would need `2046` dropped (absorbed) plus `0101` and `2419` rebased.
+
+### Added — ten shared carries
+
+`1097` (GFXOFF for compute on GFX12), `1098` (CS user fence BO in GTT), `1180`
+(VRR inactive vtotal), `1181`/`1182` (drm_crtc fence lifetime), `2056`
+(`tcp_wmem_schedule()` clamp), `2058` (blk-mq stale `INACTIVE` flag), `2059`/
+`2060` (io_uring schedule points) and `2803` (memcg null-before-put). All apply
+to the pristine snapshot. Provenance is in `sleepy-rc/PATCH_SOURCES.md`.
+
+The eleventh rc carry, `2057` (block misaligned-bio iterator), is **not** here:
+it reverse-applies cleanly to `next-20261019`, so the snapshot already has it.
+
+### Revised in place
+
+`1084` and `9083` move to their v3 postings, and `9084` to v3 2/2, matching
+`sleepy-rc`. The changes are comment-only for `1084`/`9083`; `9084` v3 bounds
+SVM ranges by the smallest GPUVM limit.
+
+`2052`–`2055` move from CAKE v7 to **v8** (2026-10-20). v8 is a restructure:
+`fq_codel` keeps its original classify shape, and its backlog guard moves inline
+into `2054`; `2052` becomes cake-only and the guard sits before
+`codel_set_enqueue_time()`. Tested cumulatively on a preview tree with the v7
+four removed, then the v8 four applied in order — clean.
+
+`1095` stays. Its maintainer-approved replacement (cancel the idle work in the
+`hw_init()` error paths) is still under review and touches `vcn_v5_0_2`, which
+this machine does not own.
