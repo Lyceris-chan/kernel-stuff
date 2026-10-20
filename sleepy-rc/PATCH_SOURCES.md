@@ -9761,3 +9761,143 @@ The GitLab merge-request API still returns 403 without auth. `lore-stable`'s
 epoch 0 is stale (latest mail 2022), and no `linux-7.3.y` branch exists yet.
 `drm-misc`'s orcz remote failed with a connection reset; the freedesktop origin
 is current. The fd.o monthly archives lag the lore mirrors.
+
+## Sweep 2026-10-20 — next-20261020 is out; three preview rebases, nothing adopted
+
+linux-next tagged `next-20261020` (tag object `aff5f30d`, commit `8f7df005a756`)
+on 10-20. The tag adds **no AMD GPU content**: no file under
+`drivers/gpu/drm/amd` changed against `next-20261019`. Nothing was adopted.
+Every new candidate is unreviewed or belongs to the 7.4 cycle, and the carried
+revisions that moved are comment-only, inert here, or preview-only.
+
+### Source state — every source queried
+
+| Source | State |
+|---|---|
+| torvalds | `origin` `f47d223627f8` (10-19), the 7.4-rc1 window; no on-target commit since the last sweep |
+| linux-next | **`next-20261020`** `8f7df005a756` (10-20); new |
+| drm-next | `a56b45995b1e` (10-13); unchanged |
+| agd5f / amd-staging | `77f548b127c6` (10-20); nine commits since 10-18 |
+| drm-misc | `orcz/drm-misc-fixes` `d57e3a7d880d` (10-20); two `drm_crtc` fence fixes and one dma-buf IOVA fix |
+| linux-pm | `24a19b953e2a` (10-11); unchanged |
+| akpm-mm | `mm-everything` `eee7b6f8fed3` (10-19); the VMA-flag rework is the new content |
+| tip | `b5f3cea924e3` (10-20); x86/tdx merge only |
+| lore mirrors (16) | refreshed; newest mail 2026-10-20 17:42 UTC |
+| CachyOS | no commit since 10-09 (`7.3/zram`); `7.3/base` and `7.3/fixes` unchanged |
+| sirlucjan | `7275a4ad` (10-20) adds the 7.3 **t2** line — Apple T2, not this hardware |
+| firelzrd | MARIE `1.0.0-rc1` and BORE `7.0.0`, both carried; no newer commit |
+| linux-tkg | MuQSS and Gentoo Kconfig updates; neither is used here |
+| xanmod | no valid source: its remote mirrors our own commits |
+| tracker | 39 open issues updated since 10-19; none references a fix commit |
+
+### next-20261020
+
+The delta against `next-20261019` is 1797 non-merge commits over 1366 files.
+The material is the mm VMA-flags rework (`VM_SPECIAL` removal, `mmap_prepare`),
+netmem/GSO changes, ntfs, ALSA and tracing. The only AMD-adjacent commit is an
+ACPI video cleanup.
+
+The preview series was audited against the new tag: **126 of 129 apply**; three
+fail, and each is a different kind of work:
+
+- `0101-cachy-bbr3` — hunk 1 of `net/ipv4/Makefile` fails because the snapshot
+  added `obj-$(CONFIG_TCP_CONG_ROCCET) += tcp_roccet.o` at the anchor. Rebase,
+  not a content change.
+- `2046-nvme-pci-revert-dma-opt-mapping-clamp` — **absorbed**. The snapshot
+  already uses `dma_max_mapping_size(&pdev->dev) >> 9` (the revert's intent, from
+  a different commit). Drop it on the bump; do not rebase it.
+- `2419-sched-bore-7.0.0` — hunk 7 fails on the reworked `fair.c` (the
+  `enqueue_task_fair()` revert and the EEVDF `RUN_TO_PARITY` change). Rebase.
+
+A bump therefore costs one drop and two rebases, and buys nothing for this
+hardware. It is a separate version-bump session, not part of this sweep.
+
+### Candidates — all dry-run against the full `source=()` trees
+
+| Patch | Author, source | Verdict |
+|---|---|---|
+| `1084` v3, gang leader | Jesse Zhang, amd-gfx `<b4513584>` (10-20) | Carried v2 → v3 is **comment-only** (v3 drops the comments Christian asked about); the code is identical. Optional ledger refresh, no functional delta. |
+| `9083` v3 1/2, SVM GPUVM cover | Daniel Huang, amd-gfx `<f64c4123>` (10-20) | Carried v1; v3 narrows the check to SVM and rewrites the justification. Applies after reverse-applying v1. The bug needs an explicit `amdgpu.vm_size` override we do not set, so it is inert here; update the carried copy with the next package refresh. |
+| CAKE v8 1–4 | Jamal Hadi Salim, netdev `<373e39082>` (10-20) | Carried v7 in **sleepy-next only**. v8 is a real restructure: `fq_codel` keeps its original classify shape and its backlog guard moves inline into 3/4 (Toke's review). Applies cumulatively as a four-patch swap on the preview base. Adopt at the next preview refresh. |
+| `drm/amdgpu: re-enable GFXOFF for compute on GFX12` | Harkirat Gill, amd-gfx `<20261020160316.2411569-1>` | On-target gfx12.0; the `== 12` workaround it removes is in `v7.3`. Applies. Unreviewed behaviour change (idle power vs. an OpenCL workaround). Watch. |
+| `drm/amd/display: Keep the nominal vtotal while VRR is inactive` | Matthew Schwartz, amd-gfx `<202610200919>` | On-target VRR. `mod_freesync_handle_v_update()` in `v7.3` still derives the inactive vtotal from `max_refresh_in_uhz`; the patch uses `stream->timing.v_total`. Applies. Unreviewed; strong candidate for this machine's VRR path. |
+| `drm/amdgpu: cancel idle work in hw_init failure paths` | Leo Liu, amd-gfx `<f2a50ed6>` (10-20) | **Supersedes the preview's `1095`**: Alex Deucher rejected the `hw_fini` approach and asked for the cancel in the `hw_init()` error path. Applies except the `vcn_v5_0_2` hunk (not this IP). Still under review (PG question from David Wu). Watch; replace `1095` with it when it settles. |
+| SDMA/VCN/JPEG `cancel idle work` siblings | Leo Liu, same thread | Same patch; no separate carry. |
+| `drm/amdgpu: keep the CS user fence BO in GTT` | Jesse Zhang, amd-gfx `<c60cc63c>` | Real WARN/UAF fix in `amdgpu_cs.c`; applies. Part of a three-patch set whose first patch targets the 7.4-only `amdgpu_vmid_free_spm()` and whose third arrived malformed. Watch the series. |
+| KFD SVM restore backoff + mmap downgrade | Philip Yang, amd-gfx `<9e1dd313>`, `<12fc3738>` | Both apply; they stop a failing restore from starving the mmap and process locks. No review trailers yet. Watch. |
+| KFD `correct vram_available calculation` (`6044d4869613`) | Zhen Han, amd-staging | Needs the 2023 `6d9f7992335a` prerequisite; the pair applies to the series tree, reviewed by Mukul Joshi and Lijo Lazar. 7.4 material; defer. |
+| `tcp: clamp return value of tcp_wmem_schedule()` | Octavian Purdila, netdev `<304451498>` | One-line fix; `Reviewed-by` Eric Dumazet and Kuniyuki Iwashima; applies. Candidate. |
+| `block: restore the iterator when rejecting a misaligned bio` | Andrew Morton, block `<9f7bf41>` | Real KASAN overflow in the direct-I/O fallback; applies to the rc series and is already in the preview base. Candidate. |
+| `blk-mq: clear stale inactive flag on hctx reuse` | Nirmoy Das, block `<5c2beb0>` | Applies; needs CPU hotplug plus a queue-count update. Low priority. |
+| `drm_crtc` fence lifetime + `::get_driver_name()` race | André Draszik, drm-misc `3be436cbd3d2`, `cb104d395da4` | Both apply; generic DRM core, no base absorption. Low priority (unbind and sync-file debug paths). |
+| `memcg: publish null pointer before dropping css reference` | Joshua Hahn, mm `<c43b30f914>` | Two-line RCU UAF fix; applies; author could not reproduce it. Low priority. |
+| io_uring freeing-loop schedule points | Yuanhe Shu, io-uring `<9d3936b>`, `<9340918>` | Applies; softlockup only on debug kernels with huge completion batches. Low priority. |
+| `sched/eevdf: Fix sched idle task group preemption` v2 | Vincent Guittot, cgroups `<1c29ba087>` | Applies into the live `wakeup_preempt_fair()` path; only matters with `SCHED_IDLE` task groups. Low priority. |
+| CPPC v6 series | Sumit Gupta, linux-pm `<085d8797>` | Patches 2, 4 and 5 fail against `v7.3`; patch 1 alone applies, but it is a 294-line rework of the series. Defer the whole set to the next base. |
+
+Rejected, with the reason:
+
+- **SMU energy accumulator** — the gates are SMU 13.0.7/13.0.10 and
+  `smu_v14_0_2`; this machine is `smu_v14_0_0`. Wrong-chip trap.
+- **GFX12.1 VF clock read, MES 12.1, `jpeg_v4_0_3`, `dcn32` clock drop** — wrong
+  IP version or wrong display generation.
+- **UALink PASID TLB fence** — datacenter interconnect, not this silicon.
+- **`mm: zswap: set zswap_ever_enabled when enabling at runtime`** — the bug
+  needs `CONFIG_ZSWAP_DEFAULT_ON=n`; our config sets `=y`, and the carried
+  `2174` already covers pool creation. Inert here.
+- **dma-buf IOVA offset fix** — `THRU_HOST_BRIDGE` with a multi-entry phys_vec;
+  this is a single-GPU box, so the path is not taken.
+- **drm/sched v2 priority clamp** — the commit message says no driver reaches
+  the clamping path. Inert.
+- **Ring-array resizes and `amdgpu_ring_init` cleanup** — memory saving and
+  greppability, no functional change.
+- **block ioprio `READ_ONCE`/`smp_store_release`** — the patch itself states a
+  stale value is harmless; it only silences KCSAN.
+- **Display preferred-mode iterator** — "no functional change intended"
+  (coccinelle cleanup).
+- **`pci=realloc` VFCT series** — the parameter is not used on this machine.
+- **`cpuidle: Fix UAF of removed CPU PM domains`** — PSCI and RISC-V SBI only;
+  ARM/SoC. Wrong architecture.
+- **JPEG v1.0/v4.0.3, `dcn42`/`dcn50`/`dcn60`, Strix APU patches** — wrong
+  silicon.
+
+### Version sweep
+
+A normalized-subject check over every posting since 2026-10-19 across the 16
+lore mirrors, with a fuzzy pass for renames, matched four carried subjects:
+
+- `1084` v3 — comment-only (see above).
+- `9083` v3 — real revision; inert here (see above).
+- CAKE v8 — real revision, preview-only (see above).
+- `9089` — the carried copy is already the 10-19 v2; the older `[PATCH v2]`
+  label in the mirror is the same content.
+
+No other carried patch has an unadopted newer revision.
+
+### Tracker
+
+39 open drm/amd issues moved since 10-19. The on-target ones are the known
+Navi 48 / DCN 4.0.1 reports: `#6010` (INBOX0 lock), `#5985` and `#4763` (game
+ring timeouts), `#5807` and `#5843` (pageflip), `#5759` (MES `REMOVE_QUEUE`),
+`#4707` (`pp_dpm_mclk` stuck with FreeSync), `#5418` (vmin/vmax storm), and
+`#5951`, whose runtime-PM fix is already carried as `1174`. None carries a fix
+commit. `#6003` (userptr pages written by the GPU are never marked dirty) is
+the one worth tracking: Christian König's reply confirms the HMM path only
+dirties pages it faults in, so a clean present page can be reclaimed; no patch
+exists yet. It matters here because this machine swaps.
+
+### CachyOS and sirlucjan
+
+No regeneration is due: sirlucjan's only new commit is the Apple T2 line, and
+the CachyOS branches we squash have not moved since 10-09. The preview bump
+above will need `0101` rebased over the snapshot's new `tcp_roccet.o` line; the
+bbr3 content itself is unchanged.
+
+### Coverage limits
+
+The GitLab merge-request API still returns 403 without auth. `lore-stable`'s
+epoch 0 is stale (latest mail 2022) and no `linux-7.3.y` branch or `v7.3.x` tag
+exists yet (checked through the gregkh mirror; git.kernel.org became
+unreachable after the tree fetches). `lore-rust-for-linux` last moved on
+09-24. `xanmod` is not an independent source. The fd.o monthly archives lag the
+lore mirrors.
