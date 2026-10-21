@@ -3,8 +3,8 @@
 `linux-sleepy-next` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
 built from a **linux-next snapshot (`next-20261019`)** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 129 targeted
-upstream/local patches. It is not a general-purpose kernel.
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 141-patch
+series. It is not a general-purpose kernel.
 
 **Base version:** `2026.10.19-2` · **Artifact:**
 `linux-sleepy-next-2026.10.19-2-x86_64.pkg.tar.zst`
@@ -123,7 +123,7 @@ fix lands.
 
 ## Patch series
 
-256 patch entries in `source=()` (263 files; seven are excluded from the build and two are preview-only). `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+141 patch entries in `source=()` (148 files; seven are excluded from the build). `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 On a linux-next snapshot a large fraction are skipped rather than failed, since
 the snapshot already carries much of what the series adds — a skip is only safe
 for a self-contained patch, so interdependent groups are excluded outright
@@ -137,6 +137,7 @@ instead.
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) |
 | `1100–1199` | AMD Display (DCN4, colorops) |
 | `1200–1299` | AMD PM (amd-pstate, ACPI CPPC) |
+| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) |
 | `2000–2099` | Block / I/O (bfq, mq-deadline, zram, io_uring) |
 | `2100–2199` | Memory and swap (zstd, LRU-MARIE, gup, zswap) |
 | `2200–2299` | CPU idle (NAP) |

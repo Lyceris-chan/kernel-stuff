@@ -1,40 +1,44 @@
-From 1935159495733b138770e35f68ac34d61bc44e0e Mon Sep 17 00:00:00 2001
+From Melissa Wen <mwen@igalia.com> Mon Sep 17 00:00:00 2001
 From: Melissa Wen <mwen@igalia.com>
-Date: Fri, 16 Oct 2026 19:11:34 +0200
-Subject: [PATCH] drm/amd/display: set PQ in AMD FreeSync infopacket for DP HDR
+Date: Wed, 21 Oct 2026 14:29:25 +0200
+Subject: [PATCH] drm/amd/display: signal PQ EOTF in FreeSync infopacket for DP HDR
+Message-ID: <20261021123020.53928-1-mwen@igalia.com>
 
 Commit c2791297013e ("drm/amd/display: Add color bit info to freesync
 infoframe") created the app_tf interface for FreeSync HDR and commit
-c21a764a98cb ("drm/amd/display: Send PQ bit in AMD VSIF") correctly sets
-PB9 bit 5 to signal PQ EOTF in VRR info. However, Linux never made use
-of this interface and DM was building v2/v3 AMD Freesync packets
-(whenever freesync is supported) ignoring the HDR state.
+c21a764a98cb ("drm/amd/display: Send PQ bit in AMD VSIF") used it to set
+PB9 bit 5 (PQ EOTF) in v2/v3 AMD Freesync infopacket. However, Linux
+never made use of this interface: DM ignores what userspace sets
+regarding HDR and always passes TRANSFER_FUNC_UNKNOWN as app_tf, so the
+PQ bit is never set in the infopacket received by the eDP panel.
 
-Check the EOTF in the HDR static metadata and set PQ bit in AMD
-infoframe for DP accordingly.
+Check the EOTF in the HDR static metadata and set the PQ bit in Freesync
+infopacket for DP accordingly. This fixes gray-washed HDR on KDE/GNOME
+on Framework 13 Pro AI 9 HX 370 (DCN 3.5) and may fix similar issues on
+other VRR-capable panels that advertise Replay in its AMD VSDB.
 
-This fix gray-washed HDR on KDE/GNOME on FW 13 Pro (DCN351) and
-potentially fix similar issue in other hw versions that is properly
-working on Windows.  This only handles DP, since v1 FreeSync infoframe
-doesn't support EOTF, and this is the usual path for HDMI, also nobody
-reported issues with HDMI.
+It doesn't affect color/EOTF bits on infopackets for SDR and native
+HDMI.
 
+Link: https://gitlab.freedesktop.org/drm/amd/-/work_items/3200
+Reported-by: Pierre-Loup A. Griffais <pgriffais@valvesoftware.com>
 Signed-off-by: Melissa Wen <mwen@igalia.com>
 ---
- .../amd/display/amdgpu_dm/amdgpu_dm_freesync.c | 18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
+ .../display/amdgpu_dm/amdgpu_dm_freesync.c    | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_freesync.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_freesync.c
-index ab9cfbce8d73..525d6faac15a 100644
+index ab9cfbce8d73..322106d1cce7 100644
 --- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_freesync.c
 +++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_freesync.c
-@@ -165,6 +165,17 @@ void amdgpu_dm_get_freesync_config_for_crtc(
+@@ -165,6 +165,18 @@ void amdgpu_dm_get_freesync_config_for_crtc(
  }
  EXPORT_IF_KUNIT(amdgpu_dm_get_freesync_config_for_crtc);
  
 +#define DP_HDR_SDP_EOTF_IDX 2
 +
-+static bool dm_dp_in_hdr_mode(const struct dc_stream_state *stream) {
++static bool dm_dp_in_hdr_mode(const struct dc_stream_state *stream)
++{
 +	const struct dc_info_packet *hdr = &stream->hdr_static_metadata;
 +
 +	if (!dc_is_dp_signal(stream->signal) || !hdr->valid)
@@ -46,7 +50,7 @@ index ab9cfbce8d73..525d6faac15a 100644
  void amdgpu_dm_update_freesync_state_on_stream(
  	struct amdgpu_display_manager *dm,
  	struct dm_crtc_state *new_crtc_state,
-@@ -181,6 +192,7 @@ void amdgpu_dm_update_freesync_state_on_stream(
+@@ -181,6 +193,7 @@ void amdgpu_dm_update_freesync_state_on_stream(
  	bool pack_sdp_v1_3 = false;
  	struct amdgpu_dm_connector *aconn;
  	enum vrr_packet_type packet_type = PACKET_TYPE_VRR;
@@ -54,7 +58,7 @@ index ab9cfbce8d73..525d6faac15a 100644
  
  	if (!new_stream)
  		return;
-@@ -232,12 +244,16 @@ void amdgpu_dm_update_freesync_state_on_stream(
+@@ -232,12 +245,16 @@ void amdgpu_dm_update_freesync_state_on_stream(
  					&new_stream->adaptive_sync_infopacket);
  	}
  
@@ -72,6 +76,3 @@ index ab9cfbce8d73..525d6faac15a 100644
  		&vrr_infopacket,
  		pack_sdp_v1_3);
  
--- 
-2.53.0
-

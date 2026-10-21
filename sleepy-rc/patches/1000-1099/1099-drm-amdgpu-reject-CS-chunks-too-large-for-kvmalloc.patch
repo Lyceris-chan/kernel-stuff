@@ -1,0 +1,40 @@
+From Jesse Zhang <Jesse.Zhang@amd.com> Mon Sep 17 00:00:00 2001
+From: Jesse Zhang <Jesse.Zhang@amd.com>
+Date: Wed, 21 Oct 2026 13:09:59 +0800
+Subject: [PATCH V2 3/3] drm/amdgpu: reject CS chunks too large for kvmalloc()
+Message-ID: <20261021051033.3287259-3-Jesse.Zhang@amd.com>
+
+The CS ioctl copies every chunk with vmemdup_array_user() before it
+looks at it, for whatever length_dw userspace gives. kvmalloc() warns
+about allocations above INT_MAX when called without __GFP_NOWARN, so any
+process with the render node can trigger a warning. On navi31, a CS with
+a chunk of length_dw 0x20000000 returns -ENOMEM after:
+
+  WARNING: mm/slub.c:6841 at __kvmalloc_node_noprof+0x5a5/0x7d0
+
+Reject such chunks with -EINVAL before trying to copy them.
+
+Fixes: 2098105ec65c ("drm: drop drm_[cm]alloc* helpers")
+Signed-off-by: Jesse Zhang <Jesse.Zhang@amd.com>
+Reviewed-by: Christian König <christian.koenig@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c
+index 62758866378e..7c76d8305947 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c
+@@ -221,6 +221,12 @@ static int amdgpu_cs_pass1(struct amdgpu_cs_parser *p,
+ 
+ 		size = p->chunks[i].length_dw;
+ 
++		if (size > INT_MAX / sizeof(uint32_t)) {
++			ret = -EINVAL;
++			i--;
++			goto free_partial_kdata;
++		}
++
+ 		p->chunks[i].kdata = vmemdup_array_user(u64_to_user_ptr(user_chunk.chunk_data),
+ 							size,
+ 							sizeof(uint32_t));

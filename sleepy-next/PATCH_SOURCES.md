@@ -770,3 +770,15 @@ four removed, then the v8 four applied in order — clean.
 `1095` stays. Its maintainer-approved replacement (cancel the idle work in the
 `hw_init()` error paths) is still under review and touches `vcn_v5_0_2`, which
 this machine does not own.
+
+### 2026-10-21 sweep — two carries and four revision refreshes
+
+`1099` (reject CS chunks too large for `kvmalloc()`) and `1300` (KFD SMI events
+only to allowed clients) join both packages. `1084` moves to v4, `9083`/`9084`
+to v4 1/2 and 2/2, and `1177` to its 10-21 list posting, matching `sleepy-rc`.
+The preview series is now **141** patches, all applying to `next-20261019`
+(141/141).
+
+`2804` (page_vma_mapped) and `2805` (THP `MADV_COLD`) are **not** here: both
+reverse-apply cleanly to `next-20261019`, so the snapshot already contains them.
+Full triage is in the 2026-10-21 sweep in `sleepy-rc/PATCH_SOURCES.md`.

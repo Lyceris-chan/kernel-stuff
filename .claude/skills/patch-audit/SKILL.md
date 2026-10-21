@@ -97,6 +97,7 @@ Run these in order. Copy the commands exactly — do not improvise.
    | `10xx` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) |
    | `11xx` | AMD Display (DCN4/DCN401, FRL, colorops) |
    | `12xx` | AMD Power Management (amd-pstate, CPPC) |
+   | `13xx` | GPU core follow-ups (KFD SMI/VM, CS validation; opened 2026-10-21 when `10xx` filled) |
    | `20xx` | Block / I/O (bfq, mq-deadline, zram, io_uring) |
    | `21xx` | Memory management (zstd, LRU-MARIE, MGLRU, gup batching, zswap) |
    | `22xx` | CPU idle (NAP governor) |

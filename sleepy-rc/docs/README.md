@@ -3,8 +3,8 @@
 `linux-sleepy-rc` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
 built from **mainline Linux 7.3** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset and 271 targeted
-upstream/local patches. It is not a general-purpose kernel.
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 286-patch
+series. It is not a general-purpose kernel.
 
 **Base version:** `7.3.0-2` · **Artifact:**
 `linux-sleepy-rc-7.3.0-2-x86_64.pkg.tar.zst`
@@ -116,7 +116,7 @@ fix lands.
 
 ## Patch series
 
-282 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+286 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 
 | Range | Category |
 |---|---|
@@ -126,6 +126,7 @@ fix lands.
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) |
 | `1100–1199` | AMD Display (DCN4, colorops) |
 | `1200–1299` | AMD PM (amd-pstate, ACPI CPPC) |
+| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) |
 | `2000–2099` | Block / I/O (bfq, mq-deadline, zram, io_uring) |
 | `2100–2199` | Memory and swap (zstd, LRU-MARIE, gup, zswap) |
 | `2200–2299` | CPU idle (NAP) |

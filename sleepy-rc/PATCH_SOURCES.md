@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
 - **Base:** Linux `v7.3`
-- **Series:** 282 patches
+- **Series:** 286 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -21,7 +21,8 @@ are supplied by the generator instead, so every row below has a source.
 | `0001–0049` | Handmade local | 12 |
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
-| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 29 |
+| `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 30 |
+| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 1 |
 | `1100–1199` | AMD display (DCN4, colorops) | 30 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 27 |
 | `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 46 |
@@ -31,12 +32,12 @@ are supplied by the generator instead, so every row below has a source.
 | `2400–2499` | Core scheduler and sched-ext | 3 |
 | `2500–2599` | x86 and arch core | 2 |
 | `2600–2699` | Time and timers | 0 |
-| `2800–2899` | Memory management, second series (mm/swap follow-ups) | 4 |
+| `2800–2899` | Memory management, second series (mm/swap follow-ups) | 6 |
 | `2900–2999` | VFS / core filesystem | 0 |
 | `9000–9099` | agd5f staging + userq lifecycle backports | 36 |
 | `9100–9199` | Retry-fault handling v4 (agd5f staging) | 11 |
 
-**Total: 282** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 286** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-19). The counts are now generated from the patch tree
@@ -49,6 +50,11 @@ by the xswap writeout guard and then vacated, and every other gap in the range
 is likewise a vacated number that must not be reused. The mm/swap follow-ups
 open a new range rather than reusing one. `2700–2799` remains the preview-only
 zswap request stack and is deliberately not used by this package.
+
+**`1300–1399` is new (2026-10-21).** `1000–1099` is now exhausted: `1099` is its
+last slot and every earlier gap is a vacated number that must not be reused.
+GPU-core follow-ups therefore open a second range, the same way the mm
+follow-ups opened `2800–2899` when `2100–2199` filled.
 
 **A resolved numbering collision:** two patches used to share the number
 `1140` — Tom Chung's clamp of `force_min_dcfclk` to the dcn42b range (still
@@ -9955,3 +9961,134 @@ nothing this machine executes.
 - `dma-buf IOVA`, drm/sched priority, zswap runtime-enable, the SMU 14.0.2
   energy gates, the ring-array resizes and the KCSAN annotations are inert or
   non-functional here. The full rejection list is in the 2026-10-20 sweep.
+
+## Sweep 2026-10-21 — next-20261021, the mm-hotfix push, and four safe carries
+
+linux-next tagged `next-20261021` (tag object `2ca9a319`, commit `9a482184d910`)
+on 10-21. Its AMD delta is **61 commits**, but all 61 subjects are already in the
+`agd5f-linux` history scanned on 10-20, and that branch has not moved since
+(`77f548b127c6`). The genuinely new material is in `mm-everything`: two reviewed
+fixes for paths this machine executes, both already absorbed by
+`next-20261019` and therefore rc-only.
+
+### Source state — every source queried
+
+| Source | State |
+|---|---|
+| torvalds | `origin/master` `a804c5742bff` (10-20); the delta since 10-19 is the alpha/nios2 arch series and one smb fix — no on-target commit |
+| linux-next | **`next-20261021`** `9a482184d910` (10-21), tag `2ca9a319`; new since the last sweep |
+| drm-next | `fad06cfaf385` (10-21); the delta is the `drm-misc-next-2026-10-16` merge (imagination, panels, bridges); no AMD commit |
+| agd5f / amd-staging | `77f548b127c6` (10-20); **unchanged** since the last sweep |
+| drm-misc | `orcz/drm-misc-next` `b3de601e57d9` (10-21); `orcz/drm-misc-fixes` `d57e3a7d880d` (10-20) unchanged |
+| linux-pm | `24a19b953e2a` (10-11); unchanged |
+| akpm-mm | `mm-everything` `eb9795f66371` (10-20); the new delta is the mm fixes below |
+| tip | `b5f3cea924e3` (10-20); unchanged |
+| lore mirrors (15) | refreshed; newest mail 2026-10-21 13:42 UTC. `lore-stable` (2022) and `lore-rust-for-linux` (09-24) remain stale |
+| CachyOS | `cachyos-kernel-patches` adds `7.3: Add prjc` (a 14,434-line scheduler) and `7.3: Add handheld, add rt-i915`; `cachyos-linux` branches unchanged (fixes 10-05, base 10-06, zram 10-09) |
+| sirlucjan | `7275a4ad` (10-20), the t2 line; the 7.3 `fixes` line is a re-generation whose on-target members are already carried (`1230`, `0104`, `2197`) |
+| firelzrd | MARIE `1.0.0-rc1` and BORE `7.0.0`, both carried; no newer commit |
+| linux-tkg | Gentoo Kconfig update (10-19); not used here |
+| xanmod | no independent source: its remote mirrors our own commits |
+| tracker | 25 open issues updated since 10-20; the on-target ones are reports, none references a fix commit |
+
+### next-20261021
+
+The AMD side is a re-presentation of the 7.4 amdgpu tree, not new work: compare
+subjects, not hashes — the staging branch and the drm-next merge carry the same
+changes under different commits because the branch was rebuilt. The 61 subjects
+include the display queue (`Exit PSR/Replay on non-modeset full updates`,
+`Use picoseconds for line time on DCN6+`, the `dcn401` init rework), the SMU
+13.0.7/14.0.2 profile work, `gfx_v12_1` SDMA MQDs and the Apple VRAM resets.
+Each was triaged in the 2026-10-20 pass; none is new here.
+
+The new content is `akpm-mm`'s delta. The two reviewed mm fixes adopted below are
+in `next-20261021` under different hashes; `2804` and `2805` reverse-apply
+cleanly to `next-20261019`, so the preview base already contains them and they
+are rc-only carries.
+
+### Version sweep
+
+A normalized-subject pass over every non-`Re:` posting since 2026-10-10 in the
+15 mirrors matched the carried series at seven points:
+
+| Carried | Posting | Verdict |
+|---|---|---|
+| `1084` v3 | v4, amd-gfx `<20261021023209.3241785-1-Jesse.Zhang@amd.com>` (10-21) | **Real.** `amdgpu_job_free_cb()` delegates to `amdgpu_job_free()`, which frees the remaining IBs through `amdgpu_job_free_resources()` and takes the gang-leader reference before `drm_sched_job_cleanup()`. Reverse v3, forward v4 clean on both series trees. |
+| `9083` v3 | v4 1/2, amd-gfx `<20261021095906.48630-2-danielhu@amd.com>` (10-21) | **Message-only** — changed-line sets identical. File refreshed so the pair stays at one revision. |
+| `9084` v3 | v4 2/2, amd-gfx `<20261021095906.48630-3-danielhu@amd.com>` (10-21) | **Real.** Bounds ranges by `max_va_pfn` at creation and adds the `WARN_ON_ONCE()` backstop in `svm_range_map_to_gpu()`. Clean swap. |
+| `1177` | list posting `<20261021123020.53928-1-mwen@igalia.com>` (10-21) | **Style-only** code delta (brace placement), but replaces a tracker upload with a Message-ID and list SoB trail. Refreshed in place. |
+| `1098` v1 | v2 (10-21) | Content-identical resend; no file change. |
+| `2803` v1 | v2 (10-20) | Content-identical resend; no file change. |
+| `2056` v1 | net v2 1/2 (10-20) | Content-identical; v2 only adds the production warning trace to the message. |
+
+CAKE v7 → v8 was already adopted for the preview on 10-20. `9062`'s subject
+reappeared as `01/12` of a new PMC series; the carried staging copy is the same
+helper and the rest of that series is 7.4 feature work. No other carried
+subject has an unadopted higher revision.
+
+### Candidates — all dry-run against the full `source=()` trees
+
+| Candidate | Author, source | Verdict |
+|---|---|---|
+| `1099` `drm/amdgpu: reject CS chunks too large for kvmalloc()` | Jesse Zhang, amd-gfx `<20261021051033.3287259-3-...>` | **Adopted.** Rejects `length_dw > INT_MAX / sizeof(u32)` before `vmemdup_array_user()`; without it the render node can trigger the `__kvmalloc_node_noprof()` warning. `Fixes: 2098105ec65c`, `Reviewed-by: Christian König`. Applies to both bases. |
+| `1300` `drm/amdkfd: send SMI process and VM fault events only to allowed clients` v2 | Jesse Zhang, amd-gfx `<20261021083027.3460995-1-...>` | **Adopted.** Restores the per-process/privileged filter on PROCESS_START/END and VMFAULT events and matches clients by global TGID; `fd406e58b9e6` had passed `NULL` and made the events global again. Security fix; applies to both bases. |
+| `2804` `mm/page_vma_mapped: continue past nonmatching huge PMDs` | Kyle Zeng, `mm-hotfixes` commit `0f445b68b086` | **Adopted, rc only.** A PTE-mapped large folio straddling a PMD after an unaligned `mremap()` stopped the walk early and could leave stale migration PTEs behind — memory corruption. `Acked-by: David Hildenbrand`; already in `next-20261019`. |
+| `2805` `mm/madvise: atomically clear the young bit on THP MADV_COLD` | Pedro Falcato, `mm-hotfixes` commit `321cac5eb43b` | **Adopted, rc only.** Replaces the racy PMD invalidate/mkold/rewrite with `pmdp_test_and_clear_young()`; losing a concurrent hardware dirty bit could let reclaim drop a clean anon THP. `Fixes: 9c276cc65a58`, multiple reviewed/acked tags; already in `next-20261019`. |
+| KFD `Don't reuse a VRAM page that is still referenced` | Apurv Mishra, amd-gfx `<20261020003039.369579-1-Apurv.Mishra@amd.com>` (10-19) | Applies to both bases; a real BUG_ON in the SVM migration/swap path. No review and no `Fixes:` tag yet — watch. |
+| `dma-fence: Order is-signaled-bit` 1–2/2 | Philipp Stanner, dri-devel `<20261021095512.1345191-3-phasta@kernel.org>`, `-4` (10-21) | Applies, but 2/2 needs the new `set_bit_release()` from 1/2; the thread is under active review. Watch. |
+| `cancel idle work in hw_init failure paths` 1–2/2 | Leo Liu, amd-gfx (10-21 resend) | The maintainer-approved replacement for the preview's `1095`, but still under review and it touches `vcn_v5_0_2` (not this IP). Replacing `1095` needs explicit approval. Watch. |
+| KFD SVM restore backoff + mmap downgrade | Philip Yang, amd-gfx (10-20) | Applies; unreviewed lock changes. Watch. |
+| vswap v6 (12 patches) | Kairui Song, linux-mm (10-21) | Still a feature series that also rewrites `mm/zswap.c`; the 2026-09-22 decision to use zswap + swapfile stands. Watch only. |
+| `mm: unqueue deferred split folios outside the lruvec lock` v3 | Joanne Koong, linux-mm (10-19) | Lock-contention performance only; still deferred, as on 2026-10-19. |
+| `drm/amd/display` 49-patch queue, PMC 12, CWSR 7, SVM v10 22, USERQ v5 | amd-gfx (10-21) | 7.4 feature work; none is a fix for this 7.3 base. |
+| `drm/ttm, drm/xe: Don't invoke the OOM killer when evicting VRAM at suspend` | Thomas Hellström, dri-devel (10-20) | **Rejected — inert.** The new `_ctx()` API is used only by `xe_bo_evict_all_user()`; amdgpu keeps the default wrapper. |
+| `x86/mm: Use a WB source mapping for early enc/dec when PAT has no WP` | Marco Peereboom, lkml (10-20) | **Rejected — inert.** The BUG_ON requires an SEV/SEV-ES/SEV-SNP guest; this is bare metal and SME is inactive. |
+| `memcg: fix cacheline contention between lruvec stat updates and LRU lists` | Joanne Koong, linux-mm (10-20) | **Rejected.** 318-line performance rework; does not apply to the MARIE series tree and fixes no correctness bug. |
+| `r8169: clear TX LPI on RTL8168h at link up` | netdev (10-20) | **Rejected — wrong chip.** The NIC is the RTL8125B. |
+| `drm/amdgpu/vcn: cancel jpeg idle work ...` 2/2 | Leo Liu, amd-gfx (10-20) | **Rejected — wrong IP.** Touches `vcn_v4_0_3` and `vcn_v5_0_1`; this machine is `vcn_v5_0_0`. |
+| `mm/truncate: fix the zeroing end of pagecache_isize_extended()` | Nickolai Zeldovich, `mm-hotfixes` (10-16) | **Rejected — inert here.** Requires a 1k block size smaller than the page; the root ext4 uses 4096-byte blocks. |
+| `mm/vmscan: reclaim every zone in per-node proactive reclaim` | Gregory Price, `mm-hotfixes` (10-19) | **Rejected — inert.** Needs a movable-only node; this box has none. |
+| `mm/vmalloc` kcore read, `mm/page_alloc` guard-page accounting | `mm-hotfixes` (10-15..10-17) | **Rejected — debug/tooling only.** kcore readers and `debug_guardpage_minorder` respectively. |
+| `mm/vma` uffd merge, `kernel/reboot` SW_SUSPEND deadlock, `mm/mremap` Committed_AS error path | `mm-everything` (10-19..10-20) | **Rejected — path not used here.** No userfaultfd workload, systemd suspends through `/sys/power/state`, no strict overcommit. |
+| CachyOS `prjc`, `handheld`, `rt-i915` | cachyos-kernel-patches (10-20) | **Rejected.** A second scheduler patchset under a live BORE, laptop support, and Intel GPU support. |
+| sirlucjan 7.3 `fixes` line (15 patches) | sirlucjan (10-20) | **Rejected as a set.** `1230`, `0104` and `2197` are already carried; the rest are Intel, laptop or other-board fixes. |
+| SMU 14.0.2 OD features, DCN32 clock drop, `jpeg_v4_0_3`, GFX12.1 queue rework, AI mailbox, gmc6 | amd-gfx (10-20..10-21) | **Rejected — wrong chip or generation.** |
+
+### Tracker
+
+25 open drm/amd issues moved since 10-20. The on-target ones are reports, not
+fixes: `#6011` (a new 7.3 flicker regression on RX 7700 XT), `#6010` (INBOX0
+lock on DCN 4.0.1 / Navi 48), `#6003` (userptr pages the GPU writes are never
+marked dirty — the HMM discussion with Christian König continues, no patch), and
+`#5380`, where James Lin has a working diagnostic patch in a Fedora COPR but has
+not posted it. `#6012` carries a user-attached DPIA patch for a USB4/TB3 docking
+setup — this desktop has no such dock. No new fix commit to carry.
+
+### Adopted — four carries and four revision refreshes
+
+| Patch | Subject | Author | Source |
+|---|---|---|---|
+| `1099` | drm/amdgpu: reject CS chunks too large for kvmalloc() | Jesse Zhang | `<20261021051033.3287259-3-Jesse.Zhang@amd.com>` |
+| `1300` | drm/amdkfd: send SMI process and VM fault events only to allowed clients | Jesse Zhang | `<20261021083027.3460995-1-Jesse.Zhang@amd.com>` |
+| `2804` | mm/page_vma_mapped: continue past nonmatching huge PMDs | Kyle Zeng | `0f445b68b086` |
+| `2805` | mm/madvise: atomically clear the young bit on THP MADV_COLD | Pedro Falcato | `321cac5eb43b` |
+
+Revised in place: `1084` → v4, `9083` → v4 1/2 (message), `9084` → v4 2/2,
+`1177` → the 10-21 list posting. `1099` and `1300` go to both packages;
+`2804`/`2805` are rc-only because `next-20261019` already contains them, the
+same treatment `2057` received on 10-20. The rc series is now **286** patches
+and the preview **141**; both cumulative audits are clean at **286/286** and
+**141/141**. `1000–1099` is exhausted (see the range note above), so `1300`
+opens `1300–1399`.
+
+### Coverage limits
+
+The GitLab merge-request API still returns 403 without auth. The fd.o monthly
+archives lag the lore mirrors and were not used as a separate source.
+`lore-stable`'s epoch 0 remains stale (latest mail 2022), so 7.3.y stable-queue
+postings were not read this pass. **The `linux-7.3.y` branch now exists** (tip
+`c03c1a14507d`, the v7.3 release commit — no stable commits yet), where the
+2026-10-20 sweep reported no such branch. `xanmod` is not an independent source.
+Kernel.org was reachable for all tree fetches; the `next-20261021` tag needed an
+explicit `git fetch origin tag` even after `fetch --all` — the documented
+stale-tag trap.

@@ -1,8 +1,8 @@
 From Daniel Huang <danielhu@amd.com> Mon Sep 17 00:00:00 2001
 From: Daniel Huang <danielhu@amd.com>
-Date: Tue, 20 Oct 2026 21:29:00 +0800
-Subject: [PATCH v3 1/2] drm/amdkfd: disable SVM when the GPUVM cannot cover CPU addresses
-Message-ID: <20261020132901.23157-2-danielhu@amd.com>
+Date: Wed, 21 Oct 2026 17:59:05 +0800
+Subject: [PATCH v4 1/2] drm/amdkfd: disable SVM when the GPUVM cannot cover CPU addresses
+Message-ID: <20261021095906.48630-2-danielhu@amd.com>
 
 KFD SVM maps memory in GPUVM at the same virtual address used by
 the CPU. However, svm_range_map_to_gpu() passes the corresponding
@@ -63,6 +63,7 @@ SVM is the only path whose address is dictated by the CPU mapping.
 Closes: https://github.com/ROCm/TheRock/issues/9302
 Assisted-by: Claude:claude-opus-5
 Signed-off-by: Daniel Huang <danielhu@amd.com>
+Reviewed-by: Felix Kuehling <Felix.Kuehling@amd.com>
 ---
  drivers/gpu/drm/amd/amdkfd/kfd_svm.h      | 15 +++++++++++++--
  drivers/gpu/drm/amd/amdkfd/kfd_topology.c | 11 ++++++++++-
