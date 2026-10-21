@@ -18,6 +18,69 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-3-sleepy-rc (Linux 7.3)]: 2026-10-21
+
+A patch-only refresh; the base stays at `v7.3`. The series moves from 282 to
+289 patches and the package is rebuilt at `pkgrel=3`. BTF is present in
+`vmlinux` and the modules, `TCP_CONG_BBR3` is on with the old BBR off, and the
+built-in cmdline is unchanged.
+
+### Added — ten patches
+
+GPU and KFD: `1099` rejects CS chunks too large for `kvmalloc()` before the
+copy, closing a render-node-triggered warning; `1300` restores the
+per-process/privileged filter on KFD SMI PROCESS_START/END and VMFAULT events
+and matches clients by global TGID; `1301` stops SVM migration from reusing a
+VRAM page that a CPU fault still references; `1302` backs off the SVM restore
+retry to 128 ms and `1303` downgrades the mmap lock before validating ranges,
+so a failing restore no longer starves the process locks; `1304` cancels the
+VCN/UVD/VCE/JPEG idle work in each `hw_init()` error path; `1305` and `1306`
+give high-priority kernel queues a longer quantum instead of a higher queue
+priority, which was starving lower-priority queues on GFX12.
+
+Memory: `2804` keeps `page_vma_mapped_walk()` going past a nonmatching huge PMD
+after an unaligned `mremap()`, and `2805` clears the young bit atomically on THP
+`MADV_COLD`; both are rc-only because `next-20261019` already contains them.
+
+### Changed — four revisions
+
+`1084` moves to v4 (frees the remaining IBs through `amdgpu_job_free_resources()`
+and takes the gang-leader reference before cleanup); `9083` to v4 1/2 (message
+only) and `9084` to v4 2/2 (bounds ranges at creation plus a backstop);
+`1177` moves from the tracker upload to Melissa Wen's list posting.
+
+### Dropped
+
+`1095` is retired. Its `hw_fini` approach was rejected upstream; `1304`, with
+Alex Deucher's `Reviewed-by`, is the replacement he asked for.
+
+`2028`–`2030` (r8169 PHY/firmware error propagation and firmware release) are
+retired. Andrew Lunn challenged the fatal-error approach, the author agreed the
+TODO is stale and proposed failing `rtl_open()` instead, and no v2 followed;
+none of the three is in any upstream tree. The numbers become gaps.
+
+### Not adopted
+
+The `dma-fence` signaled-bit ordering pair is rejected: Christian König
+objected that the signaling bit must be visible before the callbacks run.
+`memcg` cacheline contention is a performance rework that does not apply here;
+the TTM suspend-OOM change is xe-only; the PAT/WB fix needs an SEV guest.
+
+## [2026.10.19-3-sleepy-next (linux-next `next-20261019`)]: 2026-10-21
+
+A patch-only refresh; the snapshot stays at `next-20261019`. The series moves
+from 139 to 143 patches: eight added, `1095` and the r8169 trio dropped. The
+package is rebuilt at `pkgrel=3`; BTF is present in `vmlinux` and the modules.
+
+### Added
+
+`1099`, `1300`–`1306`, the same carries as `7.3.0-3-sleepy-rc`. `2804` and
+`2805` are omitted because the snapshot already contains them.
+
+### Dropped
+
+`1095`, replaced by `1304` as in the rc package.
+
 ## [7.3.0-2-sleepy-rc (Linux 7.3)]: 2026-10-20
 
 A patch-only refresh; the base stays at `v7.3`. The series moves from 271 to

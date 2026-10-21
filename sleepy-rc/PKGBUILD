@@ -182,7 +182,7 @@ _rcver=
 
 pkgver=7.3.0
 _tagrel=1
-pkgrel=2
+pkgrel=3
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -372,6 +372,12 @@ source=(
   "patches/1200-1299/1232-cpufreq-amd-pstate-propagate-cppc_set_auto_sel-errors.patch"
   "patches/1200-1299/1233-drm-amd-pm-reapply-UMD-profile-state-after-recovery.patch"
   "patches/1300-1399/1300-drm-amdkfd-send-SMI-process-and-VM-fault-events-only-to-allowed-clients.patch"
+  "patches/1300-1399/1301-drm-amdkfd-dont-reuse-a-VRAM-page-that-is-still-referenced.patch"
+  "patches/1300-1399/1302-drm-amdkfd-back-off-SVM-restore-work-retry.patch"
+  "patches/1300-1399/1303-drm-amdkfd-downgrade-mmap-lock-in-SVM-restore-work.patch"
+  "patches/1300-1399/1304-drm-amdgpu-cancel-idle-work-in-hw-init-failure-paths.patch"
+  "patches/1300-1399/1305-drm-amdgpu-gfx12-use-longer-quantums-for-high-priority-kernel-queues.patch"
+  "patches/1300-1399/1306-drm-amdgpu-dont-set-queue-priorities-for-kernel-queues.patch"
 
   "patches/2000-2099/2000-block-mq-deadline-pass-in-queue-directly-to-dd_inser.patch"
   "patches/2000-2099/2001-block-mq-deadline-skip-expensive-merge-lookups-if-co.patch"
@@ -398,9 +404,6 @@ source=(
   "patches/2000-2099/2025-io_uring-run-cancelations-sync-on-release.patch"
   "patches/2000-2099/2026-io_uring-drop-files-buffers-at-release.patch"
   "patches/2000-2099/2027-io_uring-wait-inflight-requests-on-release.patch"
-  "patches/2000-2099/2028-r8169-propagate-errors-from-phy-write.patch"
-  "patches/2000-2099/2029-r8169-propagate-firmware-access-errors.patch"
-  "patches/2000-2099/2030-r8169-release-firmware-on-application-failure.patch"
   "patches/2000-2099/2032-tcp-preserve-timestamps-across-recv-collapse.patch"
   "patches/2000-2099/2033-tcp-init-skb-tx-timestamp-key-before-clone.patch"
   "patches/2000-2099/2036-net-tcp-account-zerocopy-receive-vma-memory.patch"
@@ -1300,6 +1303,12 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         '2dc217768b922b2eb54a51a62353b3c00e8af9ec981c74ce8fbbb58b6ab5fc3aba9518de7a8b7990adc261e834265e8e734bf00be6fdddcf8ebeb1d34d7950a3'
         '0f5d94175b09133882ab22d9d778986512691e1ca24aac4ff5613b8124aee9d9b8e62a0e7fcd8c5512824c0baee9e83ff4ed4edde0e97787819494e24bce0f60'
         '047e9ad4d728054bcb8687f54b6458e244246169698d1f5501f8dd11cdaad596fecc40d6077b8647d99431eecbd7abbde0d845fd4b6b0d42d60902d2d4b68d40'
+        'e4ab88fa78543be89074ee59d3bc55a114e8750abfc57b54b5f34e14b292a127f5ee6a2a1b3d88784499a32cde40eae4558c0585f3ac033a777a742707edd045'
+        '36393226e5da4a93b9d014a5ba078b55e9dfdc2e08b53251c626ee0b3a1031cc872d52a035d8ba137bc5859b8d43b6b1c805b572afa45cbb27c94c5cfb0a8c1d'
+        'ebc1dfea60a624abcfa5ccecaa563a5086989066e87ba4df378d1289d90487943ae12444b3be0c46bf725968ab3df18f0e1dd36d8bd15e328c9d02077070b8f3'
+        '16db839a3ed572b744a048bc9dd604f039557aab1a2ec6d07bce9dc67471173bd238e3505a702082aca1da27989e0c1c52af59cf1eb10e5a9a8009b18b4b2943'
+        '457fc6479993df3898a11b2083328ee8397d9dcbd6a5a4b2eb67e2b5adc4ce5045bfde6aed883432303326b86ba4bab49315148a4c21c5e78ece97e09f13e443'
+        '19c4a2368507ea7002c1bbd795c8395598b96770e5338771c1b67de9d99a7fb50f9ccc531005c6ce727b7baf74910b5f6f310c27ac9208b77da20537351463be'
         'c20b3b791715d02756742bfa34f4921bcaebeee62edf079fe15c89afdc11451a2656122f4f21335cd116676ff69c3b7eee80c6adfdcbfe838c0f1e9012ce0428'
         'df68cfd344b37cae25fa446c82c5897510de23c55761570969dc5a6f2a5bf4c11b31e50c1670a18bef1065af6597e72e0ed839e8fdbc0328cf2dcf34484e5758'
         '8bff27696075ec53ca042b0c9e0deae345712e652b3b66bab1da82c4deefdf35533d04c00d59de70cbf968380236131bc819e0eeaa8aa40edfd84df3bd0972ef'
@@ -1325,9 +1334,6 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         '4f715093d40032414fc74918a288d30fad73f64b4f6cb303a7829f3005118235871ee9ba7b43ace96e5d0244d69801d64ecba79af0f867686916310cfd0a1363'
         'e6d19b9f779fede319820e924f35652493d89e70c42663468902565c6f3e71579a904c74472414f9e6cf7c6515fc6d2b0c4a203d6cfe301752895a805bd49cf1'
         '774faad36252bd8ad3976a49a0b3e2c9ffe873ea63ade7c93eee36c0a279664fb81d21dddf826531edb7f1b376cb158f7ffd7ded8edbd404de76886422323dac'
-        '22f9f5672f3fce63623c0b76876546acdaffeaa2aa8b1a2055e453537bd9ecf19a14e57ac5fd617085a411e02f428ae33a3756b2ad2502e917eeceda690820df'
-        '69e92c577e2b1359d61ac27351f97bb6d8a7ac24cabb12a257fd200c7a95d617426a7ab2db018e03725f92a419266eb0a03c4979dc8864c9c106cdd606a62657'
-        'a4ebff4f2f23f5b05ea1175802faf6bc4010a26b5f0552687ced0021712a3047748e9c9ff60c1e02c15814084b0040b48314146b7e52f3552a3ff1f99fc666ba'
         '4ce35080bedddaa29d42e8779ce91868d55af5caffffa0fdfe4bab4c3f1da64bf231cac54fb327e41f33f93195557fdf61c0715d0b6ec4d5e349673a9e094f8e'
         '41756f27cf26b832b7cdb42653a06a179c5e54f4a918b2fd8d548817935a7c270a0e7603a4e9f86ae7c981c61695a876c48ce52a21a7a1e5a431d1485c8efc8e'
         '623cebb6d1611a7d167f968c8752210b11371901fb44f49bfcf3d98ca2b47cd0b266ebb9fd43b66ae4542a207823723bed7ac9ce273bcb9cebe33c0a5f7e2296'

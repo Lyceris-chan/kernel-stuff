@@ -18,8 +18,8 @@ moved, so the full ledger is not duplicated here.
 | Snapshot | `next-20261019`, tag `13f2fb693de7` (tip `3d229ce89862`) |
 | Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261019.tar.gz` |
 | Snapshot tree `Makefile` | `7.3.0` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.10.19-2-sleepy-next` |
-| Package | `linux-sleepy-next-2026.10.19-2` |
+| Kernel release | `2026.10.19-3-sleepy-next` |
+| Package | `linux-sleepy-next-2026.10.19-3` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -548,8 +548,8 @@ the preview builds it too. It is absent from the snapshot's own `insn.h`.
 
 | | |
 |---|---|
-| Files in `patches/` | 146 |
-| Entries in `source=()` | 139 |
+| Files in `patches/` | 150 |
+| Entries in `source=()` | 143 |
 | Excluded from `source=()` | 7 — `1008`, `1012`, `1013`, `1014`, `1017`, `9060`, `9040` |
 | Preview-only adds | none; the zswap request stack (`2700`/`2701`) is absorbed by this snapshot |
 | Preview-only carries | none; the 7.3-bump carries are absorbed and removed (see *Base bump to `next-20261019`*) |
@@ -782,3 +782,18 @@ The preview series is now **141** patches, all applying to `next-20261019`
 `2804` (page_vma_mapped) and `2805` (THP `MADV_COLD`) are **not** here: both
 reverse-apply cleanly to `next-20261019`, so the snapshot already contains them.
 Full triage is in the 2026-10-21 sweep in `sleepy-rc/PATCH_SOURCES.md`.
+
+### 2026-10-21 second pass — six carries, `1095` and the r8169 trio retired
+
+`1301`–`1303` (KFD VRAM-page reuse, SVM restore backoff, mmap downgrade),
+`1304` (cancel idle work in the `hw_init()` error paths), `1305`/`1306` (gfx12
+queue-priority fix) join both packages. `1095` is removed: its `hw_fini`
+approach was rejected upstream, and `1304` — now with `Reviewed-by: Alex
+Deucher` — is the replacement Alex asked for. `2028`–`2030` (r8169 firmware
+error handling) are also removed: the author withdrew the approach after
+Andrew Lunn's review and no v2 followed. All four numbers are retired, not
+reused.
+
+`1303` depends on `1302` and follows it directly. The preview takes the full
+`1304`; the rc copy strips only the `vcn_v5_0_2` hunk (not this IP). The preview
+series is now **143** patches and all apply to `next-20261019`.

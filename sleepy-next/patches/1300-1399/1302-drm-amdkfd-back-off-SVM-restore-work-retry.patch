@@ -1,0 +1,97 @@
+From Philip Yang <Philip.Yang@amd.com> Mon Sep 17 00:00:00 2001
+From: Philip Yang <Philip.Yang@amd.com>
+Date: Tue, 20 Oct 2026 12:31:15 -0400
+Subject: [PATCH 1/2] drm/amdkfd: Back off SVM restore work retry
+Message-ID: <20261020163116.1069749-1-Philip.Yang@amd.com>
+
+svm_range_restore_work retries every AMDGPU_SVM_RANGE_RESTORE_DELAY_MS,
+1ms, as long as validation keeps failing. Each attempt takes
+process_info->lock, the mmap write lock and svms->lock, so a restore
+that cannot converge, for example while memory reclaim keeps
+invalidating the ranges, starves everything waiting for the same locks.
+svm_range_set_attr cannot add a new range until the retries stop.
+
+Double the retry delay on each failed attempt, up to 128ms, and reset it
+when a new eviction cycle starts. Retrying 1000 times per second does
+not help a restore that is failing, and the backoff leaves gaps for
+other users of these locks to make progress.
+
+Signed-off-by: Philip Yang <Philip.Yang@amd.com>
+---
+ drivers/gpu/drm/amd/amdkfd/kfd_priv.h |  2 ++
+ drivers/gpu/drm/amd/amdkfd/kfd_svm.c  | 16 ++++++++++++++--
+ 2 files changed, 16 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_priv.h b/drivers/gpu/drm/amd/amdkfd/kfd_priv.h
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_priv.h
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_priv.h
+@@ -908,6 +908,8 @@
+ 	atomic_t			evicted_ranges;
+ 	atomic_t			drain_pagefaults;
+ 	struct delayed_work		restore_work;
++	/* Retry delay of restore_work, doubled on each failed attempt */
++	u32				restore_delay_ms;
+ 	DECLARE_BITMAP(bitmap_supported, MAX_GPU_INSTANCE);
+ 	/* First CPU page index beyond the smallest GPUVM supported by the
+ 	 * SVM capable GPUs of this process. Zero if none support SVM.
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c b/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
+@@ -45,6 +45,7 @@
+ #define dev_fmt(fmt) "kfd_svm: %s: " fmt, __func__
+ 
+ #define AMDGPU_SVM_RANGE_RESTORE_DELAY_MS 1
++#define AMDGPU_SVM_RANGE_RESTORE_DELAY_MAX_MS 128
+ 
+ /* Long enough to ensure no retry fault comes after svm range is restored and
+  * page table is updated.
+@@ -1961,6 +1962,7 @@
+ 	struct mm_struct *mm;
+ 	int evicted_ranges;
+ 	int invalid;
++	u32 delay;
+ 	int r;
+ 
+ 	svms = container_of(dwork, struct svm_range_list, restore_work);
+@@ -2031,15 +2033,23 @@
+ 	pr_debug("restore svm ranges successfully\n");
+ 
+ out_reschedule:
++	/* Back off on repeated failures, retrying at the shortest delay keeps
++	 * retaking the same locks and starves everything else waiting for them.
++	 */
++	delay = svms->restore_delay_ms;
++	if (evicted_ranges)
++		svms->restore_delay_ms = min_t(u32, delay * 2,
++					       AMDGPU_SVM_RANGE_RESTORE_DELAY_MAX_MS);
++
+ 	mutex_unlock(&svms->lock);
+ 	mmap_write_unlock(mm);
+ 	mutex_unlock(&process_info->lock);
+ 
+ 	/* If validation failed, reschedule another attempt */
+ 	if (evicted_ranges) {
+-		pr_debug("reschedule to restore svm range\n");
++		pr_debug("reschedule to restore svm range in %u ms\n", delay);
+ 		queue_delayed_work(system_freezable_wq, &svms->restore_work,
+-			msecs_to_jiffies(AMDGPU_SVM_RANGE_RESTORE_DELAY_MS));
++				   msecs_to_jiffies(delay));
+ 
+ 		kfd_smi_event_queue_restore_rescheduled(mm);
+ 	}
+@@ -2114,6 +2124,7 @@
+ 			pr_debug("failed to quiesce KFD\n");
+ 
+ 		pr_debug("schedule to restore svm %p ranges\n", svms);
++		svms->restore_delay_ms = AMDGPU_SVM_RANGE_RESTORE_DELAY_MS;
+ 		queue_delayed_work(system_freezable_wq, &svms->restore_work,
+ 			msecs_to_jiffies(AMDGPU_SVM_RANGE_RESTORE_DELAY_MS));
+ 	} else {
+@@ -3411,6 +3422,7 @@
+ 	INIT_LIST_HEAD(&svms->list);
+ 	atomic_set(&svms->evicted_ranges, 0);
+ 	atomic_set(&svms->drain_pagefaults, 0);
++	svms->restore_delay_ms = AMDGPU_SVM_RANGE_RESTORE_DELAY_MS;
+ 	INIT_DELAYED_WORK(&svms->restore_work, svm_range_restore_work);
+ 	INIT_WORK(&svms->deferred_list_work, svm_range_deferred_list_work);
+ 	INIT_LIST_HEAD(&svms->deferred_range_list);

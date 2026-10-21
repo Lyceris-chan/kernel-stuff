@@ -3,11 +3,11 @@
 `linux-sleepy-next` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
 built from a **linux-next snapshot (`next-20261019`)** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 141-patch
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 143-patch
 series. It is not a general-purpose kernel.
 
-**Base version:** `2026.10.19-2` · **Artifact:**
-`linux-sleepy-next-2026.10.19-2-x86_64.pkg.tar.zst`
+**Base version:** `2026.10.19-3` · **Artifact:**
+`linux-sleepy-next-2026.10.19-3-x86_64.pkg.tar.zst`
 
 The release is named for the **snapshot date**, not the mainline release the
 snapshot was cut from — linux-next is a daily tree, and its base release goes
@@ -101,29 +101,21 @@ builds install the shipped config.
 ## Kernel command line (baked in)
 
 ```
-cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0 amdgpu.dcdebugmask=0x800
+cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0
 ```
 
 `pcie_aspm=off` + `amdgpu.aspm=0/runpm=0` are the drm/amd !5538 SMU bus-drop
 stopgaps (DPM stays on). `cpuidle.governor=nap` activates the NAP governor, and
 `amd_pstate.epp_boost=1` enables the per-core EPP boost.
 
-`amdgpu.dcdebugmask=0x800` disables the DCN4 idle power states. The 7.2 line
-dropped it after the display "box" turned out to be a COSMIC compositor bug,
-and the rc3 line re-added it while bisecting the MSI MAG251RX flicker at
-1920x1080@240Hz (worst under cursor movement). The flicker itself stopped in
-rc3-9: patch `1164` restores the rc2 MCCS clear so the MAG251RX is no longer
-advertised as VRR-capable, matching the cachyos-rc kernel that was verified
-clean on this monitor. The mask stays because it reduced the flicker frequency
-before that fix and covers the clock-gated HUBP flip-pending misread: when the
-HUBP is clock-gated, `hubp2_is_flip_pending()` reports no pending flip, so flip
-completion can arrive before the hardware latches (AMD's `f64a9be56536`
-concedes the gap). It costs idle power; drop it if a proper DCN4 flip-pending
-fix lands.
+`amdgpu.dcdebugmask=0x800` (DC_DISABLE_IPS) is deliberately **not** set in the
+preview: it exists to exercise the snapshot's display code with IPS enabled.
+`sleepy-rc` keeps the mask for the MAG251RX flicker history, documented in
+`sleepy-rc/docs/README.md`.
 
 ## Patch series
 
-141 patch entries in `source=()` (148 files; seven are excluded from the build). `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+143 patch entries in `source=()` (150 files; seven are excluded from the build). `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 On a linux-next snapshot a large fraction are skipped rather than failed, since
 the snapshot already carries much of what the series adds — a skip is only safe
 for a self-contained patch, so interdependent groups are excluded outright

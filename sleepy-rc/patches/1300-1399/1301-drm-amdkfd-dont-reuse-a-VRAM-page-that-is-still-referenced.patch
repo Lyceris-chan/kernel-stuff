@@ -1,0 +1,58 @@
+From Apurv Mishra <Apurv.Mishra@amd.com> Mon Sep 17 00:00:00 2001
+From: Apurv Mishra <Apurv.Mishra@amd.com>
+Date: Mon, 19 Oct 2026 20:30:39 -0400
+Subject: [PATCH] drm/amdkfd: Don't reuse a VRAM page that is still referenced
+Message-ID: <20261020003039.369579-1-Apurv.Mishra@amd.com>
+
+In svm_migrate_copy_to_vram(), skip VRAM pages with a non-zero refcount
+and leave those pages in system memory for this migration.
+
+When an svm_bo is reused, a VRAM page can still be held by an in-flight
+CPU fault (do_swap_page -> svm_migrate_to_ram). Migrating to VRAM then
+re-initializes the page via zone_device_page_init(), resetting its
+refcount. The fault's late put_page() frees the page mid-migration, so
+migrate_vma_finalize() never restores that PTE. It is left pointing at a
+freed system page and hmm_range_fault() hits BUG_ON in
+pfn_swap_entry_to_page() (swapops.h).
+
+Signed-off-by: Apurv Mishra <Apurv.Mishra@amd.com>
+---
+ drivers/gpu/drm/amd/amdkfd/kfd_migrate.c | 20 +++++++++++++++-----
+ 1 file changed, 15 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_migrate.c b/drivers/gpu/drm/amd/amdkfd/kfd_migrate.c
+index 8b96e1fe741a..1eb92ac6eb05 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_migrate.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_migrate.c
+@@ -297,16 +297,26 @@ svm_migrate_copy_to_vram(struct kfd_node *node, struct svm_range *prange,
+ 	amdgpu_res_first(prange->ttm_res, ttm_res_offset,
+ 			 npages << PAGE_SHIFT, &cursor);
+ 	for (i = j = 0; (i < npages) && (mpages < migrate->cpages); i++) {
+-		struct page *spage;
++		struct page *spage = migrate_pfn_to_page(migrate->src[i]);
+ 
+ 		if (migrate->src[i] & MIGRATE_PFN_MIGRATE) {
+ 			dst[i] = cursor.start + (j << PAGE_SHIFT);
+ 			migrate->dst[i] = svm_migrate_addr_to_pfn(adev, dst[i]);
+-			svm_migrate_get_vram_page(prange, migrate->dst[i]);
+-			migrate->dst[i] = migrate_pfn(migrate->dst[i]);
+-			mpages++;
++			/*
++			 * A reused svm_bo page may still be held by a CPU fault.
++			 * Reinitializing it would free it under this migration,
++			 * so leave this page in system memory.
++			 */
++			if (page_ref_count(pfn_to_page(migrate->dst[i]))) {
++				dst[i] = 0;
++				migrate->dst[i] = 0;
++				spage = NULL;
++			} else {
++				svm_migrate_get_vram_page(prange, migrate->dst[i]);
++				migrate->dst[i] = migrate_pfn(migrate->dst[i]);
++				mpages++;
++			}
+ 		}
+-		spage = migrate_pfn_to_page(migrate->src[i]);
+ 		if (spage && !is_zone_device_page(spage)) {
+ 			src[i] = dma_map_page(dev, spage, 0, PAGE_SIZE,
+ 					      DMA_BIDIRECTIONAL);

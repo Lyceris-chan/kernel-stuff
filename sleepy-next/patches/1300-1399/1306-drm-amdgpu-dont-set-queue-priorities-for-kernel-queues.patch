@@ -1,0 +1,33 @@
+From Alex Deucher <alexander.deucher@amd.com> Mon Sep 17 00:00:00 2001
+From: Alex Deucher <alexander.deucher@amd.com>
+Date: Wed, 21 Oct 2026 09:15:45 -0400
+Subject: [PATCH 8/8] drm/amdgpu: don't set queue priorities for kernel queues
+Message-ID: <20261021131545.1962601-8-alexander.deucher@amd.com>
+
+Align with KFD and don't set queue priorities for kernel
+queues.  This can result in starvation of lower priority
+queues.
+
+v2: fix GC 8 and 9
+
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_ring.c | 4 ++--
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_ring.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_ring.c
+index 2277345413165..4d472ce8cb710 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_ring.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_ring.c
+@@ -830,10 +830,8 @@ static void amdgpu_ring_to_mqd_prop(struct amdgpu_ring *ring,
+ 	prop->hqd_active = ring->funcs->type == AMDGPU_RING_TYPE_KIQ;
+ 
+ 	prop->allow_tunneling = is_high_prio_compute;
+-	if (is_high_prio_compute || is_high_prio_gfx) {
++	if (is_high_prio_compute || is_high_prio_gfx)
+ 		prop->hqd_pipe_priority = AMDGPU_GFX_PIPE_PRIO_HIGH;
+-		prop->hqd_queue_priority = AMDGPU_GFX_QUEUE_PRIORITY_MAXIMUM;
+-	}
+ }
+ 
+ int amdgpu_ring_init_mqd(struct amdgpu_ring *ring)

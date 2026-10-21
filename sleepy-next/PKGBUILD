@@ -203,7 +203,7 @@ _snapdate=${_srctag#next-}                                            # 20261016
 _snapver="${_snapdate:0:4}.${_snapdate:4:2}.${_snapdate:6:2}"
 pkgver=${_snapver}
 _tagrel=1
-pkgrel=2
+pkgrel=3
 # Build parallelism. Previously capped at 8 on a diagnosis that did not hold up.
 #
 # The cap was added after an rc4-7 build thrashed badly — 6 watchdog firings and
@@ -317,7 +317,6 @@ source=(
   "patches/1000-1099/1092-drm-amdgpu-keep-PRT-mappings-off-the-VM-state-lists-again.patch"
   "patches/1000-1099/1093-drm-amdgpu-Fix-out-of-bounds-write-in-amdgpu_debugfs_gfxoff_count_read.patch"
   "patches/1000-1099/1094-drm-amdgpu-sdma7-dont-access-registers-in-mqd-setup.patch"
-  "patches/1000-1099/1095-drm-amdgpu-call-hw_fini-for-failed-ip-blocks.patch"
   "patches/1000-1099/1096-drm-amdkfd-enable-sdma-ib-processing.patch"
   "patches/1000-1099/1097-drm-amdgpu-re-enable-GFXOFF-for-compute-on-GFX12.patch"
   "patches/1000-1099/1098-drm-amdgpu-keep-the-CS-user-fence-BO-in-GTT.patch"
@@ -345,6 +344,12 @@ source=(
   "patches/1200-1299/1203-Documentation-amd-pstate-Document-the-epp_boost-pa.patch"
   "patches/1200-1299/1233-drm-amd-pm-reapply-UMD-profile-state-after-recovery.patch"
   "patches/1300-1399/1300-drm-amdkfd-send-SMI-process-and-VM-fault-events-only-to-allowed-clients.patch"
+  "patches/1300-1399/1301-drm-amdkfd-dont-reuse-a-VRAM-page-that-is-still-referenced.patch"
+  "patches/1300-1399/1302-drm-amdkfd-back-off-SVM-restore-work-retry.patch"
+  "patches/1300-1399/1303-drm-amdkfd-downgrade-mmap-lock-in-SVM-restore-work.patch"
+  "patches/1300-1399/1304-drm-amdgpu-cancel-idle-work-in-hw-init-failure-paths.patch"
+  "patches/1300-1399/1305-drm-amdgpu-gfx12-use-longer-quantums-for-high-priority-kernel-queues.patch"
+  "patches/1300-1399/1306-drm-amdgpu-dont-set-queue-priorities-for-kernel-queues.patch"
   "patches/2000-2099/2000-block-mq-deadline-pass-in-queue-directly-to-dd_inser.patch"
   "patches/2000-2099/2001-block-mq-deadline-skip-expensive-merge-lookups-if-co.patch"
   "patches/2000-2099/2002-block-bfq-pass-in-queue-directly-to-bfq_insert_reque.patch"
@@ -354,9 +359,6 @@ source=(
   "patches/2000-2099/2011-r8169-dont-enable-chip-LTR-when-the-platform-has-not-enabled-LTR.patch"
   "patches/2000-2099/2014-blk-mq-check-passthrough-before-cached-request.patch"
   "patches/2000-2099/2015-nvme-bump-genctr-when-cancelling-a-request.patch"
-  "patches/2000-2099/2028-r8169-propagate-errors-from-phy-write.patch"
-  "patches/2000-2099/2029-r8169-propagate-firmware-access-errors.patch"
-  "patches/2000-2099/2030-r8169-release-firmware-on-application-failure.patch"
   "patches/2000-2099/2033-tcp-init-skb-tx-timestamp-key-before-clone.patch"
   "patches/2000-2099/2036-net-tcp-account-zerocopy-receive-vma-memory.patch"
   "patches/2000-2099/2037-net-neighbour-serialize-proxy-timer-teardown.patch"
@@ -1152,7 +1154,6 @@ b2sums=('3fb6a79397b58ee24a7c15af1a6ccfc7dc8d0dba63917b4a9b965d0223077a7292bdc43
         'cf59145882c0a87dd9c968da99d3d7d041360377da39cd69b85119ae33643b2bdc14101eafcf1dbc584d7bbc59f6e812b14bf6977fdf9af53ecada9b0959b874'
         '3f80f24880d3dd37480cc56c98bca853cc63823cdf6e5cdf3b3f3ece481e10e6199ad2cce8870114caf5ae22320a6ac90f23e8ce2ab48289a42c7fcbb917dba8'
         '9318658b932f9a302ab5a628d18449febda84ab114deae754a4721f6978afe5b88f69d67d2eef14132b173b881a32cb22f27bb5b826801139c24edd7e2086dd0'
-        '732147449901d0551f996d9e0c7d1958a045651f504db46bb2c346a48c60d9df62147241d1d1ff73be4686a811e3d08eeb0a86340e24556d210432a28c9e7eae'
         '9759573eaf947b7f5da586d7c9c2db3d2db1fc50bf2a18668525cd7294c76a1b552efff8a9bff7ab2c0914789369ea6c57db8c82456bc6f220dc7e1df56817e7'
         'c26cb8e350e75bfaf660e6cc89c4b20e489190a817b13d80179fbd8b463b8fafc0e4319d3afcdbdc8fbc131480d9fc68eb17f4811091ce4e106dc2101f77f7ed'
         'd321c0340c5fdb2668910be0995ad0510fce4487bfb46ffeca8bf8e4149c875534aad40199c5f705ac38a904f8abee3039d4b18b13a6f5a0e6f2d040724a05d6'
@@ -1180,6 +1181,12 @@ b2sums=('3fb6a79397b58ee24a7c15af1a6ccfc7dc8d0dba63917b4a9b965d0223077a7292bdc43
         '52fe01328f544e023666eab1fd378ae0a0eb47385d495403a55a933f71beedcf295300767c1e43feb46366915fae8bea3b9137f11d16ed194a1fcf71d95aec0d'
         '0f5d94175b09133882ab22d9d778986512691e1ca24aac4ff5613b8124aee9d9b8e62a0e7fcd8c5512824c0baee9e83ff4ed4edde0e97787819494e24bce0f60'
         '047e9ad4d728054bcb8687f54b6458e244246169698d1f5501f8dd11cdaad596fecc40d6077b8647d99431eecbd7abbde0d845fd4b6b0d42d60902d2d4b68d40'
+        'e4ab88fa78543be89074ee59d3bc55a114e8750abfc57b54b5f34e14b292a127f5ee6a2a1b3d88784499a32cde40eae4558c0585f3ac033a777a742707edd045'
+        '36393226e5da4a93b9d014a5ba078b55e9dfdc2e08b53251c626ee0b3a1031cc872d52a035d8ba137bc5859b8d43b6b1c805b572afa45cbb27c94c5cfb0a8c1d'
+        'ebc1dfea60a624abcfa5ccecaa563a5086989066e87ba4df378d1289d90487943ae12444b3be0c46bf725968ab3df18f0e1dd36d8bd15e328c9d02077070b8f3'
+        'feba387ecc525bb1c0dbc42a784d973764246c14cbd7380aa0a2b1ec8409337ba2df94762153bb12cc13d4220935be3d9e56bb24fdede76eb2caa47915f37fd2'
+        '457fc6479993df3898a11b2083328ee8397d9dcbd6a5a4b2eb67e2b5adc4ce5045bfde6aed883432303326b86ba4bab49315148a4c21c5e78ece97e09f13e443'
+        '19c4a2368507ea7002c1bbd795c8395598b96770e5338771c1b67de9d99a7fb50f9ccc531005c6ce727b7baf74910b5f6f310c27ac9208b77da20537351463be'
         'c20b3b791715d02756742bfa34f4921bcaebeee62edf079fe15c89afdc11451a2656122f4f21335cd116676ff69c3b7eee80c6adfdcbfe838c0f1e9012ce0428'
         'df68cfd344b37cae25fa446c82c5897510de23c55761570969dc5a6f2a5bf4c11b31e50c1670a18bef1065af6597e72e0ed839e8fdbc0328cf2dcf34484e5758'
         '8bff27696075ec53ca042b0c9e0deae345712e652b3b66bab1da82c4deefdf35533d04c00d59de70cbf968380236131bc819e0eeaa8aa40edfd84df3bd0972ef'
@@ -1189,9 +1196,6 @@ b2sums=('3fb6a79397b58ee24a7c15af1a6ccfc7dc8d0dba63917b4a9b965d0223077a7292bdc43
         '0eb42c67084faaf6390258842b0cdf37c7440b24a9956209b20674991f520606f98ba3dda12f4912a23d7a17c9eaa74fb84518561ed46e00139afe6a71ae6950'
         '948439eb30f3f1ddbad4ad6540dafdf269d223cd268608b2978084101d956db9533f5adf5a3d93c02b5f105c838be7a28ee042c34b8236b6e5da31410b72037c'
         '1a5d63e7d2ed21ff1c2118eabee1856542be64cded4a61cf2c05346a0166ceed4c667de1d2b8231b4cbf4d500858653651f9d4cee1e8cc727718ae20a3bfaa04'
-        '22f9f5672f3fce63623c0b76876546acdaffeaa2aa8b1a2055e453537bd9ecf19a14e57ac5fd617085a411e02f428ae33a3756b2ad2502e917eeceda690820df'
-        '69e92c577e2b1359d61ac27351f97bb6d8a7ac24cabb12a257fd200c7a95d617426a7ab2db018e03725f92a419266eb0a03c4979dc8864c9c106cdd606a62657'
-        'a4ebff4f2f23f5b05ea1175802faf6bc4010a26b5f0552687ced0021712a3047748e9c9ff60c1e02c15814084b0040b48314146b7e52f3552a3ff1f99fc666ba'
         '41756f27cf26b832b7cdb42653a06a179c5e54f4a918b2fd8d548817935a7c270a0e7603a4e9f86ae7c981c61695a876c48ce52a21a7a1e5a431d1485c8efc8e'
         '8e2cba2e32d9b9d1e3a021bb9eaf3305abecc4e0f5eff7fa8e65825d5ff8eccf5ae4bd8cbe24d3b57cb6a0eedae9ec103817d8495d1ea6fa43772cf67249a146'
         '551d1ccc3e9f3fb4f792b1b0132faccb0f69855a97819ca19a66174eca26e754c11bc29023903f48303a3adaa8a98f63cd6318fddaca4143c613ea81333ebd1d'

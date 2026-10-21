@@ -1,0 +1,48 @@
+From Alex Deucher <alexander.deucher@amd.com> Mon Sep 17 00:00:00 2001
+From: Alex Deucher <alexander.deucher@amd.com>
+Date: Wed, 21 Oct 2026 09:15:43 -0400
+Subject: [PATCH 6/8] drm/amdgpu/gfx12: rework kernel queue priority handling
+Message-ID: <20261021131545.1962601-6-alexander.deucher@amd.com>
+
+Rather than setting a higher queue priority which could
+starve a lower priority queue, enable longer quantums
+for high priority kernel queues. This will avoid
+starvation, but provide longer runtime for high priority
+queues.
+
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c b/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c
+index d334fb8050201..b9f847d9c8dd9 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c
+@@ -2945,6 +2945,12 @@ static int gfx_v12_0_gfx_mqd_init(struct amdgpu_device *adev, void *m,
+ 	/* set up time quantum */
+ 	tmp = regCP_GFX_HQD_QUANTUM_DEFAULT;
+ 	tmp = REG_SET_FIELD(tmp, CP_GFX_HQD_QUANTUM, QUANTUM_EN, 1);
++	/* increase the duration of a high priority kernel queue */
++	if (prop->kernel_queue &&
++	    (prop->hqd_pipe_priority == AMDGPU_GFX_PIPE_PRIO_HIGH))
++		tmp = REG_SET_FIELD(tmp, CP_GFX_HQD_QUANTUM, QUANTUM_DURATION, 20);
++	else
++		tmp = REG_SET_FIELD(tmp, CP_GFX_HQD_QUANTUM, QUANTUM_DURATION, 10);
+ 	mqd->cp_gfx_hqd_quantum = tmp;
+ 
+ 	/* set up gfx hqd base. this is similar as CP_RB_BASE */
+@@ -3213,7 +3219,12 @@ static int gfx_v12_0_compute_mqd_init(struct amdgpu_device *adev, void *m,
+ 
+ 	tmp = REG_SET_FIELD(0, CP_HQD_QUANTUM, QUANTUM_EN, 1);
+ 	tmp = REG_SET_FIELD(tmp, CP_HQD_QUANTUM, QUANTUM_SCALE, 1);
+-	tmp = REG_SET_FIELD(tmp, CP_HQD_QUANTUM, QUANTUM_DURATION, 1);
++	/* increase the duration of a high priority kernel queue */
++	if (prop->kernel_queue &&
++	    (prop->hqd_pipe_priority == AMDGPU_GFX_PIPE_PRIO_HIGH))
++		tmp = REG_SET_FIELD(tmp, CP_HQD_QUANTUM, QUANTUM_DURATION, 2);
++	else
++		tmp = REG_SET_FIELD(tmp, CP_HQD_QUANTUM, QUANTUM_DURATION, 1);
+ 	mqd->cp_hqd_quantum = tmp;
+ 
+ 	mqd->cp_hqd_active = prop->hqd_active;

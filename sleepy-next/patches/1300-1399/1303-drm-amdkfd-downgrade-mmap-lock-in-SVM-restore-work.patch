@@ -1,0 +1,49 @@
+From Philip Yang <Philip.Yang@amd.com> Mon Sep 17 00:00:00 2001
+From: Philip Yang <Philip.Yang@amd.com>
+Date: Tue, 20 Oct 2026 12:31:16 -0400
+Subject: [PATCH 2/2] drm/amdkfd: Downgrade mmap lock in SVM restore work
+Message-ID: <20261020163116.1069749-2-Philip.Yang@amd.com>
+
+svm_range_restore_work holds the mmap write lock across the entire loop
+validating and mapping every invalid range, which blocks all mmap,
+munmap and page fault activity of the process, not only the KFD paths
+waiting for the same locks.
+
+Only the deferred work flush handshake in
+svm_range_list_lock_and_flush_work needs the write lock.
+svm_range_validate_and_map runs under the read lock, as
+svm_range_set_attr already does after its mmap_write_downgrade. The
+flush stays valid because svm_range_deferred_list_work takes the write
+lock, so it cannot run while the read lock is held.
+
+Downgrade the mmap lock before walking the range list.
+
+Signed-off-by: Philip Yang <Philip.Yang@amd.com>
+---
+ drivers/gpu/drm/amd/amdkfd/kfd_svm.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c b/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
+index 28b687133cf8..f63bd8cf4174 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
+@@ -1987,6 +1987,10 @@ static void svm_range_restore_work(struct work_struct *work)
+ 
+ 	mutex_lock(&process_info->lock);
+ 	svm_range_list_lock_and_flush_work(svms, mm);
++	/* Validate and map needs the read lock only, and deferred list work
++	 * takes the write lock, so the flush above stays valid.
++	 */
++	mmap_write_downgrade(mm);
+ 	mutex_lock(&svms->lock);
+ 
+ 	evicted_ranges = atomic_read(&svms->evicted_ranges);
+@@ -2045,7 +2049,7 @@ static void svm_range_restore_work(struct work_struct *work)
+ 					       AMDGPU_SVM_RANGE_RESTORE_DELAY_MAX_MS);
+ 
+ 	mutex_unlock(&svms->lock);
+-	mmap_write_unlock(mm);
++	mmap_read_unlock(mm);
+ 	mutex_unlock(&process_info->lock);
+ 
+ 	/* If validation failed, reschedule another attempt */

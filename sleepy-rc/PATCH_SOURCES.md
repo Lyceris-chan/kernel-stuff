@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
 - **Base:** Linux `v7.3`
-- **Series:** 286 patches
+- **Series:** 289 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -22,10 +22,10 @@ are supplied by the generator instead, so every row below has a source.
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 30 |
-| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 1 |
+| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 7 |
 | `1100–1199` | AMD display (DCN4, colorops) | 30 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 27 |
-| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 46 |
+| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 43 |
 | `2100–2199` | Memory management and swap (zstd, LRU-MARIE, gup, zswap) | 50 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 20 |
@@ -37,7 +37,7 @@ are supplied by the generator instead, so every row below has a source.
 | `9000–9099` | agd5f staging + userq lifecycle backports | 36 |
 | `9100–9199` | Retry-fault handling v4 (agd5f staging) | 11 |
 
-**Total: 286** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 289** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-19). The counts are now generated from the patch tree
@@ -10092,3 +10092,67 @@ postings were not read this pass. **The `linux-7.3.y` branch now exists** (tip
 Kernel.org was reachable for all tree fetches; the `next-20261021` tag needed an
 explicit `git fetch origin tag` even after `fetch --all` — the documented
 stale-tag trap.
+
+## Adopted 2026-10-21 (second pass) — six carries, three retirements
+
+A re-scan after the first pass (newest mail 14:18 UTC) found no on-target
+posting since 13:40. The follow-up work was the remaining valid candidates from
+the first pass's watch list, plus the upstream-directed replacement of `1095`.
+
+### Revert audit — none
+
+Every carried subject was matched against `Revert "…"` commits since 2026-08-01
+in all nine trees (torvalds, linux-next, drm-next, agd5f, amd-staging, drm-misc,
+linux-pm, akpm-mm, tip): **zero hits**. The last reverts/NAKs before this pass
+were the 2026-10-19 drops (`9051`/`9052`, `9082`). A NAK scan over the lore
+mirrors since 2026-09-15 found only the self-withdrawn r8169 series handled
+below; no other carried patch is named.
+
+### Retired — `1095`
+
+Leo Liu's `drm/amdgpu: cancel idle work in hw_init failure paths for
+vcn/uvd/vce/jpeg` now carries **`Reviewed-by: Alex Deucher`** (2026-10-21
+13:56) and `Fixes: 416e1fab4752` / `Cc: stable`. Alex had rejected the `hw_fini`
+approach `1095` used; the replacement cancels the work in each `hw_init()` error
+path. `1095` is removed from the preview (it was never in rc) and its number is
+left as a gap, not reused. The rc copy of the replacement strips the
+`vcn_v5_0_2.c` hunk: that file's `hw_init()` path differs in `v7.3` and the IP is
+not this machine's (ours is `vcn_v5_0_0`); the other 28 files apply, including
+our `vcn_v5_0_0.c`. The preview takes the full patch.
+
+### Retired — `2028`–`2030`, the r8169 firmware-error series
+
+The NAK scan also surfaced the September thread on `[PATCH net-next 0/3] r8169:
+handle firmware application errors`. Andrew Lunn challenged making firmware
+application failures fatal; the author then concluded that *"the TODO I was
+trying to solve is stale"*, that the proper handling is to fail `rtl_open()`
+instead, and offered to send that instead. None of the three patches is in
+torvalds or linux-next, no v2 followed, and the thread has been stalled since
+2026-09-18. The self-withdrawn series is dropped rather than carried; `2028`,
+`2029` and `2030` become gaps.
+
+### Added
+
+| Patch | Subject | Author | Source | Note |
+|---|---|---|---|---|
+| `1301` | drm/amdkfd: Don't reuse a VRAM page that is still referenced | Apurv Mishra | `<20261020003039.369579-1-Apurv.Mishra@amd.com>` | Skips a VRAM page with a non-zero refcount in `svm_migrate_copy_to_vram()`; without it a late `put_page()` from a CPU fault frees the page mid-migration and leaves a PTE to a freed system page. Unreviewed; applies to both bases. |
+| `1302` | drm/amdkfd: Back off SVM restore work retry | Philip Yang | `<20261020163116.1069749-1-Philip.Yang@amd.com>` | Doubles the restore retry delay to 128 ms; a failing restore otherwise takes the process locks 1000 times a second. **Hunk rebased:** the `kfd_priv.h` context gained `max_va_pfn` from `9084` v4, so the hunk was regenerated against the series tree with the same added lines. |
+| `1303` | drm/amdkfd: Downgrade mmap lock in SVM restore work | Philip Yang | `<20261020163226.1069749-2-Philip.Yang@amd.com>` | `Reviewed-by: Felix Kuehling`. Downgrades to the read lock before validating ranges. Applies only after `1302` (its context uses the new `AMDGPU_SVM_RANGE_RESTORE_DELAY_MAX_MS`), which the numbering preserves. |
+| `1304` | drm/amdgpu: cancel idle work in hw_init failure paths for vcn/uvd/vce/jpeg | Leo Liu | `<20261021125444.27886-1-leo.liu@amd.com>` | `Reviewed-by: Alex Deucher`, `Fixes: 416e1fab4752`, `Cc: stable`. Replaces `1095`. rc copy strips the `vcn_v5_0_2` hunk (not this IP). |
+| `1305` | drm/amdgpu/gfx12: rework kernel queue priority handling | Alex Deucher | `<20261021131545.1962601-6-alexander.deucher@amd.com>` | 6/8 of the priority series: high-priority kernel queues get a longer quantum (20/10, 2/1) instead of a higher queue priority, which starves lower-priority queues. `gfx_v12_0.c` is this machine's exact file. |
+| `1306` | drm/amdgpu: don't set queue priorities for kernel queues | Alex Deucher | `<20261021131545.1962601-8-alexander.deucher@amd.com>` | 8/8, the shared `amdgpu_ring.c` half of the same fix. The `gfx_v8_0`/`gfx_v9_0`/`gfx_v9_4_3` hunks are stripped (not this silicon); the remaining one-file hunk applies to both bases. |
+
+### Rejected — the dma-fence ordering pair
+
+`dma-buf/dma-fence: Order setting of the signaled-bit` and its
+`set_bit_release()` prerequisite drew an explicit objection from Christian
+König on 2026-10-21: *"That has been suggested and rejected before … the
+signaling bit must be visible before the callbacks are run or things like
+`dma_fence_default_wait()` just break."* Not carried.
+
+### Series
+
+The rc series is **289** patches and the preview **143** (the preview lost
+`1095` and the r8169 trio, and gained the six carries). `1300–1399` now holds
+seven patches. Both cumulative audits are clean; the build and BTF results are
+recorded in `CHANGELOG.md`.
