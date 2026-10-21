@@ -15,11 +15,11 @@ moved, so the full ledger is not duplicated here.
 
 | | |
 |---|---|
-| Snapshot | `next-20261019`, tag `13f2fb693de7` (tip `3d229ce89862`) |
-| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261019.tar.gz` |
+| Snapshot | `next-20261021`, tag `2ca9a319abef` (tip `9a482184d910`) |
+| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261021.tar.gz` |
 | Snapshot tree `Makefile` | `7.3.0` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.10.19-3-sleepy-next` |
-| Package | `linux-sleepy-next-2026.10.19-3` |
+| Kernel release | `2026.10.21-1-sleepy-next` |
+| Package | `linux-sleepy-next-2026.10.21-1` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -797,3 +797,48 @@ reused.
 `1303` depends on `1302` and follows it directly. The preview takes the full
 `1304`; the rc copy strips only the `vcn_v5_0_2` hunk (not this IP). The preview
 series is now **143** patches and all apply to `next-20261019`.
+
+## Base bump to `next-20261021` — 2026-10-21
+
+`sleepy-next` moves to `next-20261021` (tag `2ca9a319abef`, tip
+`9a482184d910`), release `2026.10.21-1-sleepy-next`, `pkgrel=1`. The snapshot
+adds **62 non-merge AMD commits** over `next-20261019` and **1066 non-merge
+commits overall**. The AMD additions include the reviewed KFD doorbell-race,
+GPU-reset BO-free, CWSR-reference and pinned-object-accounting fixes, plus
+`set VRR_EN for inactive state`. They are now **base content** and are not
+carried as patches.
+
+### Dropped as absorbed
+
+`1063`, `1082`, `1083`, `1085`, `1091`, `1092`, `1176`, `1181`, `1182`, `1233`,
+`2046`, `2058`, `2803`. Each reverse-applies cleanly to `next-20261021` or is
+present under a superseding commit. `1063`'s RCU documentation is in the base
+with different wording; `1082`'s condition is in the base as
+`bo_va->base.bo && !bo_va->base.moved` from `22763a52e089` (the absorbed
+`1092`); `2046`'s `dma_max_mapping_size()` intent is in the base.
+
+### Rebased
+
+- **`0101` (bbr3):** the base added `obj-$(CONFIG_TCP_CONG_ROCCET) += tcp_roccet.o`
+  at the `Makefile` anchor. Regenerated from the carried squash against the
+  series state; the BBRv3 content is unchanged.
+- **`2419` (BORE 7.0.0):** dropped the `update_protect_slice()` hunk. The new
+  base reworked that function around `cfs_rq_min_slice()`, which already uses
+  BORE's `se->slice`; forcing the old `#ifdef CONFIG_SCHED_BORE` would override
+  the min-slice logic.
+- **`1175` (debugfs `memdup_user_nul`):** dropped the `hdmi_automation_enable`
+  hunk. The base replaced that handler with `debugfs_create_bool`; the other 18
+  hunks, which fix the OOB reads, still apply.
+
+### Added
+
+`1307` — `gpu/buddy: do not pass caller list to __alloc_contig_try_harder()`
+(commit `fb26cf4f1df4`, `Reviewed-by: Arunpravin Paneer Selvam`). This is
+preview-only: the `v7.3` `drivers/gpu/buddy.c` context differs, so the rc copy
+needs a rebase before it can take the patch.
+
+### Verification
+
+The reconciled series is **131 patches** and applies **131/131** to
+`next-20261021` with the cumulative `audit_series.py`. Build and BTF results are
+recorded in `CHANGELOG.md`.

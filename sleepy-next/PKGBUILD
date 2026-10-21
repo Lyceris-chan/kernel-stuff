@@ -182,7 +182,7 @@ pkgbase="linux-$_pkgsuffix"
 # snapshot DATE rather than by whichever mainline rc it happened to be cut
 # from. `_srctag` is defined first because pkgver is derived from it — a bump
 # that moves the tag but not the version is not possible.
-_srctag=next-20261019
+_srctag=next-20261021
 _srcname=${_srctag}
 _snapdate=${_srctag#next-}                                            # 20261016
 # Dotted (2026.10.09), and that is NOT cosmetic. Both tools that consume the
@@ -203,7 +203,7 @@ _snapdate=${_srctag#next-}                                            # 20261016
 _snapver="${_snapdate:0:4}.${_snapdate:4:2}.${_snapdate:6:2}"
 pkgver=${_snapver}
 _tagrel=1
-pkgrel=3
+pkgrel=1
 # Build parallelism. Previously capped at 8 on a diagnosis that did not hold up.
 #
 # The cap was added after an rc4-7 build thrashed badly — 6 watchdog firings and
@@ -280,7 +280,7 @@ _nv_ver=610.43.02
 _nv_pkg="NVIDIA-Linux-x86_64-${_nv_ver}"
 _nv_open_pkg="NVIDIA-kernel-module-source-${_nv_ver}"
 source=(
-  "https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261019.tar.gz"
+  "https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261021.tar.gz"
   "config"
   "patches/0001-0049/0001-drm-amd-pm-Fix-typo-in-smu_v14_0_set_irq_state.patch"
   "patches/0001-0049/0002-drm-amd-pm-Fix-memory-leaks-in-smu_v14_0_fini_smc_ta.patch"
@@ -304,17 +304,11 @@ source=(
   "patches/1000-1099/1018-drm-amdgpu-Switch-order-of-GC-and-Display-IP-blocks.patch"
   "patches/1000-1099/1055-drm-amd-pm-fix-incorrect-avg-vcn-utilization-in-gpu_metrics.patch"
   "patches/1000-1099/1058-drm-amdgpu-track-suboptimal-always-valid-bos.patch"
-  "patches/1000-1099/1063-drm-sched-document-the-RCU-dependency.patch"
   "patches/1000-1099/1064-drm-amdgpu-dont-release-the-fence-reference-consumed-by-the-scheduler.patch"
   "patches/1000-1099/1070-drm-amdgpu-more-compact-SDMA-7.0-IB-emission.patch"
   "patches/1000-1099/1071-drm-amdgpu-more-compact-VCN-IB-emission.patch"
   "patches/1000-1099/1081-drm-amdgpu-allow-dispatch-tunneling-on-GFX12.patch"
-  "patches/1000-1099/1082-drm-amdgpu-mark-all-BOs-for-update-in-amdgpu_vm_bo_insert_map.patch"
-  "patches/1000-1099/1083-drm-amdgpu-identify-the-root-PD-by-pointer.patch"
   "patches/1000-1099/1084-drm-amdgpu-drop-the-gang-leader-reference-when-freeing.patch"
-  "patches/1000-1099/1085-drm-amdgpu-reject-ANONONLY-userptrs-spanning-multiple-VMAs.patch"
-  "patches/1000-1099/1091-drm-amdgpu-wait-for-pending-page-table-updates.patch"
-  "patches/1000-1099/1092-drm-amdgpu-keep-PRT-mappings-off-the-VM-state-lists-again.patch"
   "patches/1000-1099/1093-drm-amdgpu-Fix-out-of-bounds-write-in-amdgpu_debugfs_gfxoff_count_read.patch"
   "patches/1000-1099/1094-drm-amdgpu-sdma7-dont-access-registers-in-mqd-setup.patch"
   "patches/1000-1099/1096-drm-amdkfd-enable-sdma-ib-processing.patch"
@@ -332,17 +326,13 @@ source=(
   "patches/1100-1199/1164-revert-drm-amd-display-consult-mccs-freesync-cap-only-if-requested.patch"
   "patches/1100-1199/1174-drm-amd-display-take-runtime-pm-reference-only-when-a-CRTC-turns-on.patch"
   "patches/1100-1199/1175-drm-amd-display-use-memdup_user_nul-in-debugfs.patch"
-  "patches/1100-1199/1176-drm-amd-display-fix-swap-in-median3-for-DSC-rate-control.patch"
   "patches/1100-1199/1177-drm-amd-display-set-PQ-in-AMD-FreeSync-infopacket-for-DP-HDR.patch"
   "patches/1100-1199/1178-drm-amd-display-fix-NULL-deref-in-dcn401_update_clocks_update_dtb_dto.patch"
   "patches/1100-1199/1179-drm-amd-display-set-allow_freesync-before-validating-a-new-stream.patch"
   "patches/1100-1199/1180-drm-amd-display-keep-the-nominal-vtotal-while-VRR-is-inactive.patch"
-  "patches/1100-1199/1181-drm-drm_crtc-ensure-dma_fence_ops-remain-valid-during-unbind.patch"
-  "patches/1100-1199/1182-drm-drm_crtc-fix-race-with-dma_fence_signal-in-get_driver_name.patch"
   "patches/1200-1299/1201-cpufreq-amd-pstate-Update-cppc_req_cached-before-w.patch"
   "patches/1200-1299/1202-cpufreq-amd-pstate-Add-per-core-EPP-boost-for-rec.patch"
   "patches/1200-1299/1203-Documentation-amd-pstate-Document-the-epp_boost-pa.patch"
-  "patches/1200-1299/1233-drm-amd-pm-reapply-UMD-profile-state-after-recovery.patch"
   "patches/1300-1399/1300-drm-amdkfd-send-SMI-process-and-VM-fault-events-only-to-allowed-clients.patch"
   "patches/1300-1399/1301-drm-amdkfd-dont-reuse-a-VRAM-page-that-is-still-referenced.patch"
   "patches/1300-1399/1302-drm-amdkfd-back-off-SVM-restore-work-retry.patch"
@@ -350,6 +340,7 @@ source=(
   "patches/1300-1399/1304-drm-amdgpu-cancel-idle-work-in-hw-init-failure-paths.patch"
   "patches/1300-1399/1305-drm-amdgpu-gfx12-use-longer-quantums-for-high-priority-kernel-queues.patch"
   "patches/1300-1399/1306-drm-amdgpu-dont-set-queue-priorities-for-kernel-queues.patch"
+  "patches/1300-1399/1307-gpu-buddy-do-not-pass-caller-list-to-alloc-contig-try-harder.patch"
   "patches/2000-2099/2000-block-mq-deadline-pass-in-queue-directly-to-dd_inser.patch"
   "patches/2000-2099/2001-block-mq-deadline-skip-expensive-merge-lookups-if-co.patch"
   "patches/2000-2099/2002-block-bfq-pass-in-queue-directly-to-bfq_insert_reque.patch"
@@ -363,14 +354,12 @@ source=(
   "patches/2000-2099/2036-net-tcp-account-zerocopy-receive-vma-memory.patch"
   "patches/2000-2099/2037-net-neighbour-serialize-proxy-timer-teardown.patch"
   "patches/2000-2099/2045-net-sched-sch-cake-prevent-shaper-corruption-in-cake_overhead.patch"
-  "patches/2000-2099/2046-nvme-pci-revert-dma-opt-mapping-clamp.patch"
   "patches/2000-2099/2051-nvme-honor-the-volatile-write-cache-enable-state.patch"
   "patches/2000-2099/2052-net-sched-cake-return-classifier-result.patch"
   "patches/2000-2099/2053-net-sched-cake-split-gso-list-iterator.patch"
   "patches/2000-2099/2054-net-sched-cap-the-accounted-backlog.patch"
   "patches/2000-2099/2055-net-sched-cake-hash-before-segmenting.patch"
   "patches/2000-2099/2056-tcp-clamp-the-return-value-of-tcp_wmem_schedule.patch"
-  "patches/2000-2099/2058-blk-mq-clear-stale-inactive-flag-on-hctx-reuse.patch"
   "patches/2000-2099/2059-io_uring-add-a-schedule-point-in-io_free_batch_list.patch"
   "patches/2000-2099/2060-io_uring-add-a-schedule-point-in-__io_req_caches_free.patch"
   "patches/2100-2199/2100-zstd-7.3-merge-v1.6.0-into-kernel-tree.patch"
@@ -402,7 +391,6 @@ source=(
   "patches/2400-2499/2419-sched-bore-7.0.0-burst-oriented-response-enhancer.patch"
   "patches/2400-2499/2420-sched-fair-do-not-scan-twice-in-detach_tasks.patch"
   "patches/2500-2599/2506-x86-boot-validate-SRAT-subtables-before-parsing.patch"
-  "patches/2800-2899/2803-mm-memcontrol-publish-null-pointer-before-dropping-css-reference.patch"
   "patches/9000-9099/9034-drm-amdgpu-fix-VM-update-overrun-on-non-4K-page-kernels.patch"
   "patches/9000-9099/9035-drm-amdgpu-add-the-BO-va-mapping-offset-when-kmapping-an-IB.patch"
   "patches/9000-9099/9039-drm-amdgpu-userq-bound-the-eviction-fence-rearm-retry-loop.patch"
@@ -430,6 +418,11 @@ source=(
   # and 1012/1013 consume the tlb_inv_num_dw member and amdgpu_emit_tlb_inv() helper
   # that only 1008 declares. Partial application does not compile. sleepy-rc retains
   # all five.
+  # Absorbed by next-20261021 and dropped on the 2026-10-21 bump:
+  # 1063, 1082, 1083, 1085, 1091, 1092, 1176, 1181, 1182, 1233, 2046, 2058, 2803.
+  # 0101 and 2419 were rebased for this snapshot; 1175 lost its
+  # hdmi_automation_enable hunk, whose handler the base replaced with
+  # debugfs_create_bool.
   # 1174 (scanout alpha) was preview-only and its change is in the base.
   # Removed 2026-10-17; sleepy-rc never carried this one.
 
@@ -1117,7 +1110,7 @@ for _p in "${pkgname[@]}"; do
     }"
 done
 
-b2sums=('3fb6a79397b58ee24a7c15af1a6ccfc7dc8d0dba63917b4a9b965d0223077a7292bdc43205443082e40cfdda3d020772672de4e2f7e495e119ccb651cdd8b145'
+b2sums=('76afb31b942844b351aadc49d878d5e941d1bb55fdad346d96f9c739e14bbbe9ec684c14a4bd3721b0b09a3183c9fcf9f553b5235ea73e58d5852fd06e880e6e'
         '7517360503c9da93f405b810c81a7f1f2c8ca21a704f8251f62c400723f99bd9c14b8cb851c8f36663f412f9865cde759a3a10313e605e6172322bdfa12f6f38'
         'ff25ac7c89880886b454064ba57bd1196fb747cb80c7663d7981006cc603151aee075ebe1b49b1a92866ad2a212d1e599ce622f63bfd140ad64d37b463c17aad'
         '0806d7b3b8e4e9044c14843fc53255ff92b12aaf3b8e0d0490bbf6266aaa6b01872476ce34a65c5b694cda9a1d82e84a38df16dbb9c798ae9aa6d1c9097b32aa'
@@ -1131,7 +1124,7 @@ b2sums=('3fb6a79397b58ee24a7c15af1a6ccfc7dc8d0dba63917b4a9b965d0223077a7292bdc43
         '859ed1fe2f9db6742f1a377a9367669106768b0fe20c0d66220d2e5ce1ef49927977fc4362fbb3737d01131cbed9556e1bf6b35eb7d4ca85e400fce990104e0f'
         'f75b523e6c7c4f873eaf4ba1a8a560d8abfbdef614ee55034cc6e44e3e21d4af74288da03153ba968cf062fed329600ed30ce26b1d702679164eeb547926e796'
         '00e5b994e7839f3374dcafdcfa215f3e616ddbc0d5a17405653c17c85451d091fe160b66aaf4365aecfe569d37a9b4aab47ebdc7df40085fdefaa5123a921340'
-        '2086cc9cb4ceb8734000863733881f3faedfd733fd200771f073837a24f1b1f4990e8e61cd6d7aff17c9cb5ba04098598335b9c264261b8bb7349d210be19cc7'
+        '5cbfff50539a7ad087edcb8126717f6fe3764e5e7dddffb7804a8261c1d584d440e4b65344a5591fe2457052c15dc09eccbbe9ed98ce32d4a4c4dbd4f1c63525'
         'ee5f2c4aead1f2fc8d8096ae2a953d4c45d4c79de29e0578da543767a2d96664f903f043af36cf481adc13f203e2eca8fb616c26257e6cce5b3cae26b1d46ddf'
         'fdc7fc1d942be4fe8dadcb228b7f9c02273eaec91631ff609a07722b74b1db64828e144856e01a8ffd039762d1970a7ec511a3d240481544c570592914573b69'
         '7246f1d3dcf36c1b663ba8456dddbee8eba4d1fba97d3ba4224c96dbdbfa0a51534cd2cfa403dc00a651e43473222243f74e57cafb3eb5700c8c253d5f0e3737'
@@ -1141,17 +1134,11 @@ b2sums=('3fb6a79397b58ee24a7c15af1a6ccfc7dc8d0dba63917b4a9b965d0223077a7292bdc43
         'a47c00f575dc689566a58d4e511f29cc40d642a11aa66b806ffbc5de4659c09ee6a486fdca237c3322336d716d15eb78f794bde7148885b51dfee24a0ad65edd'
         'f3c33e0d0f3a6aecacd915bcb5500a1c96cbf8352c75204d666589e867735caa77fc882cf558719742b2190f953cf4977fe78edbd8545bd782997223e0d5dd3e'
         'e9c0cba3e3db85686be0aa481f44dc2d9829c7176c6d54aafbe4c1217f7a5d82152c34020f4166c3ce3ee0aee513dd503d2155d6dc3398d45bb3fd7dcfaeb35e'
-        '7d73d083450607b1897d52b5a27bbb9469f57c3bdd11afbc8012988362fffd1cb85119cd7143e9bd53ba326b841c6ea5cad0f8c4a261e93b184b6263112e5f33'
         'be821f2580691276ef2bf31f6420a861989baef35813964cf030e67ae90d7e6c58a8746a5de4a243363c1b7ac8af5d39c17993474a46c42485c456aa36dbaf9b'
         'f7343480484edb1534ef8415fbc53b4b5d2eba995cd2384661fce2e8f1cd05e57cd7ae638f8660bb94ddc5e10ed13351fd3f061337caa8dc6ceabf20c57ec7bd'
         '929621ccbe10929801c9af4ad02aceddbfc6da4e1cbcc469f1e5ba73d795e5227c3e4b6e1083dec4e8ae0c4f1c19137851f3d35da7bb8312ad8fe0a6a490badb'
         '5348f13f920f6c9bf396ad1c39dee22f391cb26c70a583904ce810662c6054e15bbf2c4f1557afca1b9c7523ec106c1b24854511a4b37412c0570ae05ae3ecea'
-        '8a3310169fb7f0efb2b4c50a1206424fa5151f1e5a43221d045a4b84d92a344cf7d4ae190b742d183bd36d8e2fea531ad39ce81f8a34c1f18fa6dfd08289d2c4'
-        '9a420643147683992aec64e53aa791f15821846c38eef109d8a75d5e0ef3d5569daa6ae75d68325f4449c60200266272a2aaf1821be003fa5c3529f46cee343d'
         '5a435009b557415fa22e6c641675ef4015fbfe3b0e97ab965541c63415a260009cfc34ded7ab193cd1e0a7f140101d3bac4ad68f88a6283cc14dfe02838d3b51'
-        'f97729dc5afbf14f0340e140f5e7f974cdc8424ecb2c4c6d4b5155362ec332df5439af650cac635ce50b7f02680fefec794dfe972ddf05ef1ecc2b6cda2cf1c6'
-        '2ca8b91a4f23d9f2f8f6ecd9fee1ceb46f54eaf0138be0d0bd11c7aad5c259ad53b8f21abf7f1df31b4f5411b654cf964ad0a9742aaa3a3cbdd6c93ddadc0a62'
-        'cf59145882c0a87dd9c968da99d3d7d041360377da39cd69b85119ae33643b2bdc14101eafcf1dbc584d7bbc59f6e812b14bf6977fdf9af53ecada9b0959b874'
         '3f80f24880d3dd37480cc56c98bca853cc63823cdf6e5cdf3b3f3ece481e10e6199ad2cce8870114caf5ae22320a6ac90f23e8ce2ab48289a42c7fcbb917dba8'
         '9318658b932f9a302ab5a628d18449febda84ab114deae754a4721f6978afe5b88f69d67d2eef14132b173b881a32cb22f27bb5b826801139c24edd7e2086dd0'
         '9759573eaf947b7f5da586d7c9c2db3d2db1fc50bf2a18668525cd7294c76a1b552efff8a9bff7ab2c0914789369ea6c57db8c82456bc6f220dc7e1df56817e7'
@@ -1168,18 +1155,14 @@ b2sums=('3fb6a79397b58ee24a7c15af1a6ccfc7dc8d0dba63917b4a9b965d0223077a7292bdc43
         'cb2120f7a57999c68cdb95cc0da74d800b510fbbd0c4834a1fbc0043f164a2f2f9d6bc8b80d49315849f2d52385d9c8e42b248b0985679206a09e113067a857d'
         '7f6663f02a307a150c99b873158118ea02da6c2579bfef1eb4b08d808c67b836ed62e3d0fc7ac6530a42bfd38ec051923c7b0ff1922d1805c565817ea26b7c80'
         '02c0a7e63a5a19541a4ccdf3e5b2a6dac16cc95aa21bed4a00fac1e7ba0ad1e2d8fac064ac876815a4afef33e42cdc19ef52720acbebc2c14490e1e35c754f50'
-        '02933b5476f47deeb4d7313db83b35cece82df307c62f6cb48c1b03ff0b830aa0b16e2348b079374b183f456c9bb5de31552789a305feae75d682676745f8116'
-        'a8537c5b664243b43cb24da001372af5bee18fc74cf064e87785b55f0782864ee6ad0fa0f2602ae4e00ad15d3b569b34c2f833f4680ad71dfae21c4e49e839fa'
+        '83f8d13dde49fe7e09d3e68a72a0569cd4f67a698c52a2db0ebc29717a21d4b13d24e4cdb0bb14602ecf5a34f644c5d08e75bbcea34a564a1a5ccdf6b0b106fb'
         '9844718a4a3b096d03a5f105d9cb46b67f4d2332b18a8309fe07cabe95aa28f1816cb632824e7d12d7514443ddea98d67ec37c6e0440f3a66c4ed375fe45115e'
         '0e5b8d2bc80276e70b7d042b6ffe706a54f9508ae3fe78272f650996b7b726af70d758a8ab612b454b4bc1bbc9f6651c048592254382c103b33ffc891de35432'
         'fb592d87f637142552c7679b8eb16f8ff4fd8d73861a59b6291b861edd03cc3d36367dff48b36a53ee058bc32a819b7ed99f953fd6e16c3f9ec1f6e5fcdd250d'
         '05133707e85dd1c3792fe08a9a6eb4c92e4db31538af57a96656749640b0b86f12116aefc3d73387c4ccedbdf49bf7504ba45671cea452e83d9e379055f6db17'
-        'b86081e94574e37ec1ff967f980e2af005ca9fac87952d9ee65708fbaba31384cd1822e87796cc38024b1231648b704f30695082c2e5c253578c15dfa1825d4e'
-        '692ba6b926f9e6ae282834c8d7f73df95f94a1c14cf72c5e40a70c156c4679969090d5bba0f092c809c8f997cd48c18bfd8a5827bc87536885cad4505818a6fd'
         'e9d464ebf525cd8d93d48f1cbedea0197bd9d0142085da7d83ec3dfda0174483a0fea4077055fd7d1ad9180563dc6dfb77e4f52f9bcb023b7c7d7c9fb5c39ece'
         '85a469292c954e5c34d0e0a8b8be874356b5a60d9010ec9a42de1c6135c56e9096674389a8145d73772a8fe3438c4a9c14f1a3c667e91d8166da5f4d2f1fe73a'
         '52fe01328f544e023666eab1fd378ae0a0eb47385d495403a55a933f71beedcf295300767c1e43feb46366915fae8bea3b9137f11d16ed194a1fcf71d95aec0d'
-        '0f5d94175b09133882ab22d9d778986512691e1ca24aac4ff5613b8124aee9d9b8e62a0e7fcd8c5512824c0baee9e83ff4ed4edde0e97787819494e24bce0f60'
         '047e9ad4d728054bcb8687f54b6458e244246169698d1f5501f8dd11cdaad596fecc40d6077b8647d99431eecbd7abbde0d845fd4b6b0d42d60902d2d4b68d40'
         'e4ab88fa78543be89074ee59d3bc55a114e8750abfc57b54b5f34e14b292a127f5ee6a2a1b3d88784499a32cde40eae4558c0585f3ac033a777a742707edd045'
         '36393226e5da4a93b9d014a5ba078b55e9dfdc2e08b53251c626ee0b3a1031cc872d52a035d8ba137bc5859b8d43b6b1c805b572afa45cbb27c94c5cfb0a8c1d'
@@ -1187,6 +1170,7 @@ b2sums=('3fb6a79397b58ee24a7c15af1a6ccfc7dc8d0dba63917b4a9b965d0223077a7292bdc43
         'feba387ecc525bb1c0dbc42a784d973764246c14cbd7380aa0a2b1ec8409337ba2df94762153bb12cc13d4220935be3d9e56bb24fdede76eb2caa47915f37fd2'
         '457fc6479993df3898a11b2083328ee8397d9dcbd6a5a4b2eb67e2b5adc4ce5045bfde6aed883432303326b86ba4bab49315148a4c21c5e78ece97e09f13e443'
         '19c4a2368507ea7002c1bbd795c8395598b96770e5338771c1b67de9d99a7fb50f9ccc531005c6ce727b7baf74910b5f6f310c27ac9208b77da20537351463be'
+        'ac0ee32adc942b84af50a5d1e12a96d181caeba39e02d191f965aef25364f802fb64013a16655d5748fb091b933232794845a2c8018ebaa51c5b07ef2b59f31d'
         'c20b3b791715d02756742bfa34f4921bcaebeee62edf079fe15c89afdc11451a2656122f4f21335cd116676ff69c3b7eee80c6adfdcbfe838c0f1e9012ce0428'
         'df68cfd344b37cae25fa446c82c5897510de23c55761570969dc5a6f2a5bf4c11b31e50c1670a18bef1065af6597e72e0ed839e8fdbc0328cf2dcf34484e5758'
         '8bff27696075ec53ca042b0c9e0deae345712e652b3b66bab1da82c4deefdf35533d04c00d59de70cbf968380236131bc819e0eeaa8aa40edfd84df3bd0972ef'
@@ -1200,14 +1184,12 @@ b2sums=('3fb6a79397b58ee24a7c15af1a6ccfc7dc8d0dba63917b4a9b965d0223077a7292bdc43
         '8e2cba2e32d9b9d1e3a021bb9eaf3305abecc4e0f5eff7fa8e65825d5ff8eccf5ae4bd8cbe24d3b57cb6a0eedae9ec103817d8495d1ea6fa43772cf67249a146'
         '551d1ccc3e9f3fb4f792b1b0132faccb0f69855a97819ca19a66174eca26e754c11bc29023903f48303a3adaa8a98f63cd6318fddaca4143c613ea81333ebd1d'
         '3bb9de4d4fa715ca00ec36298de9978805bdb9ab9227d7604d72d1a3e065f848a4ae141a62d0ad8e09a5570eb7c27f5690a8592151b41a15819bc511e992eb1a'
-        '7da71d3d7eee5bf5e9c3a9f7168c30ceeb7dd601531644e17e2791b7a4f6f5c005c90734512db13a9f995f4f43049f0bb14ac050c7d089faa0cb95478264eb9a'
         '8a1621e5b92a75c00549b1e813456a26dc2785f90d2f6aa0437658c177bde6aa4a14f99b1e7fa7841e18c4fd3e12badcb6b4bc6df5f70a6f2bc9c98efec8c63c'
         '82eef4fbd76f3f3ebff75ec1957b619bf59bc2cef38f7247581b9df6ab613cab69c76355448683394bec78369c37c25283ada0c72cbd512740d3a8d93c8f8588'
         'cef65356af85e13be7950659504750a8fe8c8fd010ccd2dcad27c7fec57ca259ddd89f72efb5c99d4cfc80e4391d1b30061e57dd3c8b8b55ac67be55ce527b24'
         '26ff67714df5ddca7aabdf771a6af18f96707a934cac3acaf4921e49730b30c602aaf132294b64771dcfc83fcdab77044ce2d12f22d8448d8659617d43f833e4'
         'cd23000ada00b1ea6401507a63346921673dac4fc7dbd7b8958ba6f3f696c2b4304a43b11374042c2dbbaadec0878c6358f944836971cf8756572c89ae228001'
         '53d6bd1f45d8e1c26b78564964fd8d74fa30e40b399823d642f87b2e8360d1b8d1cb0ff5a0c9f4f32ecf2d4acf75d0847f922b84b0fc5a1c76ca3d4cbcf96995'
-        'ee2fdae5bcc8b9afccdf365511a31ccedbdd20dc486a3fcf1f019901bef6745684a549a4eac03839ee0b53f5e472b44fb5187d70d762837f4f9cf61a173e90fc'
         'c31f8fc6db7e5776ffbbde976239a102e5ddb0c2a6214a094a26f364718a507ac7c1960a9a955bfd16a3182979e57a8eb9ffbbde62d26ddfb983076868d619f2'
         '1455fd65a42e9bba65673da473b99187acc2e25d6535c89d365eb925500f84e23e40bddca183e83bb8af641122254083cddd8bf26fbdbd413da6a20ccd73850f'
         '04fe6270d9e54b974ee745261575fd710e3af252c6e2b2788a082455c6eeccfd2ea944245f5f58a9f4de418eca3058aaae8a27f90173b254aac15036c7a95c49'
@@ -1236,10 +1218,9 @@ b2sums=('3fb6a79397b58ee24a7c15af1a6ccfc7dc8d0dba63917b4a9b965d0223077a7292bdc43
         'c2d08fb86475f193814927cb9d5b9b744f4598e766c644cb12ba7871f55b34e0753b1292318073b9c3cdae5e077bdb598ad8b354b1bcb26635865beadf4e2d53'
         '3036834e0eea734893a0e61158c664c5292ff116f7d7c7d764d31ab4dd8a42b849789557e3877a87370a580247561c2a03fe58d1ac341e2d5684e27c8d48c1f9'
         '9c68b602fac54fde41039e569afe46b3710e0c35775ff35bb592752109676070a8caf86a8e7b1a73b7ccd9637881fc8a28e95be14cae7e1a9fdb4b1145ee3c3b'
-        'cae39f5f68facd370160f50137c6faae2ec0067236bc092c3e122d94be251b0e42a09edb3de835452d623fe38c34822c589eedfde7a0e1ff46a8279284665ac3'
+        '108b6b8d9bd8ee4b0984890380c4f46280197d2ec6609fbc46e3e538769979ca4ac0cf270daf2f254fd374657968c609473aa6e0d2ae552481347352abe42a6f'
         '2dd42e38ee5cb8d5413ef45c1a6684445661030e3b813635632e4f62dc94f677cd011afdc74593d28ada0ae00bee597b196c39a0da728703c993880b9564ae9d'
         '9065ec476686e7fbbf4efdaffeff9e0edf9a0fb802c6749bcfe443102595fbaaadda0bde6fab5cfb3ead598035d40fa1fa9392ff69b1cf1b745d648e4b78d5d8'
-        '382122a1282313eb41445c6d6baf415d97e7ffa0758e0f92866e018a85902a65300906dee9935638dc0df05b1c6cafdada5cefd5a01011c9808b44f7aa7ab401'
         '0c25491212274500756b31955cafa5f757480985f21d616ab179df8773f1d8a869ab5eb319add233c5f998ec286e12e0fbaf40c1f01cc4f6d577c799cd0a40a7'
         '2f6ecc84e0141cbee5ce379a2959550cb4830e923afa3d5275283d74d69b8e3bba51f84af96df329d1ea30af0a26f320678907833b40172cbff4a751de3682a7'
         '21ca802919183021abd12cfc782de48a895daddfa9b401700e4bef50e750537183bc3c7157e723bcae769d2bd72f9efd34e677d80d63d74eaa7344b8205eb1fe'

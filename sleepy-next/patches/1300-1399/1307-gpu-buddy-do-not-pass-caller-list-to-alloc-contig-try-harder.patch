@@ -1,0 +1,90 @@
+From fb26cf4f1df40a462ea65552a3fbcc8cfafab523 Mon Sep 17 00:00:00 2001
+From: Matthew Auld <matthew.auld@intel.com>
+Date: Tue, 6 Oct 2026 12:07:07 +0100
+Subject: [PATCH] gpu/buddy: do not pass caller list to
+ __alloc_contig_try_harder()
+
+If the caller passes a non-empty blocks list, __alloc_contig_try_harder()
+unconditionally frees it on failure or during retry.
+
+Pass the local allocated list instead and only splice it onto the caller's
+list upon success.
+
+Assisted-by: LLM
+Reported-by: Shashiko <sashiko-bot@kernel.org>
+Closes: https://sashiko.dev/#/bug/linux-fa721daf-7333-48b5-a26b-624c7f5791d7
+Fixes: 0a1844bf0b53 ("drm/buddy: Improve contiguous memory allocation")
+Cc: Arunpravin Paneer Selvam <Arunpravin.PaneerSelvam@amd.com>
+Cc: Joel Fernandes <joelagnelf@nvidia.com>
+Cc: <stable@vger.kernel.org>
+Reviewed-by: Arunpravin Paneer Selvam <Arunpravin.PaneerSelvam@amd.com>
+Signed-off-by: Matthew Auld <matthew.auld@intel.com>
+Signed-off-by: Arunpravin Paneer Selvam <Arunpravin.PaneerSelvam@amd.com>
+Link: https://patch.msgid.link/20261006110706.1636971-2-matthew.auld@intel.com
+---
+ drivers/gpu/buddy.c                | 20 ++++++++++++++------
+ drivers/gpu/tests/gpu_buddy_test.c |  9 +++++++++
+ 2 files changed, 23 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/gpu/buddy.c b/drivers/gpu/buddy.c
+index 503f7d5934e4..28cff97d57dc 100644
+--- a/drivers/gpu/buddy.c
++++ b/drivers/gpu/buddy.c
+@@ -2022,10 +2022,16 @@ int gpu_buddy_alloc_blocks(struct gpu_buddy *mm,
+ 
+ 	if (order > mm->max_order || size > mm->size) {
+ 		if ((flags & GPU_BUDDY_CONTIGUOUS_ALLOCATION) &&
+-		    !(flags & GPU_BUDDY_RANGE_ALLOCATION))
+-			return __alloc_contig_try_harder(mm, original_size,
+-							 original_min_size,
+-							 flags, blocks);
++		    !(flags & GPU_BUDDY_RANGE_ALLOCATION)) {
++			err = __alloc_contig_try_harder(mm, original_size,
++							original_min_size,
++							flags, &allocated);
++			if (err)
++				return err;
++
++			list_splice_tail(&allocated, blocks);
++			return 0;
++		}
+ 
+ 		return -EINVAL;
+ 	}
+@@ -2064,9 +2070,11 @@ int gpu_buddy_alloc_blocks(struct gpu_buddy *mm,
+ 								original_size,
+ 								original_min_size,
+ 								flags,
+-								blocks);
+-				if (!err)
++								&allocated);
++				if (!err) {
++					list_splice_tail(&allocated, blocks);
+ 					return 0;
++				}
+ 				if (err != -ENOSPC)
+ 					return err;
+ 				goto err_free;
+diff --git a/drivers/gpu/tests/gpu_buddy_test.c b/drivers/gpu/tests/gpu_buddy_test.c
+index b75d32ca6ca0..2c6f1da1a6d1 100644
+--- a/drivers/gpu/tests/gpu_buddy_test.c
++++ b/drivers/gpu/tests/gpu_buddy_test.c
+@@ -1235,6 +1235,15 @@ static void gpu_test_buddy_alloc_contiguous(struct kunit *test)
+ 							    GPU_BUDDY_CONTIGUOUS_ALLOCATION),
+ 			       "buddy_alloc hit an error size=%lu\n", 2 * ps);
+ 
++	/*
++	 * A failed contiguous allocation with a non-empty blocks list
++	 * must NOT corrupt or free pre-existing blocks.
++	 */
++	KUNIT_EXPECT_TRUE(test, gpu_buddy_alloc_blocks(&mm, 0, mm_size,
++						       3 * ps, ps, &allocated,
++						       GPU_BUDDY_CONTIGUOUS_ALLOCATION));
++	KUNIT_EXPECT_FALSE(test, list_empty(&allocated));
++
+ 	gpu_buddy_free_list(&mm, &left, 0);
+ 	KUNIT_ASSERT_FALSE_MSG(test, gpu_buddy_alloc_blocks(&mm, 0, mm_size,
+ 							    3 * ps, ps, &allocated,
+-- 
+2.56.0
+

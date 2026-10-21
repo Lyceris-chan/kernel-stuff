@@ -18,6 +18,39 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.10.21-1-sleepy-next (linux-next `next-20261021`)]: 2026-10-21
+
+Preview bump from `next-20261019` to `next-20261021`. The snapshot adds 62
+non-merge AMD commits and 1066 non-merge commits overall. The reviewed KFD
+doorbell-race, GPU-reset BO-free, CWSR-reference and pinned-object-accounting
+fixes, and `set VRR_EN for inactive state`, are now **base content**.
+
+### Changed — series reconciled to 131 patches
+
+Dropped as absorbed: `1063`, `1082`, `1083`, `1085`, `1091`, `1092`, `1176`,
+`1181`, `1182`, `1233`, `2046`, `2058`, `2803`. Rebased: `0101` (bbr3;
+`Makefile` now has `tcp_roccet.o` at the anchor), `2419` (BORE 7.0.0; dropped
+the obsolete `update_protect_slice()` hunk because the new base's
+`cfs_rq_min_slice()` already uses BORE's `se->slice`), and `1175` (dropped the
+`hdmi_automation_enable` hunk; the base replaced the handler with
+`debugfs_create_bool`).
+
+### Added — `1307`
+
+`gpu/buddy: do not pass caller list to __alloc_contig_try_harder()`
+(`fb26cf4f1df4`, `Reviewed-by: Arunpravin Paneer Selvam`). Preview-only until
+the rc copy is rebased over the `v7.3` `drivers/gpu/buddy.c` context.
+
+### Verification
+
+Cumulative audit **131/131** against `next-20261021`. Package
+`linux-sleepy-next-2026.10.21-1` (22.9 MB) and headers (35.0 MB) built and
+installed. `vmlinux` carries a `.BTF` section; `CONFIG_TCP_CONG_BBR3=y`,
+`CONFIG_DEFAULT_BBR3=y`, old `CONFIG_TCP_CONG_BBR` off, `DEBUG_INFO_DWARF5` and
+`DEBUG_INFO_BTF` on. The built-in cmdline is unchanged. The initramfs was
+rebuilt for `2026.10.21-1-sleepy-next` and the default systemd-boot entry
+`linux-sleepy-next.conf` now points at it.
+
 ## [7.3.0-3-sleepy-rc (Linux 7.3)]: 2026-10-21
 
 A patch-only refresh; the base stays at `v7.3`. The series moves from 282 to

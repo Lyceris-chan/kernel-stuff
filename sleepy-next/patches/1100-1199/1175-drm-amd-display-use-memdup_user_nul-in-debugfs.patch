@@ -32,7 +32,7 @@ its good enough like this.
  1 file changed, 68 insertions(+), 121 deletions(-)
 
 diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_debugfs.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_debugfs.c
-index 36f32ed4b87c..969e1361a5da 100644
+index 6622a686e5e0..b77f25cc849a 100644
 --- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_debugfs.c
 +++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_debugfs.c
 @@ -76,8 +76,7 @@ static const char *const mst_progress_status[] = {
@@ -417,38 +417,7 @@ index 36f32ed4b87c..969e1361a5da 100644
  		kfree(wr_buf);
  		return -EINVAL;
  	}
-@@ -3008,24 +2959,22 @@ static ssize_t hdmi_automation_enable(struct file *f, const char __user *buf,
- 	size_t size, loff_t *pos)
- {
- 	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
--	char *wr_buf = NULL;
- 	const uint32_t wr_buf_size = 40;
- 	int max_param_num = 1;
- 	uint8_t param_nums = 0;
--	long param[2];
- 	bool hdmi_comp_auto;
-+	long param[2];
-+	char *wr_buf;
- 
- 	if (size == 0)
- 		return -EINVAL;
- 
--	wr_buf = kcalloc(wr_buf_size, sizeof(char), GFP_KERNEL);
--	if (!wr_buf)
--		return -ENOSPC;
-+	wr_buf = memdup_user_nul(buf, wr_buf_size);
-+	if (IS_ERR(wr_buf))
-+		return PTR_ERR(wr_buf);
- 
- 	if (parse_write_buffer_into_params(wr_buf, wr_buf_size,
--					   (long *)param, buf,
--					   max_param_num,
--					   &param_nums)) {
-+					   param, max_param_num, &param_nums)) {
- 		kfree(wr_buf);
- 		return -EINVAL;
- 	}
-@@ -3823,7 +3772,6 @@ static ssize_t edp_ilr_write(struct file *f, const char __user *buf,
+@@ -3758,7 +3709,6 @@ static ssize_t edp_ilr_write(struct file *f, const char __user *buf,
  	struct amdgpu_device *adev = drm_to_adev(connector->base.dev);
  	struct dc *dc = (struct dc *)link->dc;
  	struct dc_link_settings prefer_link_settings;
@@ -456,7 +425,7 @@ index 36f32ed4b87c..969e1361a5da 100644
  	const uint32_t wr_buf_size = 40;
  	/* 0: lane_count; 1: link_rate */
  	int max_param_num = 2;
-@@ -3834,18 +3782,17 @@ static ssize_t edp_ilr_write(struct file *f, const char __user *buf,
+@@ -3769,18 +3719,17 @@ static ssize_t edp_ilr_write(struct file *f, const char __user *buf,
  	uint32_t entry = 0;
  	uint32_t link_rate_in_khz = 0;
  	uint8_t dpcd_rev = 0;

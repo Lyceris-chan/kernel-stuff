@@ -10141,6 +10141,7 @@ torvalds or linux-next, no v2 followed, and the thread has been stalled since
 | `1304` | drm/amdgpu: cancel idle work in hw_init failure paths for vcn/uvd/vce/jpeg | Leo Liu | `<20261021125444.27886-1-leo.liu@amd.com>` | `Reviewed-by: Alex Deucher`, `Fixes: 416e1fab4752`, `Cc: stable`. Replaces `1095`. rc copy strips the `vcn_v5_0_2` hunk (not this IP). |
 | `1305` | drm/amdgpu/gfx12: rework kernel queue priority handling | Alex Deucher | `<20261021131545.1962601-6-alexander.deucher@amd.com>` | 6/8 of the priority series: high-priority kernel queues get a longer quantum (20/10, 2/1) instead of a higher queue priority, which starves lower-priority queues. `gfx_v12_0.c` is this machine's exact file. |
 | `1306` | drm/amdgpu: don't set queue priorities for kernel queues | Alex Deucher | `<20261021131545.1962601-8-alexander.deucher@amd.com>` | 8/8, the shared `amdgpu_ring.c` half of the same fix. The `gfx_v8_0`/`gfx_v9_0`/`gfx_v9_4_3` hunks are stripped (not this silicon); the remaining one-file hunk applies to both bases. |
+| `1307` | gpu/buddy: do not pass caller list to `__alloc_contig_try_harder()` | Matthew Auld | drm-misc `fb26cf4f1df4` | `Reviewed-by: Arunpravin Paneer Selvam`; stops the contiguous VRAM allocator from freeing the caller's blocks list on failure. **Preview-only for now**: the `v7.3` `drivers/gpu/buddy.c` context differs, so the rc copy needs a rebase. |
 
 ### Rejected — the dma-fence ordering pair
 
@@ -10156,3 +10157,22 @@ The rc series is **289** patches and the preview **143** (the preview lost
 `1095` and the r8169 trio, and gained the six carries). `1300–1399` now holds
 seven patches. Both cumulative audits are clean; the build and BTF results are
 recorded in `CHANGELOG.md`.
+
+## Preview bump 2026-10-21 — `next-20261021`, 13 drops, three rebases, `1307`
+
+`sleepy-next` moves to `next-20261021` (tag `2ca9a319abef`, tip
+`9a482184d910`), release `2026.10.21-1-sleepy-next`. The snapshot adds 62
+non-merge AMD commits over `next-20261019`, including the reviewed KFD
+doorbell-race, GPU-reset BO-free, CWSR-reference and pinned-object-accounting
+fixes plus `set VRR_EN for inactive state`; those are now base content, not
+carried patches.
+
+Dropped as absorbed: `1063`, `1082`, `1083`, `1085`, `1091`, `1092`, `1176`,
+`1181`, `1182`, `1233`, `2046`, `2058`, `2803`. Rebased: `0101` (Makefile
+`tcp_roccet.o` anchor), `2419` (obsolete `update_protect_slice` hunk; the new
+`cfs_rq_min_slice()` already uses BORE's `se->slice`), `1175`
+(`hdmi_automation_enable` hunk removed; the base uses `debugfs_create_bool`).
+Added: `1307`, the reviewed `gpu/buddy` caller-list fix, preview-only until the
+rc copy is rebased. The preview series is **131** patches and applies
+**131/131** to `next-20261021`. Full detail is in
+`sleepy-next/PATCH_SOURCES.md`.
