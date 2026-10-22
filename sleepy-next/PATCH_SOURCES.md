@@ -839,6 +839,36 @@ needs a rebase before it can take the patch.
 
 ### Verification
 
-The reconciled series is **131 patches** and applies **131/131** to
-`next-20261021` with the cumulative `audit_series.py`. Build and BTF results are
-recorded in `CHANGELOG.md`.
+At the 2026-10-21 bump the reconciled series was **131 patches** and applied
+**131/131** to `next-20261021`. The 2026-10-22 section below records the
+current state: **132 patches, 132/132** to `next-20261022`. Build and BTF
+results are recorded in `CHANGELOG.md`.
+
+## Sweep 2026-10-22 — `1098` v3 and `1308` adopted; bumped to `next-20261022`
+
+The 2026-10-22 all-source sweep re-ran the cumulative audit against
+`next-20261021`: **131/131 clean**. The same-day follow-up added two patches
+and bumped the snapshot:
+
+- `1098` was replaced with v3 (Jesse Zhang,
+  `<20261022024407.4187271-1-...>`). The CS user-fence BO is now accepted only
+  when its preferred or allowed domain is exactly GTT, and userptrs are
+  detected with `amdgpu_ttm_tt_is_userptr()`. Christian König's review asks for
+  `Cc: stable` in place of the disputed `Fixes:` tag; the file keeps the
+  original trailers.
+- `1308` was added:
+  `drm/amdgpu: don't wait for the SPM VMID's jobs under the VMID manager lock`
+  v3 (Jesse Zhang, `<20261022024343.4187095-1-...>`,
+  `Reviewed-by: Christian König`, `Fixes: 9b47649cabf4`). Preview-only: the
+  snapshot has the `_spm` VMID rework; the rc base does not.
+
+`_srctag` is now `next-20261022` (`bd1ecbb61afe`, cut 10-22 13:26 UTC) and the
+series is **132 patches**, applying **132/132** with the cumulative audit. The
+1021→1022 delta is 194 non-merge commits; no AMD target file changed. The
+target-adjacent changes are the r8169 TX-LPI fix and four `sch_cake` fixes,
+both covered in `sleepy-rc/PATCH_SOURCES.md`.
+`updpkgsums` was run. Build and BTF results are recorded in `CHANGELOG.md`.
+
+The full triage, including the rejected candidates and the seven orphaned
+patch files on disk, is in the 2026-10-22 sweep in
+`sleepy-rc/PATCH_SOURCES.md`.

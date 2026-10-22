@@ -18,6 +18,66 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.10.22-1-sleepy-next (linux-next `next-20261022`)]: 2026-10-22
+
+Preview bump from `next-20261021` to `next-20261022`, one day of linux-next.
+The 194-commit delta is networking, Hyper-V, RISC-V KVM, `x86/uaccess` and
+APIC. It changes no AMD target file, so no carried patch was absorbed or
+rebased.
+
+### Changed — series moves to 132 patches
+
+`1098` moves to v3: the CS user-fence BO is accepted only when its preferred
+or allowed domain is exactly GTT, and userptrs are detected with
+`amdgpu_ttm_tt_is_userptr()`. Christian König reviewed it and asked for a
+`Cc: stable` tag in place of the disputed `Fixes:` tag.
+
+### Added — `1308`
+
+`drm/amdgpu: don't wait for the SPM VMID's jobs under the VMID manager lock`
+v3 (Jesse Zhang, `Reviewed-by: Christian König`). Preview-only: the snapshot
+has the `_spm` VMID rework; `sleepy-rc`'s 7.3 base still uses
+`amdgpu_vmid_{alloc,free}_reserved()`, so the bug and the patch do not apply
+there.
+
+### Verification
+
+Cumulative audit **132/132** against `next-20261022`. Package
+`linux-sleepy-next-2026.10.22-1` (23 MB) and headers (34 MB) built. `vmlinux`
+carries `.BTF` and `.BTF_ids`, and the `amdgpu` module carries `.BTF`;
+`CONFIG_TCP_CONG_BBR3=y`, `CONFIG_DEFAULT_BBR3=y`, old `CONFIG_TCP_CONG_BBR`
+off, `DEBUG_INFO_DWARF5` and `DEBUG_INFO_BTF` on. The built-in cmdline keeps
+the preview's deliberate omission of `amdgpu.dcdebugmask=0x800`. Installed
+with a rebuilt initramfs; the default systemd-boot entry
+`linux-sleepy-next.conf` points at it.
+
+## [7.3.0-4-sleepy-rc (Linux 7.3)]: 2026-10-22
+
+A patch-only refresh; the base stays at `v7.3`. The series moves from 289 to
+290 patches and the package is rebuilt at `pkgrel=4`.
+
+### Added — `2322`
+
+`sorttable: parse nm output correctly` (Lorenzo Stoakes, merged
+`4719513c0fa2`). Without it, a size-less `nm` entry can be misparsed and
+swallow the next symbol once `2305` stops sorting `nm` output, losing function
+names.
+
+### Changed — `1098` v3
+
+As above: the rework replaces the v1 special case in
+`amdgpu_cs_bo_validate()`.
+
+### Verification
+
+Cumulative audit **290/290** against `v7.3`. Package
+`linux-sleepy-rc-7.3.0-4` (22 MB) and headers (33 MB) built and installed.
+`vmlinux` carries `.BTF` and `.BTF_ids`; `CONFIG_TCP_CONG_BBR3=y`,
+`CONFIG_DEFAULT_BBR3=y`, old `CONFIG_TCP_CONG_BBR` off, `DEBUG_INFO_DWARF5`
+and `DEBUG_INFO_BTF` on. The built-in cmdline, including
+`amdgpu.dcdebugmask=0x800`, is unchanged. The initramfs was rebuilt for
+`7.3.0-4-sleepy-rc`.
+
 ## [2026.10.21-1-sleepy-next (linux-next `next-20261021`)]: 2026-10-21
 
 Preview bump from `next-20261019` to `next-20261021`. The snapshot adds 62

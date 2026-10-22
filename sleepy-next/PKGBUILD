@@ -182,9 +182,9 @@ pkgbase="linux-$_pkgsuffix"
 # snapshot DATE rather than by whichever mainline rc it happened to be cut
 # from. `_srctag` is defined first because pkgver is derived from it — a bump
 # that moves the tag but not the version is not possible.
-_srctag=next-20261021
+_srctag=next-20261022
 _srcname=${_srctag}
-_snapdate=${_srctag#next-}                                            # 20261016
+_snapdate=${_srctag#next-}                                            # 20261022
 # Dotted (2026.10.09), and that is NOT cosmetic. Both tools that consume the
 # release string require it to BEGIN with dotted decimal notation:
 #
@@ -280,7 +280,7 @@ _nv_ver=610.43.02
 _nv_pkg="NVIDIA-Linux-x86_64-${_nv_ver}"
 _nv_open_pkg="NVIDIA-kernel-module-source-${_nv_ver}"
 source=(
-  "https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261021.tar.gz"
+  "https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261022.tar.gz"
   "config"
   "patches/0001-0049/0001-drm-amd-pm-Fix-typo-in-smu_v14_0_set_irq_state.patch"
   "patches/0001-0049/0002-drm-amd-pm-Fix-memory-leaks-in-smu_v14_0_fini_smc_ta.patch"
@@ -341,6 +341,7 @@ source=(
   "patches/1300-1399/1305-drm-amdgpu-gfx12-use-longer-quantums-for-high-priority-kernel-queues.patch"
   "patches/1300-1399/1306-drm-amdgpu-dont-set-queue-priorities-for-kernel-queues.patch"
   "patches/1300-1399/1307-gpu-buddy-do-not-pass-caller-list-to-alloc-contig-try-harder.patch"
+  "patches/1300-1399/1308-drm-amdgpu-dont-wait-for-the-SPM-VMIDs-jobs-under-the-VMID-manager-lock.patch"
   "patches/2000-2099/2000-block-mq-deadline-pass-in-queue-directly-to-dd_inser.patch"
   "patches/2000-2099/2001-block-mq-deadline-skip-expensive-merge-lookups-if-co.patch"
   "patches/2000-2099/2002-block-bfq-pass-in-queue-directly-to-bfq_insert_reque.patch"
@@ -723,6 +724,8 @@ EOF
     # of the race (the non-atomic RMW that clears VUPDATE_NO_LOCK_EN); this mask
     # covers the clock-gating half, which is hardware.
     # It costs idle power. Drop it again if a proper DCN4 flip-pending fix lands.
+    # The preview deliberately leaves the mask OUT so the snapshot's display code
+    # runs with IPS enabled (docs/README.md); only sleepy-rc's CMDLINE sets it.
     # Appended to the bootloader params (CMDLINE_OVERRIDE is off); boots this kernel
     # with ASPM off regardless of the platform/BIOS default.
     scripts/config -e CMDLINE_BOOL --set-str CMDLINE "cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0" -d CMDLINE_OVERRIDE
@@ -1110,7 +1113,7 @@ for _p in "${pkgname[@]}"; do
     }"
 done
 
-b2sums=('76afb31b942844b351aadc49d878d5e941d1bb55fdad346d96f9c739e14bbbe9ec684c14a4bd3721b0b09a3183c9fcf9f553b5235ea73e58d5852fd06e880e6e'
+b2sums=('38d20c7e8cc9d06fcd939625a15f0cb7a6c6f9b3c454f109c007cf94cc77cf381303c4dc43fa13bc1a0d86ec549954e9c79b8bdc127a97399c0a0ed7e375c993'
         '7517360503c9da93f405b810c81a7f1f2c8ca21a704f8251f62c400723f99bd9c14b8cb851c8f36663f412f9865cde759a3a10313e605e6172322bdfa12f6f38'
         'ff25ac7c89880886b454064ba57bd1196fb747cb80c7663d7981006cc603151aee075ebe1b49b1a92866ad2a212d1e599ce622f63bfd140ad64d37b463c17aad'
         '0806d7b3b8e4e9044c14843fc53255ff92b12aaf3b8e0d0490bbf6266aaa6b01872476ce34a65c5b694cda9a1d82e84a38df16dbb9c798ae9aa6d1c9097b32aa'
@@ -1143,7 +1146,7 @@ b2sums=('76afb31b942844b351aadc49d878d5e941d1bb55fdad346d96f9c739e14bbbe9ec684c1
         '9318658b932f9a302ab5a628d18449febda84ab114deae754a4721f6978afe5b88f69d67d2eef14132b173b881a32cb22f27bb5b826801139c24edd7e2086dd0'
         '9759573eaf947b7f5da586d7c9c2db3d2db1fc50bf2a18668525cd7294c76a1b552efff8a9bff7ab2c0914789369ea6c57db8c82456bc6f220dc7e1df56817e7'
         'c26cb8e350e75bfaf660e6cc89c4b20e489190a817b13d80179fbd8b463b8fafc0e4319d3afcdbdc8fbc131480d9fc68eb17f4811091ce4e106dc2101f77f7ed'
-        'd321c0340c5fdb2668910be0995ad0510fce4487bfb46ffeca8bf8e4149c875534aad40199c5f705ac38a904f8abee3039d4b18b13a6f5a0e6f2d040724a05d6'
+        'ec62df6677c77f5c93491fd0189bb3fb1ea2ef5f820cd291035f1d0d0ec7d0c5a9900d6343fcecb4ba7ce0f989b376e6aa8a79d99454362c9295ec85e84c423c'
         'f18ff199982fe93cb76f1dcb1f4faf13cd3ba2b8f189038040cb6d10d5cc3adf8df7a6f5e718fe9cdc87c02fbbbc4ec85ca06945ded600401046595443daa094'
         '0fb08f727791630b6101b8263b23ce433a8b65f895ff757a4d79b282815be449e7b1932a752635e848b3b3ba8235a775a3bf618cfb933bb80d69f3a38f5e5ead'
         '8b3a99b10483d883adcf7d8b2f9daacedd5be8e5cd6a9064a659c73cff5c657c47c4a21d5eaedc139baf906036326a06833ff22a055fe707cac33bac3bfb57a2'
@@ -1171,6 +1174,7 @@ b2sums=('76afb31b942844b351aadc49d878d5e941d1bb55fdad346d96f9c739e14bbbe9ec684c1
         '457fc6479993df3898a11b2083328ee8397d9dcbd6a5a4b2eb67e2b5adc4ce5045bfde6aed883432303326b86ba4bab49315148a4c21c5e78ece97e09f13e443'
         '19c4a2368507ea7002c1bbd795c8395598b96770e5338771c1b67de9d99a7fb50f9ccc531005c6ce727b7baf74910b5f6f310c27ac9208b77da20537351463be'
         'ac0ee32adc942b84af50a5d1e12a96d181caeba39e02d191f965aef25364f802fb64013a16655d5748fb091b933232794845a2c8018ebaa51c5b07ef2b59f31d'
+        '884718a4fbae6daeafdc21d4faf60916e49032613ca8c4d78cdc27301650d4fa1af7fc286b4f125c1a41a13ff4f7cf11dcb846e6e22aec88227441b8f23ddfaf'
         'c20b3b791715d02756742bfa34f4921bcaebeee62edf079fe15c89afdc11451a2656122f4f21335cd116676ff69c3b7eee80c6adfdcbfe838c0f1e9012ce0428'
         'df68cfd344b37cae25fa446c82c5897510de23c55761570969dc5a6f2a5bf4c11b31e50c1670a18bef1065af6597e72e0ed839e8fdbc0328cf2dcf34484e5758'
         '8bff27696075ec53ca042b0c9e0deae345712e652b3b66bab1da82c4deefdf35533d04c00d59de70cbf968380236131bc819e0eeaa8aa40edfd84df3bd0972ef'

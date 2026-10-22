@@ -10173,6 +10173,183 @@ Dropped as absorbed: `1063`, `1082`, `1083`, `1085`, `1091`, `1092`, `1176`,
 `cfs_rq_min_slice()` already uses BORE's `se->slice`), `1175`
 (`hdmi_automation_enable` hunk removed; the base uses `debugfs_create_bool`).
 Added: `1307`, the reviewed `gpu/buddy` caller-list fix, preview-only until the
-rc copy is rebased. The preview series is **131** patches and applies
-**131/131** to `next-20261021`. Full detail is in
+rc copy is rebased. At the 2026-10-21 bump the preview series was **131**
+patches and applied **131/131** to `next-20261021`; the 2026-10-22 follow-up
+below records the current state. Full detail is in
 `sleepy-next/PATCH_SOURCES.md`.
+
+## Sweep 2026-10-22 — `1098` v3, `2322` sorttable, `1308` preview-only, and the next-20261022 bump
+
+The mid-day pass below found the candidates; the same-day follow-up adopted all
+three and bumped the preview to `next-20261022`. The source state is current to
+that snapshot and the evening mail (18:11 UTC).
+
+### Source state
+
+| Source | State |
+|---|---|
+| torvalds | `7be4bc52fd9e` (10-21). The delta is the 7.4 merge window: kbuild, `__{get,put}_user()` removal, driver-core, VFS, libcrypto — no new AMD or on-target fix |
+| linux-next | **`next-20261022`** `bd1ecbb61afe` (10-22 13:26 UTC) supersedes `next-20261021` `9a482184d910`; the local `master` ref stays stale while the tags move. The 1021→1022 delta is 194 non-merge commits: networking, Hyper-V, RISC-V KVM, `x86/uaccess` and APIC. No AMD commit. The only target-adjacent changes are the r8169 TX-LPI fix and four `sch_cake` fixes, triaged below |
+| drm-next | `fad06cfaf385` (10-21), unchanged; no AMD commit |
+| agd5f / amd-staging | `77f548b127c6` (10-20), **unchanged**. A transient `ls-remote` value (`5be86ee05e71`) did not persist; re-reading the remote confirms `77f548b127c6` |
+| drm-misc | `orcz/drm-misc-next` **`cf5d8e390e2a`** (10-21); the delta is `accel/amdxdna` NPU work plus the already-carried `gpu/buddy` fix `1307` |
+| linux-pm | `origin/linux-next` **`028374da13e7`** (10-16) — this branch had never been scanned. Its on-target amd-pstate fixes are already carried (`1231`, `1232`) or are 7.4-only |
+| akpm-mm | `mm-everything` `eb9795f66371` (10-20), unchanged |
+| tip | `a20696e6cd31` (10-21); APIC/x2apic, arm64 and netfs only |
+| lore mirrors (15) | refreshed; newest mail 2026-10-22 06:53 UTC. `lore-stable` (2022) and `lore-rust-for-linux` (09-24) remain stale |
+| CachyOS | branches and `cachyos-kernel-patches` unchanged since 10-21 |
+| sirlucjan | `7275a4ad` (10-20), unchanged |
+| firelzrd | MARIE `1.0.0-rc1` and BORE `7.0.0`, both carried; no newer commit |
+| linux-tkg | tip unchanged (09-07); not used here |
+| xanmod | not an independent source |
+
+### Version sweep — 53 subject hits, three real deltas
+
+A normalized-subject pass over every non-`Re:` posting since 2026-09-01 in all
+mirrors produced 53 carried patches with a higher posting version. The
+changed-line comparison removes the version-label artifacts: the rest are
+content-identical, our carried content is a superset, or the posting predates
+the carried revision. The three real deltas:
+
+| Carried | Posting | Verdict |
+|---|---|---|
+| `1098` v1 | v3, amd-gfx `<20261022024407.4187271-1-Jesse.Zhang@amd.com>` (10-22) | **Real.** The v2 rework (Christian) drops the `amdgpu_cs_bo_validate()` special case and instead only accepts BOs whose preferred or allowed domain is exactly GTT, and uses `amdgpu_ttm_tt_is_userptr()` because `get_usermm()` returns NULL after the creating task exits. Reverse v1, forward v3 clean with `-F0` on both the rc and the full series. **Adopted** the same day: the file was replaced in both packages and the 290- and 132-patch series re-audited clean |
+| `9088` v1 | v4 6/6, amd-gfx (09-15) | **No change needed.** The staging tree now has the `if (count && sdma->burst_nop)` form. Our carried 7.3-adapted `sdma_v7_0` hunk already uses that form with the required `sdma &&` null guard; the 27 v4-only lines are the `sdma_v2_4`–`v7_1` conversions that this partial port deliberately drops as wrong silicon |
+| `2302`–`2321` v3 | v4 22-patch series (09-23) | **Real, different base.** The merged v4 set is in `next-20261021` as base content. Our v3 misses `sorttable: parse nm output correctly` (v4 04/22) and `objtool: do not hash DWARF relocations` (v4 16/22). The sorttable fix was adopted as `2322`; the objtool patch fails 5/6 hunks against 7.3 |
+
+The remaining hits, including `2800`, `2803`, `2056`, `1175`, `1233`, `9087`
+and `9089`, are content-identical or already a superset of the newer posting.
+`9087`'s only delta is whitespace; the carried file is already v2. `1231`/`1232`
+carry the v2 content. `2191`/`2193` carry the LRU-MARIE-adapted versions, which
+are intentionally different from the plain v3 postings.
+
+### New candidates
+
+| Candidate | Author, source | Verdict |
+|---|---|---|
+| `drm/amdgpu: don't wait for the SPM VMID's jobs under the VMID manager lock` v3 | Jesse Zhang, amd-gfx `<20261022024343.4187095-1-...>`, `Reviewed-by: Christian König`, `Fixes: 9b47649cabf4` | **Adopted as `1308`, preview only.** Waiting for the reserved VMID's jobs under the VMID manager lock stalls every submission on the hub and deadlocks a full GPU reset. The preview base has the `_spm` rework and the patch applies **cleanly** to the full series; the rc base still has `amdgpu_vmid_{alloc,free}_reserved()`, so the patch does not apply and the bug does not exist there |
+| `sorttable: parse nm output correctly` v4 04/22 | Lorenzo Stoakes, kbuild series `<...>`; merged as `4719513c0fa2` | **Adopted as `2322`, rc only.** A size-less `nm` entry is misparsed and can swallow the next symbol; once `2305` stops sorting `nm` output, function names can be lost. No carried patch touches `scripts/sorttable.c`; the one-hunk patch applies cleanly to the full rc series. The preview already has it as base |
+| `drm/amdgpu/ras: Select EEPROM ops based on PSP IP version` | Ce Sun, amd-gfx (10-22) | **Rejected — would regress this machine.** The new switch has cases for 13.0.6/12/14, 13.0.15 and 15.0.8 but **not 14.0.0**; `psp_ip_version` here is `14.0.0`, so the default path returns `NULL` and RAS EEPROM would be disabled |
+| `mm/zswap: distinguish incompressible pages from compressor failures` 1–2/2 | Suseendran Bhaskaran, linux-mm (10-21) | **Rejected — maintainer objection.** Yosry Ahmed: issue 1 "is completely fixed by patch 1, so it doesn't belong here", and the store-on-failure behaviour in issue 2 was intentional in `dca4437a5861`. The 2/2 also conflicts with the LRU-MARIE `#ifdef` block in our `zswap_compress()` |
+| MES queue-reset series 1–3/3 | Amber Lin, amd-gfx (10-21) | **Watch.** Adds an `xcp` argument for compute partitioning; no `Fixes:`, no review, feature-oriented. `gfx_v12_0.c` is on-target, but this is not a fix for this machine's single-XCC Navi 48 |
+| `rework amdgpu open() path to function in sleep state` v2 1–3/3 | Shahyan Soltani, amd-gfx (10-21) | **Watch — feature.** Power-efficiency rework of open/close/VM validation; not a fix and not reviewed |
+| `nvme-pci: shut down the controller if disabling the HMB fails on suspend` | nvme list (10-22) | **Rejected — inert.** HMB is for DRAM-less controllers; the Phison E16 has its own DRAM |
+| `PCI: Ignore Immediate Readiness on Samsung PM9D3a NVMe` | PCI list (10-21) | **Rejected — wrong device.** The NVMe is a Phison E16 |
+| `nvmet: prevent double-free after metadata SGL allocation failure`, nvme dma-buf fixes | nvme/block lists (10-21..10-22) | **Rejected — target-side or unused.** This machine is an NVMe host and does not use the new dma-buf passthrough |
+| `kernfs: do not hold of->mutex across sysfs ->store()` + autofs | fsdevel (10-21) | **Out of target scope.** A real lock-cycle fix, but kernfs/sysfs churn is not this machine's bottleneck; the 7.4 Meta scalability series is likewise a 7.4 item |
+| `mm/huge_memory: take a reference on a folio PUD copied by fork`, `mm/rmap: duplicate a PMD mapping ...` v4 | Konstantin Khorenko, linux-mm (10-21) | **Rejected — inert.** The PUD path is device-DAX only; the rmap helper has no caller until the next patch in that series |
+| `io_uring/futex` persistent-wait RFC, `x86/mm` shadow-stack RFC | lkml (10-21) | **Rejected — RFCs.** No merged content |
+| `cpufreq: schedutil: Serialize sugov_start() against rate limit updates` | Hui Su, merged `ce390caf5541` | **Optional.** Applies cleanly to the rc and is in the preview base, but the running governor is `performance`; the race is inert while schedutil is not selected |
+| `cpufreq/amd-pstate: Fix TOCTOU when changing driver mode via sysfs` | Mario Limonciello, merged `b667a6809171` | **No action.** Already in the preview base. The rc series takes `amd_pstate_driver_lock` before reading `mode_state_machine`, so the pre-lock read the fix removes is not present; the patch fails on the rc tree for that reason |
+| SMU 14.0.2 OD, DCN36, `gfx_v12_1`, `nbio_v6_3_2`, `jpeg_v4_0_3`, VF-only RAS fixes | amd-gfx (10-21..10-22) | **Rejected — wrong chip, wrong IP or VF-only.** Running blocks confirmed from the journal: `psp_v14_0_0`, `smu_v14_0_0`, `gfx_v12_0_0`, `sdma_v7_0_0`, `vcn_v5_0_0`, `mes_v12_0` |
+
+### Reverts, drops and NAKs — none
+
+A normalized-subject match against every `Revert "…"` commit since 2026-01-01
+in all nine trees produced one hit: `2046`. It is **our own carried revert**
+(`Revert "nvme-pci: clamp max_hw_sectors based on DMA optimized limitation"`,
+Christoph Hellwig), and it has now merged upstream through
+`nvme-7.4-2026-10-15`; the preview dropped it as absorbed. No carried work was
+reverted. A `Nacked-by:`/rejection scan over the 13 mailing-list mirrors since
+2026-09-15 matched no carried subject.
+
+### Tracker
+
+20 open `drm/amd` issues moved since 10-21. The on-target ones are reports, not
+fix commits: `#6017` (RX 9070 XT page-flip EINVAL), `#6014` (Navi 48 HDMI 2.1
+FRL not trained on an LG OLED), `#6011` (7.3 flicker on RX 7700 XT), `#6003`
+(GPU-written userptr pages never marked dirty — HMM discussion continues),
+`#5380` (RX 9060 XT DCN 4.0.1 transition; James Lin's diagnostic patch works but
+is not posted upstream) and `#5999` (RX 9060 XT freeze on unlock). No new fix
+commit to carry.
+
+### Phoronix triage
+
+| Article | Actual content | Verdict |
+|---|---|---|
+| Linux 7.4 Kbuild | Lorenzo Stoakes' series merged as `kbuild-7.4-1` (`bb29b957eaaa`); this **is** the series we carry as `2302`–`2321` | Carried. The merged v4 is in the preview base. The rc's v3 misses the `sorttable` fix (recommended above) and the objtool DWARF patch (7.4-base); the `.modinfo` keep/align follow-ups are inert under this config (no `CONFIG_LD_DEAD_CODE_DATA_ELIMINATION`, only `LTO_CLANG_THIN`) |
+| Linus kills `__get_user`/`__put_user` | `x86/uaccess: Remove __get_user() and __put_user()`, merged `22a78a25438d` (10-21) | No impact. No carried patch calls either helper; the earlier matches in `21xx` were `__get_user_pages()` |
+| Linux 7.4 crypto library | `libcrypto-for-linus` (`95615dd9ff28`); x86 AES moves into `lib/crypto` | No carry — a 7.4 feature/refactor, not a fix. Note AES is on the LUKS path, so the 7.4 bump may show a gain |
+| Linux 7.4 sync close files | VFS `sync_close` (`f47d223627f8`), close_range/exec/exit close inline | No carry — 7.4 VFS perf/behaviour change, outside the target set |
+| Linux 7.4 kernfs scalability | VFS `kernfs` pull (`0ddc887102d8`), Shakeel Butt's 18 patches | No carry — 7.4 cgroupfs/sysfs scalability, outside the target set |
+| Coredump sockets sparse | VFS `coredump` pull (`ada21d495cce`), `COREDUMP_SPARSE` | No carry — 7.4 feature |
+| Reading page cache without a folio ref | Kiryl Shutsemau's RFC reworking Linus' series; **not merged** | Watch only. It is an RFC and would interact with the LRU-MARIE read path |
+
+### Housekeeping
+
+`sleepy-next/patches/` holds **138** files against **131** `source=()`
+entries: `1008`, `1012`, `1013`, `1014`, `1017`, `9040` and `9060` are orphaned
+files (their gaps are intentional and must not be renumbered). A
+`patch-cleanup` pass should remove them; nothing was deleted in this sweep.
+
+### Recommended follow-up — all resolved the same day
+
+1. Refreshed **`1098`** to v3 in both packages.
+2. Added the **`sorttable: parse nm output correctly`** fix to the rc as
+   **`2322`**.
+3. Added the **SPM VMID wait/deadlock fix** to the preview only as **`1308`**.
+4. **`9088`** needed no change: the carried `sdma_v7_0` hunk already has the v4
+   form.
+5. The remaining kbuild v4 deltas stay deferred to the 7.4 bump.
+
+## Follow-up 2026-10-22 — adoption and the `next-20261022` bump
+
+### Adopted
+
+| Number | Packages | Source | Change |
+|---|---|---|---|
+| `1098` v3 | both | Jesse Zhang, amd-gfx `<20261022024407.4187271-1-Jesse.Zhang@amd.com>` | Replaces the v1 special case with the v2/v3 rework: the user fence is accepted only when the BO's preferred or allowed domain is exactly GTT, and userptrs are detected with `amdgpu_ttm_tt_is_userptr()`. Christian König replied to v3 asking that the `Fixes:` claim be replaced by `Cc: stable` (the bug predates the blamed commit) and added `Reviewed-by`; the carried file keeps the original trailers. |
+| `2322` | rc | merged `4719513c0fa2`, Lorenzo Stoakes, kbuild v4 04/22 | `sorttable: parse nm output correctly`, the prerequisite for the carried `2305`. The preview base already has it. |
+| `1308` | next | Jesse Zhang, amd-gfx `<20261022024343.4187095-1-Jesse.Zhang@amd.com>` | SPM VMID wait/deadlock fix; preview only, because the rc base lacks the `_spm` rework and the bug does not exist there. |
+
+`1099` v3 (10-22) is content-identical to the carried v2 — zero changed lines —
+so the file is unchanged and the post is recorded as a resend.
+
+### Bump
+
+`sleepy-next/PKGBUILD` moves `_srctag` to `next-20261022` and the snapshot URL
+with it. Cumulative `audit_series.py` results after the additions:
+
+| Package | Base | Series | Result |
+|---|---|---|---|
+| sleepy-next | `next-20261022` `bd1ecbb61afe` | 132 | 132/132 clean |
+| sleepy-rc | `v7.3` `c03c1a14507d` | 290 | 290/290 clean |
+
+`updpkgsums` was run in both packages.
+
+### New since the mid-day pass
+
+| Item | Verdict |
+|---|---|
+| CAKE fixes in the 1022 base: `widen buffer_used to u64`, `serialize reconfiguration with the datapath`, `reduce parent backlog when clearing a tin`, `drop dead nla_nest_end()` (`dc48c97e7c69`, `d23a16d907dc`, `d7010be1ba23`, `700b4c6c70d6`) | **Preview absorbs; rc defers.** They are net-next 7.4 commits with no `Fixes:` or `Cc: stable`; the 7.4 bump picks them up. They apply cleanly to v7.3 if a future sweep decides to carry them early. |
+| `r8169: clear TX LPI on RTL8168h at link up after phylink conversion` (`f71ff7d40652`) | **No carry.** `RTL_GIGA_MAC_VER_46` is the RTL8168h/8111h path; this machine's NIC is the RTL8125B. The 7.3 rc has no phylink conversion, so the bug does not exist there; the preview gets the fix from its base. |
+| `drm/scheduler: signal fences of jobs pushed to a stopped entity` (Olivier Kaloudoff, dri-devel 10-22) | **Rejected — maintainer NAK.** Christian König: the patch "makes things even worse"; a stopped entity is the driver's bug, to be fixed in amdgpu's hot-remove path, not in the shared scheduler. It applies cleanly to both bases, which is exactly what makes it a trap. |
+| `cpufreq: CPPC: Enable boost by default when supported` v2 (Huawei, 10-22) | **Rejected — inert.** It patches the generic `cppc_cpufreq` driver; this machine runs `amd_pstate`, and `CONFIG_CPUFREQ_CPPC` is not set. |
+| `tick/nohz: Reevaluate the tick for kicks flushed outside hardirq` v2 (10-22) | **Rejected — inert.** `CONFIG_NO_HZ_FULL=y`, but no CPU is in the `nohz_full` mask at boot (no `nohz_full=` parameter), so the kick path never runs. |
+| `nvme-pci: shut down the controller if disabling the HMB fails on suspend` (10-22) | **Rejected — inert.** HMB is a DRAM-less-controller feature and the Phison E16 reports none; the author compile-tested only. |
+| `drm/amdgpu: add GFX engine reset support for GFX11/GFX12` v2 15/15 (Jesse Zhang, 10-22) | **Watch — feature series.** `gfx_v12_0` is on-target, but this is a new reset path that depends on the userq rework, not a fix. Revisit when it lands in a snapshot. |
+| `[RFC PATCH] drm/amdgpu/gfx12: Add SPM interrupt source plumbing` (10-22) | **No action — RFC.** |
+| SMU 15.0.8 metrics, DCN2 seamless boot, DCN3.2 OD_MCLK, `gfx_v12_1`, VF/SR-IOV SPM, radeon VCE posts (10-22) | Wrong IP, wrong chip or VF-only. |
+
+Phoronix's 7.4 scheduling article (Vincent Guittot's EEVDF short-slice update,
+up to 55% lower latency) is inert here: BORE owns `fair.c`, so EEVDF hunks land
+in the dead path.
+
+### Reverts and tracker, re-checked
+
+The revert scan over all nine trees and 13 mirrors for 10-21..10-22 found no new
+revert of carried work. `2046` remains the only match: our own nvme clamp
+revert, now upstream and absorbed by the preview. The two userq eviction-fence
+reverts posted 09-17 are still unmerged, so `1065`/`1066` stay.
+
+Twenty-six `drm/amd` issues moved since 10-21. The on-target ones are reports,
+not fix commits: `#6017`, `#6014`, `#6011`, `#6003`, `#5999`, `#5380` and
+`#6012` (DPIA/MST s2idle; the reporter says a patch was submitted to amd-gfx,
+but it is not visible in the mirror yet). No new fix commit to carry.
+
+### Housekeeping
+
+`sleepy-next/patches/` now holds 139 files against 132 `source=()` entries; the
+same seven orphans remain (`1008`, `1012`, `1013`, `1014`, `1017`, `9040`,
+`9060`) and still need a `patch-cleanup` pass. `sleepy-rc/patches/` holds 290
+files against 290 entries.
