@@ -1,0 +1,55 @@
+From: Jesse Zhang <Jesse.Zhang@amd.com>
+Date: Fri, 23 Oct 2026 18:12:34 +0800
+Subject: [PATCH 3/3] drm/amdgpu: wait for the GEM_VA input fences interruptibly
+Message-ID: <20261023101246.937830-3-Jesse.Zhang@amd.com>
+
+GEM_VA waits for the fences of its input syncobjs uninterruptibly. Those
+are provided by userspace and can take arbitrarily long to signal, and
+while waiting the task can't even be killed.
+
+On navi31, with a sw_sync fence as
+input fence, the task stays in D state after SIGKILL until the fence is
+signaled. Holding the fence for 260s on the latter, the hung task
+detector complains:
+
+  INFO: task va_infence_kill:17316 blocked for more than 120 seconds.
+  task:va_infence_kill state:D stack:0     pid:17316 tgid:17316 ppid:17315
+  Call Trace:
+   __schedule+0x44f/0x1960
+   schedule+0x2e/0x100
+   schedule_timeout+0xee/0x100
+   dma_fence_default_wait+0xe0/0x260
+   dma_fence_wait_timeout+0xaf/0x1b0
+   amdgpu_gem_va_ioctl+0x3aa/0x940 [amdgpu]
+   drm_ioctl_kernel+0xac/0x110 [drm]
+   drm_ioctl+0x2c6/0x5b0 [drm]
+   __x64_sys_ioctl+0xa0/0xf0
+
+Wait interruptibly and return the error, nothing has been changed yet at
+that point, so the ioctl can simply be restarted.
+
+Fixes: 38c67ec9aa4b ("drm/amdgpu: Add input fence to sync bo map/unmap")
+Signed-off-by: Jesse Zhang <Jesse.Zhang@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
+index c982d102614e..29960d932e75 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
+@@ -77,10 +77,11 @@ amdgpu_gem_add_input_fence(struct drm_file *filp,
+ 		if (ret)
+ 			goto free_memdup;
+ 
+-		dma_fence_wait(fence, false);
+-
+ 		/* TODO: optimize async handling */
++		ret = dma_fence_wait(fence, true);
+ 		dma_fence_put(fence);
++		if (ret)
++			goto free_memdup;
+ 	}
+ 
+ free_memdup:
+

@@ -18,6 +18,54 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.10.23-1-sleepy-next (linux-next `next-20261023`)]: 2026-10-23
+
+Preview bump from `next-20261022` to `next-20261023`, one day of linux-next.
+The 167-commit delta is parisc, tpm, smb, ocfs2, stackdepot and one `nvme-pci`
+dma-buf change. It changes no AMD target file, so no carried patch was absorbed
+or rebased.
+
+### Changed — series moves to 135 patches
+
+Three amd-gfx fixes from Jesse Zhang are added to both packages:
+
+- `1309` — `gfx12: flush the scratch register write in the ring test`
+  (`Reviewed-by: Lijo Lazar`). The posted `0xCAFEDEAD` write can lose the race
+  with the CP's `0xDEADBEEF`; measured 39/10000 false ring-test failures on
+  Navi 48, each escalating recovery to a full GPU reset.
+- `1310` — sign extend the addresses `GEM_OP(GET_MAPPING_INFO)` returns.
+- `1311` — wait for the `GEM_VA` input fences interruptibly.
+
+The same series' 2/3 is already carried as `9035`. The sweep's rejected and
+deferred candidates are in `sleepy-rc/PATCH_SOURCES.md`.
+
+### Verification
+
+Cumulative audit **135/135** against `next-20261023`. Package
+`linux-sleepy-next-2026.10.23-1` (22 MB) and headers (34 MB) built. The
+extracted `vmlinux` carries `.BTF` and `.BTF_ids`; `tcp_bbr3` is built and the
+old `tcp_bbr` is not. Installed with a rebuilt initramfs; the systemd-boot
+default entry `linux-sleepy-next.conf` points at it.
+
+## [7.3.0-5-sleepy-rc (Linux 7.3)]: 2026-10-23
+
+A patch-only refresh; the base stays at `v7.3`. The series moves from 290 to
+293 patches and the package is rebuilt at `pkgrel=5`.
+
+### Added — `1309`–`1311`
+
+The same three amd-gfx fixes as the preview: the gfx12 ring-test MMIO
+read-back (`Reviewed-by: Lijo Lazar`), the `GEM_OP` mapping-address sign
+extension, and the interruptible `GEM_VA` fence wait.
+
+### Verification
+
+Cumulative audit **293/293** against `v7.3`. Package
+`linux-sleepy-rc-7.3.0-5` (22 MB) and headers (33 MB) built. `.BTF` and
+`.BTF_ids` are present; `tcp_bbr3` is built and the old `tcp_bbr` is not. The
+built-in cmdline keeps `amdgpu.dcdebugmask=0x800`. Installed side by side with
+the preview and a rebuilt initramfs.
+
 ## [2026.10.22-1-sleepy-next (linux-next `next-20261022`)]: 2026-10-22
 
 Preview bump from `next-20261021` to `next-20261022`, one day of linux-next.

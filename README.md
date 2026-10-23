@@ -8,7 +8,7 @@ Two packages share one patch series:
 | Directory | Package | Base |
 |---|---|---|
 | [`sleepy-rc/`](sleepy-rc/) | `linux-sleepy-rc` | mainline **`v7.3`** |
-| [`sleepy-next/`](sleepy-next/) | `linux-sleepy-next` | linux-next snapshot **`next-20261022`** |
+| [`sleepy-next/`](sleepy-next/) | `linux-sleepy-next` | linux-next snapshot **`next-20261023`** |
 
 They are deliberately installable **side by side**: each sets its own
 `_pkgsuffix`, which drives both `pkgbase` and the kernel release, so the module

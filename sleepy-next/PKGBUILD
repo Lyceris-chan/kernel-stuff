@@ -182,9 +182,9 @@ pkgbase="linux-$_pkgsuffix"
 # snapshot DATE rather than by whichever mainline rc it happened to be cut
 # from. `_srctag` is defined first because pkgver is derived from it — a bump
 # that moves the tag but not the version is not possible.
-_srctag=next-20261022
+_srctag=next-20261023
 _srcname=${_srctag}
-_snapdate=${_srctag#next-}                                            # 20261022
+_snapdate=${_srctag#next-}                                            # 20261023
 # Dotted (2026.10.09), and that is NOT cosmetic. Both tools that consume the
 # release string require it to BEGIN with dotted decimal notation:
 #
@@ -280,7 +280,7 @@ _nv_ver=610.43.02
 _nv_pkg="NVIDIA-Linux-x86_64-${_nv_ver}"
 _nv_open_pkg="NVIDIA-kernel-module-source-${_nv_ver}"
 source=(
-  "https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261022.tar.gz"
+  "https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261023.tar.gz"
   "config"
   "patches/0001-0049/0001-drm-amd-pm-Fix-typo-in-smu_v14_0_set_irq_state.patch"
   "patches/0001-0049/0002-drm-amd-pm-Fix-memory-leaks-in-smu_v14_0_fini_smc_ta.patch"
@@ -342,6 +342,9 @@ source=(
   "patches/1300-1399/1306-drm-amdgpu-dont-set-queue-priorities-for-kernel-queues.patch"
   "patches/1300-1399/1307-gpu-buddy-do-not-pass-caller-list-to-alloc-contig-try-harder.patch"
   "patches/1300-1399/1308-drm-amdgpu-dont-wait-for-the-SPM-VMIDs-jobs-under-the-VMID-manager-lock.patch"
+  "patches/1300-1399/1309-drm-amdgpu-gfx12-flush-the-scratch-register-write-in-the-ring-test.patch"
+  "patches/1300-1399/1310-drm-amdgpu-sign-extend-the-addresses-GEM_OP-GET_MAPPING_INFO-returns.patch"
+  "patches/1300-1399/1311-drm-amdgpu-wait-for-the-GEM_VA-input-fences-interruptibly.patch"
   "patches/2000-2099/2000-block-mq-deadline-pass-in-queue-directly-to-dd_inser.patch"
   "patches/2000-2099/2001-block-mq-deadline-skip-expensive-merge-lookups-if-co.patch"
   "patches/2000-2099/2002-block-bfq-pass-in-queue-directly-to-bfq_insert_reque.patch"
@@ -1113,7 +1116,7 @@ for _p in "${pkgname[@]}"; do
     }"
 done
 
-b2sums=('38d20c7e8cc9d06fcd939625a15f0cb7a6c6f9b3c454f109c007cf94cc77cf381303c4dc43fa13bc1a0d86ec549954e9c79b8bdc127a97399c0a0ed7e375c993'
+b2sums=('f2397ac48cea0d4f36ba453cb6557f15ee82c580a472374be4bcdf93b67d5d7563b9b7e403c90a732c104345e0202ad8ee41d61e1d60d4135f52646be944f8e1'
         '7517360503c9da93f405b810c81a7f1f2c8ca21a704f8251f62c400723f99bd9c14b8cb851c8f36663f412f9865cde759a3a10313e605e6172322bdfa12f6f38'
         'ff25ac7c89880886b454064ba57bd1196fb747cb80c7663d7981006cc603151aee075ebe1b49b1a92866ad2a212d1e599ce622f63bfd140ad64d37b463c17aad'
         '0806d7b3b8e4e9044c14843fc53255ff92b12aaf3b8e0d0490bbf6266aaa6b01872476ce34a65c5b694cda9a1d82e84a38df16dbb9c798ae9aa6d1c9097b32aa'
@@ -1175,6 +1178,9 @@ b2sums=('38d20c7e8cc9d06fcd939625a15f0cb7a6c6f9b3c454f109c007cf94cc77cf381303c4d
         '19c4a2368507ea7002c1bbd795c8395598b96770e5338771c1b67de9d99a7fb50f9ccc531005c6ce727b7baf74910b5f6f310c27ac9208b77da20537351463be'
         'ac0ee32adc942b84af50a5d1e12a96d181caeba39e02d191f965aef25364f802fb64013a16655d5748fb091b933232794845a2c8018ebaa51c5b07ef2b59f31d'
         '884718a4fbae6daeafdc21d4faf60916e49032613ca8c4d78cdc27301650d4fa1af7fc286b4f125c1a41a13ff4f7cf11dcb846e6e22aec88227441b8f23ddfaf'
+        '2b80faf3869bd80cd43f649bc0ab502a9777d4323fa520b7597853065c4c2069a165a73a85451894707406f33489bae01addbaeb0ca40c870e4840280d8b7a9c'
+        'ecd1ddd21c0d7793bed08324a4f8daf32ad83da730d8de84b9cd0a1f4d7405be08b679c3369fb0a5ef87674035aa9aeb0f10f2017e019206d239338788f4ec90'
+        'ef3a1bec01495f875254332367e70a1425258628273e3ed7f8b276d0a9045617138997713593a7f8f573b89f18b26ae29a9f413ee1efbdb73798c71d65e514ac'
         'c20b3b791715d02756742bfa34f4921bcaebeee62edf079fe15c89afdc11451a2656122f4f21335cd116676ff69c3b7eee80c6adfdcbfe838c0f1e9012ce0428'
         'df68cfd344b37cae25fa446c82c5897510de23c55761570969dc5a6f2a5bf4c11b31e50c1670a18bef1065af6597e72e0ed839e8fdbc0328cf2dcf34484e5758'
         '8bff27696075ec53ca042b0c9e0deae345712e652b3b66bab1da82c4deefdf35533d04c00d59de70cbf968380236131bc819e0eeaa8aa40edfd84df3bd0972ef'

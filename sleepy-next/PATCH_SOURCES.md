@@ -15,11 +15,11 @@ moved, so the full ledger is not duplicated here.
 
 | | |
 |---|---|
-| Snapshot | `next-20261021`, tag `2ca9a319abef` (tip `9a482184d910`) |
-| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261021.tar.gz` |
+| Snapshot | `next-20261023`, tag `77cb3534193b` (tip `20a33c6b6cbe`) |
+| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261023.tar.gz` |
 | Snapshot tree `Makefile` | `7.3.0` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.10.21-1-sleepy-next` |
-| Package | `linux-sleepy-next-2026.10.21-1` |
+| Kernel release | `2026.10.23-1-sleepy-next` |
+| Package | `linux-sleepy-next-2026.10.23-1` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -872,3 +872,34 @@ both covered in `sleepy-rc/PATCH_SOURCES.md`.
 The full triage, including the rejected candidates and the seven orphaned
 patch files on disk, is in the 2026-10-22 sweep in
 `sleepy-rc/PATCH_SOURCES.md`.
+
+## Sweep 2026-10-23 — bumped to `next-20261023`; `1309`–`1311`
+
+`_srctag` is now `next-20261023` (`20a33c6b6cbe`, tag `77cb3534193b`, cut
+10-23 16:23 +0100) and the series is **135 patches**, applying **135/135**
+with the cumulative audit. The 1022→1023 delta is 167 non-merge commits
+(parisc, tpm, smb, ocfs2, stackdepot, one `nvme-pci` dma-buf change); **no AMD
+target file changed**.
+
+Three patches were adopted for both packages in the same session, all from
+Jesse Zhang on amd-gfx:
+
+- `1309` — `gfx12: flush the scratch register write in the ring test`,
+  `Reviewed-by: Lijo Lazar`. Five lines in `gfx_v12_0.c`; stops a measured
+  39/10000 false ring-test failure on Navi 48 that escalates to a full GPU
+  reset.
+- `1310` — sign extend the addresses `GEM_OP(GET_MAPPING_INFO)` returns.
+- `1311` — wait for the `GEM_VA` input fences interruptibly.
+
+The same series' 2/3 (`parse CS IBs at the BO offset their VA mapping starts
+at`) is already carried as `9035`; its forward dry-run fails only because the
+carried line is `kptr += m->offset + …`, and the identifier probe shows the
+change is present.
+
+Preview-specific state is unchanged: `1307` (gpu/buddy) and `1308` (SPM VMID)
+remain preview-only. The base already carries AMD's own HDMI FRL timeout pair
+(`7f8585e6b79e`, `378e09642326`), so the external 300 ms patch is not carried
+here; the rc base lacks both and keeps `1168`.
+
+The full sweep — version pass, rejected candidates, revert scan, tracker and
+Phoronix triage — is the 2026-10-23 section in `sleepy-rc/PATCH_SOURCES.md`.

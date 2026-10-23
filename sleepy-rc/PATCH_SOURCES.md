@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
 - **Base:** Linux `v7.3`
-- **Series:** 289 patches
+- **Series:** 293 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -22,7 +22,7 @@ are supplied by the generator instead, so every row below has a source.
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 30 |
-| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 7 |
+| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 10 |
 | `1100–1199` | AMD display (DCN4, colorops) | 30 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 27 |
 | `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 43 |
@@ -37,7 +37,7 @@ are supplied by the generator instead, so every row below has a source.
 | `9000–9099` | agd5f staging + userq lifecycle backports | 36 |
 | `9100–9199` | Retry-fault handling v4 (agd5f staging) | 11 |
 
-**Total: 289** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 293** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-19). The counts are now generated from the patch tree
@@ -10353,3 +10353,122 @@ but it is not visible in the mirror yet). No new fix commit to carry.
 same seven orphans remain (`1008`, `1012`, `1013`, `1014`, `1017`, `9040`,
 `9060`) and still need a `patch-cleanup` pass. `sleepy-rc/patches/` holds 290
 files against 290 entries.
+
+## Sweep 2026-10-23 — `next-20261023`; three carries (`1309`–`1311`)
+
+The daily all-source pass ran against sources refreshed to the 10-23 evening.
+The preview moves to `next-20261023` in the same session. All 135 preview
+patches and all 293 rc patches apply to their bases with the cumulative audit.
+
+### Source state
+
+| Source | State | Delta |
+|---|---|---|
+| torvalds | `734bef548a96` (10-22) | 7.4 merge-window material; no AMD or target commit |
+| linux-next | **`next-20261023`** `20a33c6b6cbe`, tag `77cb3534193b` (cut 10-23 16:23 +0100) supersedes `next-20261022` `bd1ecbb61afe` | The 1022→1023 delta is 167 non-merge commits: parisc, tpm, smb, ocfs2, stackdepot and one `nvme-pci` dma-buf change. **No AMD file changed.** |
+| drm-next | `fad06cfaf385` (10-21), unchanged | no AMD commit |
+| agd5f / amd-staging | `77f548b127c6`, unchanged | — |
+| drm-misc | `gitlab/drm-misc-next` `cf61bef3801c` (10-22) | `accel/amdxdna` NPU work only |
+| linux-pm | `origin/linux-next` `028374da13e7` (10-16), unchanged | — |
+| akpm-mm | `mm-everything` `c908b9c24b3e` (10-22) | ocfs2, stackdepot, hugetlb mremap/PMD-sharing fixes. No `mm/swap`, zswap or LRU commit |
+| tip | `ca46e0d235bc` (10-23) | `x86/cpuid` function 0x23 indexing, rust, btusb; nothing on-target |
+| lore mirrors (16) | refreshed; newest mail 10-23 18:14 +0100 | `lore-stable` (2022) and `lore-rust-for-linux` (09-24) remain stale |
+| CachyOS | unchanged | branches last moved 10-06..10-09 |
+| sirlucjan | `7275a4ad` (10-20), unchanged | — |
+| firelzrd | unchanged | MARIE `1.0.0-rc1` and BORE `7.0.0` remain the carried revisions |
+| linux-tkg | unchanged (09-07) | not used by this machine |
+
+The one `nvme-pci` change in the 1023 base is `detach dma-bufs only on
+removal` (`fd13f31ac62a`), part of the new dma-buf passthrough work and inert
+here: this machine uses the Phison E16 as a plain NVMe host.
+
+### Version sweep — resends only, no updates
+
+A normalized-subject pass over every mirror since 2026-08-01 reproduced the
+known higher-version hits recorded in the 2026-10-22 sweep; none is new and
+none changes the carried content.
+
+| Carried | Posting | Verdict |
+|---|---|---|
+| `1099` v2 | v3 3/3, amd-gfx (10-22) | Resend; zero changed lines. No file change |
+| `1301` | Reposted 10-23 13:17, `<20261023171722.46301-1-Apurv.Mishra@amd.com>` | **Identical content** — same blob index `8b96e1fe741a..1eb92ac6eb05`. Resend, not a revision |
+| `2051` | nvme list thread through 10-23 16:53 | Keith Busch: *"the principle … looks fine … I'll get this queued up"*. No v2; carried content stands |
+
+### New candidates
+
+| Candidate | Author, source | Verdict |
+|---|---|---|
+| `drm/amdgpu/gfx12: flush the scratch register write in the ring test` | Jesse Zhang, amd-gfx `<20261023063031.849579-1-...>`, `Reviewed-by: Lijo Lazar` | **Adopted as `1309`.** On Navi 48 the posted `0xCAFEDEAD` write can lose the race with the CP's `0xDEADBEEF`; measured 39/10000 false ring-test failures, each escalating recovery to a full GPU reset. Reads the scratch register back before the doorbell. Applies cleanly to both bases |
+| `drm/amdgpu: sign extend the addresses GEM_OP(GET_MAPPING_INFO) returns` 1/3 | Jesse Zhang, amd-gfx `<20261023101246.937830-1-...>`, `Fixes: 4d82724f7f2b` | **Adopted as `1310`.** Upper-half VA mappings were reported un-sign-extended, so userspace could not recreate or unmap them. Unreviewed at post time; self-contained and applies to both bases |
+| `drm/amdgpu: wait for the GEM_VA input fences interruptibly` 3/3 | Jesse Zhang, amd-gfx `<20261023101246.937830-3-...>`, `Fixes: 38c67ec9aa4b` | **Adopted as `1311`.** A userspace fence that never signals left the task unkillable in `D` state; now waited interruptibly and returned. Same series as `1310`; unreviewed, applies to both bases |
+| `drm/amdgpu: parse CS IBs at the BO offset their VA mapping starts at` 2/3 | Jesse Zhang, amd-gfx | **Already carried as `9035`** in both packages. The forward dry-run "fails" only because the carried line is `kptr += m->offset + …`; the identifier probe shows the change is present. No action |
+| GPU-reset 8-patch series (`VKMS` → `gmc11`) | Prike Liang, amd-gfx `<20261023083422.3049246-N-...>` | **Watch.** Lijo Lazar gave `Reviewed-by` on 5/8 and 7/8, but 2/8 still has his open question about TTM/SDMA during KFD resume and 6/8 is unreviewed. 1/8 is VKMS-only, 3/8 and 4/8 are UVD/VCE (not this silicon), 8/8 is `gmc11`. Revisit as a whole series |
+| `drm/amdgpu: reset dGPU on resume if it kept power across s2idle` | Maharshii Patel, amd-gfx `<20260924203756.2771789-1-...>` | **Rejected — not this SMU.** The description scopes the failure to SMU 13.0.0/7/10 and 14.0.2/3, which skip `smu_disable_dpms()` on suspend. This machine is `smu_v14_0_0`; the generic `smu_suspend()` in `amdgpu_smu.c:2176` calls `smu_disable_dpms()`. The patch would add an unneeded ASIC reset to every s2idle resume |
+| `drm/amdgpu: Ensure that harvest information gets set` | Kent Russell, amd-gfx, `Fixes: 3ee1065e9830` | **Rejected — probe-failure path.** It restores harvest data in the `ip_discovery` sysfs export used when probe fails. This GPU probes cleanly; no runtime effect |
+| `drm/amdkfd: Scope VOP3PX trap workaround to revision 0` | Jay Cornwall, amd-gfx | **Rejected — wrong chip.** `cwsr_trap_gfx12_1_0_hex` is selected only for `KFD_GC_VERSION >= IP_VERSION(12,1,0)`; this machine's GC 12.0 uses `cwsr_trap_gfx12_hex` |
+| `mm/zswap: validate dlen and normalize comp_ret on compression success` | Suseendran Bhaskaran, linux-mm, `Acked-by: Yosry Ahmed` | **Deferred.** Hunk 1 fails on the preview base and hunk 2 on the rc base: the carried LRU-MARIE `zswap_compress()` block changes the same function. The effect is an error-code accounting fix (`reject_compress_fail` vs `reject_compress_poor`), not a correctness bug here. Revisit with the next MARIE rebase |
+| `nvme-pci: disable accessible controller on error paths` | Eduard Zateev, nvme list, `Assisted-by: LLM` | **Rejected for now.** Unreviewed, and sashiko-bot flags a high-severity regression in the `nvme_reset_work()` dead-suspend path. The carried tree keeps the upstream behaviour until a v2 |
+| `blk-mq: reset queue state on scheduler teardown` | Jianan Huang, block list, `Assisted-by: LLM` | **Rejected.** Unreviewed, and it resets `nr_requests` and `async_depth` to `tag_set->queue_depth` for every queue on teardown, overriding driver defaults (NVMe sets its own `async_depth`). The failed-elevator-switch scenario is real but the reset is too blunt to carry without review |
+| io_uring: `kbuf` pickup head, `recvmsg` `MAX_RW_COUNT`, `register_blind` restrictions, `SOCK_TYPE_MASK` | io_uring list, 10-23 | **Deferred.** Four self-contained fixes, but none touches this machine's failure surface (bundled receive, 4 GiB buffer selection, io_uring sandbox restrictions). Two are `Assisted-by: ARTIST LLM` and unreviewed |
+| `drm/amd/display: Allow 300 ms for HDMI FRL link training at every rate` thread | Jerry Zuo (AMD), amd-gfx 10-23 | **No action.** AMD says the change is covered by `Fix HDMI2.2 LT timeout duration` (`7f8585e6b79e`) and `Adjust HDMI FRL LT timeout` (`378e09642326`). Both are in the preview base; neither is in `v7.3`, so rc keeps `1168` |
+| PMC v2 13-patch series, dma-buf import/mmap, CU bitmap, `drop async_gfx_ring`, jpeg type-4 version bump, SMU 15.0.8 board/NPM, `iommu/amd` PerfOpt | amd-gfx 10-22..10-23 | **Rejected — features, cleanups, wrong chip or APU-only.** None is a fix for this machine |
+
+### Reverts, drops and NAKs — none
+
+A normalized-subject match of every `Revert "…"` commit since 2026-06-01 in all
+nine trees against every carried patch produced **zero** hits. The recent
+reverts in the trees (sched/fair dead code, namei refwalk, enetc eMDIO, ath9k)
+do not touch carried work. A `Nacked-by:`/rejection scan over the 13
+mailing-list mirrors since 10-20 likewise matched no carried subject. The only
+open maintainer objection is Christian König's on the `vram_lost_counter` 1/3
+(he prefers initializing `vm->generation` to `~0UL`), and that series is not
+carried.
+
+### Tracker
+
+27 open `drm/amd` issues moved since 10-22. The on-target ones are reports, not
+fix commits: `#6010` (the DCN 4.0.1/Navi 48 INBOX0 deadlock, now with a second
+trigger — fullscreen VRR Gamescope close/restart), `#6017` (RX 9070 XT page-flip
+EINVAL), `#6026` (DP MST tiled audio NULL deref), `#6027` and `#5940`
+(brightness curves), and `#5380` (the 180 Hz ODM-combine blank; the diagnostic
+workaround is confirmed but still not posted upstream). `#6025` is Strix Point
+(GC 11.0.3), not this chip. No new fix commit to carry.
+
+### Phoronix triage
+
+| Article (10-23) | Actual content | Verdict |
+|---|---|---|
+| Linux 7.4 Fixes AMD CPU TLB Size Reporting For Zen 5 & Newer | Zen 5+ CPUID path | Not this CPU (Zen 4) |
+| Linux 7.4 Power Management Preps For AMD Ryzen Zen 6 | 7.4 amd-pstate work | Not this CPU; 7.4 material |
+| Linux 7.4 Workqueue 10–100× faster | 7.4 workqueue rework | Not a fix; 7.4 |
+| HPFS removal, oneDNN, OpenSSL, Vulkan, FFmpeg, LibreSSL, HID | unrelated | — |
+| Linux 7.4 PCI hibernation improvement | 7.4 PCI PM | Out of scope for the 7.3 base |
+| Kernel vulnerabilities posted to LKML | process story | No patch to carry |
+
+### Adopted
+
+| Number | Subject | Author | Source | Note |
+|---|---|---|---|---|
+| `1309` | drm/amdgpu/gfx12: flush the scratch register write in the ring test | Jesse Zhang | `<20261023063031.849579-1-Jesse.Zhang@amd.com>` | `Reviewed-by: Lijo Lazar`. `gfx_v12_0.c` is this machine's exact file; stops a measured 39/10000 false ring-test failure that escalates to a full GPU reset |
+| `1310` | drm/amdgpu: sign extend the addresses GEM_OP(GET_MAPPING_INFO) returns | Jesse Zhang | `<20261023101246.937830-1-Jesse.Zhang@amd.com>` | `Fixes: 4d82724f7f2b`. Restores the upper VA bits so a mapping returned by `GET_MAPPING_INFO` can be used with `GEM_VA`. Unreviewed |
+| `1311` | drm/amdgpu: wait for the GEM_VA input fences interruptibly | Jesse Zhang | `<20261023101246.937830-3-Jesse.Zhang@amd.com>` | `Fixes: 38c67ec9aa4b`. A never-signalling userspace fence no longer pins the task in uninterruptible sleep. Unreviewed |
+
+### Bump and verification
+
+`sleepy-next/PKGBUILD` moves `_srctag` to `next-20261023` and the snapshot URL
+with it; `pkgver` derives `2026.10.23`. Cumulative `audit_series.py` results:
+
+| Package | Base | Series | Result |
+|---|---|---|---|
+| sleepy-next | `next-20261023` `20a33c6b6cbe` | 135 | 135/135 clean |
+| sleepy-rc | `v7.3` `c03c1a14507d` | 293 | 293/293 clean |
+
+`updpkgsums` was run in both packages. Build and BTF results are recorded in
+`CHANGELOG.md`.
+
+### Housekeeping
+
+`sleepy-rc/patches/` holds 293 files against 293 entries.
+`sleepy-next/patches/` holds 142 files against 135 entries; the same seven
+orphans remain (`1008`, `1012`, `1013`, `1014`, `1017`, `9040`, `9060`) and
+still need a `patch-cleanup` pass.

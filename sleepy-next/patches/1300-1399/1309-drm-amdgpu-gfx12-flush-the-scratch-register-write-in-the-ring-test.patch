@@ -1,0 +1,49 @@
+From: Jesse Zhang <Jesse.Zhang@amd.com>
+Date: Fri, 23 Oct 2026 14:30:26 +0800
+Subject: [PATCH] drm/amdgpu/gfx12: flush the scratch register write in the ring test
+Message-ID: <20261023063031.849579-1-Jesse.Zhang@amd.com>
+
+The ring test writes 0xCAFEDEAD to SCRATCH_REG0 through MMIO, rings the
+doorbell for the CP to write 0xDEADBEEF with SET_UCONFIG_REG, and polls
+for the new value.
+
+Nothing orders the posted MMIO write against the CP's write: the
+doorbell reaches the CP on another path. With coarse grain clock gating,
+a GC register access from the host takes about 2 us, and an awake CP can
+execute the packet before the 0xCAFEDEAD write lands. The test then
+reads 0xCAFEDEAD forever and fails, although the ring consumed the
+packet (rptr == wptr).
+
+On Navi48, 39 of 10000 back-to-back compute ring tests failed this way.
+None failed when a GC register was read back after the write, or with
+CGCG disabled.
+
+Ring tests run on every queue, pipe and IP reset, and a false failure
+there escalates the recovery to a full GPU reset.
+
+Read the scratch register back before ringing the doorbell, as
+commit 3f69d5860f5b ("drm/amdgpu: Add a read to GFX v9.4.3 ring test")
+does for a similar race on gfx 9.4.3 with multiple XCCs.
+
+Signed-off-by: Jesse Zhang <Jesse.Zhang@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c b/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c
+index d334fb805020..184e009c8e50 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c
+@@ -458,6 +458,11 @@ static int gfx_v12_0_ring_test_ring(struct amdgpu_ring *ring)
+ 	int r;
+ 
+ 	WREG32(scratch, 0xCAFEDEAD);
++	/*
++	 * Read the value back so the posted write reaches the register before
++	 * the CP writes the test value; otherwise it can overwrite the result.
++	 */
++	RREG32(scratch);
+ 	r = amdgpu_ring_alloc(ring, 5);
+ 	if (r) {
+ 		drm_err(adev_to_drm(adev),
+
