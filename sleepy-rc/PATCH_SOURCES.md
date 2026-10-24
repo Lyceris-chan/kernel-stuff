@@ -10472,3 +10472,104 @@ with it; `pkgver` derives `2026.10.23`. Cumulative `audit_series.py` results:
 `sleepy-next/patches/` holds 142 files against 135 entries; the same seven
 orphans remain (`1008`, `1012`, `1013`, `1014`, `1017`, `9040`, `9060`) and
 still need a `patch-cleanup` pass.
+
+## Sweep 2026-10-24 — no `next-20261024`; nothing adoptable
+
+The daily all-source pass ran against sources refreshed to the 10-24 evening.
+Linux-next published no snapshot for 10-24: the tag list ends at
+`next-20261023`, and `releases.json` reports `next-20261023` (2026-10-23) as the
+newest linux-next. The preview therefore stays at `next-20261023` and no package
+version moves.
+
+### Source state
+
+| Source | State | Delta |
+|---|---|---|
+| torvalds | `5b0764a53235` (10-24 04:29 UTC) | 7.4 merge window: `drm-next-2026-10-21`, PCI, IOMMU, dma-mapping, VFIO, vhost and `mm-core-7.4-rc1` (which carries the `__get_user()`/`__put_user()` removal). The drm content was already in `next-20261023` through the drm-next tree; no AMD target commit follows it |
+| linux-next | **`next-20261023`** `20a33c6b6cbe`, tag `77cb3534193b` (cut 10-23 16:23 +0100) | no `next-20261024` on the remote or in `releases.json` |
+| drm-next | `fad06cfaf385` (10-21), unchanged | no AMD commit |
+| agd5f / amd-staging | `77f548b127c6` (10-20), unchanged | newest branch tips are 10-20; no branch moved |
+| drm-misc | `cf61bef3801c` (10-23) | `accel/amdxdna` only |
+| linux-pm | `7be4bc52fd9e` (10-21) | driver-core 7.4-rc1 merge; nothing on-target |
+| akpm-mm | `origin/mm-everything` `b381966ce9b0`, tag `mm-everything-2026-10-24-09-06` | new 10-23: a memcg `high_work_func()` NULL deref, five VMA soft-dirty fixes and profile read changes. The 10-22 zswap `validate dlen` candidate is unchanged and stays deferred |
+| tip | `3719f1da14c3` (10-24) | powerpc/irq, genirq/kexec, timekeeping, posix-cpu-timers; the x86/cpuid 0x23 change was already triaged |
+| lore mirrors (16) | newest mail 10-24 17:06 UTC | `lore-stable` (2022) and `lore-rust-for-linux` (09-24) remain stale |
+| CachyOS | unchanged | `7.3/base` 10-06, `7.3/fixes` 10-05, `7.3/zram` 10-09, `7.3/hdmi` 09-21 |
+| sirlucjan | `7275a4ad` (10-20), unchanged | — |
+| firelzrd | unchanged | MARIE `1.0.0-rc1` (`dba9daf`) and BORE `7.0.0` (`1e2f57ad`) remain the carried revisions |
+| linux-tkg | 10-24 cache refresh only | not used by this machine |
+| cachyos-kernel-patches | `89bb22de` (10-22) | NVIDIA runtime-D3 only |
+
+The 7.4 `__get_user()`/`__put_user()` removal is a bump watch, not a carry: no
+carried patch calls either helper, and the `__get_user_pages()` GUP series is
+unaffected.
+
+### Version sweep — resends only
+
+A normalized-subject pass over the 293 carried patches against the 16 mirrors
+since 10-22 returned 25 subject hits. Every hit is either at the carried
+revision or a repost the 10-22/10-23 pass already recorded as content-identical:
+`1098` v3, `1099` v3, `1301`, `1304`, `1309`–`1311`, `2051` and `1168` are
+replies or resends. No carried patch has an unadopted higher revision.
+
+### New candidates
+
+| Candidate | Source | Verdict |
+|---|---|---|
+| `drm/amd/display: revert vupdate_no_lock vblank consolidation` 0/3 (`c87e6635d2db` + follow-ups; gfx1201 white-noise, `#6004`) | Ava H, amd-gfx 10-18, `<51f6a2ae-…@gmail.com>` | **Watch.** No maintainer reply; `1/3` and `3/3` do not apply to `v7.3`, and a blanket revert of upstream display code needs AMD's blessing |
+| `Support queue reset on non-SPX mode` 0/3–3/3 | Amber Lin, amd-gfx 10-22 | **Rejected — non-SPX only.** This GPU runs SPX (one XCP): `1/3` is debug-only, `2/3` adds xcp plumbing and `3/3` sizes the buffer for multi-partition. No effect here; unreviewed |
+| `drm/amd/pm: use the VBIOS trained UCLK levels on the MacBookPro16,1` | Andre Eikmeyer, amd-gfx 10-24 | **Rejected — wrong chip.** `navi10_ppt.c`, Apple Navi 14 boards (`1002:7340/106b:020f`, `0210`) |
+| `nvme-pci: fix early boot hang with nvme.quirks=` and the 256-byte buffer | Maurizio Lombardi, linux-nvme 10-23; applied by Keith Busch to `nvme-7.4` | **Rejected — inert.** `CONFIG_BLK_DEV_NVME=m` and the cmdline passes no `nvme.quirks=`; the fix arrives with a future base |
+| GPU reset 8-patch series | Prike Liang, amd-gfx 10-23 | **Watch, unchanged.** No v2; `2/8` has an open TTM/SDMA question, `6/8` is unreviewed, and `3/4` and `8/8` target wrong silicon |
+| `mm: memcontrol: fix NULL pointer deref in high_work_func() on dying memcg` | linux-mm 10-23 | **Rejected — out of scope.** Generic memcg; this machine does not set `memory.high` |
+| five `mm/vma` soft-dirty fixes | linux-mm 10-23 | **Rejected — out of scope.** No target component |
+| eDP/LVDS native-mode fallback v2 | amd-gfx 10-24 | **Rejected — laptop panel.** This desktop has no eDP/LVDS |
+| PCI bus-number v2, PCI apple/rockchip/HV/NVIDIA, ath9k AER, netfilter SIP, mm/mempolicy, irqchip gic-v3, sched_ext 17-patch set, io_uring, zram rw_semaphore | various, 10-23/10-24 | **Rejected — off-target, inert, or feature work.** sched_ext is inert under BORE; zram is unused (zswap + swapfile) |
+
+### Reverts, drops and API removals
+
+No tree has a `Revert` commit since 10-23, and no `Revert` subject in the 16
+mirrors since 10-15 matches a carried patch except the `nvme-pci` clamp revert
+that is already carried as `2046` — upstream and the tree agree there. The one
+on-target proposal is the `vupdate_no_lock` series above, which reverts
+upstream display work rather than anything carried. Linux 7.4 removed BFS and
+the `__get_user()`/`__put_user()` helpers; neither is carried (BORE is the
+scheduler) and no carried patch calls the helpers.
+
+### Tracker
+
+27 open `drm/amd` issues moved since 10-23, plus one closed. The closed issue
+(`#5711`, Navi 31 firmware) and the new reports are either other silicon or
+carry no fix commit. The threads whose descriptions name this machine are
+reports: `#6028` (Navi 48 secondary DP lost after DPMS), `#6010` (DCN 4.0.1
+INBOX0 lock), `#6032` (RX 9070 sync flood after S3), `#6027`/`#6031` (HDR
+colour). `#5951`'s runtime-PM leak fix is now applied upstream (`agd5f`
+`7073b82adcaa`) and is already carried as `1174`. No new fix commit to carry.
+
+### Phoronix triage
+
+There are no 10-24 articles; the newest front-page section is 23 October.
+
+| Article | Actual content | Verdict |
+|---|---|---|
+| Linux 7.4 Graphics Driver Changes Headlined By AMDGPU HDMI 2.1 Features | 7.4 feature summary: FRL default, UALoE, NPU | Already in the preview base; not an rc fix |
+| Linux 7.4 Slab Updates; Linux 7.4 PCI; oneDNN; HPFS removal | 7.4 performance and features | Not a target fix |
+| Linux 7.4 Fixes AMD CPU TLB Size Reporting For Zen 5 & Newer | Zen 5+ CPUID | Not this CPU (Zen 4) |
+| Linux 7.4 Power Management Preps For AMD Ryzen Zen 6 | 7.4 amd-pstate | Not this CPU |
+| Linux 7.4 HID, EDAC, Kbuild, m68k, crypto | unrelated | — |
+| Linus eliminates unsafe `__get_user()`/`__put_user()` | 7.4 core API removal | Bump watch; no carried patch uses them |
+
+### Bump
+
+`next-20261024` does not exist. The linux-next tag list ends at
+`next-20261023` and `releases.json` reports `next-20261023` (2026-10-23) as the
+newest snapshot, so there is nothing to bump to. `sleepy-next` stays at
+`_srctag=next-20261023` (pkgver `2026.10.23`, pkgrel 1) and `sleepy-rc` stays
+at `7.3.0-5`. No build is needed; the installed kernel is the same package.
+
+### Housekeeping
+
+`sleepy-rc/patches/` holds 293 files against 293 `source=()` entries.
+`sleepy-next/patches/` holds 142 files against 135 entries; the same seven
+orphans remain (`1008`, `1012`, `1013`, `1014`, `1017`, `9040`, `9060`) and
+still need a `patch-cleanup` pass.
