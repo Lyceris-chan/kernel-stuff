@@ -18,8 +18,8 @@ moved, so the full ledger is not duplicated here.
 | Snapshot | `next-20261026`, tag `9269ad8f22bc` (tip `f1ac44c32cba`) |
 | Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261026.tar.gz` |
 | Snapshot tree `Makefile` | `7.3.0` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.10.26-1-sleepy-next` |
-| Package | `linux-sleepy-next-2026.10.26-1` |
+| Kernel release | `2026.10.26-2-sleepy-next` |
+| Package | `linux-sleepy-next-2026.10.26-2` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -904,36 +904,19 @@ here; the rc base lacks both and keeps `1168`.
 The full sweep — version pass, rejected candidates, revert scan, tracker and
 Phoronix triage — is the 2026-10-23 section in `sleepy-rc/PATCH_SOURCES.md`.
 
-## Sweep 2026-10-26 (second pass) — bumped to `next-20261026`; MARIE rebased
+## Sweep 2026-10-26 (second pass) — bumped to `next-20261026`; CAST v0.2.5 ported
 
 `next-20261026` was cut at 13:51 UTC (`f1ac44c32cba`, tag `9269ad8f22bc`),
-after the morning pass's 08:30 UTC refresh. `_srctag` is now
-`next-20261026` (pkgver `2026.10.26`, pkgrel 1), the series is **135 patches**
-and the cumulative audit is **135/135**.
+after the morning pass's 08:30 UTC refresh. `_srctag` is `next-20261026`
+(pkgver `2026.10.26`, pkgrel 2), the series is **135 patches** and the
+cumulative audit is **135/135**.
 
-The 1023→1026 delta is **722 non-merge commits across 320 files**, and it
-contains **no AMD or DRM change at all**: `drivers/gpu/drm/amd`,
-`drivers/gpu/drm/ttm` and `drivers/gpu/drm/scheduler` are identical between the
-two tags. The content is dominated by perf tooling, selftests, platform/x86,
-net, md, scsi and time. The only target-relevant files touched are
-`mm/zswap.c`, `mm/vmscan.c`, `kernel/sched/fair.c` and
-`drivers/nvme/host/pci.c`.
-
-**One rebase was required.** `2101` (LRU-MARIE 1.0.0-rc1) hunk 6 inserts the
-`entry->incomp = lru_marie_enabled()` marker after
-`comp_ret = comp_ret ? comp_ret : -EINVAL;` in `zswap_compress()`.
-next-20261026's `81c49e3a6848` ("mm/zswap: validate dlen and normalize
-comp_ret on compression success") removed that line and moved the validation
-into the `!comp_ret` block above. The hunk was rebased by dropping the
-now-absent context line. The inserted code, its placement (before `goto
-unlock;` in the rejection path), and its semantics are unchanged. **The
-preview copy of `2101` therefore differs from the rc copy by that one line of
-context — the only preview-only delta this bump.** The rc copy is untouched
-because the 7.3 base still has the removed line.
-
-**No other patch was dropped, skipped or regenerated.** The 7.4 merge-window
-`__get_user()`/`__put_user()` removals did not break any carried patch, and no
-symbol used by the series disappeared from the base.
+The first build of this bump (`2026.10.26-1`) still carried LRU-MARIE, with
+`2101` hunk 6 rebased for `81c49e3a6848` — the commit that removed the
+`comp_ret = comp_ret ? comp_ret : -EINVAL;` anchor in `zswap_compress()`.
+Later the same day the package moved to **lru_cast 0.2.5**, so that rebase is
+historical and `2101` is no longer carried here. The tag delta is unchanged:
+**722 non-merge commits across 320 files, no AMD or DRM file changed**.
 
 ### Version sweep — resends only, again
 
@@ -974,13 +957,61 @@ cache-aware-scheduling regression fix for the Zen 5 / Zen 5C Ryzen AI 9 HX 370.
 That fix is hybrid-asymmetric-packing-specific and EEVDF-side; this machine is
 an eight-core homogeneous Zen 4 running BORE, so it is inert here.
 
-### rc package — reclaim policy moved to lru_cast
+### Reclaim policy — both packages now carry lru_cast 0.2.5
 
-No new carry was adopted by the sweep. Later on 2026-10-26, however, the rc
-package replaced `2101` (LRU-MARIE) with **`2102` (lru_cast 0.2.0)**, Marie's
-successor: it applies to `v7.3` with zero offsets and zero fuzz. The preview
-**keeps `2101`** because CAST does not apply to `next-20261026`
-(`mm/migrate.c` and `mm/swap.h` hunks fail; `mm/page_io.c` needs fuzz 2). The
-rc package is now `7.3.0-7` (pkgrel 7, 294 patches, audit 294/294); the
-decision, compatibility evidence and swappiness policy are in
-`sleepy-rc/PATCH_SOURCES.md`.
+Later on 2026-10-26 the rc package replaced `2101` (LRU-MARIE) with
+**`2102` (lru_cast)**, Marie's successor, and the preview followed. The author
+shipped **v0.2.5** (`71c94c9`, 2026-10-27 00:18 +0900) while this was in
+progress — a substantial update (measured per-device refault cost, anon
+write-out cost, loop tie-breaking; the author's QEMU runs now show 0.28×
+MGLRU's swap-ins and 12% more throughput) — so both packages carry v0.2.5,
+not the v0.2.0 first evaluated.
+
+- **rc**: the author's `0001-7.3-rc7-lru_cast-v0.2.5.patch`, byte-identical,
+  zero offsets/fuzz on `v7.3`. `7.3.0-8`, 294 patches, 294/294.
+- **preview**: the same patch **ported to `next-20261026`**, 135 patches,
+  135/135. The port is recorded below.
+
+### The preview port — 7.3 patch → next-20261026
+
+The preview copy is the author's header plus a diff regenerated against
+`next-20261026`, so it applies with zero fuzz. **Every difference from the
+author's patch is listed here, with the upstream commit that forced it.** No
+CAST logic is added, removed or invented.
+
+| Adaptation | Why | Upstream evidence |
+|---|---|---|
+| `mm/migrate.c`: move the `lru_cast_migrate()` insertion to the start of `folio_migrate_flags()` | 7.4 replaced the reference-flag copy with `folio_migrate_lru_refs()` | the call is the author's, only its context moved |
+| `mm/swap.h`: declaration block next to `__swap_writeout()` | base function renamed | `a6479602b783` (`__swap_writepage` → `__swap_writeout`) |
+| `mm/page_io.c`: write-timing hooks after 7.4's dropbehind loop | base function restructured; `bio_associate_blkg_from_page` renamed | `48d54b07157c` (`_from_page` → `_from_folio`) |
+| CAST's private helper `__swap_writeout()` renamed `cast_swap_writeout()` | the rename above gave the base function that name; a static helper of the same name with a different signature cannot compile | `a6479602b783` |
+| `present_section_nr()` → `valid_section_nr()` | `SECTION_MARKED_PRESENT` removed; "present" folded into "valid" | `da7acb8982ed` |
+| `is_vm_hugetlb_page()` → `vma_is_hugetlb()` | renamed | `c911e7ebebf5` |
+| `PF_KSWAPD` dropped; `PF_MEMALLOC` kept | the flag was removed; `current_is_kswapd()` now checks the kthread function | `27517f701ff3` |
+| augmented rbtree: `RB_DECLARE_CALLBACKS(…, size, compute)` → `RB_AUG_FUNC(oone, size, oadd)` | the macro now declares per-field augmenters and generates the compute; the `1 + left + right` aggregate is expressed by `oone()`/`oadd()` | `c2c620f4345c` |
+| `VM_SPECIAL` → `VM_IO \| VM_DONTEXPAND \| VM_PFNMAP \| VM_MIXEDMAP` | the composite macro was eliminated; the explicit set is exactly its old definition | `72a993449cb0` |
+| direct `#include`s of `<linux/mm.h>`, `<linux/hugetlb.h>`, `<linux/mmzone.h>` | 7.4 removed transitive includes the 7.3 build happened to rely on | header hygiene, no code change |
+
+`lru_cast_tune_osize()` is kept although the new rbtree macro no longer calls
+it: `sim.c` uses it in its own size fix-up. `lru_cast_tune_ocompute()` is
+replaced by the macro-generated compute, which implements the same
+early-exit-on-unchanged test.
+
+A check for invented code: the port's diff against the author's patch yields
+only the rows above; every other added line is byte-identical to the author's
+added line. The rc copy is byte-identical to
+`0001-7.3-rc7-lru_cast-v0.2.5.patch` (sha256
+`288386b09f673d0d8d713d2398bb6c064145c063805946047a4d85bf53093ce3`).
+All touched objects (`mm/lru_cast/`, `mm/page_io.o`, `mm/migrate.o`,
+`mm/vmscan.o`, `mm/folio.o`, `mm/memory.o`, `mm/huge_memory.o`,
+`mm/memcontrol.o`, `mm/shmem.o`, `mm/rmap.o`, `mm/workingset.o`,
+`mm/page_alloc.o`, `mm/swapfile.o`, `mm/swap_state.o`, `mm/khugepaged.o`,
+`kernel/sched/core.o`) compile on `next-20261026` with the port. The full
+package built with Clang 23.1.4 and the installed kernel reports
+`lru_cast v0.2.5 by Masahito Suzuki` with `.BTF`/`.BTF_ids`. A line-set diff
+of the port against the author's patch yields only the rows above (and the
+author's email `-- ` separator, which is not code).
+
+`vm.swappiness` stays **1** in both packages: CAST's file-first promise, not
+the measured split. The compatibility evidence and swappiness rationale are
+in `sleepy-rc/PATCH_SOURCES.md`.

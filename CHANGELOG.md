@@ -18,6 +18,102 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.10.26-2-sleepy-next (linux-next `next-20261026`)]: 2026-10-26
+
+Reclaim-policy update: the preview replaces LRU-MARIE with **lru_cast 0.2.5
+(CAST)**, ported to this base, as patch `2102`. The rc package moved to the
+same release in `7.3.0-8`; both packages now run one policy. The snapshot and
+the 135-patch series are unchanged, and the cumulative audit is **135/135**.
+
+### Ported — the author's 7.3 patch applied to next-20261026
+
+The 7.3 patch does not apply as-is to the 7.4-merge-window code. Every change
+is a mechanical adaptation, each forced by a traceable upstream commit; an
+automated line-set diff against the author's patch shows no other differences:
+
+- `mm/migrate.c` — `lru_cast_migrate()` moves to the start of
+  `folio_migrate_flags()`, before 7.4's `folio_migrate_lru_refs()` call.
+- `mm/swap.h` — the handoff/kcompressd declarations move next to the renamed
+  `__swap_writeout()` (`a6479602b783`).
+- `mm/page_io.c` — the write-timing hooks go after 7.4's dropbehind loop;
+  `bio_associate_blkg_from_page()` became `…_from_folio()` (`48d54b07157c`).
+- CAST's private helper `__swap_writeout()` is renamed
+  `cast_swap_writeout()` because the 7.4 rename (`a6479602b783`) gave the base
+  function that name.
+- `present_section_nr()` → `valid_section_nr()` (`da7acb8982ed` — "present"
+  folded into "valid").
+- `is_vm_hugetlb_page()` → `vma_is_hugetlb()` (`c911e7ebebf5`).
+- `PF_KSWAPD` dropped from `kcompressd` (removed by `27517f701ff3`; the flag's
+  Intel-GPU workaround does not apply, and `current_is_kswapd()` now checks
+  the kthread function instead).
+- Augmented rbtree: the old `RB_DECLARE_CALLBACKS(…, size, compute)` becomes
+  `RB_AUG_FUNC(oone, size, oadd)` for the new per-field API
+  (`c2c620f4345c`); the generated compute keeps the same early-exit test.
+- `VM_SPECIAL` → `VM_IO | VM_DONTEXPAND | VM_PFNMAP | VM_MIXEDMAP`
+  (`72a993449cb0` — exactly the old macro's definition).
+- Direct `<linux/mm.h>`, `<linux/hugetlb.h>`, `<linux/mmzone.h>` includes,
+  because 7.4 removed transitive includes the 7.3 build relied on.
+
+The preview copy is the author's header plus a diff regenerated against
+`next-20261026`; it applies with zero fuzz and passes `git apply --check` and
+GNU `patch`. The rc copy is the author's patch byte-identical
+(sha256 `288386b09f673…`).
+
+### Toolchain — Clang 23.1.4 from kernel.org
+
+Both packages now use the kernel.org ClangBuiltLinux
+`llvm-23.1.4-x86_64.tar.xz`. 23.1.4 is the newest release on both
+`mirrors.edge.kernel.org/pub/tools/llvm/` and the llvm-project GitHub
+releases (published 2026-10-20). It is a multicall build (`clang`, `ld.lld`
+and the `llvm-*` tools are symlinks to one `llvm` binary), links only the
+system `libz`/`libzstd`/`libstdc++`, and needs no bundled ICU libs — so the
+GitHub `LLVM-23.1.0-Linux-X64` tarball and `llvm-icu70-libs.tar.gz` are gone.
+
+### Verification
+
+Cumulative audit **135/135** against `next-20261026`. Package
+`linux-sleepy-next-2026.10.26-2` (22.8 MB) and headers (34.8 MB) built with
+**ClangBuiltLinux clang 23.1.4** (`CONFIG_CC_VERSION_TEXT` in the image). The
+extracted `vmlinux` carries `.BTF` and `.BTF_ids`, reports
+`lru_cast v0.2.5 by Masahito Suzuki`, has `CONFIG_LRU_CAST=y` (no
+`LRU_MARIE` symbol) and `CONFIG_TCP_CONG_BBR3=y` with old `tcp_bbr` absent
+from `modules.builtin`. The built-in cmdline matches this package's PKGBUILD
+(no rc-only `dcdebugmask`). The port passes `git apply --check` and GNU
+`patch` with zero fuzz; a line-set diff against the author's patch yields only
+the adaptations listed above and nothing else. Installed; initramfs rebuilt;
+the running kernel remains `2026.10.23-1` until the next reboot (none was
+performed).
+
+## [7.3.0-8-sleepy-rc (Linux 7.3)]: 2026-10-26
+
+lru_cast upgraded from v0.2.0 to **v0.2.5**, released the same day. The new
+revision measures per-device refault queues and anon write-out cost, adds a
+decay floor and hash tie-breaking for looped working sets, and reports 0.28×
+MGLRU's swap-ins with 12% more throughput in the author's QEMU runs. The
+patch is the author's byte-identical
+`0001-7.3-rc7-lru_cast-v0.2.5.patch`; the series stays at 294 patches and
+audits **294/294**. `vm.swappiness` stays 1 (CAST's file-first promise).
+
+### Toolchain — Clang 23.1.4 from kernel.org
+
+Both packages now use the kernel.org ClangBuiltLinux
+`llvm-23.1.4-x86_64.tar.xz` — the newest on both the kernel.org mirror and
+the llvm-project GitHub releases. It is a multicall build with no ICU
+dependency, so the GitHub 23.1.0 tarball and `llvm-icu70-libs.tar.gz` are
+dropped. See the 2026.10.26-2 entry for the full note.
+
+### Verification
+
+Cumulative audit **294/294** against `v7.3`. Package
+`linux-sleepy-rc-7.3.0-8` (22.6 MB) and headers (34.5 MB) built with
+**ClangBuiltLinux clang 23.1.4**. The extracted `vmlinux` carries `.BTF` and
+`.BTF_ids`, reports `lru_cast v0.2.5 by Masahito Suzuki`, has
+`CONFIG_LRU_CAST=y` (no `LRU_MARIE`), `CONFIG_TCP_CONG_BBR3=y` with old
+`tcp_bbr` absent, and the built-in cmdline still has `amdgpu.dcdebugmask=0x800`.
+The rc patch is byte-identical to the author's (sha256 `288386b0…`). Installed
+side by side with the preview, both initramfs images rebuilt, systemd-boot
+default unchanged. No reboot was performed.
+
 ## [7.3.0-7-sleepy-rc (Linux 7.3)]: 2026-10-26
 
 Reclaim-policy refresh: the rc package replaces **LRU-MARIE 1.0.0-rc1** with

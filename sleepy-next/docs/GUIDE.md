@@ -8,14 +8,16 @@ is; `../../CLAUDE.md` for the maintenance rules.
 
 | Setting | Value |
 |---|---|
-| Compiler | Clang 23.1.0 (GitHub `llvmorg-23.1.0` release asset, auto-downloaded) |
+| Compiler | Clang 23.1.4 (kernel.org ClangBuiltLinux `llvm-23.1.4-x86_64.tar.xz`, auto-downloaded) |
 | Linker | `ld.lld` |
 | LTO | ThinLTO (`CONFIG_LTO_CLANG_THIN=y`) |
 | Optimization | `-O3` + `-march=znver4` |
 
 Flags are fixed: `CC=clang LD=ld.lld LLVM=1 LLVM_IAS=1`. Never substitute
-`ld.mold` (crashes on kernel vDSO linker scripts). The prebuilt LLVM links
-against ICU 70; the PKGBUILD bundles those libs (`llvm-icu70-libs.tar.gz`).
+`ld.mold` (crashes on kernel vDSO linker scripts). The prebuilt toolchain is a
+multicall build — `clang`, `ld.lld` and the `llvm-*` tools are symlinks to one
+`llvm` binary — and links only the system `libz`/`libzstd`/`libstdc++`; no ICU
+bundle is needed.
 
 ## Build
 

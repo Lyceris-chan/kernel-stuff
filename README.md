@@ -4,9 +4,8 @@ Custom Arch Linux kernel for one machine: an AMD Ryzen 7 7700 (Zen 4) desktop
 with a Radeon RX 9070 XT (Navi 48 / RDNA 4).
 
 Two packages share one patch series, with a few package-specific deltas
-recorded in the ledgers. The largest is the reclaim policy: `sleepy-rc` uses
-**lru_cast (CAST)**, while the preview keeps **LRU-MARIE** because CAST does
-not apply to the linux-next base.
+recorded in the ledgers. Both use **lru_cast (CAST)** as the reclaim policy;
+the preview applies a port of the same patch to the linux-next base.
 
 | Directory | Package | Base |
 |---|---|---|

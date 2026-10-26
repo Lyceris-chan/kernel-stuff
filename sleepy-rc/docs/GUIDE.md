@@ -8,14 +8,16 @@ maintenance rules.
 
 | Setting | Value |
 |---|---|
-| Compiler | Clang 23.1.0 (GitHub `llvmorg-23.1.0` release asset, auto-downloaded) |
+| Compiler | Clang 23.1.4 (kernel.org ClangBuiltLinux `llvm-23.1.4-x86_64.tar.xz`, auto-downloaded) |
 | Linker | `ld.lld` |
 | LTO | ThinLTO (`CONFIG_LTO_CLANG_THIN=y`) |
 | Optimization | `-O3` + `-march=znver4` |
 
 Flags are fixed: `CC=clang LD=ld.lld LLVM=1 LLVM_IAS=1`. Never substitute
-`ld.mold` (crashes on kernel vDSO linker scripts). The prebuilt LLVM links
-against ICU 70; the PKGBUILD bundles those libs (`llvm-icu70-libs.tar.gz`).
+`ld.mold` (crashes on kernel vDSO linker scripts). The prebuilt toolchain is a
+multicall build — `clang`, `ld.lld` and the `llvm-*` tools are symlinks to one
+`llvm` binary — and links only the system `libz`/`libzstd`/`libstdc++`; no ICU
+bundle is needed.
 
 ## Build
 
@@ -57,12 +59,12 @@ requirements, and verification.
 
 ## Reclaim policy: lru_cast (CAST)
 
-The rc package carries **lru_cast 0.2.0** (`2102`) as its page-replacement
-policy. It is on at boot. The preview package still carries LRU-MARIE because
-CAST does not apply to the linux-next base.
+The rc package carries **lru_cast 0.2.5** (`2102`) as its page-replacement
+policy. It is on at boot. Both packages carry it; the preview applies a port
+of the same patch to the linux-next base.
 
 ```bash
-cat /sys/kernel/mm/lru_cast/version      # 0.2.0
+cat /sys/kernel/mm/lru_cast/version      # 0.2.5
 cat /sys/kernel/mm/lru_cast/enabled      # 1
 cat /sys/kernel/mm/lru_cast/estimate     # anon share, measured swappiness, costs
 ```

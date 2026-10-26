@@ -10754,13 +10754,15 @@ stays at `7.3.0-6` (pkgrel 6, 294/294).
 entries; the same seven orphans remain (`1008`, `1012`, `1013`, `1014`, `1017`,
 `9040`, `9060`).
 
-## 2026-10-26 (later) — reclaim policy: LRU-MARIE replaced by lru_cast 0.2.0 in the rc package
+## 2026-10-26 (later) — reclaim policy: LRU-MARIE replaced by lru_cast 0.2.5 in both packages
 
-**Decision.** The `sleepy-rc` package now carries **lru_cast 0.2.0 (CAST)** as
-`2102` and no longer carries LRU-MARIE (`2101`) at all. The `sleepy-next`
-preview keeps `2101`: CAST is not compatible with the `next-20261026` base
-(evidence below). This is a deliberate split, recorded here because
-`sleepy-rc/PATCH_SOURCES.md` is authoritative for both packages.
+**Decision.** Both packages now carry **lru_cast 0.2.5 (CAST)** as `2102` and
+no longer carry LRU-MARIE (`2101`) at all. The rc package applies the author's
+7.3 patch byte-identically; the preview applies a port of it to
+`next-20261026`, regenerated so it applies with zero fuzz (the three adapted
+insertions and the one name-collision rename are recorded in
+`sleepy-next/PATCH_SOURCES.md`). This ledger remains authoritative for the
+series.
 
 ### Why CAST
 
@@ -10777,40 +10779,42 @@ ring with a measured LRFU ranking. It adds three things Marie does not have:
 - **a runtime switch**, `/sys/kernel/mm/lru_cast/enabled`, so a misbehaving
   policy can be turned off without another reboot.
 
-The author's README reports, against MGLRU on a swap-bound stress-ng workload,
-0.4–0.5× the swap-ins and a working set that survives a streaming read where
-MGLRU and the legacy LRU both lose it. There is **no independent head-to-head
-benchmark against Marie**; the case for CAST over Marie is the author's
-successor designation plus the structural additions above, not a measured
-same-machine comparison. That is stated plainly because the repo's rule is
-that a README claim is not evidence.
+The v0.2.5 README reports, against MGLRU on a swap-bound stress-ng workload,
+0.28× the swap-ins and 12% more throughput, and a working set that survives a
+streaming read where MGLRU and the legacy LRU both lose it. There is **no
+independent head-to-head benchmark against Marie**; the case for CAST over
+Marie is the author's successor designation plus the structural additions
+above, not a measured same-machine comparison. That is stated plainly because
+the repo's rule is that a README claim is not evidence.
 
-### Compatibility — why rc only
+### Compatibility — rc direct, preview ported
 
 | Test | `v7.3` (rc) | `next-20261026` (preview) |
 |---|---|---|
-| `git apply --check` | pass | fail |
-| `patch -p1 --forward -F2 --dry-run` | pass, **zero offsets, zero fuzz** | 2 hunks failed + `mm/page_io.c` hunk 4 needs fuzz 2 |
-| Failing hunks | — | `mm/migrate.c` at 777, `mm/swap.h` at 258 |
+| `git apply --check` | pass | pass (ported patch) |
+| `patch -p1 --forward -F2 --dry-run` | pass, **zero offsets, zero fuzz** | pass, **zero fuzz** |
+| Port needed | none | 3 insertions + 1 helper rename |
 | Config symbols | `64BIT`, `MMU`, `SPARSEMEM=y` all present | same |
 
-The patch is `0001-7.3-rc7-lru_cast-v0.2.0.patch` from firelzrd/lru_cast,
-repo commit `8d0ab44` (2026-10-26 12:20 +0900), author
-`Masahito S <firelzrd@gmail.com>`. The preview failures are the 7.4 MM
-changes (migrate/swap APIs) the patch was not written or tested against —
-porting it would mean hand-modifying 324 KB of third-party MM code across a
-merge window, which this repo does not do. The preview therefore stays on
-Marie until the author publishes a 7.4-compatible revision.
+The author's patch is `0001-7.3-rc7-lru_cast-v0.2.5.patch` from
+firelzrd/lru_cast, repo commit `71c94c9` (2026-10-27 00:18 +0900), author
+`Masahito S <firelzrd@gmail.com>`. The 7.4 base renames `__swap_writepage()`
+to `__swap_writeout()`, which collides with CAST's private helper of that
+name; the preview copy renames the helper to `cast_swap_writeout()` and calls
+the renamed base function. That, the moved declaration block and the two new
+insertion sites are the entire delta. The rc copy is the author's patch
+unchanged.
 
 ### The swap, patch by patch
 
 | Change | Detail |
 |---|---|
-| **Removed `2101`** | `linux7.3-rc7-lru_marie-1.0.0-rc1`. User-approved conditional swap: CAST and Marie occupy the same hooks and cannot coexist. Its ledger history above is unchanged; the file is removed from `sleepy-rc/patches/` only. The preview keeps its copy. |
-| **Added `2102`** | `2102-mm-7.3-lru_cast-v0.2.0.patch` (`0001-7.3-rc7-lru_cast-v0.2.0.patch`, byte-identical). Applies at the position `2101` held, after `2100` zstd. |
+| **Removed `2101`** | `linux7.3-rc7-lru_marie-1.0.0-rc1`. User-approved conditional swap: CAST and Marie occupy the same hooks and cannot coexist. Its ledger history above is unchanged; the file is removed from **both** patch trees. |
+| **Added `2102`** | `2102-mm-7.3-lru_cast-v0.2.5.patch`. The rc copy is the author's `0001-7.3-rc7-lru_cast-v0.2.5.patch`, byte-identical, at the position `2101` held (after `2100` zstd). The preview copy is the port described above. |
+| **v0.2.0 → v0.2.5** | The author released v0.2.5 (`71c94c9`) while this change was in progress. It adds measured anon write-out cost, per-device refault queues, a decay floor and hash tie-breaking for loops; the author's swap-in figure improves from 0.4–0.5× to 0.28× MGLRU. Both packages carry v0.2.5. |
 | **Refreshed `2191`–`2193`** | Kefeng Wang's upstream zswap series had been rebased onto Marie's `zswap_store()` (`#ifdef CONFIG_LRU_MARIE`, `xa_is_value` guard). Without Marie that context is gone. They were regenerated from the upstream commits `0bdbe1ccedd9`, `50eb352dcd30`, `81a798cf85e9` (linux-next, 2026-09-10), preserving the author, `Signed-off-by`s and trailers. They now apply to stock 7.3 zswap with offsets only. |
-| **Config** | `scripts/config -e LRU_MARIE` → `-e LRU_CAST`. MGLRU stays built (`LRU_GEN`, `LRU_GEN_ENABLED`, `LRU_GEN_WALKS_MMU`) as the fallback; CAST is on at boot and the two are never on at once. |
-| **pkgrel** | `7.3.0-6` → `7.3.0-7`, series stays at **294 patches**, cumulative audit **294/294** against `v7.3`. |
+| **Config** | `scripts/config -e LRU_MARIE` → `-e LRU_CAST`, in both packages. MGLRU stays built (`LRU_GEN`, `LRU_GEN_ENABLED`, `LRU_GEN_WALKS_MMU`) as the fallback; CAST is on at boot and the two are never on at once. |
+| **pkgrel** | `7.3.0-6` → `7.3.0-8`, series stays at **294 patches**, cumulative audit **294/294** against `v7.3`. The preview is `2026.10.26-2`, **135/135**. |
 
 ### Swappiness stays 1, deliberately
 
@@ -10828,10 +10832,16 @@ a user decision, not a sweep carry.
 
 ### Verification
 
-- `git apply --check` and GNU `patch` dry-run on clean `v7.3`: both pass,
-  zero offsets and zero fuzz.
-- Cumulative series audit: **294/294** against `v7.3`.
-- The build and BTF/BBR3 checks are recorded in the release entry.
+- rc: `git apply --check` and GNU `patch` dry-run on clean `v7.3` both pass,
+  zero offsets and zero fuzz; cumulative audit **294/294**.
+- preview: the ported patch passes both appliers on clean `next-20261026`
+  with zero fuzz; cumulative audit **135/135**.
+- Both packages built with Clang 23.1.4; the installed kernels report
+  `lru_cast v0.2.5` and carry `.BTF`/`.BTF_ids`.
+- The rc patch is byte-identical to the author's file (sha256
+  `288386b09f673d0d8d713d2398bb6c064145c063805946047a4d85bf53093ce3`);
+  the preview port's only line-set differences are the adaptations listed in
+  `sleepy-next/PATCH_SOURCES.md`.
 
 ## 2026-10-26 (exhaustive tracker pass) — 2,034 items, no adoptable fix
 

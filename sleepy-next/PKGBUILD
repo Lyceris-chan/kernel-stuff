@@ -203,7 +203,7 @@ _snapdate=${_srctag#next-}                                            # 20261026
 _snapver="${_snapdate:0:4}.${_snapdate:4:2}.${_snapdate:6:2}"
 pkgver=${_snapver}
 _tagrel=1
-pkgrel=1
+pkgrel=2
 # Build parallelism. Previously capped at 8 on a diagnosis that did not hold up.
 #
 # The cap was added after an rc4-7 build thrashed badly — 6 watchdog firings and
@@ -367,7 +367,7 @@ source=(
   "patches/2000-2099/2059-io_uring-add-a-schedule-point-in-io_free_batch_list.patch"
   "patches/2000-2099/2060-io_uring-add-a-schedule-point-in-__io_req_caches_free.patch"
   "patches/2100-2199/2100-zstd-7.3-merge-v1.6.0-into-kernel-tree.patch"
-  "patches/2100-2199/2101-mm-7.3-introduce-LRU-MARIE-1.0.0-rc1.patch"
+  "patches/2100-2199/2102-mm-7.3-lru_cast-v0.2.5.patch"
   "patches/2100-2199/2120-mm-gup-mm-gup-break-out-gup-fill-pages-helper.patch"
   "patches/2100-2199/2121-mm-gup-mm-gup-convert-follow-page-mask-to-return-a-long.patch"
   "patches/2100-2199/2122-mm-gup-mm-gup-split-follow-page-pte-commit-out-of.patch"
@@ -470,23 +470,20 @@ validpgpkeys=(
   E18447AC260021D31F3FF6C4C8A2A4774B8B63C4  # Eric Naim <dnaim@cachyos.org>
   E8B9AA39F054E30E8290D492C3C4820857F654FE  # Peter Jung <admin@ptr1337.dev>
 )
-# Pre-built LLVM toolchain: the official GitHub llvm-project release asset
-# LLVM-23.1.0-Linux-X64.tar.xz (llvmorg-23.1.0, added to source() below) is the
-# toolchain actually used. It links against ICU 70 (Arch ships ICU 78), so the
-# libs are bundled via the llvm-icu70-libs source. The kernel.org
-# ClangBuiltLinux weekly-rc auto-fetch was dropped 2026-09-02 (legacy
-# _kernel_org_llvm_tarball was never added to source()).
+# Pre-built LLVM toolchain: the kernel.org ClangBuiltLinux release
+# llvm-23.1.4-x86_64.tar.xz (added to source() below) is the toolchain
+# actually used. It is a multicall build — clang, ld.lld and the llvm-* tools
+# are symlinks to one `llvm` binary — and needs no bundled ICU libs (it links
+# only the system libz/libzstd/libstdc++). 23.1.4 is the latest on both
+# mirrors.edge.kernel.org and the llvm-project GitHub releases as of
+# 2026-10-26.
 : "${_use_kernel_org_llvm:=yes}"
-: "${_llvm_dir_name:=LLVM-23.1.0-Linux-X64}"
+: "${_llvm_dir_name:=llvm-23.1.4-x86_64}"
 
 _set_build_flags() {
     if _is_lto_kernel; then
         if [ "$_use_kernel_org_llvm" = "yes" ]; then
             export PATH="${srcdir}/${_llvm_dir_name}/bin:${PATH}"
-            # GitHub LLVM 23.1.0 needs ICU 70 (see llvm-icu70-libs source)
-            mkdir -p "${srcdir}/${_llvm_dir_name}/lib"
-            tar xzf "$srcdir/llvm-icu70-libs.tar.gz" -C "${srcdir}/${_llvm_dir_name}/lib"
-            export LD_LIBRARY_PATH="${srcdir}/${_llvm_dir_name}/lib:${LD_LIBRARY_PATH}"
             BUILD_FLAGS=(
                 CC=clang
                 LD=ld.lld
@@ -676,7 +673,7 @@ EOF
     # the blk-mq rework), so olddefconfig silently discarded it. The NVMe device's
     # scheduler is set by udev's /usr/lib/udev/rules.d/60-ioschedulers.rules, which
     # assigns kyber to nvme[0-9]*. MQ_IOSCHED_KYBER must still be built in.
-    scripts/config -e LRU_GEN -e LRU_GEN_ENABLED -e LRU_GEN_WALKS_MMU -e LRU_MARIE -e CPU_IDLE_GOV_NAP -e MQ_IOSCHED_KYBER -m USB_VIDEO_CLASS -m I2C_CHARDEV -m SENSORS_PROM21_XHCI -e R8169 -e REALTEK_PHY -d TCP_CONG_BBR -e TCP_CONG_BBR3 -e DEFAULT_BBR3 --set-str DEFAULT_TCP_CONG "bbr3"
+    scripts/config -e LRU_GEN -e LRU_GEN_ENABLED -e LRU_GEN_WALKS_MMU -e LRU_CAST -e CPU_IDLE_GOV_NAP -e MQ_IOSCHED_KYBER -m USB_VIDEO_CLASS -m I2C_CHARDEV -m SENSORS_PROM21_XHCI -e R8169 -e REALTEK_PHY -d TCP_CONG_BBR -e TCP_CONG_BBR3 -e DEFAULT_BBR3 --set-str DEFAULT_TCP_CONG "bbr3"
     # next-20261019's sched_ext tree has two merge gaps: free_dsq_irq_workfn()
     # uses dsq->pcpu although the field was renamed to pcpu_user, and
     # scx_reenq_wait_dispatching() is called but not defined anywhere. BORE is
@@ -1203,7 +1200,7 @@ b2sums=('504eaa3b28fdf926327df3892585bf3faf8a75412c4d30486b3e9f19c1b8d868d04049c
         'c31f8fc6db7e5776ffbbde976239a102e5ddb0c2a6214a094a26f364718a507ac7c1960a9a955bfd16a3182979e57a8eb9ffbbde62d26ddfb983076868d619f2'
         '1455fd65a42e9bba65673da473b99187acc2e25d6535c89d365eb925500f84e23e40bddca183e83bb8af641122254083cddd8bf26fbdbd413da6a20ccd73850f'
         '04fe6270d9e54b974ee745261575fd710e3af252c6e2b2788a082455c6eeccfd2ea944245f5f58a9f4de418eca3058aaae8a27f90173b254aac15036c7a95c49'
-        '423b248c4eaa34841028b7147b030201e369d4bbd764fdadd6c46bb0aab7143f3d5d4afeff3ba26527065ccf9ca64a44b5ead1d54b2ed4d8612daf6928ee16c2'
+        '3c4c29d522f24135fbe7443dd80ec52008158fcd55c2b654012349ad7845049b2258dd720b4736c547d2d74857131433bc209623cfbaa787b780735a6f43ed73'
         'a745db752d2586475d373cb29e64b4f42f6e305b4b3e588efbce955491429c73b3d16c426e76118b1499bbfb4a2159192f3950ed06d309064eb28750a1d6e6aa'
         '8820c684d4f21c9c74729a518f187334b817b8059436aa808e423533a67a6b752a93df4e79c200307b29635f0de393f6749aaa52cfc20e28957f759b4adb6ce0'
         '877dc1eebcaec113969ea45471b63e0339066a270da667b5c1aa1578e26aa01c7ec34e1cb4c436565553388e0ba04add10bf3540fe4ba7e11b24aa8a8d8ccc4f'
@@ -1253,11 +1250,8 @@ b2sums=('504eaa3b28fdf926327df3892585bf3faf8a75412c4d30486b3e9f19c1b8d868d04049c
         '9941983df5ddd7f1b0f4be6d080e3df63c089841d3601426d7d433539a13ab58fe6ccbcf9da43ee14d65dab73341c307552835e022d69bbdde71f938fb4e6bfc'
         'e403a04ae608423f8d336c19dc32e943a02ef0c263e7aa1304b4ee5c3310459059a9ad2a21ac95e00b0d388a7c7fe30eb8ff99f0e06e8f481eb63ffa703fc211'
         '522c769379f6ea061f6c717603d13fb73bd3206723ba46c67ed45677f3f703b181e99011bd4698ec396ebb1695e9cc1f4b0d55368a517cf1e8a06004eb73e798'
-        '2cdec9daf2eb9d4a8e95f33bcc81e603899db1f2e4f55cde68fa29727972238b5bd544e055a06bd0c94569e222666f6d8bf231db9fa8593b6d5f4fe52b26022a'
-        '4cf91dd679c25cb8c7a519f5d77fdf29cc345043bd8a71b6c8e54d1a4179cf489f464108464ad2b1bc8ccffd743707e6fdaae1e33300b29a4fc7b9457b90e6be')
+        'f8948396584fc2c3e82bf857c6f3ad7fd77e887b5d30fdbf288ed01f939b101e28e0f7b67d7e52c28d8479918da3cad72d6650daa6200739139426d5d491ef75')
 
 if [ "$_use_kernel_org_llvm" = "yes" ]; then
-    source+=("https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.0/LLVM-23.1.0-Linux-X64.tar.xz")
-# The official GitHub LLVM release links against ICU 70 (Arch has ICU 78). Bundle the libs.
-source+=("llvm-icu70-libs.tar.gz")
+    source+=("https://mirrors.edge.kernel.org/pub/tools/llvm/files/llvm-23.1.4-x86_64.tar.xz")
 fi

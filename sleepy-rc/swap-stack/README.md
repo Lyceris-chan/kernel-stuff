@@ -118,13 +118,14 @@ set's own `SWP_XSWAP` guard, which was removed with it.
 
 | Package | Kernel | Policy | What `vm.swappiness = 1` means |
 |---|---|---|---|
-| `linux-sleepy-rc` 7.3.0-7+ | 7.3 | **lru_cast 0.2.0** (`2102`) | CAST's *file-first promise*: reclaim file down to the clean-file floor, then anon. Its measured split is only used for other values |
-| `linux-sleepy-next` | linux-next | **LRU-MARIE 1.0.0-rc1** (`2101`) | MARIE's `max_swappiness` clamps the effective value to 1 |
+| `linux-sleepy-rc` 7.3.0-8+ | 7.3 | **lru_cast 0.2.5** (`2102`) | CAST's *file-first promise*: reclaim file down to the clean-file floor, then anon. Its measured split is only used for other values |
+| `linux-sleepy-next` 2026.10.26-2+ | linux-next | **lru_cast 0.2.5** (`2102`, ported) | The same promise on the preview's ported copy |
 
-Both packages therefore run file-first with `vm.swappiness = 1`; only the
-mechanism differs. CAST does not apply to the `next-20261026` base, which is
-why the preview kept Marie — see the 2026-10-26 (later) entry in
-`../PATCH_SOURCES.md`.
+Both packages therefore run file-first with `vm.swappiness = 1`. The preview
+applies a port of the author's 7.3 patch to the linux-next base — see the
+2026-10-26 (later) entry in `../PATCH_SOURCES.md` and the port notes in
+`../../sleepy-next/PATCH_SOURCES.md`. The MARIE text below is kept as the
+history of how this policy was measured.
 
 **This section previously argued the opposite**, at length. It called the clamp
 a misconfiguration and clearing it "the fix" for the 2026-09-22 OOM. It was
@@ -136,12 +137,13 @@ the anon and file lists:
 
 ```c
 u8 configured = (u8)mem_cgroup_swappiness(memcg);
-u8 swappiness = (READ_ONCE(marie_low_swappiness_mode) && configured > 1) ?
+u8 swappiness = (READ_ONCE(marie_max_swappiness) && configured > 1) ?
                 1 : configured;
 ```
 
-`marie_low_swappiness_mode` defaults to **1**, so it replaced any configured
-value above 1 with 1 before the picker saw it. Its header states this applies
+`marie_max_swappiness` defaults to **1**, so it replaced any configured
+value above 1 with 1 before the picker saw it. (The knob was named
+`low_swappiness_mode` before MARIE 1.0.0-rc1.) Its header states this applies
 *"regardless of the higher values vm.swappiness / memory.swappiness udev
 rules, tuning daemons, or distro defaults have installed."*
 
@@ -220,12 +222,15 @@ way.
 ## Install
 
 ```bash
-sudo install -Dm644 99-zswap-swappiness.conf      /etc/sysctl.d/99-zswap-swappiness.conf
-sudo install -Dm644 marie-low-swappiness-mode.conf /etc/tmpfiles.d/99-marie-low-swappiness-mode.conf
+sudo install -Dm644 99-zswap-swappiness.conf /etc/sysctl.d/99-zswap-swappiness.conf
 sudo ./setup-swapfile.sh
 ```
 
-zswap is on by default (`CONFIG_ZSWAP_DEFAULT_ON=y`) and so is the shrinker
+`marie-low-swappiness-mode.conf` is **historical**: it writes MARIE's
+`max_swappiness`, and no shipped kernel carries MARIE any more (CAST replaced
+it in both packages on 2026-10-26). Keep it only if you still boot an older
+kernel; on CAST kernels the write fails harmlessly at boot. zswap is on by
+default (`CONFIG_ZSWAP_DEFAULT_ON=y`) and so is the shrinker
 (`CONFIG_ZSWAP_SHRINKER_DEFAULT_ON=y`) — the latter is **load-bearing**, since
 without it nothing ever drains the pool.
 
@@ -272,11 +277,11 @@ existing; that mistake was made once here already.
 
 - **MARIE's swappiness clamp was cleared, then restored on 2026-09-23.** The
   cleared state is what made the machine sluggish; see the correction above.
-- **2026-10-26: the rc package moved from LRU-MARIE to lru_cast 0.2.0.** CAST
-  is Marie's successor and is carried as `2102`; the preview keeps `2101`
-  because CAST does not apply to the linux-next base. `vm.swappiness` stays 1,
-  which CAST honours as its file-first promise. See the 2026-10-26 (later)
-  entry in `../PATCH_SOURCES.md`.
+- **2026-10-26: both packages moved from LRU-MARIE to lru_cast 0.2.5.** CAST
+  is Marie's successor and is carried as `2102`; the preview applies a port of
+  the same patch to its linux-next base. `vm.swappiness` stays 1, which CAST
+  honours as its file-first promise. See the 2026-10-26 (later) entry in
+  `../PATCH_SOURCES.md`.
 - **Swap backend: xswap -> zswap + a 16 GiB swapfile.** The xswap series
   (`2155`-`2168`, `2199`; 15 patches) was removed; patch `2196`, a standalone
   zswap fix salvaged from that series, was added.

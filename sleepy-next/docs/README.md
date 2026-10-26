@@ -6,8 +6,8 @@ built from a **linux-next snapshot (`next-20261026`)** plus a sanitized
 [CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 135-patch
 series. It is not a general-purpose kernel.
 
-**Base version:** `2026.10.26-1` · **Artifact:**
-`linux-sleepy-next-2026.10.26-1-x86_64.pkg.tar.zst`
+**Base version:** `2026.10.26-2` · **Artifact:**
+`linux-sleepy-next-2026.10.26-2-x86_64.pkg.tar.zst`
 
 The release is named for the **snapshot date**, not the mainline release the
 snapshot was cut from — linux-next is a daily tree, and its base release goes
@@ -29,10 +29,14 @@ initramfs build.
 
 ## Highlights
 
-- **Clang ThinLTO `-O3 -march=znver4`** via the kernel.org pre-built LLVM
-  23.1.0.
-- **LRU-MARIE 0.12.0** page eviction — the author's `mm/lru_marie/` subsystem
-  carried byte-identical, rebased to this base.
+- **Clang ThinLTO `-O3 -march=znver4`** via the kernel.org ClangBuiltLinux
+  pre-built LLVM 23.1.4.
+- **lru_cast 0.2.5 (CAST)** page eviction — Masahito Suzuki's successor to
+  LRU-MARIE, carried as `2102`. The same patch is applied here as a port to
+  this base (three insertion sites and one helper rename; recorded in
+  `../PATCH_SOURCES.md`). It keeps Marie's per-PFN state array, SIMD walker,
+  look-around, kcompressd and clean-file floor, and replaces the generational
+  ring with a measured LRFU. Both packages carry it.
 - **`mm/gup` folio batching** (Rik van Riel's series) for mTHP throughput.
 - **BBR3** default + CAKE SQM via `net-tune`; ACPI CPPC hardening + per-core EPP
   boost for `amd-pstate`.
@@ -59,15 +63,17 @@ initramfs build.
   runs on its own, and `backing_dev` rejects a file outright.
   `swap-stack/` carries the userspace side. It replaced an xswap device on
   2026-09-22 (series removed, 15 patches).
-- **LRU-MARIE governs reclaim policy, and `vm.swappiness` is set to match.**
-  MARIE's `low_swappiness_mode` (on by default) clamps the effective swappiness
-  to 1, so reclaim is file-first: it targets the ~27 GB of largely-cold page
-  cache rather than the ~2.3 GB of live anonymous working set. Clearing that
-  clamp to let `swappiness=180` apply was tried on 2026-09-22 and reverted — it
-  made MARIE reclaim anon almost exclusively, producing 201M anon steals and
-  192M anon refaults, and stalled every task on memory 16% of the time.
-  `vm.swappiness` is now **1** so the sysctl agrees with what MARIE actually
-  uses. See `../swap-stack/README.md`.
+- **CAST ranking is active; the anon/file split is held file-first.**
+  `vm.swappiness` stays **1**, which CAST treats as a promise: reclaim file
+  down to the clean-file floor (10% of memory), then anon. That is the
+  measured-correct policy for this workload — roughly 27 GB of largely-cold
+  page cache against ~2.3 GB of live anonymous working set. Letting anon go
+  first was tried under MARIE on 2026-09-22 and produced 201M anon steals,
+  192M anon refaults and PSI `full` at 16%. CAST's own measured split sits
+  behind that promise: setting `vm.swappiness` to `60` would enable it, but
+  that is a user decision, not a default. The LRFU ordering, per-lruvec
+  reclaim, kcompressd and the clean-file floor all remain active. See
+  `../../sleepy-rc/swap-stack/README.md`.
 
 ## Build and install
 
@@ -131,7 +137,7 @@ instead.
 | `1200–1299` | AMD PM (amd-pstate, ACPI CPPC) |
 | `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) |
 | `2000–2099` | Block / I/O (bfq, mq-deadline, zram, io_uring) |
-| `2100–2199` | Memory and swap (zstd, LRU-MARIE, gup, zswap) |
+| `2100–2199` | Memory and swap (zstd, lru_cast, gup, zswap) |
 | `2200–2299` | CPU idle (NAP) |
 | `2300–2399` | Build system / kbuild |
 | `2400–2499` | Core scheduler (non-CachyOS) |
@@ -146,5 +152,5 @@ instead.
 
 `GUIDE.md` (this directory) covers toolchain, PROFILE_PEAK, troubleshooting, and
 net-tune. `../net-tune/README.md` documents the SQM service, and
-`../swap-stack/README.md` the zswap + swapfile stack and the MARIE swappiness fix.
+`../swap-stack/README.md` the zswap + swapfile stack and the swappiness policy.
 `../../CLAUDE.md` holds the maintenance rules; `../PATCH_SOURCES.md` the ledger.

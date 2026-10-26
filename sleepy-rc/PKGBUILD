@@ -182,7 +182,7 @@ _rcver=
 
 pkgver=7.3.0
 _tagrel=1
-pkgrel=7
+pkgrel=8
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -426,7 +426,7 @@ source=(
   "patches/2000-2099/2059-io_uring-add-a-schedule-point-in-io_free_batch_list.patch"
   "patches/2000-2099/2060-io_uring-add-a-schedule-point-in-__io_req_caches_free.patch"
   "patches/2100-2199/2100-zstd-7.3-merge-v1.6.0-into-kernel-tree.patch"
-  "patches/2100-2199/2102-mm-7.3-lru_cast-v0.2.0.patch"
+  "patches/2100-2199/2102-mm-7.3-lru_cast-v0.2.5.patch"
   "patches/2100-2199/2120-mm-gup-mm-gup-break-out-gup-fill-pages-helper.patch"
   "patches/2100-2199/2121-mm-gup-mm-gup-convert-follow-page-mask-to-return-a-long.patch"
   "patches/2100-2199/2122-mm-gup-mm-gup-split-follow-page-pte-commit-out-of.patch"
@@ -584,23 +584,20 @@ validpgpkeys=(
   E18447AC260021D31F3FF6C4C8A2A4774B8B63C4  # Eric Naim <dnaim@cachyos.org>
   E8B9AA39F054E30E8290D492C3C4820857F654FE  # Peter Jung <admin@ptr1337.dev>
 )
-# Pre-built LLVM toolchain: the official GitHub llvm-project release asset
-# LLVM-23.1.0-Linux-X64.tar.xz (llvmorg-23.1.0, added to source() below) is the
-# toolchain actually used. It links against ICU 70 (Arch ships ICU 78), so the
-# libs are bundled via the llvm-icu70-libs source. The kernel.org
-# ClangBuiltLinux weekly-rc auto-fetch was dropped 2026-09-02 (legacy
-# _kernel_org_llvm_tarball was never added to source()).
+# Pre-built LLVM toolchain: the kernel.org ClangBuiltLinux release
+# llvm-23.1.4-x86_64.tar.xz (added to source() below) is the toolchain
+# actually used. It is a multicall build — clang, ld.lld and the llvm-* tools
+# are symlinks to one `llvm` binary — and needs no bundled ICU libs (it links
+# only the system libz/libzstd/libstdc++). 23.1.4 is the latest on both
+# mirrors.edge.kernel.org and the llvm-project GitHub releases as of
+# 2026-10-26.
 : "${_use_kernel_org_llvm:=yes}"
-: "${_llvm_dir_name:=LLVM-23.1.0-Linux-X64}"
+: "${_llvm_dir_name:=llvm-23.1.4-x86_64}"
 
 _set_build_flags() {
     if _is_lto_kernel; then
         if [ "$_use_kernel_org_llvm" = "yes" ]; then
             export PATH="${srcdir}/${_llvm_dir_name}/bin:${PATH}"
-            # GitHub LLVM 23.1.0 needs ICU 70 (see llvm-icu70-libs source)
-            mkdir -p "${srcdir}/${_llvm_dir_name}/lib"
-            tar xzf "$srcdir/llvm-icu70-libs.tar.gz" -C "${srcdir}/${_llvm_dir_name}/lib"
-            export LD_LIBRARY_PATH="${srcdir}/${_llvm_dir_name}/lib:${LD_LIBRARY_PATH}"
             BUILD_FLAGS=(
                 CC=clang
                 LD=ld.lld
@@ -1361,7 +1358,7 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         'c31f8fc6db7e5776ffbbde976239a102e5ddb0c2a6214a094a26f364718a507ac7c1960a9a955bfd16a3182979e57a8eb9ffbbde62d26ddfb983076868d619f2'
         '1455fd65a42e9bba65673da473b99187acc2e25d6535c89d365eb925500f84e23e40bddca183e83bb8af641122254083cddd8bf26fbdbd413da6a20ccd73850f'
         '04fe6270d9e54b974ee745261575fd710e3af252c6e2b2788a082455c6eeccfd2ea944245f5f58a9f4de418eca3058aaae8a27f90173b254aac15036c7a95c49'
-        '626219222f5a3c5dcb68095e662ddf37a085baa3f2e3b16abc99c492abd653ecd3a365bb8cf8ecb941c9fbd2c78e28bd96cb39d571934820fe3eb4f3b8338fad'
+        '0d06bf829a176a7dafee17841c9f132dd55111ea99c4f006f31ed1836807822c827041793b40bd365b1b4a0b7b8aa71fa270d6a37a0b16009e34c3f9895210c9'
         'a745db752d2586475d373cb29e64b4f42f6e305b4b3e588efbce955491429c73b3d16c426e76118b1499bbfb4a2159192f3950ed06d309064eb28750a1d6e6aa'
         '8820c684d4f21c9c74729a518f187334b817b8059436aa808e423533a67a6b752a93df4e79c200307b29635f0de393f6749aaa52cfc20e28957f759b4adb6ce0'
         '877dc1eebcaec113969ea45471b63e0339066a270da667b5c1aa1578e26aa01c7ec34e1cb4c436565553388e0ba04add10bf3540fe4ba7e11b24aa8a8d8ccc4f'
@@ -1491,11 +1488,8 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         'f78d409734e9810f448e564aae9bdad28af03193913053f25deee0eebaa8b999cbf135e6e0c27e5c5ffe9bac5918fd0ddf9a73307a67d8e1be2876d8b99b1646'
         '5a986874cf6e64a32b084a25147132d21d32dce0378f91f63e8a918e91bd0e18423e96ef3dc6fb319c3ae0663f6326edcebe8b9a1e08d7d318295ddda21ac4bb'
         '334fc42a82212dbfb0ff37865a7ccbf4df09164c252b9c7493ba0ee0d58aaa9a0aa89e012c50be8b4671e01dceab45175634617e15032182590989adad35a7ab'
-        '2cdec9daf2eb9d4a8e95f33bcc81e603899db1f2e4f55cde68fa29727972238b5bd544e055a06bd0c94569e222666f6d8bf231db9fa8593b6d5f4fe52b26022a'
-        '4cf91dd679c25cb8c7a519f5d77fdf29cc345043bd8a71b6c8e54d1a4179cf489f464108464ad2b1bc8ccffd743707e6fdaae1e33300b29a4fc7b9457b90e6be')
+        'f8948396584fc2c3e82bf857c6f3ad7fd77e887b5d30fdbf288ed01f939b101e28e0f7b67d7e52c28d8479918da3cad72d6650daa6200739139426d5d491ef75')
 
 if [ "$_use_kernel_org_llvm" = "yes" ]; then
-    source+=("https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.0/LLVM-23.1.0-Linux-X64.tar.xz")
-# The official GitHub LLVM release links against ICU 70 (Arch has ICU 78). Bundle the libs.
-source+=("llvm-icu70-libs.tar.gz")
+    source+=("https://mirrors.edge.kernel.org/pub/tools/llvm/files/llvm-23.1.4-x86_64.tar.xz")
 fi

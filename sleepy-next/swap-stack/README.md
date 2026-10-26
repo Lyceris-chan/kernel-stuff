@@ -112,7 +112,20 @@ livelock"*. The discussions run through reclaim-efficiency counters and
 `no_progress_loops` instead. That specific chain belongs to the xswap patch
 set's own `SWP_XSWAP` guard, which was removed with it.
 
-## The MARIE swappiness clamp — correct, and clearing it was a mistake
+## Reclaim policy and swappiness — file-first, and clearing it was a mistake
+
+### Which policy is running
+
+| Package | Kernel | Policy | What `vm.swappiness = 1` means |
+|---|---|---|---|
+| `linux-sleepy-rc` 7.3.0-8+ | 7.3 | **lru_cast 0.2.5** (`2102`) | CAST's *file-first promise*: reclaim file down to the clean-file floor, then anon. Its measured split is only used for other values |
+| `linux-sleepy-next` 2026.10.26-2+ | linux-next | **lru_cast 0.2.5** (`2102`, ported) | The same promise on the preview's ported copy |
+
+Both packages therefore run file-first with `vm.swappiness = 1`. The preview
+applies a port of the author's 7.3 patch to the linux-next base — see the
+2026-10-26 (later) entry in `../PATCH_SOURCES.md` and the port notes in
+`../../sleepy-next/PATCH_SOURCES.md`. The MARIE text below is kept as the
+history of how this policy was measured.
 
 **This section previously argued the opposite**, at length. It called the clamp
 a misconfiguration and clearing it "the fix" for the 2026-09-22 OOM. It was
@@ -124,12 +137,13 @@ the anon and file lists:
 
 ```c
 u8 configured = (u8)mem_cgroup_swappiness(memcg);
-u8 swappiness = (READ_ONCE(marie_low_swappiness_mode) && configured > 1) ?
+u8 swappiness = (READ_ONCE(marie_max_swappiness) && configured > 1) ?
                 1 : configured;
 ```
 
-`marie_low_swappiness_mode` defaults to **1**, so it replaced any configured
-value above 1 with 1 before the picker saw it. Its header states this applies
+`marie_max_swappiness` defaults to **1**, so it replaced any configured
+value above 1 with 1 before the picker saw it. (The knob was named
+`low_swappiness_mode` before MARIE 1.0.0-rc1.) Its header states this applies
 *"regardless of the higher values vm.swappiness / memory.swappiness udev
 rules, tuning daemons, or distro defaults have installed."*
 
@@ -191,20 +205,32 @@ inside build windows *with* the clamp cleared, which is why they clustered.
 
 ### `vm.swappiness` is set to 1, not 180
 
-`99-zswap-swappiness.conf` previously set 180 and argued for it. With the clamp
-on, 180 is a value nothing consumes — which is what sent two diagnoses wrong,
-because the sysctl *read* 180 while the machine used 1. It is now 1, so the
-file agrees with what MARIE actually does.
+`99-zswap-swappiness.conf` previously set 180 and argued for it. With MARIE's
+clamp on, 180 is a value nothing consumes — which is what sent two diagnoses
+wrong, because the sysctl *read* 180 while the machine used 1.
+
+Under CAST the value has a different job: **1 is a promise**, not a clamp.
+CAST documents `0` (never swap), `1` (file first down to the clean-file floor,
+then anon) and `200` (anon first) as fixed policies; any other value is only
+the starting point of its measured split. The file stays at 1 deliberately:
+file-first is the measured-correct policy for this workload, and letting the
+measurement start from 60 would allow CAST to choose an anon-first split on
+a machine where the anon is the live desktop working set. The LRFU ranking,
+per-lruvec reclaim, kcompressd and the clean-file floor are active either
+way.
 
 ## Install
 
 ```bash
-sudo install -Dm644 99-zswap-swappiness.conf      /etc/sysctl.d/99-zswap-swappiness.conf
-sudo install -Dm644 marie-low-swappiness-mode.conf /etc/tmpfiles.d/99-marie-low-swappiness-mode.conf
+sudo install -Dm644 99-zswap-swappiness.conf /etc/sysctl.d/99-zswap-swappiness.conf
 sudo ./setup-swapfile.sh
 ```
 
-zswap is on by default (`CONFIG_ZSWAP_DEFAULT_ON=y`) and so is the shrinker
+`marie-low-swappiness-mode.conf` is **historical**: it writes MARIE's
+`max_swappiness`, and no shipped kernel carries MARIE any more (CAST replaced
+it in both packages on 2026-10-26). Keep it only if you still boot an older
+kernel; on CAST kernels the write fails harmlessly at boot. zswap is on by
+default (`CONFIG_ZSWAP_DEFAULT_ON=y`) and so is the shrinker
 (`CONFIG_ZSWAP_SHRINKER_DEFAULT_ON=y`) — the latter is **load-bearing**, since
 without it nothing ever drains the pool.
 
@@ -213,16 +239,18 @@ without it nothing ever drains the pool.
 ```bash
 swapon --show                             # /swapfile, priority 100
 cat /proc/sys/vm/swappiness               # 1
-cat /sys/kernel/mm/lru_marie/low_swappiness_mode   # 1   <- clamp on (MARIE default)
+cat /sys/kernel/mm/lru_cast/enabled       # 1 on the rc kernel (CAST active)
+cat /sys/kernel/mm/lru_marie/max_swappiness  # 1 on the preview (MARIE clamp)
 cat /sys/module/zswap/parameters/enabled           # Y
 cat /sys/module/zswap/parameters/shrinker_enabled  # Y
 sudo cat /sys/kernel/debug/zswap/stored_pages      # grows under pressure
 sudo cat /sys/kernel/debug/zswap/written_back_pages # >0 once the pool drains
 ```
 
-**Both should read 1, and that is the intended state** — the sysctl agreeing
-with the clamped value MARIE actually uses. If `low_swappiness_mode` reads 0
-the clamp has been cleared, which lets `vm.swappiness` reach the picker, and
+**The swappiness should read 1, and that is the intended state.** Under CAST
+it is the file-first promise; under MARIE it agrees with the clamped value the
+picker uses. If the MARIE clamp reads 0 the clamp has been cleared, which lets
+`vm.swappiness` reach the picker, and
 that combination is the configuration that made the machine thrash. Check
 `/etc/tmpfiles.d/` and re-run `systemd-tmpfiles --create`.
 
@@ -249,6 +277,11 @@ existing; that mistake was made once here already.
 
 - **MARIE's swappiness clamp was cleared, then restored on 2026-09-23.** The
   cleared state is what made the machine sluggish; see the correction above.
+- **2026-10-26: both packages moved from LRU-MARIE to lru_cast 0.2.5.** CAST
+  is Marie's successor and is carried as `2102`; the preview applies a port of
+  the same patch to its linux-next base. `vm.swappiness` stays 1, which CAST
+  honours as its file-first promise. See the 2026-10-26 (later) entry in
+  `../PATCH_SOURCES.md`.
 - **Swap backend: xswap -> zswap + a 16 GiB swapfile.** The xswap series
   (`2155`-`2168`, `2199`; 15 patches) was removed; patch `2196`, a standalone
   zswap fix salvaged from that series, was added.
