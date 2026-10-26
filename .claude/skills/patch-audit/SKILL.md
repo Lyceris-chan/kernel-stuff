@@ -107,6 +107,7 @@ Run these in order. Copy the commands exactly — do not improvise.
    | `26xx` | Time / timers — reserved, currently empty in both packages |
    | `27xx` | zswap request stack — `sleepy-next/` preview only |
    | `29xx` | VFS / core filesystem (initramfs pinning, fs_struct) |
+   | `30xx` | Platform, USB and hwmon (PROM21 chipset temperature) |
    | `90xx` | agd5f staging + userq lifecycle backports |
    | `91xx` | Retry-fault handling v4 (agd5f staging, 9100–9110) |
 

@@ -18,6 +18,37 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-6-sleepy-rc (Linux 7.3)]: 2026-10-26
+
+A patch-only refresh; the base stays at `v7.3`. The series moves from 293 to
+294 patches and the package is rebuilt at `pkgrel=6`.
+
+### Added — chipset temperature sensors (`3000`)
+
+`3000` adds the AMD 600-series PCI IDs to `xhci-pci-prom21`
+(`29381088ac50`, Stephen Horvath, `Tested-by` from an X670 board with the same
+`1022:43f7` DID this B650 board has). The Promontory 21 glue publishes the
+auxiliary device that `prom21-xhci.ko` turns into chipset temperature sensors;
+the merged 7.2 driver listed only the 800-series IDs.
+
+The IDs alone do nothing while `CONFIG_SENSORS_PROM21_XHCI` is unset, so both
+packages now select `-m SENSORS_PROM21_XHCI` in `prepare()`. That also flips
+the hidden `USB_XHCI_PCI_PROM21` to `y`, which compiles the glue.
+
+### Verification
+
+Cumulative audit **294/294** against `v7.3`. Package
+`linux-sleepy-rc-7.3.0-6` (22 MB) and headers (33 MB) built. The extracted
+`vmlinux` carries `.BTF` and `.BTF_ids`; `tcp_bbr3` is built and the old
+`tcp_bbr` is not; `prom21-xhci.ko` is in the package and the built-in cmdline
+still has `amdgpu.dcdebugmask=0x800`. Installed side by side with the preview
+and a rebuilt initramfs. No reboot was performed.
+
+The 2026-10-26 sweep found no functional update to a carried patch. It flagged
+`lru_cast` v0.2.0 (Marie's successor) as a user decision, and kept the ATOM
+calltable underflow, the single-NAPI io_uring busy-poll change and the TCP MSS
+revert on the watch list; the triage is in `sleepy-rc/PATCH_SOURCES.md`.
+
 ## [2026.10.23-1-sleepy-next (linux-next `next-20261023`)]: 2026-10-23
 
 Preview bump from `next-20261022` to `next-20261023`, one day of linux-next.

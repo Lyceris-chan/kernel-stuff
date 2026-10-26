@@ -676,7 +676,7 @@ EOF
     # the blk-mq rework), so olddefconfig silently discarded it. The NVMe device's
     # scheduler is set by udev's /usr/lib/udev/rules.d/60-ioschedulers.rules, which
     # assigns kyber to nvme[0-9]*. MQ_IOSCHED_KYBER must still be built in.
-    scripts/config -e LRU_GEN -e LRU_GEN_ENABLED -e LRU_GEN_WALKS_MMU -e LRU_MARIE -e CPU_IDLE_GOV_NAP -e MQ_IOSCHED_KYBER -m USB_VIDEO_CLASS -m I2C_CHARDEV -e R8169 -e REALTEK_PHY -d TCP_CONG_BBR -e TCP_CONG_BBR3 -e DEFAULT_BBR3 --set-str DEFAULT_TCP_CONG "bbr3"
+    scripts/config -e LRU_GEN -e LRU_GEN_ENABLED -e LRU_GEN_WALKS_MMU -e LRU_MARIE -e CPU_IDLE_GOV_NAP -e MQ_IOSCHED_KYBER -m USB_VIDEO_CLASS -m I2C_CHARDEV -m SENSORS_PROM21_XHCI -e R8169 -e REALTEK_PHY -d TCP_CONG_BBR -e TCP_CONG_BBR3 -e DEFAULT_BBR3 --set-str DEFAULT_TCP_CONG "bbr3"
     # next-20261019's sched_ext tree has two merge gaps: free_dsq_irq_workfn()
     # uses dsq->pcpu although the field was renamed to pcpu_user, and
     # scx_reenq_wait_dispatching() is called but not defined anywhere. BORE is

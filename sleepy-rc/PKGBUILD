@@ -182,7 +182,7 @@ _rcver=
 
 pkgver=7.3.0
 _tagrel=1
-pkgrel=5
+pkgrel=6
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -555,6 +555,7 @@ source=(
   "patches/9100-9199/9108-drm-amdgpu-vm-Use-init-PTE-flags-in-amdgpu_vm_handle_fault.patch"
   "patches/9100-9199/9109-drm-amdgpu-ih6.0-Enable-retry-CAM-on-Navi-3-dGPUs.patch"
   "patches/9100-9199/9110-drm-amdgpu-ih7.0-Enable-retry-CAM-on-Navi-4-dGPUs.patch"
+  "patches/3000-3099/3000-usb-xhci-pci-add-amd-600-series-to-xhci-pci-prom21.patch"
 )
 
 # makepkg 7.1.0 resolves local sources by basename in the PKGBUILD directory
@@ -767,7 +768,7 @@ EOF
     # the blk-mq rework), so olddefconfig silently discarded it. The NVMe device's
     # scheduler is set by udev's /usr/lib/udev/rules.d/60-ioschedulers.rules, which
     # assigns kyber to nvme[0-9]*. MQ_IOSCHED_KYBER must still be built in.
-    scripts/config -e LRU_GEN -e LRU_GEN_ENABLED -e LRU_GEN_WALKS_MMU -e LRU_MARIE -e CPU_IDLE_GOV_NAP -e MQ_IOSCHED_KYBER -m USB_VIDEO_CLASS -m I2C_CHARDEV -e R8169 -e REALTEK_PHY -d TCP_CONG_BBR -e TCP_CONG_BBR3 -e DEFAULT_BBR3 --set-str DEFAULT_TCP_CONG "bbr3"
+    scripts/config -e LRU_GEN -e LRU_GEN_ENABLED -e LRU_GEN_WALKS_MMU -e LRU_MARIE -e CPU_IDLE_GOV_NAP -e MQ_IOSCHED_KYBER -m USB_VIDEO_CLASS -m I2C_CHARDEV -m SENSORS_PROM21_XHCI -e R8169 -e REALTEK_PHY -d TCP_CONG_BBR -e TCP_CONG_BBR3 -e DEFAULT_BBR3 --set-str DEFAULT_TCP_CONG "bbr3"
     # R8169 + REALTEK_PHY built in, not modules. As modules they are loaded
     # by udev after the root switch (measured: probe at 6.26s, PHY attach
     # 7.05s, carrier 10.13s), which pushes the link negotiation past most of
@@ -1489,6 +1490,7 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         '840a7398ba7bd658038b40ba90d12da76709a296a6dab27a29d959c5c303a0bf572ab55376e38af749b649ebd9bcb1b0fa40f927aa636db0b58ad2824daea158'
         'f78d409734e9810f448e564aae9bdad28af03193913053f25deee0eebaa8b999cbf135e6e0c27e5c5ffe9bac5918fd0ddf9a73307a67d8e1be2876d8b99b1646'
         '5a986874cf6e64a32b084a25147132d21d32dce0378f91f63e8a918e91bd0e18423e96ef3dc6fb319c3ae0663f6326edcebe8b9a1e08d7d318295ddda21ac4bb'
+        '334fc42a82212dbfb0ff37865a7ccbf4df09164c252b9c7493ba0ee0d58aaa9a0aa89e012c50be8b4671e01dceab45175634617e15032182590989adad35a7ab'
         '2cdec9daf2eb9d4a8e95f33bcc81e603899db1f2e4f55cde68fa29727972238b5bd544e055a06bd0c94569e222666f6d8bf231db9fa8593b6d5f4fe52b26022a'
         '4cf91dd679c25cb8c7a519f5d77fdf29cc345043bd8a71b6c8e54d1a4179cf489f464108464ad2b1bc8ccffd743707e6fdaae1e33300b29a4fc7b9457b90e6be')
 

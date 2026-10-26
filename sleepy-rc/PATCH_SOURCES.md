@@ -28,16 +28,17 @@ are supplied by the generator instead, so every row below has a source.
 | `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 43 |
 | `2100–2199` | Memory management and swap (zstd, LRU-MARIE, gup, zswap) | 50 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
-| `2300–2399` | Build system and kbuild | 20 |
+| `2300–2399` | Build system and kbuild | 21 |
 | `2400–2499` | Core scheduler and sched-ext | 3 |
 | `2500–2599` | x86 and arch core | 2 |
 | `2600–2699` | Time and timers | 0 |
 | `2800–2899` | Memory management, second series (mm/swap follow-ups) | 6 |
 | `2900–2999` | VFS / core filesystem | 0 |
+| `3000–3099` | Platform, USB and hwmon (PROM21 chipset temperature) | 1 |
 | `9000–9099` | agd5f staging + userq lifecycle backports | 36 |
 | `9100–9199` | Retry-fault handling v4 (agd5f staging) | 11 |
 
-**Total: 293** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 294** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-19). The counts are now generated from the patch tree
@@ -719,6 +720,25 @@ split page tables as kernel page tables; `2507` excludes alternatives text
 poking from racing a concurrent `change_page_attr`. `CONFIG_X86_PAT=y`, and PAT
 is per-CPU and on the hot path of every `ioremap`/`set_memory_*` caller, so
 this is live code rather than a latent corner.
+
+### Platform, USB and hwmon (3000–3099)
+
+`3000` — **usb: xhci-pci: Add AMD 600 series to xhci-pci-prom21**
+(Stephen Horvath, merged `29381088ac50`, `Cc: stable@vger.kernel.org # 7.2.x`).
+The Promontory 21 xHCI glue publishes the auxiliary device that
+`prom21-xhci.ko` turns into chipset temperature sensors, but the merged 7.2
+driver listed only the 800-series IDs (`1022:43fc`, `1022:43fd`). This board is
+an ASRock B650 PG Lightning and its chipset xHCI is **`1022:43f7`**, the exact
+DID the commit was tested on (X670); the commit adds `43f7`, `43f9` (B665) and
+`43fa` (A620). It is present in `next-20261023` and in mainline, absent from
+`v7.3`, so it is carried for `sleepy-rc` only. Forward dry-run and series audit:
+clean.
+
+The IDs alone do nothing while `CONFIG_SENSORS_PROM21_XHCI` is unset, which is
+how both base configs ship. The prepare() overrides now set `-m
+SENSORS_PROM21_XHCI`; that also flips the hidden `USB_XHCI_PCI_PROM21` to `y`
+(`default USB_XHCI_PCI if SENSORS_PROM21_XHCI != n`), which is what compiles
+`xhci-pci-prom21.o`. Without that config change this patch is dead code.
 
 ### agd5f staging backports (9000–9099)
 
@@ -10573,3 +10593,154 @@ at `7.3.0-5`. No build is needed; the installed kernel is the same package.
 `sleepy-next/patches/` holds 142 files against 135 entries; the same seven
 orphans remain (`1008`, `1012`, `1013`, `1014`, `1017`, `9040`, `9060`) and
 still need a `patch-cleanup` pass.
+
+## Sweep 2026-10-26 — `3000` prom21 600-series; `lru_cast` released
+
+The 10-26 pass refreshed every tree and mirror to 08:30 UTC. Linux-next has
+**not** published `next-20261026` yet (tag list and `releases.json` still end at
+`next-20261023`); the bump section is appended when the tag lands.
+
+### Source state
+
+| Source | State | Delta |
+|---|---|---|
+| torvalds | `6b4b543fa187` (10-25) | 7.4 merge-window content; `Makefile` still says `7.3.0` (no 7.4-rc1 tag yet). No AMD target commit after 10-23 |
+| linux-next | **`next-20261023`** `20a33c6b6cbe`, tag `77cb3534193b` | no `next-20261026` on the remote or in `releases.json` at 08:30 UTC |
+| drm-next | `fad06cfaf385` (10-21), unchanged | no AMD commit |
+| agd5f / amd-staging | `77f548b127c6` (10-20), unchanged | no branch moved |
+| drm-misc | `gitlab/drm-misc-next` (10-23) | `accel/amdxdna` only |
+| linux-pm | `7be4bc52fd9e` (10-21) | driver-core 7.4-rc1 merge; nothing on-target |
+| akpm-mm | `origin/mm-everything` `1abf7693a143` (10-25) | 10-24/25: ocfs2 xattr, damon static-state, `/proc/profile` layout, vmalloc `vm_map_ram` offset, VMA soft-dirty. None target |
+| tip | `f19aa57d9feb` (10-25) | powerpc/irq, genirq/kexec, timekeeping, posix-cpu-timers, sched/cache, perf. Nothing target |
+| lore mirrors (15) | newest mail 10-26 | amd-gfx `44b4b20a`; dri-devel `562dff54`; lkml `6d88cf5572`; linux-mm `b008230a92` |
+| CachyOS | unchanged | `7.3/base` 10-06, `7.3/fixes` 10-05, `7.3/zram` 10-09, `7.3/hdmi` 09-21 |
+| sirlucjan | `7275a4ad` (10-20), unchanged | — |
+| firelzrd | MARIE `dba9daf` (10-17) unchanged; **lru_cast v0.2.0 released 10-26** | see the successor note below |
+| linux-tkg | `3db34e3` (10-24) cache refresh only | not used by this machine |
+| cachyos-kernel-patches | `89bb22de` (10-22) | NVIDIA runtime-D3 only |
+
+### Version sweep — 19 newer-dated postings, no functional update
+
+A normalized-subject pass over both carried series against the 15 current
+mirrors found 19 postings newer than the carried revision. All are resends,
+reworded comments, whitespace, or changelog-only:
+
+| Carried | Posting | Verdict |
+|---|---|---|
+| `1179` v1 | v2, 10-26, `44b4b20a` | added-line delta empty — resend |
+| `1309` v1 | v2 7/7, 10-26, `ea728ffc` | only the comment wording differs; same `RREG32(scratch)` flush |
+| `2056` v2 | v4, 10-26, `e43b384b36` | delta empty — resend |
+| `2800` v1 | v4, 10-26, `785512d91c` | comment-only: expands the `sync_with_folio_pmd_zap` doc and adds one comment; code identical |
+| `1099` v2 | v3, 10-22 | delta empty |
+| `9087` v1 | v2, 10-15 | whitespace-only reindent of the `min(...)` continuation |
+| `1231`/`1232` v1 | v2, 10-01 | delta empty; both are the REDUNDANT pair already rejected |
+| `2302`/`2308`/`2313`–`2317` v3 | v4, 09-23 | the recorded 2026-10-22 decision stands: v4 is a different base; sorttable is carried as `2322`, objtool fails 5/6 |
+| `2037`/`2039` | v2/v3 | changelog-only ("No code changes") |
+| `2154`, `2185` | v3/v6 | delta empty |
+| `9088` v1 | v4 6/6 | no change needed — the v4-only lines are the v2.4–v7.1 conversions this partial port drops as wrong silicon |
+| `1151` | "v4" | older February posting, not an update |
+
+### New candidates
+
+| Candidate | Source | Verdict |
+|---|---|---|
+| `usb: xhci-pci: Add AMD 600 series to xhci-pci-prom21` `29381088ac50` | merged, `Cc: stable # 7.2.x` | **ADOPTED as `3000`.** Tested on the same `1022:43f7` DID this board has |
+| **lru_cast v0.2.0** (`326f2ad1b9da`, patch for 7.3-rc7) | firelzrd, 10-26 12:18 +0900 | **Major candidate, NOT adopted.** Marie's successor: measured-LRFU ranking, self-tuning swappiness, per-lruvec cgroups, runtime switch. Applies clean to `v7.3`. It replaces the same MM integration points as `2101`, so carrying both is not possible; swapping MARIE for it is a user decision, not a sweep carry |
+| ATOM calltable underflow v3 (Aldo Panzardo) | amd-gfx/dri-devel 09-23, Alex Deucher replied "Applied" | **Watch.** Applies clean to both series trees, but the commit is in **no fetched ref** four weeks after the reply, and the `ATOM_CMD_INIT` 16-vs-64-byte interaction is still unresolved. Do not carry until it appears in a tree |
+| ATOM parameter-space bounds check v2 | same author, 09-23 | **Watch.** Zero review; 10-09 and 10-24 pings unanswered |
+| `io_uring/napi: drop the single NAPI busy poll special case` | io-uring 10-26 | **Watch.** Reproduced on exactly this NIC shape — `r8169`, one RX queue, `busy_poll_to` — and net-tune sets `busy_poll=50`/`busy_read=50`. No review yet |
+| Revert advertising TCP MSS from the configured MTU 0/2 | netdev 10-26 | **Watch.** Confirmed regression on 7.3-rc7 with a namespace reproducer; `2640e6419594` is in this base. Reverts base content, not a carried patch; no maintainer reply yet |
+| GPU reset 8-patch series (Prike Liang) | amd-gfx, replies 10-26 | **Watch, unchanged.** Prike answered Lijo's TTM/SDMA question (`amdgpu_device_gpu_resume()` submits no TTM job); still no v2, `6/8` unreviewed, `3/4` and `8/8` wrong silicon |
+| reset_engine 15-patch series v2 (gfx12 engine reset) | amd-gfx 10-22 | **Watch.** Feature work, no review; 10-25 replies are review discussion |
+| `block: fix discard alignment for non-power-of-two granularities` | block 10-26 | **Rejected — inert.** This NVMe advertises `discard_granularity=512` (power of two) and dm-thin is not used |
+| `shmem: do not extend i_size when no data was copied` | linux-mm 10-25 | **Rejected — out of scope.** Real bug (`Fixes:` present in base) but generic tmpfs, no review |
+| `drm/amd/display: keep custom brightness curve in userspace domain` v3 | dri-devel 10-24 | **Rejected — inert.** Only the AUX/PWM panel backlight path; this desktop drives an external monitor |
+| `drm/amdgpu: use the SGT mapping type` 26-patch conversion | dri-devel 10-26 | **Rejected — refactor.** DRM mapping-type conversion, not a target fix |
+| userq style 3/3 (`BIT()`, blank lines) | amd-gfx 10-26 | **Rejected — cosmetic.** No behaviour change |
+| nvme-rdma T10-PI NULL deref; nvmet FDP; nvme service-time iopolicy; zram v7 15-patch; io_uring dma-buf pull; TLS 1.3 KeyUpdate RFC; Apple GMUX 13-patch; eDP native-mode/panel-power; 7.4 block/memblock/slab/MM features | 10-24..10-26 | **Rejected — off-target, inert, or 7.4 feature work.** No RDMA/NVMET hardware; zram unused (zswap + swapfile); RFC or 7.4-only |
+
+### Reverts, drops and API removals
+
+No merged `Revert "…"` since 10-23 matches a carried patch; the only subject
+match in the whole since-09-01 scan is `2046`, the `nvme-pci` clamp revert we
+already carry, so upstream and the tree agree. The `sched/fair: Remove dead
+code on enqueue_task_fair()` revert is 7.4-base content; BORE is a full
+replacement and does not carry that removal. The new `Revert "…"` proposals
+since 10-24 are the TCP MSS pair (base content, watch above), nouveau PCI
+quiesce and perf AUX — none carried. No carried patch uses a helper removed by
+7.4 (`__get_user()`/`__put_user()` removal was already a bump watch).
+
+### Tracker
+
+29 open `drm/amd` issues moved since 10-24. The on-target threads are reports,
+not fixes: `#6039` (Navi 44 eGPU, but DCN 4.0.1: UBSAN index -1 in
+`dml2_core_dcn4_calcs.c` on the post-MODE1-reset path), `#6032`/`#5994`
+(Navi 48 S3/display-wake sync flood and the `amdgpu_dm_atomic_commit_tail`
+vblank WARN, still reproducible on 7.3.0-4), `#5965` (R9500 SMU hang with
+hwmon `ENOTSUP`), `#5869` (gfx1201 ring reset → MODE1/VRAM lost under
+vkd3d-proton), `#5961` (framebuffer corruption; one reporter's Plasma 6.8
+update removed it), `#6033` (HDMI `vrr_capable` 0 on an RX 5600M),
+`#6031` (HDR colours after 7.3.0), `#6030`/`#5709` (HDMI FRL deadlock and
+training budget on DCN 3.1.5). No comment cites a new fix commit; `#5657`'s
+`63e19ef3ddab` fix is already in the `v7.3` base. No patch to carry.
+
+Two issues closed since 10-24. `#5711` is Navi 31 firmware (not this GPU).
+`#5663` is the important one: Navi 4x DCC corruption after every suspend/resume,
+bisected to `3a6f6eeb3db5` ("give ttm entities access to all the sdma scheds").
+Closed because `cd647796ac13`/`eaeac1498b28` ("implement workaround for sdma dcc
+corruption") sets `num_move_entities = 1` for `IP_VERSION(7,0,0)`/`(7,0,1)`.
+That workaround is **already in `v7.3`** at `amdgpu_ttm_enable_buffer_funcs()`,
+so this GPU is covered and nothing needs carrying.
+
+### Tracker patches and threads surfaced by the second pass
+
+The first pass read issue descriptions and the tails of the on-target comments.
+A second pass over all 74 open issues updated since 10-20 extracted every
+uploaded patch and every commit-looking token. No merged commit is missing from
+the base; the interesting non-merged material is:
+
+| Thread | What it contains | Verdict |
+|---|---|---|
+| `#6012` | Zdenek Kabelac's `drm/amd/display: do not resume cached CRTCs of lost DPIA` (submitted to amd-gfx 10-21, CC Wayne Lin). Disables CRTCs whose `DISPLAY_ENDPOINT_USB4_DPIA` link was lost during suspend so a dead tunnel is not re-committed | **Out of scope.** This desktop has no USB4/DPIA tunnel; the connectors are direct DP/HDMI |
+| `#5981` | Mario Limonciello's 3-patch DPIA/MST series: `Release the IRQ-owned stream`, `Skip stale DPIA slot updates`, `Reject unallocated MST payloads`. Tracker attachments 10-14; a reporter tested the v7.3 port with no WARNs | **Out of scope** for the same reason (DPIA/MST). Three `Fixes:`/`Cc: stable`, so they will arrive with a future base |
+| `#6003` | amdgpu userptr pages written by the GPU are never marked dirty, so reclaim can drop them and the next CPU access reads the stale swap copy. Generic amdgpu, present since `915d3eecfa23` (2019); no patch yet, Christian König engaged | **Watch.** Live on any amdgpu userptr/HMM workload; no fix to carry |
+| `#6025` | NULL deref in `rb_erase` via `drm_sched_rq_update_fifo_locked` from `amdgpu_gem_va_ioctl`, then a soft-lockup cascade. `agd5f` CC'd Christian | **Watch.** No patch yet |
+| `#6011` | 7.3 display-flicker regression reports across Navi 3x / 7900 XTX, one ending in a GPU reset loop. No fix; the `#6004` vupdate reverts are already watch-only and do not apply to 7.3 | **Watch.** No kernel patch |
+| `#6014` | Navi 48 HDMI 2.1 FRL not trained on an LG OLED sink at 4K120; no fix. Same FRL area as carried `0032`/`0033`/`1136`/`1168` | **Watch.** No patch |
+| `#5940` | Firmware brightness curve large steps near 0% on eDP panels. Confirms the `keep custom brightness curve` v3 patch is the eDP/PWM path only | **Confirms the reject** — this desktop drives an external monitor |
+
+`#5951`'s runtime-PM leak fix is `7073b82adcaa` and is already carried as `1174`.
+`#5663` is closed; its SDMA/DCC workaround (`num_move_entities = 1`) is in
+`v7.3`.
+
+### Phoronix triage
+
+RSS through 10-25 20:24 EDT:
+
+| Article | Actual content | Verdict |
+|---|---|---|
+| **AMD 600 Series Chipsets Now Have Temperature Monitoring Support** | `xhci-pci-prom21` gains the 600-series IDs, marked for 7.2/7.3 backport | **Adopted as `3000`** — this board is `1022:43f7`, the tested DID |
+| Linux 7.4 Graphics / Block / MM / Slab / memblock / Sound / Input / Staging | 7.4 merge-window feature summaries | Feature work, not 7.3 fixes; the preview base already carries the graphics content |
+| Linux 7.4 Fixes AMD CPU TLB Size Reporting For Zen 5 & Newer | Zen 5+ CPUID path | Not this CPU |
+| Linux 7.4 Power Management Preps For Zen 6 | 7.4 amd-pstate | Not this CPU |
+| Realtek rtl8723bs deleted from staging | Wi-Fi driver deletion | Not this NIC (`r8169`) |
+| SteamOS, systemd Rust, Wild linker, KDE, OBS, HPFS, oneDNN, OpenSSL, Vulkan, FFmpeg, LibreSSL, Redox, Wayland VNC, AV2 | unrelated | — |
+
+### Adopted
+
+| Number | Subject | Author | Source | Note |
+|---|---|---|---|---|
+| `3000` | usb: xhci-pci: Add AMD 600 series to xhci-pci-prom21 | Stephen Horvath | `29381088ac50`, `Tested-by: Mirko Jechow` | Adds `1022:43f7/43f9/43fa`; `43f7` is this B650 board's chipset xHCI, so `prom21-xhci` can read chipset temperatures. Present in the preview base; **rc-only carry**. `-m SENSORS_PROM21_XHCI` added to both prepare() overrides, otherwise the IDs are dead |
+
+### Bump
+
+`next-20261026` had not been cut at 08:30 UTC. The preview stays at
+`next-20261023` until the tag lands; see the appended bump section for the
+final tag, series reconciliation and verification.
+
+### Housekeeping
+
+`sleepy-rc/patches/` holds 294 files against 294 `source=()` entries (the new
+`3000` included). `sleepy-next/patches/` still holds 142 files against 135
+entries; the same seven orphans remain (`1008`, `1012`, `1013`, `1014`, `1017`,
+`9040`, `9060`).
