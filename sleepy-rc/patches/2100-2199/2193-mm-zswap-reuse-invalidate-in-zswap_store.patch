@@ -1,4 +1,4 @@
-From 9ffd38b0f610ea4eb107dc8a77b34578e6e78acd Mon Sep 17 00:00:00 2001
+From 81a798cf85e98049e63bb7daf8386e037c77a5d5 Mon Sep 17 00:00:00 2001
 From: Kefeng Wang <wangkefeng.wang@huawei.com>
 Date: Thu, 10 Sep 2026 20:35:44 +0800
 Subject: [PATCH] mm: zswap: reuse zswap_invalidate() in zswap_store()
@@ -21,26 +21,31 @@ Cc: Yosry Ahmed <yosryahmed@google.com>
  1 file changed, 2 insertions(+), 13 deletions(-)
 
 diff --git a/mm/zswap.c b/mm/zswap.c
+index c92a497b3c0a..03f986882d06 100644
 --- a/mm/zswap.c
 +++ b/mm/zswap.c
-@@ -1607,17 +1607,12 @@
- 	if (!ret) {
- 		unsigned type = swp_type(swp);
- 		pgoff_t offset = swp_offset(swp);
+@@ -1543,19 +1543,8 @@ bool zswap_store(struct folio *folio)
+ 	 * offsets corresponding to each page of the folio. Otherwise,
+ 	 * writeback could overwrite the new data in the swapfile.
+ 	 */
+-	if (!ret) {
+-		unsigned type = swp_type(swp);
+-		pgoff_t offset = swp_offset(swp);
 -		struct zswap_entry *entry;
 -		struct xarray *tree;
- 
+-
 -		for (index = 0; index < nr_pages; ++index) {
 -			tree = swap_zswap_tree(swp_entry(type, offset + index));
 -			entry = xa_erase(tree, offset + index);
--			if (entry && !xa_is_value(entry))
+-			if (entry)
 -				zswap_entry_free(entry);
 -		}
-+		zswap_invalidate(type, offset, nr_pages);
- #ifdef CONFIG_LRU_MARIE
- 		if (incomp) {
-+			struct xarray *tree;
-+
- 			tree = swap_zswap_tree(swp_entry(type, offset + incomp_index));
- 			if (!xa_is_err(xa_store(tree, offset + incomp_index,
- 						ZSWAP_INCOMP_MARK,
+-	}
++	if (!ret)
++		zswap_invalidate(swp_type(swp), swp_offset(swp), nr_pages);
+ 
+ 	return ret;
+ }
+-- 
+2.56.0
+

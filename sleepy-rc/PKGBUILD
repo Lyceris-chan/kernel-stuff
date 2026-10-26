@@ -182,7 +182,7 @@ _rcver=
 
 pkgver=7.3.0
 _tagrel=1
-pkgrel=6
+pkgrel=7
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -426,7 +426,7 @@ source=(
   "patches/2000-2099/2059-io_uring-add-a-schedule-point-in-io_free_batch_list.patch"
   "patches/2000-2099/2060-io_uring-add-a-schedule-point-in-__io_req_caches_free.patch"
   "patches/2100-2199/2100-zstd-7.3-merge-v1.6.0-into-kernel-tree.patch"
-  "patches/2100-2199/2101-mm-7.3-introduce-LRU-MARIE-1.0.0-rc1.patch"
+  "patches/2100-2199/2102-mm-7.3-lru_cast-v0.2.0.patch"
   "patches/2100-2199/2120-mm-gup-mm-gup-break-out-gup-fill-pages-helper.patch"
   "patches/2100-2199/2121-mm-gup-mm-gup-convert-follow-page-mask-to-return-a-long.patch"
   "patches/2100-2199/2122-mm-gup-mm-gup-split-follow-page-pte-commit-out-of.patch"
@@ -768,7 +768,7 @@ EOF
     # the blk-mq rework), so olddefconfig silently discarded it. The NVMe device's
     # scheduler is set by udev's /usr/lib/udev/rules.d/60-ioschedulers.rules, which
     # assigns kyber to nvme[0-9]*. MQ_IOSCHED_KYBER must still be built in.
-    scripts/config -e LRU_GEN -e LRU_GEN_ENABLED -e LRU_GEN_WALKS_MMU -e LRU_MARIE -e CPU_IDLE_GOV_NAP -e MQ_IOSCHED_KYBER -m USB_VIDEO_CLASS -m I2C_CHARDEV -m SENSORS_PROM21_XHCI -e R8169 -e REALTEK_PHY -d TCP_CONG_BBR -e TCP_CONG_BBR3 -e DEFAULT_BBR3 --set-str DEFAULT_TCP_CONG "bbr3"
+    scripts/config -e LRU_GEN -e LRU_GEN_ENABLED -e LRU_GEN_WALKS_MMU -e LRU_CAST -e CPU_IDLE_GOV_NAP -e MQ_IOSCHED_KYBER -m USB_VIDEO_CLASS -m I2C_CHARDEV -m SENSORS_PROM21_XHCI -e R8169 -e REALTEK_PHY -d TCP_CONG_BBR -e TCP_CONG_BBR3 -e DEFAULT_BBR3 --set-str DEFAULT_TCP_CONG "bbr3"
     # R8169 + REALTEK_PHY built in, not modules. As modules they are loaded
     # by udev after the root switch (measured: probe at 6.26s, PHY attach
     # 7.05s, carrier 10.13s), which pushes the link negotiation past most of
@@ -1361,7 +1361,7 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         'c31f8fc6db7e5776ffbbde976239a102e5ddb0c2a6214a094a26f364718a507ac7c1960a9a955bfd16a3182979e57a8eb9ffbbde62d26ddfb983076868d619f2'
         '1455fd65a42e9bba65673da473b99187acc2e25d6535c89d365eb925500f84e23e40bddca183e83bb8af641122254083cddd8bf26fbdbd413da6a20ccd73850f'
         '04fe6270d9e54b974ee745261575fd710e3af252c6e2b2788a082455c6eeccfd2ea944245f5f58a9f4de418eca3058aaae8a27f90173b254aac15036c7a95c49'
-        '83ca07acaaf08c443599c6913f15e44485326725c4c0961f736e8f2676d839684fc5a75c73a7ab2ddebfb5a48cec4d379a794c5575a810cc64b96942bb033149'
+        '626219222f5a3c5dcb68095e662ddf37a085baa3f2e3b16abc99c492abd653ecd3a365bb8cf8ecb941c9fbd2c78e28bd96cb39d571934820fe3eb4f3b8338fad'
         'a745db752d2586475d373cb29e64b4f42f6e305b4b3e588efbce955491429c73b3d16c426e76118b1499bbfb4a2159192f3950ed06d309064eb28750a1d6e6aa'
         '8820c684d4f21c9c74729a518f187334b817b8059436aa808e423533a67a6b752a93df4e79c200307b29635f0de393f6749aaa52cfc20e28957f759b4adb6ce0'
         '877dc1eebcaec113969ea45471b63e0339066a270da667b5c1aa1578e26aa01c7ec34e1cb4c436565553388e0ba04add10bf3540fe4ba7e11b24aa8a8d8ccc4f'
@@ -1402,9 +1402,9 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         '3d44ec3507a3cb53d0b74520e46f34ef4529f650b6d66ffea14623162c9fa7d561874eb6291c0f4a399d3382b7734d4a764e331bca47a0ded4a3ef574c10bef6'
         'a4c89c1fe2f5482f9b60b53911925201e1ddc8b2d2f0c9d351c72e2a961181a7bd9c2df9bed70476705f638b6699a725f7792b376a6305bc81adc2ad9ce1aa8f'
         '5fd386e624b1864451a6a6bfdc4665e95fdcd8475b0c8aad91aa6072a8b61e28870bf2387746302fc21f208ac3eb6037c52fc2639ede09971a563f4f45eacc01'
-        '0887c13623a3da1c4ba288bd1b1fdba80f9515c76476d1906e35dfaf21cf854c847f60fcd76ace465ed7b7dc605f02d3d7ba92962fd41d0b302832faf0523ce9'
-        '39d5989b8077ce04020b97888ed9d8c44a1edbaa10c2b33fed26da11b0640d8b947da46a66156318de2c6f782121ff6e4adaee789163299cbb7ef5c9f701f2d7'
-        '6a4f02db5860a81e627270cd2be5c9de9ffea38baa52a01508ece7e655b09a9b6b1d77556f7c771037a2cd6c9c8bc6d7775d4a7b57cd97b8ec7541e113899cb0'
+        '81918d7a7843b272062477da0a588ae848568a6ed2b067465f1607f84346eb84a6816db83673bd1e7098e297a60a56028b231b656e05469aa60e7042d3fb87cc'
+        '836c8289138e9ba28cedd23707c0c8ce52331e7ff633fb0bba600b2afb3a6d44c44c0f7e724278f498867b618027d0c88d8f329ab0b899d663c1dbaff9c7fd78'
+        'c464d7456e2375384eee047778ca6125e4b59919174e3f698ea89693e05eb00ed9bba5392509fc77058c707ffabcd05e05c0ab332efe4a091698eb6e196874e2'
         'eec79c47419e1ab4b0ff9131462f8dc7631c3ac690495ff233a103189e50251db8b2acd278f8f05a7ffcb2ebeb78ebda1cc5f0435ab5669fd0195075cf99c4cf'
         '53ece150b33c60c302078284fb336eb1f5a77cd0816772074cd1d551e4dd8db775759b9b1a16e00da73c332fed14ec472b183b084cdcd723d1e6c79a4f07538e'
         'd89984aace72f914a1613b6ef9aff57adf7daa1fdc196af78b11fce9b5ce9680d0ff43d2a44d5e378c7aee54ad0e1450d0349fd6e217d6af2131eeb65310e86c'

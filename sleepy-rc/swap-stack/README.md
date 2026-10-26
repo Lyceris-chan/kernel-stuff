@@ -112,7 +112,19 @@ livelock"*. The discussions run through reclaim-efficiency counters and
 `no_progress_loops` instead. That specific chain belongs to the xswap patch
 set's own `SWP_XSWAP` guard, which was removed with it.
 
-## The MARIE swappiness clamp — correct, and clearing it was a mistake
+## Reclaim policy and swappiness — file-first, and clearing it was a mistake
+
+### Which policy is running
+
+| Package | Kernel | Policy | What `vm.swappiness = 1` means |
+|---|---|---|---|
+| `linux-sleepy-rc` 7.3.0-7+ | 7.3 | **lru_cast 0.2.0** (`2102`) | CAST's *file-first promise*: reclaim file down to the clean-file floor, then anon. Its measured split is only used for other values |
+| `linux-sleepy-next` | linux-next | **LRU-MARIE 1.0.0-rc1** (`2101`) | MARIE's `max_swappiness` clamps the effective value to 1 |
+
+Both packages therefore run file-first with `vm.swappiness = 1`; only the
+mechanism differs. CAST does not apply to the `next-20261026` base, which is
+why the preview kept Marie — see the 2026-10-26 (later) entry in
+`../PATCH_SOURCES.md`.
 
 **This section previously argued the opposite**, at length. It called the clamp
 a misconfiguration and clearing it "the fix" for the 2026-09-22 OOM. It was
@@ -191,10 +203,19 @@ inside build windows *with* the clamp cleared, which is why they clustered.
 
 ### `vm.swappiness` is set to 1, not 180
 
-`99-zswap-swappiness.conf` previously set 180 and argued for it. With the clamp
-on, 180 is a value nothing consumes — which is what sent two diagnoses wrong,
-because the sysctl *read* 180 while the machine used 1. It is now 1, so the
-file agrees with what MARIE actually does.
+`99-zswap-swappiness.conf` previously set 180 and argued for it. With MARIE's
+clamp on, 180 is a value nothing consumes — which is what sent two diagnoses
+wrong, because the sysctl *read* 180 while the machine used 1.
+
+Under CAST the value has a different job: **1 is a promise**, not a clamp.
+CAST documents `0` (never swap), `1` (file first down to the clean-file floor,
+then anon) and `200` (anon first) as fixed policies; any other value is only
+the starting point of its measured split. The file stays at 1 deliberately:
+file-first is the measured-correct policy for this workload, and letting the
+measurement start from 60 would allow CAST to choose an anon-first split on
+a machine where the anon is the live desktop working set. The LRFU ranking,
+per-lruvec reclaim, kcompressd and the clean-file floor are active either
+way.
 
 ## Install
 
@@ -213,16 +234,18 @@ without it nothing ever drains the pool.
 ```bash
 swapon --show                             # /swapfile, priority 100
 cat /proc/sys/vm/swappiness               # 1
-cat /sys/kernel/mm/lru_marie/low_swappiness_mode   # 1   <- clamp on (MARIE default)
+cat /sys/kernel/mm/lru_cast/enabled       # 1 on the rc kernel (CAST active)
+cat /sys/kernel/mm/lru_marie/max_swappiness  # 1 on the preview (MARIE clamp)
 cat /sys/module/zswap/parameters/enabled           # Y
 cat /sys/module/zswap/parameters/shrinker_enabled  # Y
 sudo cat /sys/kernel/debug/zswap/stored_pages      # grows under pressure
 sudo cat /sys/kernel/debug/zswap/written_back_pages # >0 once the pool drains
 ```
 
-**Both should read 1, and that is the intended state** — the sysctl agreeing
-with the clamped value MARIE actually uses. If `low_swappiness_mode` reads 0
-the clamp has been cleared, which lets `vm.swappiness` reach the picker, and
+**The swappiness should read 1, and that is the intended state.** Under CAST
+it is the file-first promise; under MARIE it agrees with the clamped value the
+picker uses. If the MARIE clamp reads 0 the clamp has been cleared, which lets
+`vm.swappiness` reach the picker, and
 that combination is the configuration that made the machine thrash. Check
 `/etc/tmpfiles.d/` and re-run `systemd-tmpfiles --create`.
 
@@ -249,6 +272,11 @@ existing; that mistake was made once here already.
 
 - **MARIE's swappiness clamp was cleared, then restored on 2026-09-23.** The
   cleared state is what made the machine sluggish; see the correction above.
+- **2026-10-26: the rc package moved from LRU-MARIE to lru_cast 0.2.0.** CAST
+  is Marie's successor and is carried as `2102`; the preview keeps `2101`
+  because CAST does not apply to the linux-next base. `vm.swappiness` stays 1,
+  which CAST honours as its file-first promise. See the 2026-10-26 (later)
+  entry in `../PATCH_SOURCES.md`.
 - **Swap backend: xswap -> zswap + a 16 GiB swapfile.** The xswap series
   (`2155`-`2168`, `2199`; 15 patches) was removed; patch `2196`, a standalone
   zswap fix salvaged from that series, was added.

@@ -15,11 +15,11 @@ moved, so the full ledger is not duplicated here.
 
 | | |
 |---|---|
-| Snapshot | `next-20261023`, tag `77cb3534193b` (tip `20a33c6b6cbe`) |
-| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261023.tar.gz` |
+| Snapshot | `next-20261026`, tag `9269ad8f22bc` (tip `f1ac44c32cba`) |
+| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261026.tar.gz` |
 | Snapshot tree `Makefile` | `7.3.0` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.10.23-1-sleepy-next` |
-| Package | `linux-sleepy-next-2026.10.23-1` |
+| Kernel release | `2026.10.26-1-sleepy-next` |
+| Package | `linux-sleepy-next-2026.10.26-1` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -903,3 +903,84 @@ here; the rc base lacks both and keeps `1168`.
 
 The full sweep — version pass, rejected candidates, revert scan, tracker and
 Phoronix triage — is the 2026-10-23 section in `sleepy-rc/PATCH_SOURCES.md`.
+
+## Sweep 2026-10-26 (second pass) — bumped to `next-20261026`; MARIE rebased
+
+`next-20261026` was cut at 13:51 UTC (`f1ac44c32cba`, tag `9269ad8f22bc`),
+after the morning pass's 08:30 UTC refresh. `_srctag` is now
+`next-20261026` (pkgver `2026.10.26`, pkgrel 1), the series is **135 patches**
+and the cumulative audit is **135/135**.
+
+The 1023→1026 delta is **722 non-merge commits across 320 files**, and it
+contains **no AMD or DRM change at all**: `drivers/gpu/drm/amd`,
+`drivers/gpu/drm/ttm` and `drivers/gpu/drm/scheduler` are identical between the
+two tags. The content is dominated by perf tooling, selftests, platform/x86,
+net, md, scsi and time. The only target-relevant files touched are
+`mm/zswap.c`, `mm/vmscan.c`, `kernel/sched/fair.c` and
+`drivers/nvme/host/pci.c`.
+
+**One rebase was required.** `2101` (LRU-MARIE 1.0.0-rc1) hunk 6 inserts the
+`entry->incomp = lru_marie_enabled()` marker after
+`comp_ret = comp_ret ? comp_ret : -EINVAL;` in `zswap_compress()`.
+next-20261026's `81c49e3a6848` ("mm/zswap: validate dlen and normalize
+comp_ret on compression success") removed that line and moved the validation
+into the `!comp_ret` block above. The hunk was rebased by dropping the
+now-absent context line. The inserted code, its placement (before `goto
+unlock;` in the rejection path), and its semantics are unchanged. **The
+preview copy of `2101` therefore differs from the rc copy by that one line of
+context — the only preview-only delta this bump.** The rc copy is untouched
+because the 7.3 base still has the removed line.
+
+**No other patch was dropped, skipped or regenerated.** The 7.4 merge-window
+`__get_user()`/`__put_user()` removals did not break any carried patch, and no
+symbol used by the series disappeared from the base.
+
+### Version sweep — resends only, again
+
+The normalized-subject pass over all sixteen mirrors found four higher-version
+postings, all already triaged in the morning pass and all content-identical or
+comment-only: `1179` v2 (resend), `1309` v2 (comment wording only), `2056` v4
+(delta empty), `2800` v4 (comment-only). No carried patch has a functional
+update waiting.
+
+### New candidates since the morning pass
+
+| Candidate | Source | Verdict |
+|---|---|---|
+| `drm/amdgpu: reset dGPU on resume if it kept power across s2idle` (Maharshii Patel, 09-24; Mario Limonciello reply 10-26) | amd-gfx | **Inert here.** The machine boots with `mem_sleep_default=deep` and `amdgpu.runpm=0`; the patch targets s2idle-only desktops. Alex's suggested `dgpu_s0i3` branch is the same s2idle runtime-PM class |
+| `drm/amdgpu: Fix DC scanout position handling` (Erhan Bilgili, 10-25; Michel Dänzer reply 10-26) | amd-gfx | **Watch, do not carry yet.** Real VRR bug: the 13-bit mask truncates scanout/vblank positions above 8191 lines at high vtotal. The reviewer agrees on the 16-bit DC decode but asked for `lower_16_bits()`/`upper_16_bits()` instead of the posted masks. Wait for v2 |
+| `drm/amd/display: Fix logger leak on perf trace allocation failure` (Jackie Liu, 10-26) | amd-gfx | **Watch, no carry.** Two-line error-path leak with `Fixes:` + stable; no review yet and only reachable when `dc_perf_trace_create()` fails |
+| `drm/amdkfd: Force perfmon clock on for profiler PMC requests` (Apurv Mishra, 10-26) | amd-gfx | **Rejected — feature + ABI.** 198 lines, bumps `KFD_IOC_PROFILER_VERSION_NUM`; fixes PMCs reading 0 at DPM AUTO, not a regression on this machine |
+| `drm/amdkfd: bound SVM migration fence wait and guard with drm_dev_enter` v5 | amd-gfx | **Rejected — NAK.** Christian König: the entity lifetime problem is "essentially unfixable" in drm_sched and the proposed fence workaround would cause data corruption; big NAK on the series |
+| `drm/amdgpu: Ensure that harvest information gets set` | amd-gfx | **Watch.** Alex Deucher still asking whether other IP-discovery tables are missed; review open |
+| `drm/amd/display: Add null DC check to hpd init` | amd-gfx | **Rejected — test-only.** KUNIT calls `amdgpu_dm_hpd_init()` with `adev->dm.dc == NULL`; production never does |
+| `[PATCH 00/49] DC Patches Oct 26 2026` | amd-gfx | **Rejected — 7.5 feature set.** Core 2 BLS scaffolding, staged dcn401 init splits and DCN401 PHY state reading are merge-window work, not stable fixes |
+| `PCI: Preserve the initial bus number` 3/3 | amd-gfx/dri-devel | **Rejected — inert.** Only changes `pci=realloc` handling; this machine does not boot with it |
+| `drm/amdgpu: Harden against potential deadlock` | amd-gfx | **Rejected — no live bug.** The author states the deadlock cannot occur today because `amdkfd_fence_ops` does not implement `signaled` |
+
+### Tracker and Phoronix, second pass
+
+Fifteen `drm/amd` work items moved after the morning refresh. The on-target
+ones remain reports, not fixes: `#5994` (Navi 48 resume MODE1 failure, still
+reproducible on 7.3.0-4, VRR path implicated), `#5965` (Navi 48 SMU hang with
+hwmon `ENOTSUP`; no fan/clock control is set by the reporter), `#6011` (7.3
+display flicker across Navi 3x/7900 XTX, October firmware does not help),
+`#6039` (Navi 44 eGPU) and `#6038` (Raphael iGPU s2idle SMU, asking for a 7.3
+repro; the dGPU here is on the deep path). No comment cites a new fix commit.
+
+Phoronix through 10-26 15:17 EDT: the only kernel-relevant items are 7.4
+merge-window summaries, the Core MM tree split, an EFI improvement, and the
+cache-aware-scheduling regression fix for the Zen 5 / Zen 5C Ryzen AI 9 HX 370.
+That fix is hybrid-asymmetric-packing-specific and EEVDF-side; this machine is
+an eight-core homogeneous Zen 4 running BORE, so it is inert here.
+
+### rc package — reclaim policy moved to lru_cast
+
+No new carry was adopted by the sweep. Later on 2026-10-26, however, the rc
+package replaced `2101` (LRU-MARIE) with **`2102` (lru_cast 0.2.0)**, Marie's
+successor: it applies to `v7.3` with zero offsets and zero fuzz. The preview
+**keeps `2101`** because CAST does not apply to `next-20261026`
+(`mm/migrate.c` and `mm/swap.h` hunks fail; `mm/page_io.c` needs fuzz 2). The
+rc package is now `7.3.0-7` (pkgrel 7, 294 patches, audit 294/294); the
+decision, compatibility evidence and swappiness policy are in
+`sleepy-rc/PATCH_SOURCES.md`.

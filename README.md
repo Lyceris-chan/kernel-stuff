@@ -3,12 +3,15 @@
 Custom Arch Linux kernel for one machine: an AMD Ryzen 7 7700 (Zen 4) desktop
 with a Radeon RX 9070 XT (Navi 48 / RDNA 4).
 
-Two packages share one patch series:
+Two packages share one patch series, with a few package-specific deltas
+recorded in the ledgers. The largest is the reclaim policy: `sleepy-rc` uses
+**lru_cast (CAST)**, while the preview keeps **LRU-MARIE** because CAST does
+not apply to the linux-next base.
 
 | Directory | Package | Base |
 |---|---|---|
 | [`sleepy-rc/`](sleepy-rc/) | `linux-sleepy-rc` | mainline **`v7.3`** |
-| [`sleepy-next/`](sleepy-next/) | `linux-sleepy-next` | linux-next snapshot **`next-20261023`** |
+| [`sleepy-next/`](sleepy-next/) | `linux-sleepy-next` | linux-next snapshot **`next-20261026`** |
 
 They are deliberately installable **side by side**: each sets its own
 `_pkgsuffix`, which drives both `pkgbase` and the kernel release, so the module

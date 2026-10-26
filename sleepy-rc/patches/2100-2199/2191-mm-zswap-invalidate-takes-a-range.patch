@@ -1,4 +1,4 @@
-From eabd297f77a2b930c236f42404b10566b5b66ac3 Mon Sep 17 00:00:00 2001
+From 0bdbe1ccedd9e40201fed3a8e3ee3423b11687cf Mon Sep 17 00:00:00 2001
 From: Kefeng Wang <wangkefeng.wang@huawei.com>
 Date: Thu, 10 Sep 2026 20:35:42 +0800
 Subject: [PATCH] mm: zswap: convert zswap_invalidate() to take a range
@@ -35,20 +35,21 @@ Cc: Yosry Ahmed <yosryahmed@google.com>
  3 files changed, 26 insertions(+), 15 deletions(-)
 
 diff --git a/include/linux/zswap.h b/include/linux/zswap.h
+index 30c193a1207e..df6cafbe95dc 100644
 --- a/include/linux/zswap.h
 +++ b/include/linux/zswap.h
-@@ -30,7 +30,7 @@
- #ifdef CONFIG_LRU_MARIE
- bool zswap_folio_reused(struct folio *folio);
- #endif
+@@ -27,7 +27,7 @@ struct zswap_lruvec_state {
+ unsigned long zswap_total_pages(void);
+ bool zswap_store(struct folio *folio);
+ int zswap_load(struct folio *folio);
 -void zswap_invalidate(swp_entry_t swp);
 +void zswap_invalidate(int type, pgoff_t offset, unsigned long nr_entries);
  int zswap_swapon(int type, unsigned long nr_pages);
  void zswap_swapoff(int type);
  void zswap_memcg_offline_cleanup(struct mem_cgroup *memcg);
-@@ -59,7 +59,11 @@
+@@ -49,7 +49,11 @@ static inline int zswap_load(struct folio *folio)
+ 	return -ENOENT;
  }
- #endif
  
 -static inline void zswap_invalidate(swp_entry_t swp) {}
 +static inline void zswap_invalidate(int type, pgoff_t offset,
@@ -60,14 +61,15 @@ diff --git a/include/linux/zswap.h b/include/linux/zswap.h
  {
  	return 0;
 diff --git a/mm/swapfile.c b/mm/swapfile.c
+index a8118f095f4d..2c263563b70e 100644
 --- a/mm/swapfile.c
 +++ b/mm/swapfile.c
-@@ -1328,10 +1328,7 @@
+@@ -1316,10 +1316,8 @@ static void swap_range_free(struct swap_info_struct *si, unsigned long offset,
  {
  	unsigned long end = offset + nr_entries - 1;
  	void (*swap_slot_free_notify)(struct block_device *, unsigned long);
 -	unsigned int i;
--
+ 
 -	for (i = 0; i < nr_entries; i++)
 -		zswap_invalidate(swp_entry(si->type, offset + i));
 +	zswap_invalidate(si->type, offset, nr_entries);
@@ -75,12 +77,14 @@ diff --git a/mm/swapfile.c b/mm/swapfile.c
  	if (si->flags & SWP_BLKDEV)
  		swap_slot_free_notify =
 diff --git a/mm/zswap.c b/mm/zswap.c
+index 15cea0e8ce36..4b8aa503afd1 100644
 --- a/mm/zswap.c
 +++ b/mm/zswap.c
-@@ -237,10 +237,14 @@
+@@ -228,10 +228,15 @@ static bool zswap_has_pool;
  /* One swap address space for each 64M swap space */
  #define ZSWAP_ADDRESS_SPACE_SHIFT 14
  #define ZSWAP_ADDRESS_SPACE_PAGES (1 << ZSWAP_ADDRESS_SPACE_SHIFT)
++
 +static inline struct xarray *zswap_tree(int type, pgoff_t offset)
 +{
 +	return &zswap_trees[type][offset >> ZSWAP_ADDRESS_SPACE_SHIFT];
@@ -94,7 +98,7 @@ diff --git a/mm/zswap.c b/mm/zswap.c
  }
  
  #define zswap_pool_debug(msg, p)			\
-@@ -1757,18 +1761,22 @@
+@@ -1656,18 +1661,22 @@ int zswap_load(struct folio *folio)
  	return 0;
  }
  
@@ -113,15 +117,18 @@ diff --git a/mm/zswap.c b/mm/zswap.c
 +		tree = zswap_tree(type, offset + i);
  
 -	entry = xa_erase(tree, offset);
--	if (entry && !xa_is_value(entry))
+-	if (entry)
 -		zswap_entry_free(entry);
 +		if (xa_empty(tree))
 +			continue;
 +
 +		entry = xa_erase(tree, offset + i);
-+		if (entry && !xa_is_value(entry))
++		if (entry)
 +			zswap_entry_free(entry);
 +	}
  }
  
  int zswap_swapon(int type, unsigned long nr_pages)
+-- 
+2.56.0
+

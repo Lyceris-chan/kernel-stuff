@@ -55,6 +55,34 @@ service only shapes CAKE.
 See [`../net-tune/README.md`](../net-tune/README.md) for configuration,
 requirements, and verification.
 
+## Reclaim policy: lru_cast (CAST)
+
+The rc package carries **lru_cast 0.2.0** (`2102`) as its page-replacement
+policy. It is on at boot. The preview package still carries LRU-MARIE because
+CAST does not apply to the linux-next base.
+
+```bash
+cat /sys/kernel/mm/lru_cast/version      # 0.2.0
+cat /sys/kernel/mm/lru_cast/enabled      # 1
+cat /sys/kernel/mm/lru_cast/estimate     # anon share, measured swappiness, costs
+```
+
+`vm.swappiness` is **1**, which CAST honours as the file-first promise (file
+down to the clean-file floor, then anon) rather than as the start of its
+measured split. Set it to `60` to let CAST measure the anon/file split itself;
+`0` and `200` are the other two promises. The clean-file floor is
+`/sys/kernel/mm/lru_cast/clean_min_ratio` (default 10, % of node memory).
+
+To fall back without rebuilding, switch CAST off and MGLRU on — the two are
+never on at once, and enabling the active one's alternative returns `EBUSY`:
+
+```bash
+echo 0 > /sys/kernel/mm/lru_cast/enabled   # CAST off -> legacy LRU
+echo y > /sys/kernel/mm/lru_gen/enabled    # MGLRU on
+```
+
+Boot with `lru_cast=0` to start with CAST off.
+
 ## Known issues
 
 - **Display artifact (the "box")** — a rectangle over application windows that
@@ -76,6 +104,7 @@ requirements, and verification.
   REG_WAIT hang). The DCN4 flip-schedule patches that made these worse
   (`9051`/`9052`) were dropped — AMD reverted them upstream.
 - **`pcie_aspm=off`** slightly raises idle PCIe power draw (the !5538 stopgap).
-- **LRU-MARIE and MGLRU are mutually exclusive**, and **scx full-switch mode
-  bypasses CFS load balancing** — carried patches for either subsystem do
-  nothing while the other owns it.
+- **CAST and MGLRU are never on at once** (both are built; switch the active
+  one off before enabling the other), and **scx full-switch mode bypasses CFS
+  load balancing** — carried patches for either subsystem do nothing while the
+  other owns it.

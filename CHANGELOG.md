@@ -18,6 +18,100 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-7-sleepy-rc (Linux 7.3)]: 2026-10-26
+
+Reclaim-policy refresh: the rc package replaces **LRU-MARIE 1.0.0-rc1** with
+**lru_cast 0.2.0 (CAST)**, Marie's designated successor, carried as patch
+`2102`. The preview keeps Marie because CAST does not apply to the linux-next
+base. The base stays at `v7.3`; the series stays at 294 patches and the
+package is rebuilt at `pkgrel=7`.
+
+### Changed — MARIE → CAST in the rc package
+
+CAST keeps every Marie mechanism this machine uses — the flat per-PFN 32-bit
+state array, SIMD PTE walker, rmap-fed bloom filter, look-around, two-stage
+prefetch, `kcompressd` and `clean_min_ratio` — and replaces the eight-
+generation ring with a measured, self-tuning LRFU ranking. It adds per-lruvec
+reclaim (so `memory.max` is enforced through the active policy) and a runtime
+switch at `/sys/kernel/mm/lru_cast/enabled`.
+
+Compatibility decided the split:
+
+| Test | `v7.3` (rc) | `next-20261026` (preview) |
+|---|---|---|
+| `git apply --check` | pass | fail |
+| `patch -p1 -F2 --dry-run` | pass, zero offsets/fuzz | `mm/migrate.c` and `mm/swap.h` hunks fail; `mm/page_io.c` needs fuzz 2 |
+
+The preview cannot take it without hand-porting 324 KB of third-party MM code
+across the 7.4 merge window, so it stays on Marie until the author publishes a
+7.4-compatible revision.
+
+Kefeng Wang's zswap series (`2191`–`2193`) had been rebased onto Marie's
+`zswap_store()` and stopped applying without it. They were regenerated from
+the upstream commits (`0bdbe1ccedd9`, `50eb352dcd30`, `81a798cf85e9`) with the
+author and trailers intact.
+
+### Swappiness unchanged
+
+`vm.swappiness` stays **1**: under CAST that is its file-first promise (file
+down to the clean-file floor, then anon), not the start of the measured split.
+That preserves the measured-correct policy for this workload — ~27 GB of
+largely-cold page cache against ~2.3 GB of live anonymous memory. `60` would
+enable CAST's measured split; that is a user decision.
+
+### Verification
+
+Cumulative audit **294/294** against `v7.3`. Package
+`linux-sleepy-rc-7.3.0-7` (22.6 MB) and headers (34.5 MB) built. The extracted
+`vmlinux` carries `.BTF` and `.BTF_ids`; `CONFIG_LRU_CAST=y` with no
+`CONFIG_LRU_MARIE` symbol, `CONFIG_TCP_CONG_BBR3=y` and the old `tcp_bbr`
+absent from `modules.builtin`; the built-in cmdline still has
+`amdgpu.dcdebugmask=0x800`. Installed side by side with the preview, both
+initramfs images rebuilt, and the systemd-boot default
+(`linux-sleepy-next.conf`) unchanged. No reboot was performed.
+
+## [2026.10.26-1-sleepy-next (linux-next `next-20261026`)]: 2026-10-26
+
+Preview bump from `next-20261023` to `next-20261026`, the tag that landed after
+the morning sweep's 08:30 UTC refresh. The 1023→1026 delta is 722 non-merge
+commits across 320 files and changes **no AMD or DRM target file** —
+`drivers/gpu/drm/amd`, `ttm` and `scheduler` are identical between the two
+tags. The content is dominated by perf tooling, selftests, platform/x86, net,
+md, scsi and time; the target-relevant edits are in `mm/zswap.c`,
+`mm/vmscan.c`, `kernel/sched/fair.c` and `drivers/nvme/host/pci.c`.
+
+### Changed — `2101` rebased for the new zswap code
+
+`81c49e3a6848` ("mm/zswap: validate dlen and normalize comp_ret on compression
+success") removed the `comp_ret = comp_ret ? comp_ret : -EINVAL;` line that
+MARIE's zswap hunk anchored on. The preview copy of `2101` drops that context
+line. This is the only preview-only delta. No patch was dropped or skipped; the
+series remains 135 patches and audits 135/135 against `next-20261026`. (Later
+the same day the rc package removed `2101` altogether in favour of lru_cast —
+see the 7.3.0-7 entry.)
+
+### Sweep — no new carries
+
+The second pass of 2026-10-26 found four higher-version postings, all resends
+with no functional delta (`1179` v2, `1309` v2, `2056` v4, `2800` v4), and no
+revert of carried work. The new on-target material is watch-only: the DC
+scanout-position fix (VRR 13-bit truncation, awaiting v2 after review), the DC
+logger error-path leak, the harvest-information fix (review open), and the
+s2idle dGPU-reset series (inert here: `mem_sleep_default=deep`,
+`amdgpu.runpm=0`). The KFD SVM-migration fence series is NAKed upstream. Full
+triage in `sleepy-next/PATCH_SOURCES.md`.
+
+### Verification
+
+Cumulative audit **135/135** against `next-20261026`. Package
+`linux-sleepy-next-2026.10.26-1` (23.0 MB) and headers (34.9 MB) built. The
+extracted `vmlinux` carries `.BTF` and `.BTF_ids`; `CONFIG_LRU_MARIE=y`,
+`CONFIG_TCP_CONG_BBR3=y`, and the old `tcp_bbr` absent from
+`modules.builtin`. The built-in cmdline matches this package's PKGBUILD
+(it deliberately omits the rc-only `amdgpu.dcdebugmask=0x800`). Installed;
+initramfs rebuilt; the running kernel remains `2026.10.23-1` until the next
+reboot (none was performed).
+
 ## [7.3.0-6-sleepy-rc (Linux 7.3)]: 2026-10-26
 
 A patch-only refresh; the base stays at `v7.3`. The series moves from 293 to

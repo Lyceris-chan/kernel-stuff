@@ -10734,9 +10734,18 @@ RSS through 10-25 20:24 EDT:
 
 ### Bump
 
-`next-20261026` had not been cut at 08:30 UTC. The preview stays at
-`next-20261023` until the tag lands; see the appended bump section for the
-final tag, series reconciliation and verification.
+`next-20261026` landed at 13:51 UTC (`f1ac44c32cba`, tag `9269ad8f22bc`).
+The preview moved to `_srctag=next-20261026` (pkgver `2026.10.26`, pkgrel 1).
+The 1023→1026 delta is **722 non-merge commits across 320 files with no AMD
+or DRM file changed at all** — `drivers/gpu/drm/amd`, `ttm` and `scheduler`
+are identical between the tags. The series is 135 patches and audits
+**135/135** after exactly one rebase: `2101`'s zswap hunk 6 anchored on
+`comp_ret = comp_ret ? comp_ret : -EINVAL;`, which `81c49e3a6848` removed; the
+preview copy of the hunk drops that context line, while the rc copy is
+unchanged because the 7.3 base still has it. The full second pass — four
+content-identical resends, the new candidates, the tracker and Phoronix — is
+in `sleepy-next/PATCH_SOURCES.md`. No new carry was adopted, so `sleepy-rc`
+stays at `7.3.0-6` (pkgrel 6, 294/294).
 
 ### Housekeeping
 
@@ -10744,3 +10753,134 @@ final tag, series reconciliation and verification.
 `3000` included). `sleepy-next/patches/` still holds 142 files against 135
 entries; the same seven orphans remain (`1008`, `1012`, `1013`, `1014`, `1017`,
 `9040`, `9060`).
+
+## 2026-10-26 (later) — reclaim policy: LRU-MARIE replaced by lru_cast 0.2.0 in the rc package
+
+**Decision.** The `sleepy-rc` package now carries **lru_cast 0.2.0 (CAST)** as
+`2102` and no longer carries LRU-MARIE (`2101`) at all. The `sleepy-next`
+preview keeps `2101`: CAST is not compatible with the `next-20261026` base
+(evidence below). This is a deliberate split, recorded here because
+`sleepy-rc/PATCH_SOURCES.md` is authoritative for both packages.
+
+### Why CAST
+
+CAST is Masahito Suzuki's designated successor to Marie. It keeps every Marie
+mechanism this machine uses — the flat per-PFN 32-bit state array, the SIMD
+PTE walker, the rmap-fed bloom filter, look-around, two-stage prefetch,
+`kcompressd`, and `clean_min_ratio` — and replaces Marie's eight-generation
+ring with a measured LRFU ranking. It adds three things Marie does not have:
+
+- **per-lruvec reclaim**, so cgroup limits (`memory.max`) are enforced through
+  the active policy instead of falling back to the stock path;
+- **measured anon/file split** at run time (the swappiness prior is only a
+  starting point; see the swappiness note below);
+- **a runtime switch**, `/sys/kernel/mm/lru_cast/enabled`, so a misbehaving
+  policy can be turned off without another reboot.
+
+The author's README reports, against MGLRU on a swap-bound stress-ng workload,
+0.4–0.5× the swap-ins and a working set that survives a streaming read where
+MGLRU and the legacy LRU both lose it. There is **no independent head-to-head
+benchmark against Marie**; the case for CAST over Marie is the author's
+successor designation plus the structural additions above, not a measured
+same-machine comparison. That is stated plainly because the repo's rule is
+that a README claim is not evidence.
+
+### Compatibility — why rc only
+
+| Test | `v7.3` (rc) | `next-20261026` (preview) |
+|---|---|---|
+| `git apply --check` | pass | fail |
+| `patch -p1 --forward -F2 --dry-run` | pass, **zero offsets, zero fuzz** | 2 hunks failed + `mm/page_io.c` hunk 4 needs fuzz 2 |
+| Failing hunks | — | `mm/migrate.c` at 777, `mm/swap.h` at 258 |
+| Config symbols | `64BIT`, `MMU`, `SPARSEMEM=y` all present | same |
+
+The patch is `0001-7.3-rc7-lru_cast-v0.2.0.patch` from firelzrd/lru_cast,
+repo commit `8d0ab44` (2026-10-26 12:20 +0900), author
+`Masahito S <firelzrd@gmail.com>`. The preview failures are the 7.4 MM
+changes (migrate/swap APIs) the patch was not written or tested against —
+porting it would mean hand-modifying 324 KB of third-party MM code across a
+merge window, which this repo does not do. The preview therefore stays on
+Marie until the author publishes a 7.4-compatible revision.
+
+### The swap, patch by patch
+
+| Change | Detail |
+|---|---|
+| **Removed `2101`** | `linux7.3-rc7-lru_marie-1.0.0-rc1`. User-approved conditional swap: CAST and Marie occupy the same hooks and cannot coexist. Its ledger history above is unchanged; the file is removed from `sleepy-rc/patches/` only. The preview keeps its copy. |
+| **Added `2102`** | `2102-mm-7.3-lru_cast-v0.2.0.patch` (`0001-7.3-rc7-lru_cast-v0.2.0.patch`, byte-identical). Applies at the position `2101` held, after `2100` zstd. |
+| **Refreshed `2191`–`2193`** | Kefeng Wang's upstream zswap series had been rebased onto Marie's `zswap_store()` (`#ifdef CONFIG_LRU_MARIE`, `xa_is_value` guard). Without Marie that context is gone. They were regenerated from the upstream commits `0bdbe1ccedd9`, `50eb352dcd30`, `81a798cf85e9` (linux-next, 2026-09-10), preserving the author, `Signed-off-by`s and trailers. They now apply to stock 7.3 zswap with offsets only. |
+| **Config** | `scripts/config -e LRU_MARIE` → `-e LRU_CAST`. MGLRU stays built (`LRU_GEN`, `LRU_GEN_ENABLED`, `LRU_GEN_WALKS_MMU`) as the fallback; CAST is on at boot and the two are never on at once. |
+| **pkgrel** | `7.3.0-6` → `7.3.0-7`, series stays at **294 patches**, cumulative audit **294/294** against `v7.3`. |
+
+### Swappiness stays 1, deliberately
+
+CAST documents three values as promises: `0` never swap, `1` file first down
+to the clean-file floor and only then anon, `200` anon first. **Only other
+values feed the measured split.** `vm.swappiness` stays `1`
+(`swap-stack/99-zswap-swappiness.conf`) because file-first is the measured
+correct policy for this workload — 27 GB of largely-cold page cache against
+~2.3 GB of live anonymous working set, where letting anon be reclaimed at
+will caused 192M anon refaults and PSI `full` at 16% (2026-09-22). CAST
+therefore runs its **file-first promise** mode, not the self-tuning split.
+The LRFU ordering, per-lruvec reclaim, kcompressd and the clean-file floor
+are all still active. Moving to `60` would enable the measured split; that is
+a user decision, not a sweep carry.
+
+### Verification
+
+- `git apply --check` and GNU `patch` dry-run on clean `v7.3`: both pass,
+  zero offsets and zero fuzz.
+- Cumulative series audit: **294/294** against `v7.3`.
+- The build and BTF/BBR3 checks are recorded in the release entry.
+
+## 2026-10-26 (exhaustive tracker pass) — 2,034 items, no adoptable fix
+
+A full enumeration of the drm/amd work-item tracker, beyond the routine
+updated-since pass. **No patch from it is carried**: every candidate that
+looked on-target failed provenance, confirmation, or silicon checks.
+
+### Coverage
+
+- **1,914 open issues** (all 21 pages) and **120 closed issues** updated since
+  2026-09-01 — 2,034 unique items.
+- **1,643** deep-read with every note: **18,985 notes**, 19,750 unique
+  7–40-hex tokens. 760 tokens resolve to real commits (676 unique SHAs).
+- **348 unique attached patch texts** dry-run on clean `v7.3` and
+  `next-20261026` worktrees: 79 clean on both, 31 v7.3-only, 4 next-only,
+  234 on neither.
+- Every Table-B candidate cross-checked against the carried series by subject
+  *and* by the identifiers/functions it introduces — none is carried.
+
+### Candidates, and why none was adopted
+
+| Issue / patch | What it is | Verdict |
+|---|---|---|
+| **#5935** `drm/amd/pm: restate all customized OD features on every table upload` (`a89585cd`, Kenneth Feng, AMD; upstream as `1b63bb39` in next) | SMU 14.0.2 OD/PPT mask fix; v7.3 backport applies cleanly | **Rejected — wrong SMU sub-version.** This GPU reports `<smu_v14_0_0>` in dmesg; the patch only touches `smu_v14_0_2_ppt.c`. It would compile and do nothing. Same trap as DCN42B/GC 12.1 |
+| **#4871** `drm/amd/display: Validate stream dimensions` (`0af0343c`, Mario Limonciello) | 8-line phantom-stream guard for a divide error in `spl_fixpt_from_fraction`; DCN 4.0.1 reaches `dml2_0/dml21/dml21_utils.c`, so it is *not* inert | **Rejected — unconfirmed.** Posted as a diagnostic in Jan 2026; a tester reported the crash persisting on a patched kernel and argued the guard is backwards; Mario's June reply: "It didn't seem to be enough." Do not carry an unverified guard as a fix |
+| **#5780** FRL occupancy + same-sink FRL recovery (`d07e5563`, `c467b268`, Dana McKimmie) | HDMI 2.1 FRL fixes; both HDMI outputs here make this on-target; clean on both bases | **Watch.** Community proposal, no maintainer review, changes destructive link-verification policy. #6014 (FRL not trained on an LG OLED) is still open with no fix |
+| **#5339** RGBA8888 support (`30172d2a`, `4f53cb08`, Harry Wentland) + RA24 removal (`97b6ec89`) | DM advertises RGBA8888 but DC rejected it; 25-file format plumbing touches `dcn401_dpp.c`/`dcn401_hubbub.c` | **Watch.** Correct-looking AMD work but unreviewed and 25 files wide; the RA24 attachment is the opposite workaround (removes the format). No corruption observed on this machine |
+| **#4753** FAMS2 MCLK-stutter workarounds | gfx1201/DCN 4.0.1 display stall on MCLK change; several variants, one applies to both bases | **Watch.** Community workarounds, some attachments without a mail header (no author/provenance), and the full variant disables offload flip. Not a reviewed fix |
+| **#2403** PSP resume recovery (`d1bccbe1`, Mario Limonciello) | Resets the GPU if PSP setup fails after resume | **Rejected — stale 2023 proposal** never merged; six generations of code have moved since |
+| **#4591** filter ATPX methods; **#5100** pciehp ReBAR workaround | D3cold/ATPX; eGPU MCE hang | **Rejected — off-topology.** No ATPX (desktop, single dGPU) and no eGPU |
+| **#6012/#5981** DPIA/MST teardown series | USB4/DPIA dock fixes; reporter-tested | **Rejected — out of scope.** Both HDMI outputs are direct; no USB4 tunnel |
+| **#4805** HF-VSDB parse v2 | Clean on v7.3 | **Rejected — re-enables the HF-VSDB VRR parsing deliberately stripped** (the COSMIC overlay/box trigger) |
+| **#5616** fast-update WIP; **#5387** TTM bulk_move; **#3625** OD mask; **#5905** | Superseded or already fixed in base (`63e19ef3`, `3db7d7d5`, `1b63bb39`, `a2eae9f4`) | **Rejected — obsolete** |
+| **#3200**, **#5897** | Already carried as `1177`, `1171`/`1172` | No action |
+
+### On-target watch list (no fix in thread)
+
+All open, none with a commit or patch that resolves the report: `#6010`
+(DCN 4.0.1/Navi 48 freeze in `dm_handle_vmin_vmax_update` during cross-monitor
+VRR move), `#5994` (Navi 48 resume MODE1 + DM WARN), `#5965` (Navi 48 SMU hang,
+hwmon `ENOTSUP`), `#6032`/`#5921` (S3 resume, MODE1 per suspend), `#5869`
+(gfx1201 ring reset under vkd3d-proton), `#6039` (Navi 44 eGPU), `#6028`
+(secondary DP monitor lost), `#6017`/`#5967` (atomic/page-flip failures),
+`#6014` (HDMI FRL not trained), `#5985`/`#5917` (gfx/comp timeouts), `#5912`
+(DCC after S3), `#5954` (UCLK pinned at max), `#5538` (SMU bus drop),
+`#5949` (HDMI audio underruns), `#5934` (CRB DSC overflow), `#5909` (MES stall
+over USB4), `#5585`/`#5969` (FreeSync artifacts/VRR), `#6010`.
+
+**Conclusion: nothing from the tracker is carried today.** The two rejected
+board-level fixes are recorded because their failure modes are not obvious:
+an OD fix for the wrong SMU sub-version compiles and is inert, and a
+plausible divide-error guard that testers could not confirm is not a fix.

@@ -19229,10 +19229,9 @@ diff --git a/mm/zswap.c b/mm/zswap.c
  static bool zswap_compress(struct folio *folio, long index,
  			   struct zswap_entry *entry, struct zswap_pool *pool)
  {
-@@ -931,6 +948,14 @@
+@@ -948,5 +965,13 @@
  		if (!mem_cgroup_zswap_writeback_enabled(folio_memcg(folio))) {
  			rcu_read_unlock();
- 			comp_ret = comp_ret ? comp_ret : -EINVAL;
 +#ifdef CONFIG_LRU_MARIE
 +			/*
 +			 * Marie: let zswap_store() mark the slot, so an
