@@ -15,11 +15,11 @@ moved, so the full ledger is not duplicated here.
 
 | | |
 |---|---|
-| Snapshot | `next-20261026`, tag `9269ad8f22bc` (tip `f1ac44c32cba`) |
-| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261026.tar.gz` |
+| Snapshot | `next-20261027`, tag `151a134a4e6e` (tag object `27e28adce2ba`) |
+| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261027.tar.gz` |
 | Snapshot tree `Makefile` | `7.3.0` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.10.26-2-sleepy-next` |
-| Package | `linux-sleepy-next-2026.10.26-2` |
+| Kernel release | `2026.10.27-1-sleepy-next` |
+| Package | `linux-sleepy-next-2026.10.27-1` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -1015,3 +1015,46 @@ author's email `-- ` separator, which is not code).
 `vm.swappiness` stays **1** in both packages: CAST's file-first promise, not
 the measured split. The compatibility evidence and swappiness rationale are
 in `sleepy-rc/PATCH_SOURCES.md`.
+
+## Bump to `next-20261027` — 2026-10-27
+
+`next-20261027` was cut at 14:33 UTC on 2026-10-27 (`151a134a4e6e`, tag object
+`27e28adce2ba`). `_srctag` is `next-20261027`, pkgver `2026.10.27`, pkgrel 1.
+The snapshot delta from `next-20261026` is **460 commits across 196 files**
+(5,111 insertions, 11,071 deletions). No `drivers/gpu/drm/amd` file changed;
+the touches inside this build's target paths are `block/`, `io_uring/`,
+`kernel/sched/ext`, `mm/` (including `mm/migrate.c` and `mm/swapfile.c`),
+`net/sched` and `mm/vmalloc.c`.
+
+The series is **136 patches** and the cumulative audit is **136/136** against
+`next-20261027`. All 135 pre-existing patches still apply; nothing needed a
+rebase for this snapshot. Two additions/changes from the 2026-10-27 sweep:
+
+- **`1312`** — `drm/amdgpu: check amdgpu_vm_ready() in dma-buf move notify`
+  (Dariusz Marcinkiewicz, `Reviewed-by` and "Applied!" from Alex Deucher).
+  Applies to both bases.
+- **`1309` v2** — comment-wording refresh of the gfx12 ring-test flush; the
+  code is unchanged and `Reviewed-by: Lijo Lazar` is retained.
+
+### lru_cast v0.2.6 port
+
+The author released **v0.2.6** (`2b1e212`, 2026-10-27 07:31 +0900) on top of
+v0.2.5. The only source change is in `mm/lru_cast/policy/balance.c`:
+`lru_cast_pick()` reads each type's size from the LRU lists with
+`lru_cast_lru_size()` instead of `lruvec_page_state()`, because a memcg's
+counters can still read zero for a cgroup new to its limit and leave reclaim
+with nothing to scan. `version.h` moves to `0.2.6`.
+
+The preview copy is the v0.2.5 port with exactly that delta — the six-line
+comment above `lru_cast_pick()`, the four `lru_cast_lru_size()` calls and the
+version string. `mm/lru_cast/policy/balance.c` and `version.h` produced by
+applying it are byte-identical to the author's v0.2.6 patch. The ten 7.4
+adaptations recorded in the previous section are unchanged: a line-set diff
+against the author's v0.2.6 yields only those rows and the author's `-- `
+separator. The rc copy is byte-identical to
+`0001-7.3-rc7-lru_cast-v0.2.6.patch`.
+
+The port applies cleanly to a pristine `next-20261027` tree with `git apply
+--check` and GNU `patch`, and the rc copy applies to `v7.3` the same way. Both
+packages built with Clang 23.1.4 and are installed side by side; the integrity
+checks are recorded in the rc ledger.

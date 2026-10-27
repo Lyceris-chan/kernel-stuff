@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
 - **Base:** Linux `v7.3`
-- **Series:** 293 patches
+- **Series:** 295 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -22,7 +22,7 @@ are supplied by the generator instead, so every row below has a source.
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 30 |
-| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 10 |
+| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 11 |
 | `1100–1199` | AMD display (DCN4, colorops) | 30 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 27 |
 | `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 43 |
@@ -38,7 +38,7 @@ are supplied by the generator instead, so every row below has a source.
 | `9000–9099` | agd5f staging + userq lifecycle backports | 36 |
 | `9100–9199` | Retry-fault handling v4 (agd5f staging) | 11 |
 
-**Total: 294** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 295** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-19). The counts are now generated from the patch tree
@@ -10894,3 +10894,121 @@ over USB4), `#5585`/`#5969` (FreeSync artifacts/VRR), `#6010`.
 board-level fixes are recorded because their failure modes are not obvious:
 an OD fix for the wrong SMU sub-version compiles and is inert, and a
 plausible divide-error guard that testers could not confirm is not a fix.
+
+## Sweep 2026-10-27 — lru_cast v0.2.6, `1312`, `1309` v2; preview to `next-20261027`
+
+All six source classes were queried. The tree scan covered every branch of
+`torvalds` (tip `d135ab453a74`, 2026-10-26), `linux-next` (tag `next-20261027`),
+`drm-next` (`fad06cfaf385`, 2026-10-21), all 132 `agd5f-linux` branches
+(`ba496bb83788`, 2026-10-23), `drm-misc`, `linux-pm` (`7be4bc52fd9e`), the 18
+`akpm-mm` branches including `mm-everything-2026-10-27-01-38`, and `tip`
+(`e00da09bdd67`). `amd-staging-drm-next` returned HTTP 503 on fetch, but
+`agd5f-linux` is the same remote and branch and fetched cleanly, so that source
+was read from the working clone. CachyOS, sirlucjan, firelzrd (BORE 7.0.0,
+unchanged) and linux-tkg were refreshed; no `01xx` squash needed regeneration
+because the series still applies to `next-20261027`. The lore mirrors and the
+two `lists.freedesktop.org` October archives were refreshed and parsed; the
+drm/amd tracker was queried by update time; Phoronix was read through its RSS
+feed.
+
+### Adopted
+
+| Patch | What | Why |
+|---|---|---|
+| `1312` | drm/amdgpu: check `amdgpu_vm_ready()` in dma-buf move notify (Dariusz Marcinkiewicz) | `Reviewed-by: Alex Deucher`, "Applied!" in the 10-26 thread. A SIGKILLed process's stopped VM entities are no longer used to clear PTEs during imported dma-buf teardown; the author reproduced the task hang without it. `amdgpu_vm_ready()` and prerequisite `aa5fc4362fac` are in both bases. |
+| `1309` v1 → v2 | drm/amdgpu/gfx12: flush the scratch register write in the ring test | The 10-26 v2 is the reviewed posting (`Reviewed-by: Lijo Lazar`); only the comment wording changes, the `RREG32(scratch)` is identical. Both packages refreshed. |
+| `2102` v0.2.5 → v0.2.6 | lru_cast, both packages | See below. |
+
+### lru_cast v0.2.6
+
+The author shipped **v0.2.6** (`2b1e212`, 2026-10-27 07:31 +0900) after v0.2.5.
+The change is confined to `mm/lru_cast/policy/balance.c` and `version.h`:
+`lru_cast_pick()` now reads each type's size from the LRU lists with
+`lru_cast_lru_size()` instead of `lruvec_page_state()` counters. The counters
+are summed only periodically, so a cgroup new to its limit could report zero
+pages, leaving reclaim with nothing to scan and the charge OOM. Both packages
+carry v0.2.6.
+
+- **rc**: the author's `0001-7.3-rc7-lru_cast-v0.2.6.patch`, byte-identical,
+  applies to `v7.3` with `git apply --check` and GNU `patch` (zero fuzz).
+- **preview**: the ported copy was moved the same way as v0.2.5 — the added
+  comment, the four `lru_cast_lru_size()` calls and the version string. A
+  line-set diff against the author's v0.2.6 yields only the ten 7.4 API
+  adaptations already recorded for v0.2.5 (swap-writeout rename, `VM_SPECIAL`,
+  `valid_section_nr`, `vma_is_hugetlb`, `PF_KSWAPD`, rbtree macro, includes),
+  plus the author's `-- ` separator. `mm/lru_cast/policy/balance.c` and
+  `version.h` produced by the port are byte-identical to the author's patch.
+
+### Version sweep — 7 higher-version hits, one real
+
+| Carried | Hit | Verdict |
+|---|---|---|
+| `1175` v1 | v4, 10-16 | Content-identical resend; the only added line is the mail signature separator |
+| `1099` v2 | v3, 10-22 | Content-identical resend |
+| `1179` v1 | v2, 10-26 | Content-identical resend |
+| `1233` v1 | "v2", 10-16 | Already the carried revision — the hit is Kenneth Feng's reply quoting it |
+| `9087` v1 | "v2", 10-15 | Reviewer reply (Christian König) quoting the patch; no new diff |
+| `9089` v1 | "v2", 10-20 | Reviewer reply (Philip Yang) quoting the patch; no new diff |
+| `1309` v1 | v2, 10-26 | **Adopted** — comment-only change, same `RREG32`; reviewed |
+
+### New candidates — triaged, not adopted
+
+| Candidate | Verdict |
+|---|---|
+| `drm/amdgpu: reset dGPU on resume if it kept power across s2idle` (Maharshii Patel) | **Rejected.** Alex Deucher redirected it to the runtime-PM `dgpu_s0i3` branch; the patch's SMU list is 13.0.0/7/10 and 14.0.2/3, not this GPU's 14.0.0; S3 is explicitly unaffected; the posting is an Outlook-mangled "any update?" reply and does not apply |
+| `drm/amdgpu: prevent parameter-space underflow in nested ATOM table calls` v3 | **Rejected.** Alex Deucher: it "caused a regression in atombios parsing when I ran it through CI" — applied then dropped upstream |
+| `drm/amdgpu: Fix DC scanout position handling` (Erhan Bilgili) | **Watch.** The 13-bit mask is wrong for DC's 16-bit packed positions and the reporter's 4K240 VRR example is this display class, but Michel Dänzer objected to the `adev->dc_enabled`/`0x1fff` split and asked for `lower_16_bits()`/`upper_16_bits()`; wait for v2 |
+| `drm/amdgpu: Report MES ring wait timeouts` (Erhan Bilgili) | **Watch.** Correct in principle, but Alex Deucher asked for `r = -ETIMEDOUT;` without the `!r` check; wait for v2 |
+| `drm/amd/display: Fix logger leak on perf trace allocation failure` | **Watch.** Clear leak on an error path, applies to both, but unreviewed |
+| `drm/amdgpu: Harden against potential deadlock` | **Skip.** The deadlock cannot occur while `ops->signaled` is unimplemented; Felix Kuehling suggests removing the check entirely |
+| `drm/amdgpu: Ensure that harvest information gets set` | **Watch.** Mario Limonciello asked for `guard(spinlock)`, Alex Deucher asked whether other discovery tables are missed; not final, and the impact is ip_discovery sysfs only |
+| `drm/amd/display: Add null DC check to hpd init` | **Skip.** KUNIT-test-only path; it does not even apply to the rc base |
+| `drm/amdkfd: Force perfmon clock on for profiler PMC requests` | **Skip.** A 10-file feature with a `KFD_IOC_PROFILER_VERSION_NUM` uapi bump, not a fix; it also depends on the UMD-profile reapply work |
+| GPU-reset ordering series (`finish GPU recovery callbacks`, `stop the schedulers`) | **Watch.** Under review by Lijo Lazar; adopting two of eight parts would leave the series incomplete |
+| `drm/amdgpu: clear RB_OVERFLOW bit … navi10_ih`, `gfx10` MQD, VCE1 | **Rejected — wrong silicon.** Navi 10 / GFX10 / VCE1 are not this GPU |
+| UALink, VFCT/`pci=realloc`, GMUX, eGPU, IBM resource-node series | **Rejected — off-topology** |
+| `vupdate_no_lock` vblank consolidation revert (Ava H, 3 patches) | **Watch.** Base commit `c87e6635d2db` *is* in `v7.3` and `next-20261027`, and the report is gfx1201 multi-monitor corruption — this machine's class. But there is no maintainer reply to the revert series, and the repo's rule is that reverting base work needs a maintainer's blessing; the reporter's mixed DP+HDMI setup also differs from this machine's direct-HDMI topology. Revisit if AMD acks or reproduces |
+
+### Reverts and drops versus the series
+
+A `--grep='^Revert'` pass over every tree since 2026-07-01 and a subject scan of
+the October lists found **no revert of any carried patch**. The only revert of
+on-target work is the `vupdate_no_lock` series above, which targets a commit
+that is in the base rather than one of our patches. The ATOM underflow fix is
+the opposite case: a new candidate whose upstream application was followed by
+a regression report and a drop.
+
+### Tracker and Phoronix
+
+The drm/amd tracker returned **32 open issues updated since 2026-10-26** and
+**7 closed**. New on-target threads: `#6044` (Navi 48 black flash on
+window open/close with 7.3.0, no log at `drm.debug`), `#6032` (RX 9070 reset
+after S3 with a data-fabric sync flood) and `#6028` (secondary DP monitor lost
+after DPMS-off). None carries a fix commit. `#6030` is DCN 3.1.5, not this
+display block. `#5951` closed and its title matches the carried `1174`
+runtime-PM reference fix.
+
+Phoronix through 2026-10-27 12:50 EDT was all 7.4 merge-window material —
+KVM, NTFS ADS, hwmon, EFI, Core MM, EXT4 — plus the Firefox 159 AMD graphics
+fix, which is userspace. Nothing on-target new. The 10-25 AMD 600-series
+temperature item is already carried as `3000`; the new hwmon additions name
+ASUS/MSI boards, not the ASRock B650 PG Lightning.
+
+### Absorption check
+
+Every carried preview patch was reverse-tested against a pristine
+`next-20261027` tree. Only `1093` (the debugfs GFXOFF count bounds fix)
+reverse-applied, and that was a **false positive**: GNU patch matched the hunk
+at line 706, not the real function at 1456, and the base still contains
+`size & 0x3` / `result += 4` — the bug the patch fixes. No absorbed drop is
+needed this bump.
+
+### Audits
+
+`audit_series.py` with the new files: **295/295** on `v7.3` and **136/136** on
+`next-20261027`. Both packages built with Clang 23.1.4. The extracted `vmlinux`
+of each carries `.BTF` and `.BTF_ids`, reports `lru_cast v0.2.6 by Masahito
+Suzuki`, has `tcp_bbr3.ko` in `modules.builtin` and no old `tcp_bbr`, and the
+built-in cmdlines match their PKGBUILDs (the rc one additionally carries
+`amdgpu.dcdebugmask=0x800`). Both packages are installed side by side; the
+running kernel remains `2026.10.26-2-sleepy-next` and no reboot was performed.

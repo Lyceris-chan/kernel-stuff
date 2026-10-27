@@ -18,6 +18,73 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.10.27-1-sleepy-next (linux-next `next-20261027`)]: 2026-10-27
+
+Preview bump from `next-20261026` to `next-20261027` — 460 commits across 196
+files, with no `drivers/gpu/drm/amd` file changed — plus **lru_cast v0.2.6**,
+the reviewed `1312` dma-buf hang fix and the `1309` v2 comment refresh. The
+series is **136 patches** and the cumulative audit is **136/136**.
+
+### Changed
+
+- **lru_cast 0.2.6** — `lru_cast_pick()` reads each type's size from the LRU
+  lists with `lru_cast_lru_size()` instead of the periodically summed memcg
+  counters. A cgroup new to its limit could report zero pages, leaving reclaim
+  with nothing to scan and the charge OOM. The rc copy is the author's
+  `0001-7.3-rc7-lru_cast-v0.2.6.patch` byte-for-byte; the preview copy is the
+  v0.2.5 port plus the same six-line comment, four call-site changes and
+  version string.
+- **`1312`** — `drm/amdgpu: check amdgpu_vm_ready() in dma-buf move notify`
+  (Dariusz Marcinkiewicz, `Reviewed-by` and "Applied!" from Alex Deucher). A
+  SIGKILLed process's stopped VM entities are no longer used to clear PTEs
+  while imported dma-bufs are torn down; without it the task hangs.
+- **`1309` v2** — comment-only refresh of the gfx12 ring-test flush; the
+  `RREG32(scratch)` and the `Reviewed-by: Lijo Lazar` are unchanged.
+
+### Sweep
+
+All source classes were queried: every branch of the eight kernel trees, the
+lore mirrors, both freedesktop October archives, the drm/amd work-item tracker
+by update time, and Phoronix. The version sweep found seven higher-version
+postings: three content-identical resends, two reviewer replies quoting the
+patch, one already the carried revision, and only `1309` v2 was real. No
+carried patch was reverted upstream. No carried preview patch is absorbed by
+the new snapshot; `1093` reverse-applies only to the wrong function and the
+base still has the bug.
+
+New candidates were triaged, not merged. `1312` was adopted. The DC
+scanout-position mask fix, the MES timeout report, the DC logger leak, the
+discovery harvest fix and the GPU-reset ordering series are watch items with
+open review requests. The dGPU s2idle reset was redirected to the runtime-PM
+`dgpu_s0i3` branch. The ATOM underflow fix was dropped upstream after an
+atombios regression. The in-base `vupdate_no_lock` consolidation has a
+three-patch revert posted for gfx1201 multi-monitor corruption but no
+maintainer reply, so it stays a watch item.
+
+### Verification
+
+Cumulative audit **136/136** against `next-20261027`. Package
+`linux-sleepy-next-2026.10.27-1` (23.1 MB) and headers (34.8 MB) built with
+**ClangBuiltLinux clang 23.1.4**. The extracted `vmlinux` carries `.BTF` and
+`.BTF_ids`, reports `lru_cast v0.2.6 by Masahito Suzuki`, has
+`CONFIG_TCP_CONG_BBR3=y` with old `tcp_bbr` absent, and the built-in cmdline is
+`cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0`.
+Installed side by side with the rc package; no reboot or shutdown.
+
+## [7.3.0-9-sleepy-rc (Linux 7.3)]: 2026-10-27
+
+lru_cast v0.2.6, the reviewed `1312` dma-buf fix and the `1309` v2 refresh. The
+base stays `v7.3`; the series moves to **295 patches** and audits **295/295**.
+
+### Verification
+
+Package `linux-sleepy-rc-7.3.0-9` (22.8 MB) and headers (34.5 MB) built with
+Clang 23.1.4. The extracted `vmlinux` carries `.BTF` and `.BTF_ids`, reports
+`lru_cast v0.2.6 by Masahito Suzuki`, has `CONFIG_TCP_CONG_BBR3=y` with old
+`tcp_bbr` absent, and the built-in cmdline still has `amdgpu.dcdebugmask=0x800`.
+The rc patch is byte-identical to the author's (sha256 `aeae9c32…`). Installed
+side by side with the preview; no reboot.
+
 ## [2026.10.26-2-sleepy-next (linux-next `next-20261026`)]: 2026-10-26
 
 Reclaim-policy update: the preview replaces LRU-MARIE with **lru_cast 0.2.5

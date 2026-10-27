@@ -1,7 +1,7 @@
-From 95aea5b73e0c8749486eccb43e912b4759325166 Mon Sep 17 00:00:00 2001
+From 63b974b71f2fc014224fe09db8019dd3c976d0c7 Mon Sep 17 00:00:00 2001
 From: Masahito S <firelzrd@gmail.com>
-Date: Mon, 26 Oct 2026 23:51:38 +0900
-Subject: [PATCH] 7.3-rc7-lru_cast-v0.2.5
+Date: Tue, 27 Oct 2026 07:29:47 +0900
+Subject: [PATCH] 7.3-rc7-lru_cast-v0.2.6
 
 ---
  include/linux/lru_cast.h           |  459 ++++++++++++++++++++++
@@ -35,7 +35,7 @@ Subject: [PATCH] 7.3-rc7-lru_cast-v0.2.5
  mm/lru_cast/core/store.c           |  198 +++++++++
  mm/lru_cast/core/store.h           |   25 +
  mm/lru_cast/hooks.c                |   28 +
- mm/lru_cast/policy/balance.c       |  240 +++++++++++
+ mm/lru_cast/policy/balance.c       |  246 +++++++++++
  mm/lru_cast/policy/ghost.c         |  159 ++++++++
  mm/lru_cast/policy/params.c        |   70 +++
  mm/lru_cast/policy/policy.h        |   78 ++++
@@ -87,7 +87,7 @@ Subject: [PATCH] 7.3-rc7-lru_cast-v0.2.5
  mm/swap.h                          |   18 +
  mm/vmscan.c                        |  291 +++++++++++++-
  mm/workingset.c                    |   27 +
- 83 files changed, 8546 insertions(+), 23 deletions(-)
+ 83 files changed, 8552 insertions(+), 23 deletions(-)
 
 diff --git a/include/linux/lru_cast.h b/include/linux/lru_cast.h
 new file mode 100644
@@ -2829,7 +2829,7 @@ new file mode 100644
 index 000000000000..b9eeddd7390e
 --- /dev/null
 +++ b/mm/lru_cast/policy/balance.c
-@@ -0,0 +1,240 @@
+@@ -0,0 +1,246 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * CAST -- which type to take from, and the clean-file floor.
@@ -3006,13 +3006,19 @@ index 000000000000..b9eeddd7390e
 +	weight[LRU_CAST_FILE] = MAX_SWAPPINESS - sw;
 +}
 +
++/*
++ * What @lruvec holds of each type is read off its lists, as reclaim will
++ * scan them: a memcg's statistics are summed up only now and then, and a
++ * cgroup new to its limit can show none yet -- nothing to take, its
++ * reclaim scanning nothing, and the charge OOM.
++ */
 +int lru_cast_pick(struct lruvec *lruvec, int swappiness, int priority, bool anon_ok,
 +		   bool file_ok, u64 *weight)
 +{
-+	unsigned long anon = lruvec_page_state(lruvec, NR_INACTIVE_ANON) +
-+			     lruvec_page_state(lruvec, NR_ACTIVE_ANON);
-+	unsigned long file = lruvec_page_state(lruvec, NR_INACTIVE_FILE) +
-+			     lruvec_page_state(lruvec, NR_ACTIVE_FILE);
++	unsigned long anon = lru_cast_lru_size(lruvec, LRU_INACTIVE_ANON) +
++			     lru_cast_lru_size(lruvec, LRU_ACTIVE_ANON);
++	unsigned long file = lru_cast_lru_size(lruvec, LRU_INACTIVE_FILE) +
++			     lru_cast_lru_size(lruvec, LRU_ACTIVE_FILE);
 +	int pick;
 +
 +	if (swappiness <= 0)
@@ -7345,7 +7351,7 @@ index 000000000000..976adc51303a
 +#define LRU_CAST_PROGNAME	"lru_cast"
 +#define LRU_CAST_AUTHOR	"Masahito Suzuki"
 +
-+#define LRU_CAST_VERSION	"0.2.5"
++#define LRU_CAST_VERSION	"0.2.6"
 +
 +#endif /* _MM_LRU_CAST_VERSION_H */
 diff --git a/mm/lru_cast/walk/bloom.c b/mm/lru_cast/walk/bloom.c

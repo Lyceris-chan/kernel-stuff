@@ -182,7 +182,7 @@ _rcver=
 
 pkgver=7.3.0
 _tagrel=1
-pkgrel=8
+pkgrel=9
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -381,6 +381,7 @@ source=(
   "patches/1300-1399/1309-drm-amdgpu-gfx12-flush-the-scratch-register-write-in-the-ring-test.patch"
   "patches/1300-1399/1310-drm-amdgpu-sign-extend-the-addresses-GEM_OP-GET_MAPPING_INFO-returns.patch"
   "patches/1300-1399/1311-drm-amdgpu-wait-for-the-GEM_VA-input-fences-interruptibly.patch"
+  "patches/1300-1399/1312-drm-amdgpu-check-amdgpu_vm_ready-in-dma-buf-move-notify.patch"
 
   "patches/2000-2099/2000-block-mq-deadline-pass-in-queue-directly-to-dd_inser.patch"
   "patches/2000-2099/2001-block-mq-deadline-skip-expensive-merge-lookups-if-co.patch"
@@ -426,7 +427,7 @@ source=(
   "patches/2000-2099/2059-io_uring-add-a-schedule-point-in-io_free_batch_list.patch"
   "patches/2000-2099/2060-io_uring-add-a-schedule-point-in-__io_req_caches_free.patch"
   "patches/2100-2199/2100-zstd-7.3-merge-v1.6.0-into-kernel-tree.patch"
-  "patches/2100-2199/2102-mm-7.3-lru_cast-v0.2.5.patch"
+  "patches/2100-2199/2102-mm-7.3-lru_cast-v0.2.6.patch"
   "patches/2100-2199/2120-mm-gup-mm-gup-break-out-gup-fill-pages-helper.patch"
   "patches/2100-2199/2121-mm-gup-mm-gup-convert-follow-page-mask-to-return-a-long.patch"
   "patches/2100-2199/2122-mm-gup-mm-gup-split-follow-page-pte-commit-out-of.patch"
@@ -1311,9 +1312,10 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         '16db839a3ed572b744a048bc9dd604f039557aab1a2ec6d07bce9dc67471173bd238e3505a702082aca1da27989e0c1c52af59cf1eb10e5a9a8009b18b4b2943'
         '457fc6479993df3898a11b2083328ee8397d9dcbd6a5a4b2eb67e2b5adc4ce5045bfde6aed883432303326b86ba4bab49315148a4c21c5e78ece97e09f13e443'
         '19c4a2368507ea7002c1bbd795c8395598b96770e5338771c1b67de9d99a7fb50f9ccc531005c6ce727b7baf74910b5f6f310c27ac9208b77da20537351463be'
-        '2b80faf3869bd80cd43f649bc0ab502a9777d4323fa520b7597853065c4c2069a165a73a85451894707406f33489bae01addbaeb0ca40c870e4840280d8b7a9c'
+        '6caa1a1ec351aeb7d4c0c7f82309057d27348997dee870e00ef54b47883f0fee76b26decdc35e52f7f55c78f24e8ff12e162ea27b389c82ec85f1b95e18a794c'
         'ecd1ddd21c0d7793bed08324a4f8daf32ad83da730d8de84b9cd0a1f4d7405be08b679c3369fb0a5ef87674035aa9aeb0f10f2017e019206d239338788f4ec90'
         'ef3a1bec01495f875254332367e70a1425258628273e3ed7f8b276d0a9045617138997713593a7f8f573b89f18b26ae29a9f413ee1efbdb73798c71d65e514ac'
+        '0457c2b12c48d6259f6ffd07f1f037704301431d196be7296c6b52a55ea424f44c6be88953f9c6f86f6540256452f6625f473308a9fe4b8e4fde7a81e461d2ee'
         'c20b3b791715d02756742bfa34f4921bcaebeee62edf079fe15c89afdc11451a2656122f4f21335cd116676ff69c3b7eee80c6adfdcbfe838c0f1e9012ce0428'
         'df68cfd344b37cae25fa446c82c5897510de23c55761570969dc5a6f2a5bf4c11b31e50c1670a18bef1065af6597e72e0ed839e8fdbc0328cf2dcf34484e5758'
         '8bff27696075ec53ca042b0c9e0deae345712e652b3b66bab1da82c4deefdf35533d04c00d59de70cbf968380236131bc819e0eeaa8aa40edfd84df3bd0972ef'
@@ -1358,7 +1360,7 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         'c31f8fc6db7e5776ffbbde976239a102e5ddb0c2a6214a094a26f364718a507ac7c1960a9a955bfd16a3182979e57a8eb9ffbbde62d26ddfb983076868d619f2'
         '1455fd65a42e9bba65673da473b99187acc2e25d6535c89d365eb925500f84e23e40bddca183e83bb8af641122254083cddd8bf26fbdbd413da6a20ccd73850f'
         '04fe6270d9e54b974ee745261575fd710e3af252c6e2b2788a082455c6eeccfd2ea944245f5f58a9f4de418eca3058aaae8a27f90173b254aac15036c7a95c49'
-        '0d06bf829a176a7dafee17841c9f132dd55111ea99c4f006f31ed1836807822c827041793b40bd365b1b4a0b7b8aa71fa270d6a37a0b16009e34c3f9895210c9'
+        'a2a2b50c6c55a87c7d84bd779f175e618c138a8a23a9f13b52f0dce6cf888243859688ef7b5108fb953affd03bf8bf4ad1cbae799be4330be6274608ca0c42de'
         'a745db752d2586475d373cb29e64b4f42f6e305b4b3e588efbce955491429c73b3d16c426e76118b1499bbfb4a2159192f3950ed06d309064eb28750a1d6e6aa'
         '8820c684d4f21c9c74729a518f187334b817b8059436aa808e423533a67a6b752a93df4e79c200307b29635f0de393f6749aaa52cfc20e28957f759b4adb6ce0'
         '877dc1eebcaec113969ea45471b63e0339066a270da667b5c1aa1578e26aa01c7ec34e1cb4c436565553388e0ba04add10bf3540fe4ba7e11b24aa8a8d8ccc4f'

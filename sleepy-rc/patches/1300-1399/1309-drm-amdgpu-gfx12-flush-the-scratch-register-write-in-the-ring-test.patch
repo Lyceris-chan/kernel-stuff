@@ -1,7 +1,7 @@
 From: Jesse Zhang <Jesse.Zhang@amd.com>
-Date: Fri, 23 Oct 2026 14:30:26 +0800
-Subject: [PATCH] drm/amdgpu/gfx12: flush the scratch register write in the ring test
-Message-ID: <20261023063031.849579-1-Jesse.Zhang@amd.com>
+Date: Mon, 26 Oct 2026 11:20:23 +0800
+Subject: [PATCH v2 7/7] drm/amdgpu/gfx12: flush the scratch register write in the ring test
+Message-ID: <20261026032042.2266892-7-Jesse.Zhang@amd.com>
 
 The ring test writes 0xCAFEDEAD to SCRATCH_REG0 through MMIO, rings the
 doorbell for the CP to write 0xDEADBEEF with SET_UCONFIG_REG, and polls
@@ -25,25 +25,24 @@ Read the scratch register back before ringing the doorbell, as
 commit 3f69d5860f5b ("drm/amdgpu: Add a read to GFX v9.4.3 ring test")
 does for a similar race on gfx 9.4.3 with multiple XCCs.
 
+Reviewed-by: Lijo Lazar <lijo.lazar@amd.com>
 Signed-off-by: Jesse Zhang <Jesse.Zhang@amd.com>
 ---
- drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c b/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c
-index d334fb805020..184e009c8e50 100644
+index d334fb805020..23c771dcd535 100644
 --- a/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c
 +++ b/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c
-@@ -458,6 +458,11 @@ static int gfx_v12_0_ring_test_ring(struct amdgpu_ring *ring)
+@@ -458,6 +458,8 @@ static int gfx_v12_0_ring_test_ring(struct amdgpu_ring *ring)
  	int r;
  
  	WREG32(scratch, 0xCAFEDEAD);
-+	/*
-+	 * Read the value back so the posted write reaches the register before
-+	 * the CP writes the test value; otherwise it can overwrite the result.
-+	 */
++	/* Flush the posted write before the CP writes the test value. */
 +	RREG32(scratch);
  	r = amdgpu_ring_alloc(ring, 5);
  	if (r) {
  		drm_err(adev_to_drm(adev),
-
+-- 
+2.50.1
