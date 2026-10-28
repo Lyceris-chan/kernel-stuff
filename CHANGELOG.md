@@ -18,6 +18,40 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.10.28-2-sleepy-next (linux-next `next-20261028`)]: 2026-10-28
+
+Adds **`1313`** on top of `2026.10.28-1`. Series **128 patches**, audit
+**128/128**; lru_cast v0.2.8 and NAP v0.5.1 are unchanged.
+
+### Changed
+
+- **`1313`** — `drm/amdkfd: use the queue's process info for the WPTR BO
+  eviction fence` (Jesse Zhang, `Reviewed-by: Felix Kuehling`). A WPTR BO
+  exported with `AMDKFD_IOC_EXPORT_DMABUF` and imported on a second render
+  node made `amdgpu_amdkfd_map_gtt_bo_to_gart()` read a render-node VM's
+  missing process info and oops in `AMDKFD_IOC_CREATE_QUEUE`; reproduced on
+  Navi 31. The queue's own process info is passed instead. Carried by both
+  packages.
+
+### Verification
+
+Package `linux-sleepy-next-2026.10.28-2` (22.8 MB) and headers (34.8 MB) built
+with Clang 23.1.4; `.BTF`/`.BTF_ids`, `lru_cast v0.2.8`, NAP `0.5.1` and the
+usual cmdline re-checked. Installed side by side; no reboot.
+
+## [7.3.0-11-sleepy-rc (Linux 7.3)]: 2026-10-28
+
+Adds **`1313`** on top of `7.3.0-10`. The base stays `v7.3`; the series is
+**296 patches** and audits **296/296**. `2044` v5, `2800` v6, lru_cast v0.2.8
+and NAP v0.5.1 are unchanged.
+
+### Verification
+
+Package `linux-sleepy-rc-7.3.0-11` (22.7 MB) and headers (34.5 MB) built with
+Clang 23.1.4; `.BTF`/`.BTF_ids`, `lru_cast v0.2.8`, NAP `0.5.1`, `tcp_bbr3` and
+the `amdgpu.dcdebugmask=0x800` cmdline re-checked. Installed side by side; no
+reboot.
+
 ## [2026.10.28-1-sleepy-next (linux-next `next-20261028`)]: 2026-10-28
 
 Preview bump from `next-20261027` to `next-20261028` — 613 commits across 355

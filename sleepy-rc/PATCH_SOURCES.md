@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
 - **Base:** Linux `v7.3`
-- **Series:** 295 patches
+- **Series:** 296 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -22,7 +22,7 @@ are supplied by the generator instead, so every row below has a source.
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 30 |
-| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 11 |
+| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 12 |
 | `1100–1199` | AMD display (DCN4, colorops) | 30 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 27 |
 | `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 43 |
@@ -38,7 +38,7 @@ are supplied by the generator instead, so every row below has a source.
 | `9000–9099` | agd5f staging + userq lifecycle backports | 36 |
 | `9100–9199` | Retry-fault handling v4 (agd5f staging) | 11 |
 
-**Total: 295** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 296** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-19). The counts are now generated from the patch tree
@@ -11033,16 +11033,18 @@ commit is 2022-05-18) and was not used: `sleepy-rc` tracks the `v7.3` tag, not
 the stable series. The drm/amd tracker was queried by update time and Phoronix
 was read through the front page and the 2026-10-27/28 articles.
 
-### Adopted — two revision updates
+### Adopted — `1313`, and two revision updates
 
 | Patch | Change | Why |
 |---|---|---|
-| `2044` v1 → v5 | `lib/group_cpus: snapshot cluster masks to keep grouping hotplug invariant` (Vishal Badole) | v5 is the merged upstream form (`d39303f30314`): it snapshots the SMT masks with the cluster masks under `cpus_read_trylock()`, latches the first capture, and propagates allocation errors instead of switching algorithms. The v1 carried since 2026-08-26 snapshots only the cluster masks. v5 applies to the `v7.3` series tree with zero fuzz; a cumulative rebuild of all 295 patches succeeds. |
+| `1313` | **`drm/amdkfd: use the queue's process info for the WPTR BO eviction fence`** (Jesse Zhang, AMD) | New carry, approved 2026-10-28. `amdgpu_amdkfd_map_gtt_bo_to_gart()` removed the eviction fence of `bo->vm_bo->vm->process_info`, which is the VM that opened the BO last and has no process info on a render-node VM. An unprivileged process that exports its WPTR BO with `AMDKFD_IOC_EXPORT_DMABUF` and imports it on a second render node fd oopses in `AMDKFD_IOC_CREATE_QUEUE`; reproduced on Navi 31. The patch passes the queue's process info instead. `Reviewed-by: Felix Kuehling`; `Fixes: 7f347e3f8217` is in `v7.3`. Message-ID `20261027052205.2716707-1-Jesse.Zhang@amd.com`. Applies to both series (offsets only) and is carried by both packages. |
+| `2044` v1 → v5 | `lib/group_cpus: snapshot cluster masks to keep grouping hotplug invariant` (Vishal Badole) | v5 is the merged upstream form (`d39303f30314`): it snapshots the SMT masks with the cluster masks under `cpus_read_trylock()`, latches the first capture, and propagates allocation errors instead of switching algorithms. The v1 carried since 2026-08-26 snapshots only the cluster masks. v5 applies to the `v7.3` series tree with zero fuzz; a cumulative rebuild of all 296 patches succeeds. |
 | `2800` v1 → v6 | `mm: memory: fix truncation removing mapped folios` (Baolin Wang) | v6 (2026-10-28) keeps the second `pmd_none()` check per David Hildenbrand and adds `Cc: stable`. It carries `Reviewed-by: Pedro Falcato`, `Reviewed-by: Lorenzo Stoakes` and `Acked-by: Qi Zheng`. It applies to `v7.3` with zero fuzz and survives the cumulative series. The bug is the `VM_BUG_ON_FOLIO(folio_mapped)` in `truncate_inode_folio()` reached from `shmem_fallocate()` racing `MADV_DONTNEED`. |
 
-Both are rc-only updates: the preview base already contains the `2044` change
-(`d39303f30314`) and the `2800` fix is not in `next-20261028`; the preview does
-not carry either patch.
+`2800` is rc-only: `next-20261028` already carries the fix. `2044` is now
+carried by both packages — the 1028 mm tree dropped it, as the preview ledger
+records. `1313` joins both packages as well, taking the rc series to **296**
+and the preview to **128**.
 
 ### lru_cast v0.2.6 → v0.2.8 — both packages
 
@@ -11121,7 +11123,7 @@ both series audit clean with it. The repository's v0.6.x line is marked
 | `io_uring: keep the drain active when a deferred drain request is started` (Jens Axboe) | The regression it fixes (`ecb6817b769f`) is not in `v7.3`, and `next-20261028` already has the fix. No action for either package. |
 | UALink loopback, VF2PF/SPM VF init, GMUX, Apple 5K iMac, radeon VCE1, nvme-tcp/TLS/RDMA, NVMe HMB | Off-target: wrong silicon, SR-IOV, hot-plug, Apple, or remote-storage topology. |
 | sched_ext v7.4 fixes | Inert under `CONFIG_SCHED_BORE`; the ext class is compiled but unused. |
-| `drm/amdkfd: use the queue's process info for the WPTR BO eviction fence` (Jesse Zhang) | **Adopt candidate, highest priority.** `Reviewed-by: Felix Kuehling`. Fixes a NULL dereference in `amdgpu_amdkfd_map_gtt_bo_to_gart()` when a WPTR BO exported with `AMDKFD_IOC_EXPORT_DMABUF` is imported on a second render node; reproduced on Navi 31. The `Fixes:` commit `7f347e3f8217` is in `v7.3`. It applies to the full 295-patch series with offsets only (no fuzz, no rejects) and is not in `next-20261028`. Our series already carries WPTR work (`1065`, `9077`, `9081`), so it fits the area. Held for explicit approval because it is a new patch, not a revision. |
+| ~~`drm/amdkfd: use the queue's process info for the WPTR BO eviction fence`~~ | **Adopted as `1313`** (see the adopted table above). |
 | `drm/amdgpu/userq: validate the moved individual BOs on restore` 2/3 and `pass the drm_exec ticket to amdgpu_vm_handle_moved()` 3/3 (Jesse Zhang) | Real Navi 48 SDMA user-queue fault after BO eviction, but Christian König replied that the proper fix is to move all BOs to their evicted lists, not this series. Applies to the series tree, but the approach is not agreed. Watch. |
 | `drm/amd/display: Keep FreeSync flip timing across plane resets` (Davey Hughes, 2 patches) | KUnit-tested fix for 51 fps on a 48-165 Hz FreeSync panel under KWin HDR; the author notes the atomic-check copy can be one flip stale and that only one panel/GPU was tested. No maintainer review. Watch. |
 | MES MQD size and MES reset debug series (`drm/amdgpu/mes: set the MQD size of the MES rings`, `Add debug messages for MES queue reset` v2) | Apply to the series tree, but the first is part of the userq restore series above and the rest are debug/correctness changes with no review. Watch. |

@@ -3,11 +3,11 @@
 `linux-sleepy-rc` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
 built from **mainline Linux 7.3** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 295-patch
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 296-patch
 series. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0-10` · **Artifact:**
-`linux-sleepy-rc-7.3.0-10-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0-11` · **Artifact:**
+`linux-sleepy-rc-7.3.0-11-x86_64.pkg.tar.zst`
 
 ## Target hardware
 
@@ -124,7 +124,7 @@ fix lands.
 
 ## Patch series
 
-295 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+296 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 
 | Range | Category |
 |---|---|

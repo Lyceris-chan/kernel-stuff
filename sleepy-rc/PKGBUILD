@@ -182,7 +182,7 @@ _rcver=
 
 pkgver=7.3.0
 _tagrel=1
-pkgrel=10
+pkgrel=11
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -382,6 +382,7 @@ source=(
   "patches/1300-1399/1310-drm-amdgpu-sign-extend-the-addresses-GEM_OP-GET_MAPPING_INFO-returns.patch"
   "patches/1300-1399/1311-drm-amdgpu-wait-for-the-GEM_VA-input-fences-interruptibly.patch"
   "patches/1300-1399/1312-drm-amdgpu-check-amdgpu_vm_ready-in-dma-buf-move-notify.patch"
+  "patches/1300-1399/1313-drm-amdkfd-use-the-queue-s-process-info-for-WPTR-BO.patch"
 
   "patches/2000-2099/2000-block-mq-deadline-pass-in-queue-directly-to-dd_inser.patch"
   "patches/2000-2099/2001-block-mq-deadline-skip-expensive-merge-lookups-if-co.patch"
@@ -1316,6 +1317,7 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         'ecd1ddd21c0d7793bed08324a4f8daf32ad83da730d8de84b9cd0a1f4d7405be08b679c3369fb0a5ef87674035aa9aeb0f10f2017e019206d239338788f4ec90'
         'ef3a1bec01495f875254332367e70a1425258628273e3ed7f8b276d0a9045617138997713593a7f8f573b89f18b26ae29a9f413ee1efbdb73798c71d65e514ac'
         '0457c2b12c48d6259f6ffd07f1f037704301431d196be7296c6b52a55ea424f44c6be88953f9c6f86f6540256452f6625f473308a9fe4b8e4fde7a81e461d2ee'
+        'd34e2ed111d28b4a01e9f8993c4dbe617509e212fd1222be2fb5da58b471e304b256c09aa1d305a7b84aa0e70e3cd40c26928d2cbb0c6ae08f04dc45657bab66'
         'c20b3b791715d02756742bfa34f4921bcaebeee62edf079fe15c89afdc11451a2656122f4f21335cd116676ff69c3b7eee80c6adfdcbfe838c0f1e9012ce0428'
         'df68cfd344b37cae25fa446c82c5897510de23c55761570969dc5a6f2a5bf4c11b31e50c1670a18bef1065af6597e72e0ed839e8fdbc0328cf2dcf34484e5758'
         '8bff27696075ec53ca042b0c9e0deae345712e652b3b66bab1da82c4deefdf35533d04c00d59de70cbf968380236131bc819e0eeaa8aa40edfd84df3bd0972ef'

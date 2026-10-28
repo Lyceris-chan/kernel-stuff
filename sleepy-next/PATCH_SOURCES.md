@@ -18,8 +18,8 @@ moved, so the full ledger is not duplicated here.
 | Snapshot | `next-20261028`, tag `6d0933ae9d46` (tag object `5fed66a6fde4`) |
 | Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261028.tar.gz` |
 | Snapshot tree `Makefile` | `7.3.0` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.10.28-1-sleepy-next` |
-| Package | `linux-sleepy-next-2026.10.28-1` |
+| Kernel release | `2026.10.28-2-sleepy-next` |
+| Package | `linux-sleepy-next-2026.10.28-2` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -1062,13 +1062,14 @@ checks are recorded in the rc ledger.
 ## Bump to `next-20261028` — 2026-10-28
 
 `next-20261028` was cut at 14:40 UTC on 2026-10-28 (`6d0933ae9d46`, tag object
-`5fed66a6fde4`). `_srctag` is `next-20261028`, pkgver `2026.10.28`, pkgrel 1.
+`5fed66a6fde4`). `_srctag` is `next-20261028`, pkgver `2026.10.28`, pkgrel 2
+after `1313` was added.
 The snapshot delta from `next-20261027` is **613 commits across 355 files**
 (12,563 insertions, 16,890 deletions), 143 of the files in this build's target
 paths. Unlike the previous snapshots, this delta carries the AMD merge-window
 content: nine patches the preview was carrying are now in the base.
 
-The series is **127 patches** and the cumulative audit is **127/127** against
+The series is **128 patches** and the cumulative audit is **128/128** against
 `next-20261028`.
 
 ### Absorbed — nine patches dropped
@@ -1147,7 +1148,14 @@ pre-fix content. The other mm commits that appear in
 This is the NVMe managed-IRQ affinity fix that `sleepy-rc` carries as `2044`,
 and the failure mode is this machine's NVMe across an s2idle cycle, so the
 preview now carries **`2044` v5** as well. It applies to the pristine
-`next-20261028` tree with zero fuzz and takes the series to **127 patches**.
+`next-20261028` tree with zero fuzz and takes the series to 127 patches.
+
+`1313` (`drm/amdkfd: use the queue's process info for the WPTR BO eviction
+fence`, Jesse Zhang, `Reviewed-by: Felix Kuehling`) is the one new carry of
+this sweep. It fixes a NULL dereference when a WPTR BO exported with
+`AMDKFD_IOC_EXPORT_DMABUF` is imported on a second render node, applies to this
+base with offsets only, and is carried by both packages. The series is **128
+patches**.
 
 `2800` stays rc-only: `next-20261028` already carries its fix
 (`sync_with_folio_pmd_zap()` in `mm/internal.h` and `mm/memory.c`).
@@ -1155,4 +1163,4 @@ preview now carries **`2044` v5** as well. It applies to the pristine
 ### Series state
 
 Both packages passed `audit_series.py` after the changes: **295/295** on
-`v7.3` and **127/127** on `next-20261028`.
+`v7.3` and **128/128** on `next-20261028`.
