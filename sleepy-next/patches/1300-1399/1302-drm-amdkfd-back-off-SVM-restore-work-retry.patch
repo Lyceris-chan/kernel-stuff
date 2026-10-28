@@ -25,19 +25,19 @@ Signed-off-by: Philip Yang <Philip.Yang@amd.com>
 diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_priv.h b/drivers/gpu/drm/amd/amdkfd/kfd_priv.h
 --- a/drivers/gpu/drm/amd/amdkfd/kfd_priv.h
 +++ b/drivers/gpu/drm/amd/amdkfd/kfd_priv.h
-@@ -908,6 +908,8 @@
+@@ -909,6 +909,8 @@
  	atomic_t			evicted_ranges;
  	atomic_t			drain_pagefaults;
  	struct delayed_work		restore_work;
 +	/* Retry delay of restore_work, doubled on each failed attempt */
 +	u32				restore_delay_ms;
  	DECLARE_BITMAP(bitmap_supported, MAX_GPU_INSTANCE);
- 	/* First CPU page index beyond the smallest GPUVM supported by the
- 	 * SVM capable GPUs of this process. Zero if none support SVM.
+ 	struct task_struct		*faulting_task;
+ 	/* check point ts decides if page fault recovery need be dropped */
 diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c b/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
 --- a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
 +++ b/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
-@@ -45,6 +45,7 @@
+@@ -46,6 +46,7 @@
  #define dev_fmt(fmt) "kfd_svm: %s: " fmt, __func__
  
  #define AMDGPU_SVM_RANGE_RESTORE_DELAY_MS 1
@@ -45,15 +45,15 @@ diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c b/drivers/gpu/drm/amd/amdkfd/k
  
  /* Long enough to ensure no retry fault comes after svm range is restored and
   * page table is updated.
-@@ -1961,6 +1962,7 @@
+@@ -1974,6 +1975,7 @@
  	struct mm_struct *mm;
  	int evicted_ranges;
  	int invalid;
 +	u32 delay;
- 	int r;
+ 	int r = 0;
  
  	svms = container_of(dwork, struct svm_range_list, restore_work);
-@@ -2031,15 +2033,23 @@
+@@ -2044,6 +2046,14 @@
  	pr_debug("restore svm ranges successfully\n");
  
  out_reschedule:
@@ -68,9 +68,10 @@ diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c b/drivers/gpu/drm/amd/amdkfd/k
  	mutex_unlock(&svms->lock);
  	mmap_write_unlock(mm);
  	mutex_unlock(&process_info->lock);
- 
- 	/* If validation failed, reschedule another attempt */
- 	if (evicted_ranges) {
+@@ -2052,9 +2062,9 @@
+ 	 * device is gone for good
+ 	 */
+ 	if (evicted_ranges && r != -ENODEV) {
 -		pr_debug("reschedule to restore svm range\n");
 +		pr_debug("reschedule to restore svm range in %u ms\n", delay);
  		queue_delayed_work(system_freezable_wq, &svms->restore_work,
@@ -79,7 +80,7 @@ diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c b/drivers/gpu/drm/amd/amdkfd/k
  
  		kfd_smi_event_queue_restore_rescheduled(mm);
  	}
-@@ -2114,6 +2124,7 @@
+@@ -2129,6 +2139,7 @@
  			pr_debug("failed to quiesce KFD\n");
  
  		pr_debug("schedule to restore svm %p ranges\n", svms);
@@ -87,7 +88,7 @@ diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c b/drivers/gpu/drm/amd/amdkfd/k
  		queue_delayed_work(system_freezable_wq, &svms->restore_work,
  			msecs_to_jiffies(AMDGPU_SVM_RANGE_RESTORE_DELAY_MS));
  	} else {
-@@ -3411,6 +3422,7 @@
+@@ -3428,6 +3439,7 @@
  	INIT_LIST_HEAD(&svms->list);
  	atomic_set(&svms->evicted_ranges, 0);
  	atomic_set(&svms->drain_pagefaults, 0);

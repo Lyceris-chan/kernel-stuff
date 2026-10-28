@@ -18,6 +18,85 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.10.28-1-sleepy-next (linux-next `next-20261028`)]: 2026-10-28
+
+Preview bump from `next-20261027` to `next-20261028` — 613 commits across 355
+files, carrying the AMD merge-window content. Nine carried patches are now in
+the base, `2152` is superseded, `1302` is rebased, `2044` joins the preview
+because the rebuilt mm tree dropped it, and both packages move to **lru_cast
+v0.2.8** and **NAP v0.5.1**. The series is **127 patches** and the cumulative
+audit is **127/127**.
+
+### Changed
+
+- **Nine absorbed patches** — `1084` (`df4d6d404d44`), `1096`
+  (`1ac3b84e10d2`), `1097` (`f6d97ecb68b8`), `1099` (`dab5f5280406`), `1174`
+  (`59ef9a435499`), `1300` (`77f5f4eae104`), `1308` (`55ca06a52a09`), `9086`
+  (`d76b655c98e8`) and `9089` (`7ca6f3359b55`) are dropped: each failed forward
+  and reverse-applied cleanly against the pristine snapshot, and its upstream
+  commit is in `next-20261028`.
+- **`2152` superseded** — the snapshot carries `f1ce4414a570`
+  ("khugepaged: fix readahead lock inversion in collapse_file()", Lance Yang,
+  `Reviewed-by: Pedro Falcato`, two acks), a reviewed implementation of the
+  same fix that conflicts with the carried form.
+- **`1302` rebased** — `266fab831396` added the `r != -ENODEV` guard to the
+  same reschedule block. The backoff is unchanged, the debug message reports
+  the delay, and the changed-line set is identical to the original posting.
+- **`2044` v5 added** — `next-20261027` carried the group_cpus affinity fix in
+  its mm tree; the 1028 mm tree was rebuilt without it (`lib/group_cpus.c` is
+  back to the pre-fix content, and no commit in the snapshot reverts it). The
+  fix targets this machine's NVMe across an s2idle cycle, so the preview now
+  carries the same `2044` v5 as `sleepy-rc`.
+- **lru_cast v0.2.6 → v0.2.8** — v0.2.7 adds a stale-word marking pass
+  (`stale_pfn`/`stale_tick`, `LRU_CAST_STALE_PASS`), swap-table flag handling,
+  `system_dfl_wq` delayed-work helpers and `lru_cast_key_init()`; v0.2.8 is a
+  smaller follow-up over the same files. The preview copy is the v0.2.6 port
+  with the author's v0.2.6 → v0.2.8 delta applied as a three-way merge; every
+  hunk applied cleanly. A line-set diff against the author's v0.2.8 shows only
+  the same 7.4 API adaptations recorded for v0.2.6. The rc copy is byte-identical
+  to the author's `0001-7.3-rc7-lru_cast-v0.2.8.patch`.
+- **NAP v0.5.0 → v0.5.1** — the tick is stopped only when
+  `sleep_length_ns >= TICK_NSEC`, `div_u64()` becomes `div64_u64()`, and the
+  version moves to 0.5.1. It applies to both bases with zero fuzz.
+
+### Verification
+
+Package `linux-sleepy-next-2026.10.28-1` (22.8 MB) and headers (34.8 MB) built
+with **ClangBuiltLinux clang 23.1.4**. The extracted `vmlinux` carries `.BTF`
+and `.BTF_ids`, reports `lru_cast v0.2.8 by Masahito Suzuki` and NAP `0.5.1`,
+has `CONFIG_TCP_CONG_BBR3=y` with old `tcp_bbr` absent, and the built-in cmdline
+is `cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0
+amdgpu.runpm=0`. Installed side by side with the rc package; no reboot or
+shutdown.
+
+## [7.3.0-10-sleepy-rc (Linux 7.3)]: 2026-10-28
+
+Two carried patches move to their latest revisions, and both packages move to
+lru_cast v0.2.8 and NAP v0.5.1. The base stays `v7.3`; the series stays **295
+patches** and audits **295/295**.
+
+### Changed
+
+- **`2044` v1 → v5** — the merged form (`d39303f30314`) snapshots the SMT masks
+  with the cluster masks under `cpus_read_trylock()`, latches the first capture,
+  and propagates allocation errors. It applies to the `v7.3` series tree with
+  zero fuzz.
+- **`2800` v1 → v6** — the 2026-10-28 posting keeps the second `pmd_none()`
+  check, adds `Cc: stable`, and carries reviews from Pedro Falcato and Lorenzo
+  Stoakes, an ack from Qi Zheng and a follow-up `Acked-by` from David
+  Hildenbrand.
+- **lru_cast v0.2.8** — the rc copy is the author's
+  `0001-7.3-rc7-lru_cast-v0.2.8.patch` byte-for-byte.
+- **NAP v0.5.1** — stable post from 2026-10-11.
+
+### Verification
+
+Package `linux-sleepy-rc-7.3.0-10` (22.7 MB) and headers (34.5 MB) built with
+Clang 23.1.4. The extracted `vmlinux` carries `.BTF` and `.BTF_ids`, reports
+`lru_cast v0.2.8 by Masahito Suzuki` and NAP `0.5.1`, has
+`CONFIG_TCP_CONG_BBR3=y` with old `tcp_bbr` absent, and the built-in cmdline has
+`amdgpu.dcdebugmask=0x800`. Installed side by side with the preview; no reboot.
+
 ## [2026.10.27-1-sleepy-next (linux-next `next-20261027`)]: 2026-10-27
 
 Preview bump from `next-20261026` to `next-20261027` — 460 commits across 196

@@ -229,7 +229,7 @@ renumbered to `1165` in the rc3-9 cycle (2026-09-15).
 | `2167` | mm, swap: add sysfs per-device size limit for xswap | Baoquan He | 2026-09-16 | `xswap-patches-v2-sep/0013` |
 | `2168` | mm, swap: shrink xswap to the ceiling when it drops | Baoquan He | 2026-09-16 | `xswap-patches-v2-sep/0014` |
 | `2170` | mm: distinguish large folio swap allocation failures | Xueyuan Chen | 2026-08-30 | `20260830042920.2280454-3-xueyuan.chen21@gmail.com` |
-| `2200` | 7.2-nap-v0.5.0 | Masahito S | 2026-06-05 | `04aef34448bb` |
+| `2200` | 7.2-nap-v0.5.1 | Masahito S | 2026-10-11 | `d1b63456d4ea` |
 | `2303.patch` | kallsyms: index symbols by token to speed up table compression | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-2-39817ec5db23@kernel.org` |
 | `2304.patch` | kallsyms: output binary data to speed output and kallsyms assembly | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-3-39817ec5db23@kernel.org` |
 | `2305.patch` | kbuild: do not sort nm output where the order is irrelevant | "Lorenzo Stoakes (ARM)" <ljs@kernel.org> | 2026-09-14 | `20260914-build-speedup-v2-4-39817ec5db23@kernel.org` |
@@ -643,10 +643,11 @@ compressor we do not build.
 
 ### CPU idle (2200–2299)
 
-`2200` is the NAP governor, firelzrd's `7.2-nap-v0.5.0`. sirlucjan's `7.3-rc/`
-tree has no `nap-patches` directory, so the documented source path is stale;
-NAP survives only under their `7.0/` and `6.19/` trees. The patch itself is
-unaffected.
+`2200` is the NAP governor, firelzrd's `7.2-nap-v0.5.1` (the v0.5.0 content was
+byte-identical to the author's `6.18.3-nap-v0.5.0`; v0.5.1 is the same line and
+applies to both bases at zero fuzz). sirlucjan's `7.3-rc/` tree has no
+`nap-patches` directory, so the documented source path is stale; NAP survives
+only under their `7.0/` and `6.19/` trees. The patch itself is unaffected.
 
 ### kbuild (2300–2399)
 
@@ -11012,3 +11013,185 @@ Suzuki`, has `tcp_bbr3.ko` in `modules.builtin` and no old `tcp_bbr`, and the
 built-in cmdlines match their PKGBUILDs (the rc one additionally carries
 `amdgpu.dcdebugmask=0x800`). Both packages are installed side by side; the
 running kernel remains `2026.10.26-2-sleepy-next` and no reboot was performed.
+
+## Sweep 2026-10-28 — `next-20261028`; `2044` v5 and `2800` v6
+
+All source classes were queried. The tree scan covered every branch of
+`torvalds` (`65ba8f34ec88`, 2026-10-27), `linux-next` (tag `next-20261028`,
+`6d0933ae9d46`), `drm-next` (`fad06cfaf385`), `agd5f-linux` and
+`amd-staging-drm-next` (`ba496bb83788`), `drm-misc` (`origin/drm-misc-next`),
+`linux-pm` (`7be4bc52fd9e`), the `akpm-mm` branches including
+`mm-everything` (`c8824f68cdec`) and `tip` (`0f71e811af17`). CachyOS 7.3
+branches were unchanged since 2026-10-06, sirlucjan had no commit after
+2026-10-20, firelzrd BORE stayed at 7.0.0 and `lru-marie` carried only a README
+pointer to lru_cast. linux-tkg added Project C (PrjC) for 7.3; this machine
+runs BORE, so it is not applicable. The lore mirrors (amd-gfx, dri-devel, lkml,
+netdev, mm, block, io-uring, nvme, pm, cgroups, fsdevel, pci and sched-ext)
+were refreshed through 2026-10-28; they cover the two
+`lists.freedesktop.org` lists. The `lore-stable` mirror is stale (its last
+commit is 2022-05-18) and was not used: `sleepy-rc` tracks the `v7.3` tag, not
+the stable series. The drm/amd tracker was queried by update time and Phoronix
+was read through the front page and the 2026-10-27/28 articles.
+
+### Adopted — two revision updates
+
+| Patch | Change | Why |
+|---|---|---|
+| `2044` v1 → v5 | `lib/group_cpus: snapshot cluster masks to keep grouping hotplug invariant` (Vishal Badole) | v5 is the merged upstream form (`d39303f30314`): it snapshots the SMT masks with the cluster masks under `cpus_read_trylock()`, latches the first capture, and propagates allocation errors instead of switching algorithms. The v1 carried since 2026-08-26 snapshots only the cluster masks. v5 applies to the `v7.3` series tree with zero fuzz; a cumulative rebuild of all 295 patches succeeds. |
+| `2800` v1 → v6 | `mm: memory: fix truncation removing mapped folios` (Baolin Wang) | v6 (2026-10-28) keeps the second `pmd_none()` check per David Hildenbrand and adds `Cc: stable`. It carries `Reviewed-by: Pedro Falcato`, `Reviewed-by: Lorenzo Stoakes` and `Acked-by: Qi Zheng`. It applies to `v7.3` with zero fuzz and survives the cumulative series. The bug is the `VM_BUG_ON_FOLIO(folio_mapped)` in `truncate_inode_folio()` reached from `shmem_fallocate()` racing `MADV_DONTNEED`. |
+
+Both are rc-only updates: the preview base already contains the `2044` change
+(`d39303f30314`) and the `2800` fix is not in `next-20261028`; the preview does
+not carry either patch.
+
+### lru_cast v0.2.6 → v0.2.8 — both packages
+
+The author released **v0.2.7** (2026-10-28 05:07 UTC) and **v0.2.8**
+(2026-10-28 15:37 UTC) after the v0.2.6 carried in the 2026-10-27 release. Both
+are in `firelzrd/lru_cast`; the `firelzrd-lru-marie` clone is now only the
+Marie announcement and does not carry them, which is why the mirror scan alone
+missed them. The net v0.2.6 → v0.2.8 change is 575 added and 81 removed lines
+across 17 files — 16 under `mm/lru_cast/` plus `include/linux/mmzone.h`.
+
+v0.2.7 adds a stale-word marking pass: each node's `lru_cast_clock` gains
+`stale_pfn`/`stale_tick`, `LRU_CAST_STALE_PASS` bounds how much of the node's
+state is re-read per tick, and `ktime`/`memory_hotplug` are used to time it.
+It also adds swap-table flag handling (`LRU_CAST_CAP_SWAP_TB_FLAGS`,
+`LRU_CAST_SHADOW_ANON_RESERVED`), `system_dfl_wq` delayed-work helpers,
+`lru_cast_key_init()`, and changes to ghost, evidence, readahead, sim and tune.
+v0.2.8 is a smaller follow-up over the same files.
+
+- **rc**: the author's `0001-7.3-rc7-lru_cast-v0.2.8.patch`, byte-identical,
+  applies to `v7.3` with zero fuzz and the series audits **295/295**.
+- **preview**: the v0.2.6 port plus the author's v0.2.6 → v0.2.8 delta,
+  applied as a three-way merge; every hunk applied cleanly. A line-set diff of
+  the result against the author's v0.2.8 shows only the same 7.4 API
+  adaptations recorded for v0.2.6: the rbtree augment macro, the
+  `__swap_writeout()` rename, `present_section_nr()` → `valid_section_nr()`,
+  `is_vm_hugetlb_page()` → `vma_is_hugetlb()`, the expanded `VM_SPECIAL`
+  test, and the `PF_KSWAPD` removal. The series audits **127/127**.
+
+### NAP v0.5.0 → v0.5.1 — both packages
+
+The author's `firelzrd/nap` repository carries **v0.5.1** (2026-10-11, stable
+for 6.18.3) after the v0.5.0 carried since June. The v0.5.0 content is
+byte-identical to the author's `6.18.3-nap-v0.5.0.patch`, so the carried 7.2
+label is only local naming. The v0.5.1 delta is small and behavioural:
+
+- The tick is stopped only when `sleep_length_ns >= TICK_NSEC`, with a comment
+  that stopping it saves nothing when the next timer is closer than one tick
+  period and the slow restart delays the wakeup.
+- `div_u64()` becomes `div64_u64()`, and one `RESIDENCY_THRESHOLD_NS` test is
+  reformatted across lines.
+- The version string moves to `0.5.1`.
+
+It applies to `v7.3` and `next-20261028` with zero fuzz (same eight files), and
+both series audit clean with it. The repository's v0.6.x line is marked
+**testing and exists only as a 6.12 patch**, so it is not adopted.
+
+### Version sweep — 18 higher-version hits, two real
+
+| Carried | Hit | Verdict |
+|---|---|---|
+| `1099` v2 | v3, 10-22 | Content-identical resend |
+| `1175` v1 | v4, 10-16 | Content-identical resend |
+| `1179` v1 | v2, 10-26 | Content-identical resend |
+| `1231`, `1232` v1 | v2, 10-01 | Content-identical resends |
+| `1233` v1 | "v2", 10-16 | Content-identical resend |
+| `2056` v1 | net v4, 10-26 | Content-identical resend |
+| `2803` v1 | v2, 10-20 | Content-identical resend |
+| `3000` v1 | v3, 10-04 | Content-identical resend |
+| `9087` v1 | "v2", 10-15 | The carried copy already has the v2 body and `Reviewed-by: Christian König`; the hit is the same change |
+| `9089` v1 | v2, 10-19 | The v2 content is now merged as `7ca6f3359b55`; the preview drops the patch |
+| `2044` v1 | v5, 10-27 | **Adopted** — merged as `d39303f30314` |
+| `2800` v1 | v6, 10-28 | **Adopted** — two reviews and one ack |
+
+### New candidates — triaged, not adopted
+
+| Candidate | Verdict |
+|---|---|
+| `bfq: Transfer allocated request counts when moving queues` (sunyangkai) | The 6-line accounting fix applies to the `v7.3` series tree and `bfq_entity::allocated` exists there. Posted 2026-10-28 with QEMU validation and no review yet. Watch for review or a v2. |
+| `mm/zswap: fix double decrement of the LRU node count on writeback` (Kaitao Cheng) | A real accounting bug in `shrink_memcg_cb()`/`zswap_entry_free()`, but the patch is one day old, unreviewed, and hunk 2 fails against the `v7.3` series tree. Rebasing it by hand would mean editing the author's diff; wait for review and a repost. |
+| `drm/amdkfd: Free queue in procfs_queue_type kobject release callback` (Ian Rogers, v2 8/9) | `Reviewed-by: Felix Kuehling`, but the UAF only manifests with `CONFIG_DEBUG_KOBJECT_RELEASE=y`, which this production config does not set, and it is part 8 of a 9-patch series. Watch. |
+| `drm/amdgpu: Prevent debugfs nullptr dereference` 1/2 and `drm/amd/display: Prevent debugfs nullptr dereference` 2/2 (Amadeusz Sławiński) | Unreviewed. Both paths dereference a structure only absent on ASICs that lack the feature; the RX 9070 XT has PSP SPIROM and DMUB. Watch. |
+| `drm/amdgpu: publish IH enabled before PSP programs IH_RB_CNTL` (Milan Milicevic, AMD) | The bug requires the SR-IOV VF path (`amdgpu_sriov_vf() && amdgpu_sriov_reg_indirect_ih()`); this machine is bare metal. Reject — wrong topology. |
+| `drm/amdkfd: bound SVM migration fence wait and guard with drm_dev_enter` v5 3/3 (Olivier Kaloudoff) | The thread between Christian König, Felix Kuehling and the DRM scheduler maintainers concludes that the underlying SVM/HMM hot-unplug case is "essentially unfixable"; no review tag. Watch. |
+| gfx engine soft reset series v3 (15 patches) | gfx12 soft reset is on-target, but the series is still under review and adopting parts would leave it incomplete. Watch as a series. |
+| GPU reset ordering series (finish recovery callbacks, stop schedulers) | Unchanged watch item from previous sweeps. |
+| `io_uring: keep the drain active when a deferred drain request is started` (Jens Axboe) | The regression it fixes (`ecb6817b769f`) is not in `v7.3`, and `next-20261028` already has the fix. No action for either package. |
+| UALink loopback, VF2PF/SPM VF init, GMUX, Apple 5K iMac, radeon VCE1, nvme-tcp/TLS/RDMA, NVMe HMB | Off-target: wrong silicon, SR-IOV, hot-plug, Apple, or remote-storage topology. |
+| sched_ext v7.4 fixes | Inert under `CONFIG_SCHED_BORE`; the ext class is compiled but unused. |
+| `drm/amdkfd: use the queue's process info for the WPTR BO eviction fence` (Jesse Zhang) | **Adopt candidate, highest priority.** `Reviewed-by: Felix Kuehling`. Fixes a NULL dereference in `amdgpu_amdkfd_map_gtt_bo_to_gart()` when a WPTR BO exported with `AMDKFD_IOC_EXPORT_DMABUF` is imported on a second render node; reproduced on Navi 31. The `Fixes:` commit `7f347e3f8217` is in `v7.3`. It applies to the full 295-patch series with offsets only (no fuzz, no rejects) and is not in `next-20261028`. Our series already carries WPTR work (`1065`, `9077`, `9081`), so it fits the area. Held for explicit approval because it is a new patch, not a revision. |
+| `drm/amdgpu/userq: validate the moved individual BOs on restore` 2/3 and `pass the drm_exec ticket to amdgpu_vm_handle_moved()` 3/3 (Jesse Zhang) | Real Navi 48 SDMA user-queue fault after BO eviction, but Christian König replied that the proper fix is to move all BOs to their evicted lists, not this series. Applies to the series tree, but the approach is not agreed. Watch. |
+| `drm/amd/display: Keep FreeSync flip timing across plane resets` (Davey Hughes, 2 patches) | KUnit-tested fix for 51 fps on a 48-165 Hz FreeSync panel under KWin HDR; the author notes the atomic-check copy can be one flip stale and that only one panel/GPU was tested. No maintainer review. Watch. |
+| MES MQD size and MES reset debug series (`drm/amdgpu/mes: set the MQD size of the MES rings`, `Add debug messages for MES queue reset` v2) | Apply to the series tree, but the first is part of the userq restore series above and the rest are debug/correctness changes with no review. Watch. |
+| `drm/amdgpu: Redirect imported dma-buf mmap request to exporter` (Xiaogang Chen) | **Rejected.** Christian König: "absolutely clear NAK" — mmap must be done on the exporter or the dma-buf fd, not redirected by the importer. |
+| `drm/amdgpu: Enable IP discovery via PSP mailbox` (Dejan Andjelkovic) | Passthrough A+A (guest physical address) topology; not this bare-metal desktop. Reject. |
+| Implicit-sync UAPI series, `jpeg type 4` version bump, VCE feedback buffer, `gfx10` MQD priority | Features, wrong block (VCE) or wrong silicon (GFX10). Skip or reject. |
+
+### Comments on carried patches
+
+- **`1301`** — the thread continued on 2026-10-28. Xiaogang Chen argues the
+  page-refcount check does not fix the root cause: `prange->migrate_mutex`
+  already serialises migrations, and a VRAM page can only be in one migration
+  at a time. Apurv Mishra's reply shows the reference outlives the mutex
+  (`svm_migrate_to_ram()` drops it before `do_swap_page()` releases P), and
+  that the reuse was reproduced with ASan and XNACK. The dispute is open; the
+  patch stays carried because it fixes a reproduced UAF, but it is flagged for
+  review.
+- **`2800` v6** — David Hildenbrand replied on 2026-10-28 with
+  `Acked-by: David Hildenbrand (Arm) <david@kernel.org>`. The trailer is
+  recorded here; the adopted patch's content is unchanged.
+- **`2056`** — Eric Dumazet asked for a **v5** that avoids a negative
+  `sk_forward_alloc` outright instead of clamping the return value, and said
+  the packetdrill test should be deferred. No v5 has been posted yet, so the
+  carried v4 content is draft history and the patch is a watch item for the
+  next sweep.
+- `2044` v5 and `9087` v2 drew no new comments; `1099`, `1175`, `1179`,
+  `1231`–`1233`, `2803` and `3000` were content-identical resends.
+
+### Reverts and drops versus the series
+
+A `--grep='^Revert'` pass over `torvalds`, `linux-next`, `drm-next`,
+`agd5f-linux`, `amd-staging-drm-next`, `drm-misc`, `linux-pm`, `akpm-mm` and
+`tip` since 2026-06-01 found **no revert of a carried patch**. The only hit is
+`2046`, which is the carried revert itself. The new reverts inside
+`next-20261028` are `c9019f2c4744`, `cf2bfd2dd9b8` and `ec7dbb2747a1`, all
+reverting DCN60 DSC/link code that this GPU does not run.
+
+### Tracker and Phoronix
+
+The drm/amd tracker returned **36 open issues updated since 2026-10-27**,
+including eight new ones (`#6044`–`#6050`). No comment references a fix commit.
+On-target threads: `#6044` (Navi 48 brief black flash on window open/close),
+`#6048` (RX 9070 XT wedge starting inference), `#6032` (RX 9070 reset with a
+data-fabric sync flood after S3) and `#6028` (secondary DP monitor lost after
+DPMS-off). `#6047`/`#6049` are DCN 3.2.1/3.5 MST leaks and `#6050` is a
+gfx1152 APU SMU 14.0.0 issue — not this display block or GPU.
+
+Phoronix through 2026-10-28 was Linux 7.4 merge-window material (NTFS3, the
+DMA-BUF io_uring path, hwmon, KVM, Core MM) plus userspace items (Firefox 159,
+KDE). Each on-target claim was traced to the tree:
+
+- **"AMDGPU HDMI 2.1 FRL enabled by default"** is `5fd3b60d9b80`
+  ("drm/amd/display: Enable HDMI FRL by default", Fangzhi Zuo, reviewed by
+  Harry Wentland). The v7.3 default is `amdgpu_dc_feature_mask = 2`; 7.4 adds
+  `DC_FRL_MASK`. The rc deliberately keeps FRL off: CachyOS reverted the same
+  change (`cc29db585c84`) after a flicker report, and the flicker-free
+  CachyOS kernel runs `dcfeaturemask=2` while ours previously ran `0x402`.
+  The preview base has the new default. No change.
+- **Cache-aware-scheduling fix** (Tim Chen) is for asymmetric Zen 5/5C hybrid
+  parts; the 7700 is symmetric Zen 4.
+- **TLB-size reporting fix** starts at Zen 5; the 7700 reports the old format
+  correctly.
+- **AMD 600-series chipset sensors** are already carried as `3000`.
+- **DMA-BUF io_uring support**, NTFS3, PPP BSD-compress, Provenance Time and
+  the 7.4 hwmon/KVM/Core MM items are features, RFCs or drivers for hardware
+  this machine does not have.
+
+### Audits
+
+`audit_series.py`: **295/295** on `v7.3` and **127/127** on `next-20261028`
+after the patch changes. The preview bump details, including the nine absorbed
+drops, the `1302`/`2152` handling and the `2044` base-churn carry, are in
+`sleepy-next/PATCH_SOURCES.md`.

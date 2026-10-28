@@ -2,16 +2,16 @@
 
 `linux-sleepy-next` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
-built from a **linux-next snapshot (`next-20261027`)** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 136-patch
+built from a **linux-next snapshot (`next-20261028`)** plus a sanitized
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 127-patch
 series. It is not a general-purpose kernel.
 
-**Base version:** `2026.10.27-1` · **Artifact:**
-`linux-sleepy-next-2026.10.27-1-x86_64.pkg.tar.zst`
+**Base version:** `2026.10.28-1` · **Artifact:**
+`linux-sleepy-next-2026.10.28-1-x86_64.pkg.tar.zst`
 
 The release is named for the **snapshot date**, not the mainline release the
 snapshot was cut from — linux-next is a daily tree, and its base release goes
-stale within days of the cut. The date is dotted (`2026.10.27`) because both
+stale within days of the cut. The date is dotted (`2026.10.28`) because both
 `depmod` and `mkinitcpio` require the release string to begin with dotted
 decimal notation; a bare `20261026` breaks module dependency generation and the
 initramfs build.
@@ -31,7 +31,7 @@ initramfs build.
 
 - **Clang ThinLTO `-O3 -march=znver4`** via the kernel.org ClangBuiltLinux
   pre-built LLVM 23.1.4.
-- **lru_cast 0.2.6 (CAST)** page eviction — Masahito Suzuki's successor to
+- **lru_cast 0.2.8 (CAST)** page eviction — Masahito Suzuki's successor to
   LRU-MARIE, carried as `2102`. The same patch is applied here as a port to
   this base (three insertion sites and one helper rename; recorded in
   `../PATCH_SOURCES.md`). It keeps Marie's per-PFN state array, SIMD walker,

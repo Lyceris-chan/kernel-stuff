@@ -6,8 +6,8 @@ built from **mainline Linux 7.3** plus a sanitized
 [CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 295-patch
 series. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0-9` · **Artifact:**
-`linux-sleepy-rc-7.3.0-9-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0-10` · **Artifact:**
+`linux-sleepy-rc-7.3.0-10-x86_64.pkg.tar.zst`
 
 ## Target hardware
 
@@ -24,13 +24,13 @@ series. It is not a general-purpose kernel.
 
 - **Clang ThinLTO `-O3 -march=znver4`** via the kernel.org ClangBuiltLinux
   pre-built LLVM 23.1.4.
-- **lru_cast 0.2.6 (CAST)** page eviction — Masahito Suzuki's successor to
+- **lru_cast 0.2.8 (CAST)** page eviction — Masahito Suzuki's successor to
   LRU-MARIE, carried as `2102`. It keeps Marie's per-PFN state array, SIMD PTE
   walker, rmap-fed bloom filter, look-around, kcompressd and clean-file floor,
   and replaces the generational ring with a measured, self-tuning LRFU
   ranking. It adds per-lruvec reclaim — so `memory.max` is enforced through
   the active policy — and a runtime switch at
-  `/sys/kernel/mm/lru_cast/enabled`. Both packages carry v0.2.6; the preview
+  `/sys/kernel/mm/lru_cast/enabled`. Both packages carry v0.2.8; the preview
   applies a port of the same patch to the linux-next base.
 - **`mm/gup` folio batching** (Rik van Riel's series) for mTHP throughput.
 - **BBR3** default + CAKE SQM via `net-tune`; ACPI CPPC hardening + per-core EPP

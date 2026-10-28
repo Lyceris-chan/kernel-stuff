@@ -15,11 +15,11 @@ moved, so the full ledger is not duplicated here.
 
 | | |
 |---|---|
-| Snapshot | `next-20261027`, tag `151a134a4e6e` (tag object `27e28adce2ba`) |
-| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261027.tar.gz` |
+| Snapshot | `next-20261028`, tag `6d0933ae9d46` (tag object `5fed66a6fde4`) |
+| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261028.tar.gz` |
 | Snapshot tree `Makefile` | `7.3.0` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.10.27-1-sleepy-next` |
-| Package | `linux-sleepy-next-2026.10.27-1` |
+| Kernel release | `2026.10.28-1-sleepy-next` |
+| Package | `linux-sleepy-next-2026.10.28-1` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -1058,3 +1058,101 @@ The port applies cleanly to a pristine `next-20261027` tree with `git apply
 --check` and GNU `patch`, and the rc copy applies to `v7.3` the same way. Both
 packages built with Clang 23.1.4 and are installed side by side; the integrity
 checks are recorded in the rc ledger.
+
+## Bump to `next-20261028` — 2026-10-28
+
+`next-20261028` was cut at 14:40 UTC on 2026-10-28 (`6d0933ae9d46`, tag object
+`5fed66a6fde4`). `_srctag` is `next-20261028`, pkgver `2026.10.28`, pkgrel 1.
+The snapshot delta from `next-20261027` is **613 commits across 355 files**
+(12,563 insertions, 16,890 deletions), 143 of the files in this build's target
+paths. Unlike the previous snapshots, this delta carries the AMD merge-window
+content: nine patches the preview was carrying are now in the base.
+
+The series is **127 patches** and the cumulative audit is **127/127** against
+`next-20261028`.
+
+### Absorbed — nine patches dropped
+
+Each patch below failed forward and reverse-applied cleanly against the
+pristine snapshot, and its upstream commit is in `next-20261028`:
+
+| Drop | Upstream commit |
+|---|---|
+| `1084` drop the gang leader reference when freeing gang jobs | `df4d6d404d44` |
+| `1096` Enable IB execution for user-mode SDMA queues | `1ac3b84e10d2` |
+| `1097` re-enable GFXOFF for compute on GFX12 | `f6d97ecb68b8` |
+| `1099` reject CS chunks too large for kvmalloc() | `dab5f5280406` |
+| `1174` take a runtime PM reference only when a CRTC turns on | `59ef9a435499` |
+| `1300` send SMI process and VM fault events only to allowed clients | `77f5f4eae104` |
+| `1308` don't wait for the SPM VMID's jobs under the VMID manager lock | `55ca06a52a09` |
+| `9086` validate SRAT subtables before parsing | `d76b655c98e8` |
+| `9089` split vram_pages of SVM ranges prefetched without a GPU mapping | `7ca6f3359b55` |
+
+The nine above are removed from `source=()` and from this package's `patches/`
+tree only — `sleepy-rc` keeps them, because `v7.3` does not contain the
+upstream commits. The preview tree still holds seven files that are not in
+`source=()`: `1008`/`1012`/`1013`/`1014`/`1017` (excluded by the PKGBUILD's
+own comment) and the retired `9040`/`9060`; they are not part of the series.
+
+### `2152` superseded — dropped
+
+`2152` (Nguyen Ngoc Thang, "khugepaged: hold invalidate_lock across
+collapse_file() readahead") is no longer needed. `next-20261028` contains
+`f1ce4414a570` ("khugepaged: fix readahead lock inversion in collapse_file()",
+Lance Yang, `Reviewed-by: Pedro Falcato`, `Acked-by: David Hildenbrand` and
+`Acked-by: Zi Yan`), a different implementation of the same fix that releases
+the folio locks and retries after rollback. The two conflict, and the merged
+revision is the reviewed one. `sleepy-rc` keeps `2152`: the merged fix does not
+apply to `v7.3` (two hunks fail), so the carried form is still the only fix
+there.
+
+### `1302` rebased
+
+`next-20261028` contains `266fab831396` ("drm/amdkfd: stop restore retries on
+device unplug"), which changes the same `svm_range_restore_work()` reschedule
+block and adds the `r != -ENODEV` guard. The preview copy of `1302` is rebased
+onto that state: the added `restore_delay_ms` backoff is unchanged, the
+reschedule now runs only under the upstream guard, and the debug message
+reports the current delay. The changed-line set is identical to the original
+posting (no lines added or removed). `sleepy-rc` keeps the original `1302`,
+which applies to `v7.3` where the guard does not exist.
+
+### lru_cast v0.2.8 port
+
+The author released v0.2.7 and v0.2.8 on 2026-10-28, after the v0.2.6 carried in
+the 2026-10-27 release. The preview copy is the v0.2.6 port plus the author's
+v0.2.6 → v0.2.8 delta, applied as a three-way merge; all hunks applied cleanly.
+The result differs from the author's v0.2.8 patch only in the same 7.4 API
+adaptations recorded for v0.2.6 (rbtree augment macro, `__swap_writeout()`
+rename, `valid_section_nr()`, `vma_is_hugetlb()`, expanded `VM_SPECIAL`, and
+the `PF_KSWAPD` removal). The rc copy is the author's
+`0001-7.3-rc7-lru_cast-v0.2.8.patch` byte-for-byte. Both series audit clean
+with it.
+
+The same source check covered the author's NAP governor: **v0.5.1** (stable,
+2026-10-11) replaces v0.5.0 in both packages. It applies to this snapshot at
+zero fuzz and its delta is recorded in the rc ledger.
+
+### Base churn — `group_cpus` dropped from the 1028 mm tree
+
+`next-20261027` carried `d39303f30314` ("lib/group_cpus: snapshot cluster masks
+to keep grouping hotplug invariant", the v1–v4 content) in its mm tree. The
+1028 mm tree was rebuilt without it, and `lib/group_cpus.c` is back to the
+pre-fix content. The other mm commits that appear in
+`next-20261027 ^ next-20261028` are re-hashed copies present in 1028
+(`mm/zswap` dlen `9ebe19ab4762`, `mm/vmalloc` `4685a28187f4`, `mm/ksm`
+`041b9b7eb14f`, `mm/migrate` `930eec1958e9`, swapoff `b779ef016df0`);
+`group_cpus` is the only on-target one lost.
+
+This is the NVMe managed-IRQ affinity fix that `sleepy-rc` carries as `2044`,
+and the failure mode is this machine's NVMe across an s2idle cycle, so the
+preview now carries **`2044` v5** as well. It applies to the pristine
+`next-20261028` tree with zero fuzz and takes the series to **127 patches**.
+
+`2800` stays rc-only: `next-20261028` already carries its fix
+(`sync_with_folio_pmd_zap()` in `mm/internal.h` and `mm/memory.c`).
+
+### Series state
+
+Both packages passed `audit_series.py` after the changes: **295/295** on
+`v7.3` and **127/127** on `next-20261028`.

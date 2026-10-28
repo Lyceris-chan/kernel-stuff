@@ -1,4 +1,4 @@
-From ac193222844554507db3de688808fcae51132bbd Mon Sep 17 00:00:00 2001
+From d39303f303146098c0f9f8a76fbb157142d028b6 Mon Sep 17 00:00:00 2001
 From: Vishal Badole <Vishal.Badole@amd.com>
 Date: Wed, 26 Aug 2026 22:45:37 +0530
 Subject: [PATCH] lib/group_cpus: snapshot cluster masks to keep grouping
@@ -52,11 +52,12 @@ Link: https://lore.kernel.org/20260826171537.4167367-1-Vishal.Badole@amd.com
 Fixes: 89802ca36c96 ("lib/group_cpus: make group CPU cluster aware")
 Signed-off-by: Vishal Badole <Vishal.Badole@amd.com>
 Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Reviewed-by: Wangyang Guo <wangyang.guo@intel.com>
+Tested-by: Wangyang Guo <wangyang.guo@intel.com>
 Cc: "Borislav Petkov (AMD)" <bp@alien8.de>
 Cc: Radu Rendec <radu@rendec.net>
 Cc: Thomas Gleixner <tglx@kernel.org>
 Cc: Tim Chen <tim.c.chen@linux.intel.com>
-Cc: Wangyang Guo <wangyang.guo@intel.com>
 Cc: Tianyou Li <tianyou.li@intel.com>
 Cc: Dan Liang <dan.liang@intel.com>
 Cc: <stable@vger.kernel.org>
@@ -191,5 +192,5 @@ index e6e18d7a49bb..3c2229feb9c3 100644
  		clusters[n] = cluster_mask;
  		cluster_groups[n].id = n;
 -- 
-2.55.0
+2.56.0
 

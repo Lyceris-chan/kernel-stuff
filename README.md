@@ -10,7 +10,7 @@ the preview applies a port of the same patch to the linux-next base.
 | Directory | Package | Base |
 |---|---|---|
 | [`sleepy-rc/`](sleepy-rc/) | `linux-sleepy-rc` | mainline **`v7.3`** |
-| [`sleepy-next/`](sleepy-next/) | `linux-sleepy-next` | linux-next snapshot **`next-20261027`** |
+| [`sleepy-next/`](sleepy-next/) | `linux-sleepy-next` | linux-next snapshot **`next-20261028`** |
 
 They are deliberately installable **side by side**: each sets its own
 `_pkgsuffix`, which drives both `pkgbase` and the kernel release, so the module
