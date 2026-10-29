@@ -15,11 +15,11 @@ moved, so the full ledger is not duplicated here.
 
 | | |
 |---|---|
-| Snapshot | `next-20261028`, tag `6d0933ae9d46` (tag object `5fed66a6fde4`) |
-| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261028.tar.gz` |
+| Snapshot | `next-20261029`, tag `a39c95080621` (tag object `22f566ae1781`) |
+| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261029.tar.gz` |
 | Snapshot tree `Makefile` | `7.3.0` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.10.28-2-sleepy-next` |
-| Package | `linux-sleepy-next-2026.10.28-2` |
+| Kernel release | `2026.10.29-1-sleepy-next` |
+| Package | `linux-sleepy-next-2026.10.29-1` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -1164,3 +1164,29 @@ patches**.
 
 Both packages passed `audit_series.py` after the changes: **295/295** on
 `v7.3` and **128/128** on `next-20261028`.
+
+## Sweep 2026-10-29 — `next-20261029`; six new carries, 134 patches
+
+The preview bumps from `next-20261028` to `next-20261029` (`557` commits) and
+takes the six patches adopted by the 2026-10-29 sweep: `1234`, `1235`, `1236`,
+`2061`, `2062` and `2806`. Five apply byte-for-byte; `2806` is the form
+regenerated over `2102`'s lru_cast hooks, shared with the rc series. Their
+provenance, sources and review status are recorded once in
+`sleepy-rc/PATCH_SOURCES.md` under *Sweep 2026-10-29*.
+
+### Base churn
+
+No carried patch was absorbed by the snapshot: the full 128-patch series
+applied unchanged, and a reverse-applicability scan found no real duplicate
+(`1093` reverse-matches only through a context accident at offset -745; its
+target still has `size & 0x3` in the base).
+
+The new snapshot pulls the `amd-drm-next-fixes-7.4-2026-10-28` merge into its
+base. That is merge-window content the preview gets for free; the patches that
+also exist in the rc series (for example `1097`, `1099`, `1174`, `1300`,
+`9086`, `9089`) remain rc-only because the preview base already provides them.
+
+### Series state
+
+Both packages passed `audit_series.py` after the changes: **302/302** on
+`v7.3` and **134/134** on `next-20261029`.

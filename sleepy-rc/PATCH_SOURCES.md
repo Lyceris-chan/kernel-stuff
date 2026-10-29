@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
 - **Base:** Linux `v7.3`
-- **Series:** 296 patches
+- **Series:** 302 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -24,21 +24,21 @@ are supplied by the generator instead, so every row below has a source.
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 30 |
 | `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 12 |
 | `1100–1199` | AMD display (DCN4, colorops) | 30 |
-| `1200–1299` | AMD power management (amd-pstate, CPPC) | 27 |
-| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 43 |
+| `1200–1299` | AMD power management (amd-pstate, CPPC) | 30 |
+| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 45 |
 | `2100–2199` | Memory management and swap (zstd, LRU-MARIE, gup, zswap) | 50 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 21 |
 | `2400–2499` | Core scheduler and sched-ext | 3 |
 | `2500–2599` | x86 and arch core | 2 |
 | `2600–2699` | Time and timers | 0 |
-| `2800–2899` | Memory management, second series (mm/swap follow-ups) | 6 |
+| `2800–2899` | Memory management, second series (mm/swap follow-ups) | 7 |
 | `2900–2999` | VFS / core filesystem | 0 |
 | `3000–3099` | Platform, USB and hwmon (PROM21 chipset temperature) | 1 |
 | `9000–9099` | agd5f staging + userq lifecycle backports | 36 |
 | `9100–9199` | Retry-fault handling v4 (agd5f staging) | 11 |
 
-**Total: 296** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 302** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-19). The counts are now generated from the patch tree
@@ -11197,3 +11197,97 @@ KDE). Each on-target claim was traced to the tree:
 after the patch changes. The preview bump details, including the nine absorbed
 drops, the `1302`/`2152` handling and the `2044` base-churn carry, are in
 `sleepy-next/PATCH_SOURCES.md`.
+
+## Sweep 2026-10-29 — `next-20261029`; six new carries
+
+All source classes were queried. The tree scan covered every branch of
+`torvalds` (`origin/master` `4dd16e31135e`, 2026-10-29), `linux-next` (tag
+`next-20261029`, `a39c95080621`), `drm-next` (`origin/master`, carrying
+`amd-drm-next-fixes-7.4-2026-10-28`), `agd5f-linux` and
+`amd-staging-drm-next` (`e0e9c2257911`, unchanged since 2026-10-23),
+`drm-misc` (`gitlab/drm-misc-next`), `linux-pm` (`93f51579e7df`,
+unchanged), the `akpm-mm` branches including `mm-everything`, and `tip`
+(`c81f6d2398d0`). CachyOS 7.3 branches were unchanged since 2026-10-09;
+sirlucjan had no commit after 2026-10-20; firelzrd BORE stayed at 7.0.0.
+The lore mirrors (amd-gfx, dri-devel, lkml, netdev, mm, block, io-uring,
+nvme, pm, cgroups, fsdevel, pci and sched-ext) were refreshed through
+2026-10-29 and cover the two `lists.freedesktop.org` lists. The drm/amd
+tracker was queried by update time, and Phoronix was read through the front
+page, the RSS feed and the 2026-10-29 articles.
+
+### Adopted — six patches
+
+| Patch | Subject | Source | Why |
+|---|---|---|---|
+| `1234` | `cpufreq: amd-pstate: keep minimum requests within policy limits` (Christian Loehle) | `<20261029121945.854675-2-christian.loehle@arm.com>`, linux-pm 2026-10-29 | `amd_pstate_adjust_perf()` raised `max_perf` to a scheduler minimum that exceeded the policy maximum, replacing the policy cap; it now clamps `min_perf` instead. `Fixes: 3f7b835fa4d0`, whose code is in `v7.3`. Applies to both bases. |
+| `1235` | `cpufreq: amd-pstate: clamp desired perf on resume` (Christian Loehle) | `<20261029121945.854675-3-christian.loehle@arm.com>`, linux-pm 2026-10-29 | The resume path converted `policy->cur` back to a performance level and wrote MIN/Desired/MAX with Desired above MAX when both conversions rounded up; clamps Desired to the cached limits. `Fixes: 608a76b65288`, in `v7.3`. Applies to both bases. |
+| `1236` | `drm/amd/pm: update `stapm_power_limit` values in `gpu_metrics` for SMU14` (Kanala Ramalingeswara Reddy) | `<20261029135455.1822487-1-Kanala.RamalingeswaraReddy@amd.com>`, amd-gfx 2026-10-29 | `smu_v14_0_0_get_gpu_metrics()` left the two STAPM fields unset; they are now read from `StapmOpnLimit`/`StapmCurrentLimit`. Targets this machine's SMU 14.0.0 file directly; both fields exist in `kgd_pp_interface.h`. `Reviewed-by: Mario Limonciello` in the 2026-10-29 reply. Applies to both bases. |
+| `2061` | `blk-mq: end the request if getting a keyslot fails` (Josef Bacik) | `<20261029200110.1328103-1-ebiggers@kernel.org>`, linux-block 2026-10-29 | When `blk_crypto_rq_get_keyslot()` failed, the bio was ended by hand and the request freed without undoing the `in_flight` accounting, leaving the device permanently 100% busy; a zone write-plugged write also waited forever. Ends the request through `blk_mq_end_request()` and moves zone-plug init before the keyslot. `Signed-off-by: Jens Axboe`, `Signed-off-by: Eric Biggers`, two `Fixes:` tags, `Cc: stable`; the v2 standalone repost supersedes the earlier 09/98-series form, which carried a single older `Fixes:` tag. `CONFIG_BLK_INLINE_ENCRYPTION=y` here. Applies to both bases. |
+| `2062` | `io_uring/net: fix multishot recv length limit accounting` (Cheng Yongkang) | `<179328314078.648427.10086632105828535293@gmail.com>`, io-uring 2026-10-29 | The limit was debited with the cumulative `sel->val` instead of this invocation's bytes, so a bundle retry charged the previous attempt twice and an `optlen` above `INT_MAX` turned the limit negative. Debits `sel->val - sr->done_io` and compares unsigned. `Fixes: 0ebc9a7ecf6a`, in `v7.3`, `Cc: stable`. **Applied by Jens Axboe the same day as `3e3aebb7570c`.** Applies to both bases. |
+| `2806` | `mm/zswap: drop the stale zswap entry of a zero folio` (Josef Bacik) | `<20261030-swap-fixes-v1-1-73f73a59f2fc@tencent.com>`, linux-mm 2026-10-30 | A folio can be stored in zswap, stay in the swap cache, and then be written with zeroes. `swap_writeout()` only set the zero mark, leaving the old zswap entry readable, so swap-in could return the pre-zero data. Invalidates the zswap entry in the zero-filled path. `Signed-off-by` chains from Josef Bacik, David Hildenbrand and Kairui Song, `Fixes: 0ca0c24e3211`, `Cc: stable`. **Numbered `2806`**: `2199` is a vacated xswap number and must not be reused. The hunk was regenerated against this series because `2102` (lru_cast) inserts `lru_cast_evict_*()` calls in the same block; the added lines are the author's, unchanged. |
+
+All six are carried by both packages. The preview applies them to
+`next-20261029`; the rc applies them to `v7.3`.
+
+### Deferred and rejected
+
+| Candidate | Verdict |
+|---|---|
+| `mm, swap: fix large swap-in across swap file extents` (Chris Mason, 3/3 of the 2026-10-30 swap series) | The bug needs a swap file on a **synchronous** block device (`brd`, `zram`); this machine's swap file is on NVMe and does not take the synchronous large-swap-in path. Defer. |
+| `mm/swap: account synchronous swap reads as memory stall` (Josef Bacik, 2/3) | PSI accounting only, no functional change. Skip. |
+| Merge-window KFD batch in `next-20261029`: `evict the queues only once for CRIU PROCESS_INFO`, `correct vram_available calculation`, `memory availability double accounting`, `fix doorbell allocation race`, `Fix svm_bo use after free in svm_range_clone`, `don't drop an SVM CWSR reference`, `wait for a GPU reset before freeing a BO`, `Validate the control stack of a restored queue` | Every one is reviewed AMD tree content merged for 7.4, and the preview base carries them today. The rc defers them: several depend on other 7.4 commits (`vram_available` reworks `amdgpu_object.c`; the CRIU queue validation builds on the restore series), so they are not piecemeal v7.3 carries. Watch the UAF and doorbell-race items for backport at the next rc series refresh. |
+| `drm/amdgpu: fix the error path in amdgpu_vm_pt_alloc()` and `drm/amd/display: refresh cached HDMI FreeSync state` | Both are 7.4 merge content and fail against the `v7.3` series tree (context moved); the preview has them. No rc carry. |
+| `drm/amd/display: Initialize missing TD-LUT programming inputs`, `Fix HDMI FRL FFE compliance test`, `don't WARN when removing an unallocated MST payload` | Display merge-window content. FRL is deliberately off in the rc cmdline and MST is unused here. The preview base carries them. |
+| SMU 14.0.2 and 13.0.0/13.0.7 OD-profile and fan-stop work | Wrong SMU revision: this machine is 14.0.0 (`smu_v14_0_0_ppt.c`). Reject — wrong-chip trap. |
+| `drm/amdgpu/gmc9: add extra type-2 TLB flush for gfx942/gfx950`, `UALink` debugfs/PASID work, Apple/CIK/SI reset paths, `guard VCE/UVD sched entity teardown` | Off-target silicon (CDNA, UALink, Apple, legacy video blocks). Reject. |
+| `drm/amdkfd: Force perfmon clock on for profiler PMC requests` | On-target (it touches `gfx_v12_0.c`), but it is a new refcounted clock override with a KFD UAPI version bump, not a fix. Watch. |
+| `mm/zswap: fix double decrement of the LRU node count on writeback` | Still unreviewed after the 2026-10-28 pass; not in the accepted three-patch swap series. Watch. |
+| `io_uring/napi: fix list use-after-free on PREEMPT_RT` | PREEMPT_RT only; this kernel runs `PREEMPT` full, not RT. Inert. |
+| `drm/amdgpu: Prevent debugfs nullptr dereference` 1–2/2, `x86/video: Preserve the default VGA fallback`, `x86/mce: Serialize sysfs controls against CPU hotplug` | Unreviewed; the debugfs paths need a structure absent only on ASICs this GPU is not, and the x86 items are generic. Watch. |
+
+### Version sweep — no new revisions
+
+A subject-indexed pass over every carried patch against all thirteen lore
+mirrors since 2026-08-01 reported 49 higher-version postings, the newest dated
+**2026-10-01**; none is newer than the 2026-10-28 sweep, and yesterday's
+content-identical verdicts still hold. The `1301` thread gained no message
+after 2026-10-28: Xiaogang Chen's 2026-10-28 17:41 -0500 reply is the one
+already recorded, and the dispute remains open.
+
+### Reverts and drops versus the series
+
+A `--grep='^Revert'` pass over `torvalds`, `linux-next`, `drm-next`,
+`agd5f-linux`, `amd-staging-drm-next`, `drm-misc`, `linux-pm`, `akpm-mm` and
+`tip` since 2026-10-01 found **no revert of a carried patch**. The new reverts
+inside `next-20261029` are the TCP MSS (PMTU) pair and
+`driver core: add TAINT_FORCED_BIND` — none is carried.
+
+### Tracker and Phoronix
+
+The drm/amd tracker returned **30 open issues updated since 2026-10-28**. The
+on-target ones are `#6055` (Navi 48 / RX 9070 XT in-game regression with a
+linux-firmware update), `#6051` (flip-done timeout on RX 9070), `#6048` (RX 9070
+XT wedge at inference start), `#4763` (RX 9070 XT pageflip-timeout freezes) and
+`#6053` (stale KFD queues after a reset); no comment references a new fix
+commit, and `#4763`'s 63e19ef3ddab reference has been open since 7.3-rc4.
+`#6057` is DCN 4.0.1 but PREEMPT_RT-only; `#5100` is an eGPU-over-Thunderbolt
+Navi 48 report, not this desktop. Four issues were closed over the same window;
+the only on-target one, `#5796` (HDMI RGB range on CTA modes), was closed
+because `eb5650d1f367` is already in `v7.3` — the helper
+`rgb_output_is_limited_range()` is in this base — and its DisplayPort
+follow-up regression does not apply here (HDMI-only displays).
+
+Phoronix on 2026-10-29 covered F2FS, FAT32, KSMBD, Linux 7.4 networking, ROCm
+HRX Loom and the first Linux 7.5 drm-misc-next pull. None is on-target: the
+7.5 DRM article is AMDXDNA/Ryzen AI NPU, Panfrost and bridge work; the
+networking article has no r8169, CAFE or TCP congestion item; F2FS and FAT32
+are not this machine's filesystems.
+
+### Audits
+
+`audit_series.py`: **302/302** on `v7.3` and **134/134** on `next-20261029`.
+The 128-patch preview series applied unchanged to the new snapshot; no carried
+patch was absorbed. A reverse-applicability scan of all 128 reported `1093`
+as present, but that is a false positive — the reverse hunk matched a different
+function at offset -745 with fuzz 2, while `amdgpu_debugfs_gfxoff_count_read()`
+still has `size & 0x3` in the base.

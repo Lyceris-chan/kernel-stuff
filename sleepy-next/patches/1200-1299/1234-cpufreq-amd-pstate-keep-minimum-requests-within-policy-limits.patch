@@ -1,0 +1,35 @@
+From christian.loehle@arm.com Mon Sep 17 00:00:00 2001
+From: Christian Loehle <christian.loehle@arm.com>
+Date: Thu, 29 Oct 2026 12:19:44 +0000
+Subject: [PATCH 1/2] cpufreq/amd-pstate: Keep minimum requests within policy limits
+Message-ID: <20261029121945.854675-2-christian.loehle@arm.com>
+
+The minimum performance hint can exceed the policy maximum, e.g.
+for schedutil when an RT task requests full CPU capacity. After
+converting that hint, amd_pstate_adjust_perf() raises max_perf to
+min_perf. This replaces the policy cap with the scheduler's minimum
+request, and the subsequent Desired clamp uses the expanded interval.
+
+Clamp min_perf to max_limit_perf instead of raising max_perf, to
+enforce the policy's upper-bound again.
+
+Fixes: 3f7b835fa4d0 ("cpufreq/amd-pstate: Move limit updating code")
+Signed-off-by: Christian Loehle <christian.loehle@arm.com>
+---
+ drivers/cpufreq/amd-pstate.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/cpufreq/amd-pstate.c b/drivers/cpufreq/amd-pstate.c
+index 4bedfbfc18b6..28df8507d93f 100644
+--- a/drivers/cpufreq/amd-pstate.c
++++ b/drivers/cpufreq/amd-pstate.c
+@@ -866,8 +866,7 @@ static void amd_pstate_adjust_perf(struct cpufreq_policy *policy,
+ 		min_perf = perf.min_limit_perf;
+ 
+ 	max_perf = perf.max_limit_perf;
+-	if (max_perf < min_perf)
+-		max_perf = min_perf;
++	min_perf = min(min_perf, max_perf);
+ 
+ 	amd_pstate_update(policy, min_perf, des_perf, max_perf, true,
+ 			policy->governor->flags);

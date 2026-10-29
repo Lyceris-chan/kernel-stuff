@@ -182,7 +182,7 @@ _rcver=
 
 pkgver=7.3.0
 _tagrel=1
-pkgrel=11
+pkgrel=12
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -371,6 +371,9 @@ source=(
   "patches/1200-1299/1231-cpufreq-amd-pstate-restore-previous-mode-on-failure.patch"
   "patches/1200-1299/1232-cpufreq-amd-pstate-propagate-cppc_set_auto_sel-errors.patch"
   "patches/1200-1299/1233-drm-amd-pm-reapply-UMD-profile-state-after-recovery.patch"
+  "patches/1200-1299/1234-cpufreq-amd-pstate-keep-minimum-requests-within-policy-limits.patch"
+  "patches/1200-1299/1235-cpufreq-amd-pstate-clamp-desired-perf-on-resume.patch"
+  "patches/1200-1299/1236-drm-amd-pm-update-stapm-power-limit-values-in-gpu-metrics.patch"
   "patches/1300-1399/1300-drm-amdkfd-send-SMI-process-and-VM-fault-events-only-to-allowed-clients.patch"
   "patches/1300-1399/1301-drm-amdkfd-dont-reuse-a-VRAM-page-that-is-still-referenced.patch"
   "patches/1300-1399/1302-drm-amdkfd-back-off-SVM-restore-work-retry.patch"
@@ -427,6 +430,8 @@ source=(
   "patches/2000-2099/2058-blk-mq-clear-stale-inactive-flag-on-hctx-reuse.patch"
   "patches/2000-2099/2059-io_uring-add-a-schedule-point-in-io_free_batch_list.patch"
   "patches/2000-2099/2060-io_uring-add-a-schedule-point-in-__io_req_caches_free.patch"
+  "patches/2000-2099/2061-blk-mq-end-the-request-if-getting-a-keyslot-fails.patch"
+  "patches/2000-2099/2062-io_uring-net-fix-multishot-recv-length-limit-accounting.patch"
   "patches/2100-2199/2100-zstd-7.3-merge-v1.6.0-into-kernel-tree.patch"
   "patches/2100-2199/2102-mm-7.3-lru_cast-v0.2.8.patch"
   "patches/2100-2199/2120-mm-gup-mm-gup-break-out-gup-fill-pages-helper.patch"
@@ -483,6 +488,7 @@ source=(
   "patches/2800-2899/2803-mm-memcontrol-publish-null-pointer-before-dropping-css-reference.patch"
   "patches/2800-2899/2804-mm-page_vma_mapped-continue-past-nonmatching-huge-PMDs.patch"
   "patches/2800-2899/2805-mm-madvise-atomically-clear-the-young-bit-on-THP-MADV_COLD.patch"
+  "patches/2800-2899/2806-mm-zswap-drop-the-stale-zswap-entry-of-a-zero-folio.patch"
   "patches/2200-2299/2200-7.2-nap-v0.5.1.patch"
   "patches/2300-2399/2302-kbuild-do-not-allocate-modinfo-in-vmlinux.patch"
   "patches/2300-2399/2303-kallsyms-index-symbols-by-token-to-speed-up.patch"
@@ -1306,6 +1312,9 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         '745ed55228e5cfa3f814820e3fefb897d24ff1500d165be94e8f2d6d2a0833fffb4b8f82076a517b94c8912c684e2fe098e66c0c804508f75e8181dd7499bd29'
         '2dc217768b922b2eb54a51a62353b3c00e8af9ec981c74ce8fbbb58b6ab5fc3aba9518de7a8b7990adc261e834265e8e734bf00be6fdddcf8ebeb1d34d7950a3'
         '0f5d94175b09133882ab22d9d778986512691e1ca24aac4ff5613b8124aee9d9b8e62a0e7fcd8c5512824c0baee9e83ff4ed4edde0e97787819494e24bce0f60'
+        '2b57be768da078aefb045cb1b0d1bf0af328a4a2f44577301817ca63501d1367a9fdce05b0a7491d1a51c12011d86a22fc1feca9cdb9a81d9edf115034c1c6d7'
+        '2f7217aee8314d48d6f471bcc19597e0a00ebd1187288365d4444e582fea8e9ef39c01b9678ccab52ece1b97ed1ffae12b3978ef8b385eaf8dfb9a08c8e29345'
+        '792254342b10c5ef8583b0ba04cf67f9eba46720700295b0d590c585bf9a5aa8e378e75eace55b3a2e595e0d757e4e8076d0cc55b45eed35660f802b4348437f'
         '047e9ad4d728054bcb8687f54b6458e244246169698d1f5501f8dd11cdaad596fecc40d6077b8647d99431eecbd7abbde0d845fd4b6b0d42d60902d2d4b68d40'
         'e4ab88fa78543be89074ee59d3bc55a114e8750abfc57b54b5f34e14b292a127f5ee6a2a1b3d88784499a32cde40eae4558c0585f3ac033a777a742707edd045'
         '36393226e5da4a93b9d014a5ba078b55e9dfdc2e08b53251c626ee0b3a1031cc872d52a035d8ba137bc5859b8d43b6b1c805b572afa45cbb27c94c5cfb0a8c1d'
@@ -1361,6 +1370,8 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         'ee2fdae5bcc8b9afccdf365511a31ccedbdd20dc486a3fcf1f019901bef6745684a549a4eac03839ee0b53f5e472b44fb5187d70d762837f4f9cf61a173e90fc'
         'c31f8fc6db7e5776ffbbde976239a102e5ddb0c2a6214a094a26f364718a507ac7c1960a9a955bfd16a3182979e57a8eb9ffbbde62d26ddfb983076868d619f2'
         '1455fd65a42e9bba65673da473b99187acc2e25d6535c89d365eb925500f84e23e40bddca183e83bb8af641122254083cddd8bf26fbdbd413da6a20ccd73850f'
+        '86d8bd19b0df67a239a78288ee419e3e6a30c1008383f91455b975997f66848ae5e05415b822fcb457972c52198131ab4836947753afdd2905e03f1a767a652a'
+        '37e2013c2df878b310e36689fecd10be6cada30e22cd5686642f409fa42f9866ad328e1b817188aae25eb3645079e4efcd67979d9cecc13c6abe9ed2e3d108a2'
         '04fe6270d9e54b974ee745261575fd710e3af252c6e2b2788a082455c6eeccfd2ea944245f5f58a9f4de418eca3058aaae8a27f90173b254aac15036c7a95c49'
         'db0fe4eb6465d8dc0769c3d5937f25529e6719a23e0ab05fb9f8748d29728e2134243e74e3d6fb2a0bcf970b070005253bbca70a1139a6d7c05fd76ea9a0471f'
         'a745db752d2586475d373cb29e64b4f42f6e305b4b3e588efbce955491429c73b3d16c426e76118b1499bbfb4a2159192f3950ed06d309064eb28750a1d6e6aa'
@@ -1417,6 +1428,7 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         '382122a1282313eb41445c6d6baf415d97e7ffa0758e0f92866e018a85902a65300906dee9935638dc0df05b1c6cafdada5cefd5a01011c9808b44f7aa7ab401'
         'ddfa5302f9f487d10d89bc92f8f7147bfc644f83b09627f1af80ac489b8ca2c7e183f51e0e4bfe1254ee268de4345b470bc617329abdc862d0c8c3cff0b1170c'
         '1c027a41fa18aece672206c4a230ab98e0e09956a25c347ea204dd9fe22877ad24ced0cfcf7cff316a4a2c6ff6388180a5f699af056107589b7281b20cb33e3e'
+        'a607eff6f904c8b02e05c3b379dce39dff5a518bf01588c054a8be5f4de51c9bad985df014551cc3ddeba4cfb46f3121a022414e958608da67520a1e35e3a2e3'
         '46905f8d8c9569b7c493f0734da2d4fd12dcb2914e87334e0b10f8c93057e67af71396cf264e641bb926ca0647bae2b4b61f2d8b20218650537bb3cdf828c473'
         'c57ef0e2d57de6064359a6132ed03138e2b6e65c10699e304901cf4d37f67b25a24fd20553d1b7b99b414d75ddb1f49bbe74cfa694315671026cbdfcb5b19f3c'
         'cf71c48fc7fe12a32f4fe7dd6505df11c4a74ed20abc91ee5bb4cf3688bfd766349fc698a55efd4c2fa6eab7502ec96febf06ee27a823ab13fabd8f148cb3a27'

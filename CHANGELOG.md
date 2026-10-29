@@ -18,6 +18,63 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.10.29-1-sleepy-next (linux-next `next-20261029`)]: 2026-10-29
+
+Bumps the preview from `next-20261028` to `next-20261029` (557 commits) and
+adds six sweep carries. Series **134 patches**, audit **134/134**; no carried
+patch was absorbed by the new base. lru_cast v0.2.8 and NAP v0.5.1 are
+unchanged.
+
+### Changed
+
+- **`1234`/`1235`** — `cpufreq/amd-pstate` request clamping. `1234` keeps the
+  scheduler minimum within the policy maximum instead of raising `max_perf`;
+  `1235` clamps the Desired performance restored on resume so it can no longer
+  exceed MAX.
+- **`1236`** — `drm/amd/pm`: fill `stapm_power_limit` and
+  `current_stapm_power_limit` in `gpu_metrics` from `StapmOpnLimit` and
+  `StapmCurrentLimit` on SMU 14.0.0. `Reviewed-by: Mario Limonciello`.
+- **`2061`** — `blk-mq`: end a request whose crypto keyslot lookup failed
+  through `blk_mq_end_request()`, so `in_flight` is released and the device
+  stops reporting 100% busy.
+- **`2062`** — `io_uring/net`: debit only the current invocation's bytes
+  against the multishot receive limit and compare unsigned. Jens Axboe applied
+  it upstream as `3e3aebb7570c`.
+- **`2806`** — `mm/zswap`: invalidate the old zswap entry when a folio is
+  written back zero-filled, so a later swap-in cannot return the pre-zero
+  data. The hunk is regenerated over `2102`'s lru_cast hooks.
+
+### Verification
+
+Package `linux-sleepy-next-2026.10.29-1` (22.8 MB) and headers (34.8 MB) built
+with Clang 23.1.4; `.BTF`/`.BTF_ids`, lru_cast v0.2.8, NAP 0.5.1 and the
+built-in cmdline re-checked. Installed side by side; no reboot.
+
+## [7.3.0-12-sleepy-rc (Linux 7.3)]: 2026-10-29
+
+Adds the six patches adopted by the 2026-10-29 sweep. The base stays `v7.3`;
+the series is **302 patches** and audits **302/302**. lru_cast v0.2.8, NAP
+v0.5.1, `2044` v5 and `2800` v6 are unchanged.
+
+### Changed
+
+- **`1234`/`1235`** — `cpufreq/amd-pstate` request clamping (minimum request
+  within the policy maximum; Desired clamped to the cached limits on resume).
+- **`1236`** — `drm/amd/pm`: STAPM power limits in `gpu_metrics` on SMU
+  14.0.0 (`Reviewed-by: Mario Limonciello`).
+- **`2061`** — `blk-mq`: release the request through `blk_mq_end_request()`
+  when the crypto keyslot lookup fails.
+- **`2062`** — `io_uring/net`: multishot receive limit accounting.
+- **`2806`** — `mm/zswap`: invalidate the stale zswap entry for a
+  zero-filled folio (regenerated over `2102`'s lru_cast hooks).
+
+### Verification
+
+Package `linux-sleepy-rc-7.3.0-12` (22.5 MB) and headers (34.5 MB) built with
+Clang 23.1.4; `.BTF`/`.BTF_ids`, lru_cast v0.2.8, NAP 0.5.1, `tcp_bbr3` and
+the `amdgpu.dcdebugmask=0x800` cmdline re-checked. Installed side by side; no
+reboot.
+
 ## [2026.10.28-2-sleepy-next (linux-next `next-20261028`)]: 2026-10-28
 
 Adds **`1313`** on top of `2026.10.28-1`. Series **128 patches**, audit
