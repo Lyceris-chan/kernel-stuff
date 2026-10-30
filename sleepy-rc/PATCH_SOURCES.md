@@ -11378,16 +11378,41 @@ substantive ones:
 
 ### Tracker and Phoronix
 
-The drm/amd tracker returned **36 open issues updated since 2026-10-29**. The
-on-target ones are `#6055` (Navi 48 / RX 9070 XT in-game regression with a
-linux-firmware update), `#6051` (flip-done timeout on RX 9070), `#6053` (stale
-KFD queues after a GPU reset), `#5477` (Navi 48 / DCN 4.0.1 R9700 vblank and
-flip-done stalls) and `#5988` (VRR on a 280 Hz DisplayPort monitor locking to
-24 Hz, now confirmed on a second LG monitor and a second RX 9070 XT). No
-comment references a new fix commit. `#5988` and `#6052` (Broadcast RGB on
-DisplayPort) need a DisplayPort monitor; this machine's displays are HDMI-only.
-`#5100` is an eGPU-over-Thunderbolt Navi 48 report, not this desktop. `#6057`
-is DCN 4.0.1 but PREEMPT_RT-only.
+The drm/amd work-items tracker returned **39 issues updated since 2026-10-29**
+(36 open, 3 closed); all **244 comments** were fetched through GraphQL and the
+106 hex tokens in them reduced to **28 verified commits**. Every referenced
+commit is pre-7.3 or already handled — none is a new on-target fix.
+
+The on-target open issues are `#6055` (Navi 48 / RX 9070 XT in-game regression
+with a linux-firmware update), `#6051` (flip-done timeout on RX 9070), `#6053`
+(stale KFD queues after a GPU reset), `#5477` (Navi 48 / DCN 4.0.1 R9700
+vblank and flip-done stalls) and `#5988` (VRR on a 280 Hz DisplayPort monitor
+locking to 24 Hz, now confirmed on a second LG monitor and a second RX 9070
+XT; no fix posted). `#5988` and `#6052` (Broadcast RGB on DisplayPort) need a
+DisplayPort monitor; this machine's displays are HDMI-only. `#5100` is an
+eGPU-over-Thunderbolt Navi 48 report, not this desktop. `#6057` is DCN 4.0.1
+but PREEMPT_RT-only.
+
+Three patch leads in the comments were triaged and rejected:
+
+- **Revert `a637a140ab86`** ("Allocate DCN32/1 dmub memory to GTT", Calvin
+  Owens, 2026-10-27, `<25995707c39c0c191e3ac46c4813f55a7f928403.1793131583.git.calvin@wbinvd.org>`)
+  fixes flicker and SubVP banding on Navi 31 / DCN 3.2 in `#6011` and `#5714`.
+  The commit's guard only changes `mem_domain` for `DMUB_ASIC_DCN32`/`DCN321`;
+  every other ASIC, including DCN 4.0.1, keeps `GTT | VRAM`. Wrong display
+  family — reject.
+- **Mikhail Gavrilov's DCN32 scanout-corruption root-cause patch**
+  (`<20261018221726.27259-1-mikhail.v.gavrilov@gmail.com>`) is part of the
+  same `[REGRESSION 7.3] ... DCN32 at 120 Hz` thread. DCN32 only — reject.
+- **The PSR/Replay pair in `#5957`** (Ray Wu, "Exit PSR/Replay on non-modeset
+  full updates" and "Flush ISM work before releasing the stream") targets eDP
+  laptops. Reject.
+
+The three closed items are `#6060` (fullscreen judder, traced to KWin bug
+527948, not the kernel), `#5796` (`eb5650d1f367` is already in `v7.3`; its
+DisplayPort follow-up does not apply) and `#5712` (780M pageflip, wrong chip).
+The merge-request API now answers unauthenticated: **200 with no open MRs
+updated in the window**, correcting the earlier 403 note.
 
 Phoronix on 2026-10-30 covered the Linux 7.4 x86 platform drivers (Zen 6 HSMP
 and PMC IDs), AMD PerfOpt for Radeon iGPUs, I3C and Vulkan. None is on-target:
