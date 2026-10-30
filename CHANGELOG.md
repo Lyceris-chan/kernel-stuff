@@ -18,6 +18,52 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.10.30-1-sleepy-next (linux-next `next-20261030`)]: 2026-10-30
+
+Bumps the preview from `next-20261029` to `next-20261030` (534 commits). The
+snapshot absorbs `2062`, so the preview series falls to **133 patches**; audit
+**133/133**. lru_cast v0.2.8 and NAP v0.5.1 are unchanged.
+
+### Changed
+
+- **`2062` dropped from the preview** — `next-20261030` carries the upstream
+  form (`3e3aebb7570c`). `sleepy-rc` keeps it.
+- **New base content** — the snapshot brings the blk-mq `tag_list_lock` fix
+  (`2064`), the io_uring timeout accounting fix (`2063`), the io-wq
+  worker-type use-after-free fix (`2065`), the `mm/zswap` dlen validation, the
+  `fixes_shmem-v4` series and the `amd-drm-next-fixes-7.4-2026-10-28` merge.
+  The three `2063`–`2065` patches are carried rc-only.
+
+### Verification
+
+Package `linux-sleepy-next-2026.10.30-1` and headers built with Clang 23.1.4;
+`.BTF`/`.BTF_ids`, lru_cast v0.2.8, NAP v0.5.1 and the built-in cmdline
+re-checked. Installed side by side; no reboot.
+
+## [7.3.0-13-sleepy-rc (Linux 7.3)]: 2026-10-30
+
+Adds the three patches adopted by the 2026-10-30 sweep. The base stays `v7.3`;
+the series is **305 patches** and audits **305/305**. lru_cast v0.2.8 and NAP
+v0.5.1 are unchanged.
+
+### Changed
+
+- **`2063`** — `io_uring/timeout`: cancelled timeouts now advance
+  `cq_timeouts`, so a cancellation can no longer make an off timeout fire
+  early.
+- **`2064`** — `blk-mq`: exit a queue's hctxs under `tag_list_lock`, closing a
+  race with `blk_mq_update_nr_hw_queues()` on reset.
+- **`2065`** — `io_uring/io-wq`: save the continuation-worker type before
+  dropping the reference, fixing a KASAN slab-use-after-free in
+  `io_wq_cancel_tw_create()`.
+
+### Verification
+
+Package `linux-sleepy-rc-7.3.0-13` and headers built with Clang 23.1.4;
+`.BTF`/`.BTF_ids`, lru_cast v0.2.8, NAP v0.5.1, `tcp_bbr3` and the
+`amdgpu.dcdebugmask=0x800` cmdline re-checked. Installed side by side; no
+reboot.
+
 ## [2026.10.29-1-sleepy-next (linux-next `next-20261029`)]: 2026-10-29
 
 Bumps the preview from `next-20261028` to `next-20261029` (557 commits) and

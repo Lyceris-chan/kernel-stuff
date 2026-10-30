@@ -15,11 +15,11 @@ moved, so the full ledger is not duplicated here.
 
 | | |
 |---|---|
-| Snapshot | `next-20261029`, tag `a39c95080621` (tag object `22f566ae1781`) |
-| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261029.tar.gz` |
+| Snapshot | `next-20261030`, tag `7649ba73f9e7` (tag object `b6784eb81499`) |
+| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261030.tar.gz` |
 | Snapshot tree `Makefile` | `7.3.0` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.10.29-1-sleepy-next` |
-| Package | `linux-sleepy-next-2026.10.29-1` |
+| Kernel release | `2026.10.30-1-sleepy-next` |
+| Package | `linux-sleepy-next-2026.10.30-1` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -1190,3 +1190,21 @@ also exist in the rc series (for example `1097`, `1099`, `1174`, `1300`,
 
 Both packages passed `audit_series.py` after the changes: **302/302** on
 `v7.3` and **134/134** on `next-20261029`.
+
+## Sweep 2026-10-30 — `next-20261030`; one absorption, 133 patches
+
+The preview bumps from `next-20261029` to `next-20261030` (`534` commits). The
+snapshot absorbs `2062` (`io_uring/net: fix multishot recv length limit
+accounting`, upstream `3e3aebb7570c`): the patch no longer applies to the new
+base, so it leaves the preview series, which falls from 134 to 133 patches.
+`sleepy-rc` keeps `2062`.
+
+No other carried patch was absorbed; the remaining 133 apply cleanly. The
+preview gains the base's versions of the three patches adopted rc-only this
+sweep (`2063`, `2064`, `2065`), along with the `mm/zswap` dlen validation, the
+`fixes_shmem-v4` series and the `amd-drm-next-fixes-7.4-2026-10-28` merge.
+
+### Series state
+
+Both packages passed `audit_series.py` after the changes: **305/305** on
+`v7.3` and **133/133** on `next-20261030`.

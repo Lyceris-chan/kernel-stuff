@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
 - **Base:** Linux `v7.3`
-- **Series:** 302 patches
+- **Series:** 305 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -25,7 +25,7 @@ are supplied by the generator instead, so every row below has a source.
 | `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 12 |
 | `1100–1199` | AMD display (DCN4, colorops) | 30 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 30 |
-| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 45 |
+| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 48 |
 | `2100–2199` | Memory management and swap (zstd, LRU-MARIE, gup, zswap) | 50 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 21 |
@@ -38,7 +38,7 @@ are supplied by the generator instead, so every row below has a source.
 | `9000–9099` | agd5f staging + userq lifecycle backports | 36 |
 | `9100–9199` | Retry-fault handling v4 (agd5f staging) | 11 |
 
-**Total: 302** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 305** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-19). The counts are now generated from the patch tree
@@ -11291,3 +11291,112 @@ patch was absorbed. A reverse-applicability scan of all 128 reported `1093`
 as present, but that is a false positive — the reverse hunk matched a different
 function at offset -745 with fuzz 2, while `amdgpu_debugfs_gfxoff_count_read()`
 still has `size & 0x3` in the base.
+
+## Sweep 2026-10-30 — `next-20261030`; `2063`–`2065`
+
+All source classes were queried. The tree scan covered every branch of
+`torvalds` (`origin/master` `bd5c762ac051`, 2026-10-30), `linux-next` (tag
+`next-20261030`, `7649ba73f9e7`), `drm-next` (`origin/master` `f94ed3d7cba3`,
+carrying `amd-drm-next-fixes-7.4-2026-10-28`), `agd5f-linux` and
+`amd-staging-drm-next` (`ba496bb83788`, unchanged since 2026-10-23),
+`drm-misc`, `linux-pm` (`7be4bc52fd9e`, 2026-10-21), the `akpm-mm` branches
+including `mm-everything`, and `tip` (`ce476a7f22d5`, 2026-10-30). CachyOS 7.3
+branches were unchanged since 2026-10-09; sirlucjan had no commit after
+2026-10-20; firelzrd BORE stayed at 7.0.0. linux-tkg's only change was a 7.2
+config bump. The fifteen lore mirrors were refreshed through 2026-10-30. The
+drm/amd tracker was queried by update time, and Phoronix was read through its
+RSS feed and the 2026-10-30 articles.
+
+### Adopted — three patches, rc only
+
+| Patch | Subject | Source | Why |
+|---|---|---|---|
+| `2063` | `io_uring/timeout: count cancelled timeouts in cq_timeouts` (Cheng Yongkang) | commit `1c8b49851543`, `<179328314078.648427.13761781546953594668@gmail.com>` | `io_timeout_cancel()` posts the cancelled timeout's `-ECANCELED` CQE without advancing `ctx->cq_timeouts`, while `io_timeout_fn()` and `io_kill_timeout()` do. `io_flush_timeouts()` derives the non-timeout completion count from `cached_cq_tail - cq_timeouts`, so every cancellation makes an armed off timeout fire one completion early: with `off=4` the keep-alive completes after two NOPs instead of three, and before any NOP when two victims are cancelled. Advances `cq_timeouts` under `timeout_lock` before the fail completion, on both the `ASYNC_CANCEL` and `TIMEOUT_REMOVE` paths. `Fixes: bfe68a221905`, whose code is in `v7.3`; `Cc: stable`; `Assisted-by: LLM`. Applies to the clean `v7.3` tree and the 305-patch series tree. `next-20261030` already carries the upstream commit, so the patch is rc-only. |
+| `2064` | `blk-mq: exit the hctxs of a queue under tag_list_lock` (Josef Bacik) | commit `89a2381482d8`, `<20261028164415.1262013-38-axboe@kernel.dk>` | `blk_mq_exit_queue()` exits its hctxs without `tag_list_lock` and only then takes the queue off `set->tag_list`. A concurrent `blk_mq_update_nr_hw_queues()` can exit them again and install new hctxs that nobody exits. `del_gendisk()` is kept away by `update_nr_hwq_lock`; `disk_release()` of a never-added disk and `blk_mq_destroy_queue()` are not, and `nvme_alloc_ns()` drops such a disk when it finds the queues frozen by a reset. Holds `tag_list_lock` across both steps. `Fixes: 630ef623ed26`, in `v7.3`. Applies to both the clean and series trees. `next-20261030` already carries it; rc-only. |
+| `2065` | `io_uring/io-wq: save worker type before dropping its reference` (Kyle Zeng) | commit `37e425460b7c`, `<20261030042101.73491-1-kylebot@openai.com>` | `io_wq_cancel_tw_create()` inspects `cb->func` after calling `io_worker_cancel_cb()`. For an existing worker that call can drop the last worker reference and wake `io_worker_exit()`, so the worker can be unlinked and freed by `kfree_rcu()` before the callback function is read; KASAN reports a slab-use-after-free read. Saves whether the callback belongs to an unpublished continuation worker while the reference is still held, then uses the saved result for the conditional free. `Fixes: e6db6f9398da`, whose code is in `v7.3`; `Cc: stable`. Applies to both the clean and series trees. `next-20261030` already carries it; rc-only. |
+
+All three are rc-only because the new preview base already contains them; the
+preview series therefore stays at 133 patches after the `2062` absorption.
+
+### Version sweep — five resends, no revisions
+
+A subject-indexed pass over every carried patch against the fifteen lore
+mirrors since 2026-10-19 reported five higher-version postings that the
+2026-10-29 entry had missed: `1179` v2 (2026-10-26), `1099` v3 (2026-10-22),
+`9089` v2 (2026-10-19), `2056` net v4 (2026-10-26) and `2803` v2 (2026-10-20).
+All five are resends. The changed-line sets are identical to the carried
+revisions, and the diff bodies of `1099`, `2056`, `2803` and `9089` are
+byte-identical; only their commit messages changed. `1179`'s hunk headers and
+context differ, but its added and removed lines are unchanged. No revision was
+adopted.
+
+### Reverts and drops versus the series
+
+A `--grep='^Revert'` pass over `torvalds`, `linux-next`, `drm-next`,
+`agd5f-linux`, `amd-staging-drm-next`, `drm-misc`, `linux-pm`, `akpm-mm` and
+`tip` since 2026-10-25 found **no revert of a carried patch**. The reverts in
+the window are the TCP MSS (PMTU) pair, `media: Don't hide I²C or SPI drivers
+by default`, `driver core: add TAINT_FORCED_BIND` and an xe NVLP workaround —
+none is carried.
+
+### Comments on carried patches
+
+The lore mirrors gained 34 mails on carried subjects since 2026-10-29. The
+substantive ones:
+
+- `2806` gained `Reviewed-by` from Yosry Ahmed, Nhat Pham and Johannes Weiner
+  on the 2026-10-30 repost of the swap-fixes series. No content change.
+- `1180` gained `Reviewed-by: Ivan Lipski <ivan.lipski@amd.com>` on 2026-10-30.
+- `1234` and `1235` gained `Reviewed-by` and `Tested-by` from K Prateek Nayak
+  on 2026-10-30 for the whole two-patch series.
+- `2064`'s pre-merge review by Nilay Shroff and Christoph Hellwig (2026-10-29)
+  preceded the commit now in `v7.4-rc1`; the adopted commit is the resolved
+  form.
+- `2801`'s author replied on 2026-10-30 about a separate swap-cache cleanup
+  design; it is not a revision of the carried fix.
+- `1081` remains in Alex Deucher's merge queue (a 2026-10-29 ping).
+
+### Deferred and rejected
+
+| Candidate | Verdict |
+|---|---|
+| `mm/zswap: validate dlen and normalize comp_ret on compression success` (Suseendran Bhaskaran, `fe58833eef4d`) | In `next-20261030`, but it fails both hunks against clean `v7.3` and the series tree: it is written over the 7.4 zswap request-stack rework. The semantic change is small, but its only behavioural difference here is the error code and `reject_compress_*` statistics when writeback is disabled; this machine has `memory.zswap.writeback=1`. The preview base carries it. Defer to the next rc series refresh. |
+| `mm/shmem: hold off eviction in shmem_writeout()` (`69634c496ee2`) and the rest of `fixes_shmem-v4` | The UAF path needs zswap enabled, a folio zswap cannot take, **and** `memory.zswap.writeback=0`; every cgroup on this machine reads 1. The series also targets 7.4 large swap entries, and `69634c` fails one of six hunks on `v7.3`. The preview base carries all of it. Skip. |
+| `io_uring/sqpoll: don't attach to a thread that is canceling` (`22d9db9fd64a`, 2026-10-30) | The fix depends on `cb0306c52ffa` ("io_uring/cancel: drop sqd->lock while SQPOLL waits"), which is not in `v7.3`; the release still uses the `(attached && !sqd->thread)` test. It is newer than `next-20261030` and will arrive in the next snapshot. Watch. |
+| `mm: memcontrol: fix NULL pointer deref in high_work_func()` (`aa6524755e04`) | The regression comes from `f1cf8d2f36dc` and the LRU-gen release path; MGLRU is inert here under lru_cast. The preview base carries it. Skip. |
+| `mm/vmalloc: read vm_map_ram block regions from the requested offset` (`24d45a1475dd`) | Fixes `/proc/kcore` reads through drgn, crash and gdb, not a runtime path here. The preview base carries it. Skip. |
+| `mm/shmem` swapin-error-marker and truncation fixes | Rare marker-only files and large swap entries; the preview base carries them. Skip. |
+| `net/sched: sch_cake: skip redundant cake_mq rate updates` v2 (Shubhang Kaushik) | Optimizes `cake_mq` only; net-tune installs a root `cake` qdisc and `cake` on `ifb4cake`, not `cake_mq`. Not merged. Watch. |
+| `net/sched: revalidate the sleeping-root lock in timers` and `net/sched: fix rate estimator use-after-free when clearing NOLOCK` | The first changes the SFQ, RED, PIE, FQ-PIE and DualPI2 timers, none of which this machine uses; the second needs a qdisc rate estimator, which CAKE does not install. Skip. |
+| `drm/amd/pm: fix up the amdgpu merge of the smu 14.0.2 zero fan restore` (`37a382d8b8a0`) | SMU 14.0.2, not this machine's 14.0.0. Reject — wrong-chip trap. |
+| `drm/amdgpu: Change default mtype_local for GFX12.1` (Felix Kuehling) | GC 12.1, not gfx12.0. Reject. |
+| `drm/amdgpu: Enable IP discovery via PSP mailbox` and `add support for FB carveout disablement` v2 (Dejan Andjelkovic) | New platform features, not fixes. Watch. |
+| `drm/amdkfd` CRIU v2 series (David Francis) | 7.4 merge content; the preview base carries the v1 series and will take v2 at the next snapshot. The rc does not carry the CRIU restore series piecemeal. Watch. |
+| `drm/amdgpu: switch to __nonnull_args() macro` (`6f350f6893e1`) | Annotation cleanup with no behaviour change. Skip. |
+| `sched_ext: Avoid unnecessary IMMED reenqueues on idle CPUs` (Andrea Righi) | sched-ext is compiled but unused; BORE owns scheduling. Inert. Skip. |
+| `io_uring/napi: clean up list traversal with list_for_each_entry_safe()` (`e18504a4d378`) | Cleanup only. Skip. |
+
+### Tracker and Phoronix
+
+The drm/amd tracker returned **36 open issues updated since 2026-10-29**. The
+on-target ones are `#6055` (Navi 48 / RX 9070 XT in-game regression with a
+linux-firmware update), `#6051` (flip-done timeout on RX 9070), `#6053` (stale
+KFD queues after a GPU reset), `#5477` (Navi 48 / DCN 4.0.1 R9700 vblank and
+flip-done stalls) and `#5988` (VRR on a 280 Hz DisplayPort monitor locking to
+24 Hz, now confirmed on a second LG monitor and a second RX 9070 XT). No
+comment references a new fix commit. `#5988` and `#6052` (Broadcast RGB on
+DisplayPort) need a DisplayPort monitor; this machine's displays are HDMI-only.
+`#5100` is an eGPU-over-Thunderbolt Navi 48 report, not this desktop. `#6057`
+is DCN 4.0.1 but PREEMPT_RT-only.
+
+Phoronix on 2026-10-30 covered the Linux 7.4 x86 platform drivers (Zen 6 HSMP
+and PMC IDs), AMD PerfOpt for Radeon iGPUs, I3C and Vulkan. None is on-target:
+this machine is Zen 4 with a discrete Navi 48 GPU, so the Zen 6 IDs and the
+iGPU IOMMU bypass do not run here. The 7.4 IOMMU and networking merge content
+is already in `next-20261030`.
+
+### Audits
+
+`audit_series.py`: **305/305** on `v7.3`. The preview is **133/133** on
+`next-20261030` after `2062` was absorbed by the new base and removed from its
+series.

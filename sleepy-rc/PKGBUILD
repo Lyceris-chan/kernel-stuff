@@ -182,7 +182,7 @@ _rcver=
 
 pkgver=7.3.0
 _tagrel=1
-pkgrel=12
+pkgrel=13
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -432,6 +432,9 @@ source=(
   "patches/2000-2099/2060-io_uring-add-a-schedule-point-in-__io_req_caches_free.patch"
   "patches/2000-2099/2061-blk-mq-end-the-request-if-getting-a-keyslot-fails.patch"
   "patches/2000-2099/2062-io_uring-net-fix-multishot-recv-length-limit-accounting.patch"
+  "patches/2000-2099/2063-io_uring-timeout-count-cancelled-timeouts-in-cq_timeouts.patch"
+  "patches/2000-2099/2064-blk-mq-exit-the-hctxs-of-a-queue-under-tag_list_lock.patch"
+  "patches/2000-2099/2065-io_uring-io-wq-save-worker-type-before-dropping-its-reference.patch"
   "patches/2100-2199/2100-zstd-7.3-merge-v1.6.0-into-kernel-tree.patch"
   "patches/2100-2199/2102-mm-7.3-lru_cast-v0.2.8.patch"
   "patches/2100-2199/2120-mm-gup-mm-gup-break-out-gup-fill-pages-helper.patch"
@@ -1372,6 +1375,9 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         '1455fd65a42e9bba65673da473b99187acc2e25d6535c89d365eb925500f84e23e40bddca183e83bb8af641122254083cddd8bf26fbdbd413da6a20ccd73850f'
         '86d8bd19b0df67a239a78288ee419e3e6a30c1008383f91455b975997f66848ae5e05415b822fcb457972c52198131ab4836947753afdd2905e03f1a767a652a'
         '37e2013c2df878b310e36689fecd10be6cada30e22cd5686642f409fa42f9866ad328e1b817188aae25eb3645079e4efcd67979d9cecc13c6abe9ed2e3d108a2'
+        '9aed866530c9bc16dba255e1cd131585c7fdfa6b82c7c5c025f0f661cd0694f3452a9a7ee86bcb4740af495ef030f4ec942d273705ca1e5e56d2606b8b05e9f0'
+        'bdd787f67e01334913e099a241d079084c112b190b9e5d0414aecaac324bba94b974a6c402f4d8e46636b9482d999bf6f43453d822fc2fdf28064a95ee9ad1e7'
+        '87ddc5e6a9f4ab4d30344f7b5b9688d6ae952666c70136fe22b8cd66e8e7c9747c17046739598ca10f3023ec2d74f206b5947481611abc72e41a30bf702cba53'
         '04fe6270d9e54b974ee745261575fd710e3af252c6e2b2788a082455c6eeccfd2ea944245f5f58a9f4de418eca3058aaae8a27f90173b254aac15036c7a95c49'
         'db0fe4eb6465d8dc0769c3d5937f25529e6719a23e0ab05fb9f8748d29728e2134243e74e3d6fb2a0bcf970b070005253bbca70a1139a6d7c05fd76ea9a0471f'
         'a745db752d2586475d373cb29e64b4f42f6e305b4b3e588efbce955491429c73b3d16c426e76118b1499bbfb4a2159192f3950ed06d309064eb28750a1d6e6aa'
