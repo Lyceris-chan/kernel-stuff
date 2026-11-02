@@ -1,7 +1,8 @@
-From b283884f04a2c27bd19a7cdf351b912cc845b423 Mon Sep 17 00:00:00 2001
+From nobody Mon Sep 17 00:00:00 2001
 From: Rik van Riel <riel@surriel.com>
-Date: Mon, 10 Aug 2026 22:51:51 -0400
+Date: Mon,  2 Nov 2026 14:30:20 -0500
 Subject: [PATCH 2/8] mm/gup: convert follow_page_mask() to return a long
+Message-ID: <20261102193026.3860700-3-riel@surriel.com>
 
 follow_page_mask() and its helpers return a struct page pointer: NULL,
 ERR_PTR(), or the page found. Change the return type to long instead:
@@ -10,11 +11,11 @@ ERR_PTR(), or the page found. Change the return type to long instead:
 This lets the return value carry a page count rather than a single
 struct page pointer.
 
-follow_huge_pud(), follow_huge_pmd() and follow_page_pte() now fill
-their slot with gup_fill_pages(); __get_user_pages() reads pages[i]
-back to still expand a large folio's remaining subpages itself. The
-vsyscall gate area, which bypasses follow_page_mask(), fills its own
-slot the same way.
+follow_huge_pud(), follow_huge_pmd() and follow_page_pte() now store
+the found page in a pages[0] slot. __get_user_pages() itself is
+unchanged: it reads that page back from pages[i] and expands a large
+folio's remaining subpages on its own, as before. The vsyscall gate
+area bypasses follow_page_mask() and fills its own slot the same way.
 
 *page_mask and __get_user_pages()'s handling of a large folio's
 remaining subpages are untouched, and mm/gup_test.c
@@ -24,14 +25,14 @@ remaining subpages are untouched, and mm/gup_test.c
 No functional changes intended.
 
 Suggested-by: David Hildenbrand <david@kernel.org>
-Assisted-by: Claude:claude-opus-4-8
+Reviewed-by: Suren Baghdasaryan <surenb@google.com>
 Signed-off-by: Rik van Riel <riel@surriel.com>
 ---
  mm/gup.c | 254 +++++++++++++++++++++++++++++--------------------------
  1 file changed, 134 insertions(+), 120 deletions(-)
 
 diff --git a/mm/gup.c b/mm/gup.c
-index 3b78af6c1ef8..87c1a8531d4d 100644
+index cdbe2ed3e6442..f7d940e7e5ffb 100644
 --- a/mm/gup.c
 +++ b/mm/gup.c
 @@ -608,15 +608,15 @@ static inline bool can_follow_write_common(struct page *page,
@@ -109,10 +110,10 @@ index 3b78af6c1ef8..87c1a8531d4d 100644
 -	else
 -		*page_mask = HPAGE_PUD_NR - 1;
 +		return ret;
++
++	*page_mask = HPAGE_PUD_NR - 1;
  
 -	return page;
-+	*page_mask = HPAGE_PUD_NR - 1;
-+
 +	gup_fill_pages(vma, addr, page, 1, pages);
 +
 +	return 1;

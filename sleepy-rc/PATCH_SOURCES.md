@@ -11425,3 +11425,118 @@ is already in `next-20261030`.
 `audit_series.py`: **305/305** on `v7.3`. The preview is **133/133** on
 `next-20261030` after `2062` was absorbed by the new base and removed from its
 series.
+
+## Sweep 2026-11-02 — `v7.4-rc1`, the revised GUP series, `2044` v6, `1314`
+
+All six source classes were queried. The tree scan covered `torvalds` through
+`v7.4-rc1` (`6628e7d4c6b2`, 2026-11-01), the `linux-next` tag `next-20261102`
+(`2637bdec0535`, 1404 commits over `next-20261030`), `drm-next`
+(`origin/drm-next`, 2026-10-29), `agd5f-linux`/`amd-staging-drm-next`
+(`ba496bb83788`), `drm-misc` (`origin/drm-misc-next`, 2026-11-02), `linux-pm`,
+`akpm-mm` and `tip` (`2305edc99ef7`). CachyOS 7.3 branches were unchanged since
+2026-10-09; sirlucjan's `origin/master` advanced to 2026-10-20 with a
+`7.3/t2` line (Apple T2, not carried), while its 7.3-rc zstd directories were
+unchanged since 2026-09-18; firelzrd BORE stayed at 7.0.0. The lore mirrors (amd-gfx, dri-devel, lkml, netdev, mm, block, io-uring,
+nvme, pm, pci, cgroups, fsdevel, sched-ext and rust) were refreshed through
+2026-11-02; `lore-stable` is still frozen at 2022-05-18 and `lore-rust-for-linux`
+at 2026-09-24, so those two lanes are **unverified, not quiet**. The
+`lists.freedesktop.org` November archives are partial-month; the lore git
+mirrors cover the window completely. The drm/amd tracker was queried by update
+time (55 issues) and Phoronix was read through 2026-11-02.
+
+### Adopted — `1314`, `2044` v6, and the revised `2120`–`2127`
+
+| Patch | Change | Why |
+|---|---|---|
+| `1314` | **`drm/amdgpu: rewrite all PTEs of the BOs after a VM reset`** (Jesse Zhang, AMD) | New carry. Since `5be7f6720a0f` ("Only set bo->moved when the BO was actually moved") `amdgpu_vm_bo_needs_update()` no longer sets `moved`, so `amdgpu_vm_bo_reset_state_machine()`'s `needs_update` entries write nothing for kernel and always-valid BOs. After a VRAM-losing GPU reset an SDMA write to such a BO faults (`gfxhub` page fault). The patch sets `moved` for every vm_bos on the needs_update lists. `Fixes: 5be7f6720a0f`, which is in `v7.3`; `Reviewed-by: Christian König` in `<4bdd68bf-9168-40db-8c00-0a82f86a532a@amd.com>`. Message-ID `<20261102082510.2149814-1-Jesse.Zhang@amd.com>`. Applies to `v7.3` and to `next-20261102`; carried by both packages. |
+| `2044` v5 → **v6** | `lib/group_cpus: Snapshot cluster masks to keep grouping hotplug invariant` (Vishal Badole, AMD) | v6 snapshots the **SMT sibling masks** in addition to the cluster masks, uses the snapshot in `grp_spread_init_one()` instead of `topology_sibling_cpumask()`, and latches a failed capture so a later spread cannot switch algorithms. This closes the sibling half of the same s2idle/offline-CPU affinity drift: CPUS 3–11 offline, NVMe simple-suspend resume recomputes the spread, and QID 9/11 lose the CPUs watching their queues (`completion polled` timeouts). Message-ID `<20261102070930.1803698-1-Vishal.Badole@amd.com>`; `Fixes: 89802ca36c96`, in `v7.3`. Applies to both bases; carried by both packages. |
+| `2120`–`2127` | **Revised `mm/gup` batching series** (Rik van Riel) | Reposted 2026-11-02 as `[PATCH n/8]`, `<20261102193026.3860700-2..-9-riel@surriel.com>`. Parts 1, 2, 5 and 6 are unchanged; part 3 is now `split out folio grab-and-store helper` (adds `gup_grab_folio_pages()` and `gup_flush_pages()`), part 4 `break out gup_lookup_pte() helper`, and parts 7/8 walk and batch through the renamed helpers. The explicit goal is to keep the cache flushes out of the PTE lock. `Reviewed-by: Suren Baghdasaryan` on parts 1 and 5. The revised series applies cleanly to `v7.3` and is **rc-only**: `v7.4-rc1`'s `mm/gup.c` reworked `follow_page_mask()`/`follow_pud_mask()` and changed `int flags` to `unsigned int flags`, so the series does not apply to the preview base. The preview drops all eight for this snapshot (see `sleepy-next/PATCH_SOURCES.md`). |
+
+### Preview-only carries
+
+Two new patches apply only to the 7.4-based preview and were adopted there:
+
+| Patch | Change | Why |
+|---|---|---|
+| `2066` | `r8169: enable the RxOverflow interrupt again` (Jure Rebernik) | The NIC is an RTL8125B XID 641, the exact chip in the report. `next-20261030`/`next-20261102` contain `6994520a3328`, which removed RxOverflow from the interrupt mask; on the RTL8125B the receiver stops when the ring empties and only restarts when IntrStatus clears RxOverflow, so a refill while NAPI runs can wedge reception. The patch restores the interrupt. Message-ID `<20261101102720.702600-1-jure.rebernik@luxonis.com>`; `Fixes: 6994520a3328`. `v7.3` has the old mask layout and the posting does not apply. |
+| `2700` | `mm: bypass swap readahead for zswap` **v4** (Alexandre Ghiti) | zswap is synchronous like zram but still enters `swapin_readahead()`. The v4 measurement is a 15.6% build-time drop and 93% fewer readahead pages under sustained thrash; `R-b: Barry Song`, `A-b: Yosry Ahmed`. Message-ID `<20261102144835.304017-1-alex@ghiti.fr>`. The hunk was rebased over `2102`'s `lru_cast_wait_swapin()` insertion (context only). Preview-only: the `v7.3` context differs. |
+
+### Deferred or rejected
+
+- **`lru_cast` v0.2.9** (2026-11-01, `a05e9b0`) — a 557-line delta adding the
+  shadowed/returned ghost accounting and a rewritten core inline header. It
+  applies to `v7.3` but not to the preview base, it has no changelog or review,
+  and the preview (the boot default) cannot take it. Keep v0.2.8 in both
+  packages and revisit with the next release.
+- **Vitaly Prosyak's userq/reset 2-patch** (2026-10-30) — `drm/amdgpu: unmap
+  mappings before locking reset domain` fails `git apply` on both bases, and the
+  series fixes `aebf196c550e` ("userq: wait for GPU reset before mapping or
+  unmapping queues"), which is in neither `v7.3` nor `linux-next` (it is
+  amd-staging-only). The fixed code is not in either package; defer.
+- **Perry Yuan, `drm/amdgpu: validate the size in GEM_USERPTR ioctl`** — rejects
+  userptr sizes above 1 GiB. That is a policy/ABI change, not a bug fix, and it
+  has no review tag. Defer.
+- **Mario Limonciello, DP/eDP connector DDC link at the AUX i2c adapter** — the
+  change is correct but touches only DP/eDP connectors; this machine's displays
+  are HDMI-only. Defer.
+- **Hugo Sales, VRR vblank reference on active CRTCs** — the author says v1 is
+  incomplete ("v2 will skip the PSR, Replay and IPS step when the CRTC has no
+  stream") and asked for a few days. Defer.
+- **MuXian Chen, drop RGBA8888 from plane format lists** — a reply reports a
+  broken `dm_test_get_plane_formats()` KUnit test; the upstream RGBA8888 series
+  is still being landed. Defer.
+- **Thomas Zimmermann, `drm/vblank` restart hack** — Ville Syrjälä objects that
+  a single driver's workaround must not be applied to all drivers. Reject.
+- **Cooper Morgan, FreeSync infopacket saturation above 255 Hz** — this panel is
+  240 Hz, so the one-byte v1/v2 field cannot wrap and the fix cannot trigger.
+  Reject.
+- **Hugo Sales, ACPI processor thermal RFC** — RFC, not settled. Defer.
+- Wrong-chip rejects with new activity: Navi 31 `mes12.1`/wire debug, DCN 3.2
+  WM tables, SMU 13.0.0 UCLK, GMC 7/8, SMU 7, UALink/MI300, eDP laptop ABM and
+  PSR work. None is GC 12.0 / DCN 4.0.1 / SMU 14.0.0.
+
+### Upstream reverts and drops
+
+The `v7.3..v7.4-rc1` merge window has 31 `Revert` commits. Exactly one matches
+carried work: `2e8e30b3cf9f` reverts `nvme-pci: clamp max_hw_sectors based on
+DMA optimized limitation`, which is the same revert we carry as `2046`.
+`sleepy-rc` keeps `2046`; the preview base already has the upstream revert.
+None of the other reverts touches a carried patch. `next-20261030`..
+`next-20261102` contains only the already-known `lib/sort.c` revert and an i915
+one. No AMD patch was reverted in the window.
+
+The 13 patches the preview absorbed at `next-20261021` (`1063`, `1082`, `1083`,
+`1085`, `1091`, `1092`, `1176`, `1181`, `1182`, `1233`, `2046`, `2058`, `2803`)
+were re-checked against `next-20261102`: ten reverse-apply cleanly, and the
+other three are present by identifier (`1063` has the RCU doc rewritten,
+`1082` has the `bo_va->base.bo && !bo_va->base.moved` form, `2046` has the
+upstream `dma_max_mapping_size()` revert). The earlier 2026-10-19 reconcile
+also dropped `2047`/`2048`; that pair was the one genuine gap and is now
+restored in the preview (see above).
+
+The tracker found no new on-target fix commit: 55 issues updated, 27 distinct
+commit tokens resolved, none new for Navi 48/DCN 4.0.1. `#6068` (Navi 48 HDMI
+black screen) is already covered by `1171`/`1172`; `#5339` (RA24/RGBA8888) is
+still unlanded; `#4871` gained a root cause but no patch; `#6079` and `#6081`
+are base-commit watch items, not fixes.
+
+Phoronix's only on-target 7.4 item is the HDMI FRL default-on flip
+(`5fd3b60d9b80`, "drm/amd/display: Enable HDMI FRL by default"), which moves
+`dcfeaturemask` to 1026. The running preview already reports 1026; the preview
+gets the flip from its new base, while `v7.3` does not have it. The rest of the
+window was merge-window statistics, a VFIO taint revert, iGPU-only PerfOpt and
+Zen 6/laptop platform work.
+
+### Preview correction — `2047`/`2048` restored
+
+The 2026-10-19 preview reconcile dropped the first two parts of the nvme
+passthrough copyback series as "absorbed". The base still has the pre-fix
+order (`blk_rq_unmap_user(bio)` before `blk_mq_free_request(req)`) and still
+discards the unmap error, so the drop is consistent with a content-probe false
+positive: a probe matches the pre-existing `blk_rq_unmap_user(bio)` line, while
+the fix is the reordering. Both apply cleanly to `next-20261102` and are restored in the
+preview, taking it from 128 to 130 patches. `sleepy-rc` never dropped them.
+
+### Audits
+
+`audit_series.py`: **306/306** on `v7.3` and **130/130** on `next-20261102`.

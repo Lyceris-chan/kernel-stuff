@@ -1,0 +1,49 @@
+From 王 颖杰 <x-professor@outlook.com> Mon Sep 17 00:00:00 2001
+From: 王 颖杰 <x-professor@outlook.com>
+Date: Fri, 16 Oct 2026 03:00:56 +0000
+Subject: [PATCH] nvme: release passthrough resources before user copyback
+Message-ID: <6cae8c109686ff0fb71d4b69767f9abeb45be74a.1792118770.git.x-professor@outlook.com>
+
+blk_rq_unmap_user() may fault while copying READ bounce data to
+userspace.  nvme_submit_user_cmd() currently performs that copy while
+the completed passthrough request still owns a tag.  If the destination
+faults on the same namespace and no other tag is available, the nested
+read cannot make progress.
+
+Save the request-backed result, free the request, and finish
+command-effect serialization before unmapping the bio.  The saved bio
+remains valid independently of the request and can then be copied back
+without retaining scarce queue resources or passthrough locks.
+
+With an NVMe I/O queue depth of two, a same-namespace file-backed
+destination hung beyond 60 seconds before this change.  It completed
+immediately in 20/20 runs afterward, and subsequent normal I/O remained
+live.
+
+Fixes: d29ec8241c10 ("nvme: submit internal commands through the block layer")
+Cc: stable@vger.kernel.org
+Assisted-by: LLM
+Signed-off-by: Yingjie Wang <x-professor@outlook.com>
+---
+ drivers/nvme/host/ioctl.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/nvme/host/ioctl.c b/drivers/nvme/host/ioctl.c
+index 6539d475009..e45572bc87d 100644
+--- a/drivers/nvme/host/ioctl.c
++++ b/drivers/nvme/host/ioctl.c
+@@ -221,12 +221,12 @@ static int nvme_submit_user_cmd(struct request_queue *q,
+ 	ret = nvme_execute_rq(req, false);
+ 	if (result)
+ 		*result = le64_to_cpu(nvme_req(req)->result.u64);
+-	if (bio)
+-		blk_rq_unmap_user(bio);
+ 	blk_mq_free_request(req);
+ 
+ 	if (effects)
+ 		nvme_passthru_end(ctrl, ns, effects, cmd, ret);
++	if (bio)
++		blk_rq_unmap_user(bio);
+ 	return ret;
+ 
+ out_free_req:

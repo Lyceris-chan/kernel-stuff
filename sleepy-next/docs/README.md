@@ -2,12 +2,12 @@
 
 `linux-sleepy-next` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
-built from a **linux-next snapshot (`next-20261030`)** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 133-patch
+built from a **linux-next snapshot (`next-20261102`)** plus a sanitized
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 130-patch
 series. It is not a general-purpose kernel.
 
-**Base version:** `2026.10.30-1` · **Artifact:**
-`linux-sleepy-next-2026.10.30-1-x86_64.pkg.tar.zst`
+**Base version:** `2026.11.02-1` · **Artifact:**
+`linux-sleepy-next-2026.11.02-1-x86_64.pkg.tar.zst`
 
 The release is named for the **snapshot date**, not the mainline release the
 snapshot was cut from — linux-next is a daily tree, and its base release goes
@@ -37,7 +37,6 @@ initramfs build.
   `../PATCH_SOURCES.md`). It keeps Marie's per-PFN state array, SIMD walker,
   look-around, kcompressd and clean-file floor, and replaces the generational
   ring with a measured LRFU. Both packages carry it.
-- **`mm/gup` folio batching** (Rik van Riel's series) for mTHP throughput.
 - **BBR3** default + CAKE SQM via `net-tune`; ACPI CPPC hardening + per-core EPP
   boost for `amd-pstate`.
 - **DCN4 display work**: HDMI FreeSync/VRR/ALLM, colorops, and the upstream
@@ -62,7 +61,9 @@ initramfs build.
   behind the pool keeps anonymous pages reclaimable. zram's writeback never
   runs on its own, and `backing_dev` rejects a file outright.
   `swap-stack/` carries the userspace side. It replaced an xswap device on
-  2026-09-22 (series removed, 15 patches).
+  2026-09-22 (series removed, 15 patches). The preview also carries `2700`,
+  the v4 bypass of swap readahead for zswap: zswap is synchronous like zram,
+  so readahead only fills the pool with pages the fault will not wait for.
 - **CAST ranking is active; the anon/file split is held file-first.**
   `vm.swappiness` stays **1**, which CAST treats as a promise: reclaim file
   down to the clean-file floor (10% of memory), then anon. That is the
@@ -121,11 +122,13 @@ preview: it exists to exercise the snapshot's display code with IPS enabled.
 
 ## Patch series
 
-136 patch entries in `source=()` (143 files; seven are excluded from the build). `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+130 patch entries in `source=()` (137 files; seven are excluded from the build). `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 On a linux-next snapshot a large fraction are skipped rather than failed, since
 the snapshot already carries much of what the series adds — a skip is only safe
 for a self-contained patch, so interdependent groups are excluded outright
-instead.
+instead. The `2120`–`2127` mm/gup batching series is rc-only on this snapshot:
+the revised 2026-11-02 posting applies to `v7.3` but not to the 7.4-based
+snapshot's `mm/gup.c`.
 
 | Range | Category |
 |---|---|

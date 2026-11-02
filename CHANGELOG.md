@@ -18,6 +18,81 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.11.02-1-sleepy-next (linux-next `next-20261102`)]: 2026-11-02
+
+Bumps the preview from `next-20261030` to `next-20261102` (1404 commits). The
+snapshot is cut from `v7.4-rc1`, so the preview base moves from the 7.3 release
+to the 7.4 merge-window tree. The mm/gup series moves rc-only, `2047`/`2048`
+are restored, and the preview gains `2066`, `2700` and `1314`. Series **130
+patches**; audit **130/130**.
+
+### Changed
+
+- **`2120`–`2127` dropped from the preview** — `v7.4-rc1` reworked
+  `mm/gup.c` (`follow_page_mask()`/`follow_pud_mask()`, `int` → `unsigned int`
+  flags). The 2026-11-02 repost is the same code reworked for `v7.3` and still
+  does not apply to this base. The preview keeps its own GUP code;
+  `sleepy-rc` carries the revision.
+- **`2047`/`2048` restored** — the 2026-10-19 reconcile dropped them as
+  "absorbed", but the base still frees the request before the user copyback
+  and still discards `blk_rq_unmap_user()`'s error. The patch's only moved
+  line already exists in the pre-image; the fix is the reordering. `2047` frees
+  the request before the copyback; `2048` returns `-EFAULT` on a failed bounce
+  copy.
+- **`2066` r8169 RxOverflow** — restores the interrupt on the RTL8125B XID 641.
+  The base contains `6994520a3328`, which removed it; a ring refill while NAPI
+  runs can leave the receiver stopped until an unrelated interrupt clears the
+  status.
+- **`2700` zswap readahead bypass v4** — zswap is synchronous like zram, so
+  skipping readahead removes pool traffic the fault does not wait for. The
+  author measured a 15.6% build-time drop and 93% fewer readahead pages under
+  sustained thrash.
+- **`2044` v6** — snapshots the SMT sibling masks as well as the cluster masks,
+  closing the sibling half of the offline-CPU managed-IRQ affinity drift.
+- **`1314`** — amdgpu: mark all vm_bos on the needs_update lists as moved after
+  a VM reset, so a VRAM-losing reset rewrites their PTEs.
+- **New base content** — `v7.4-rc1` brings HDMI FRL on by default
+  (`dcfeaturemask` 1026; the running `next-20261030` kernel already reports it),
+  the merge-window DRM/AMD content, and the five `mm/gup` fixes.
+
+### Verification
+
+Package `linux-sleepy-next-2026.11.02-1` and headers built with Clang 23.1.4;
+all 130 patches applied with zero skips; `.BTF`/`.BTF_ids`, lru_cast v0.2.8,
+NAP v0.5.1, `sibling_snapshot` and the built-in cmdline re-checked. Installed
+side by side; no reboot.
+
+## [7.3.0-14-sleepy-rc (Linux 7.3)]: 2026-11-02
+
+Adds `1314`, updates `2044` to v6, and replaces the `2120`–`2127` mm/gup series
+with the 2026-11-02 revision. The base stays `v7.3`; the series is **306
+patches** and audits **306/306**.
+
+### Changed
+
+- **`1314`** — amdgpu: mark all vm_bos on the needs_update lists as moved after
+  a VM reset. Since `5be7f6720a0f` `amdgpu_vm_bo_needs_update()` no longer sets
+  `moved`, so an SDMA write to an always-valid BO after a VRAM-losing reset
+  faults.
+- **`2044` v6** — snapshots the SMT sibling masks as well as the cluster masks;
+  `grp_spread_init_one()` now uses the snapshot instead of the live topology.
+- **`2120`–`2127` revision** — the 2026-11-02 GUP repost splits the folio grab
+  and page flush out of the PTE lock (`gup_grab_folio_pages()`,
+  `gup_flush_pages()`, `gup_lookup_pte()`) and batches contiguous same-folio
+  PTEs through the renamed helpers.
+- **Deferred** — lru_cast v0.2.9 (large unreviewed delta, 7.3-only), the
+  amd-staging userq/reset pair (the fixed code is absent from both bases), the
+  GEM_USERPTR 1 GiB cap (policy change), DP/eDP DDC (HDMI-only displays), and
+  the r8169 RxOverflow backport to `v7.3` (the posting does not apply; the
+  preview carries it).
+
+### Verification
+
+Package `linux-sleepy-rc-7.3.0-14` and headers built with Clang 23.1.4; all
+306 patches applied with zero skips; `.BTF`/`.BTF_ids`, lru_cast v0.2.8, NAP
+v0.5.1, `tcp_bbr3` and the `amdgpu.dcdebugmask=0x800` cmdline re-checked.
+Installed side by side; no reboot.
+
 ## [2026.10.30-1-sleepy-next (linux-next `next-20261030`)]: 2026-10-30
 
 Bumps the preview from `next-20261029` to `next-20261030` (534 commits). The

@@ -15,11 +15,11 @@ moved, so the full ledger is not duplicated here.
 
 | | |
 |---|---|
-| Snapshot | `next-20261030`, tag `7649ba73f9e7` (tag object `b6784eb81499`) |
-| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261030.tar.gz` |
-| Snapshot tree `Makefile` | `7.3.0` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.10.30-1-sleepy-next` |
-| Package | `linux-sleepy-next-2026.10.30-1` |
+| Snapshot | `next-20261102`, tag `2637bdec0535` (tag object `d1333a4249ad`) |
+| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261102.tar.gz` |
+| Snapshot tree `Makefile` | `7.4.0-rc1` — the base release, **deliberately not used in the release name** |
+| Kernel release | `2026.11.02-1-sleepy-next` |
+| Package | `linux-sleepy-next-2026.11.02-1` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -1208,3 +1208,59 @@ sweep (`2063`, `2064`, `2065`), along with the `mm/zswap` dlen validation, the
 
 Both packages passed `audit_series.py` after the changes: **305/305** on
 `v7.3` and **133/133** on `next-20261030`.
+
+## Bump 2026-11-02 — `next-20261102`; GUP moves rc-only, three carries, `2047`/`2048` restored, 130 patches
+
+The preview bumps from `next-20261030` to `next-20261102` (`1404` commits). This
+is the `v7.4-rc1` rebase: the snapshot's `Makefile` now reads `7.4.0-rc1`, so
+the preview base jumps from `v7.3` to the 7.4 merge-window tree. The base is
+still named by the snapshot date, never by the rc.
+
+### Dropped — `2120`–`2127` (mm/gup batching)
+
+The preview's eight-patch `mm/gup` series no longer applies. `v7.4-rc1`'s
+`mm/gup.c` changed `follow_page_mask()`'s signatures (`int flags` became
+`unsigned int flags`), reworked `follow_pud_mask()`/`follow_pmd_mask()`, and
+added the five `mm/gup` fixes now in the snapshot. The revised series posted on
+2026-11-02 (`<20261102193026.3860700-2-riel@surriel.com>`) is the same code
+reworked, and it applies cleanly to `v7.3` but not to the 7.4 base: `2121`
+fails at hunks 4, 13 and 16, and the later patches depend on it. The series is
+therefore **rc-only on this snapshot** and was removed from `source=()`. The
+preview base keeps its own GUP implementation; revisit when a 7.4-based
+revision is posted.
+
+### Added — `2066`, `2700`, `1314`
+
+| Patch | Change | Why |
+|---|---|---|
+| `2066` | `r8169: enable the RxOverflow interrupt again` (Jure Rebernik) | The NIC is an RTL8125B XID 641, the exact chip in the report. `next-20261030` and `next-20261102` both contain `6994520a3328`, which removed RxOverflow from the interrupt mask. On the RTL8125B the receiver stops when the ring empties and does not restart until IntrStatus clears RxOverflow; if the ring refills while NAPI runs with the mask cleared, the stop is permanent until an unrelated interrupt clears the status. The patch adds RxOverflow back to the single-vector mask. Message-ID `<20261101102720.702600-1-jure.rebernik@luxonis.com>`; `Fixes: 6994520a3328`. Preview-only: `v7.3` already has the old mask layout and the posting does not apply there. |
+| `2700` | `mm: bypass swap readahead for zswap` **v4** (Alexandre Ghiti) | zswap is a synchronous in-memory backend like zram, but it still enters `swapin_readahead()`. The author measured a 15.6% build-time drop and 93% fewer readahead pages under sustained thrash, with `R-b: Barry Song`, `A-b: Yosry Ahmed`. Message-ID `<20261102144835.304017-1-alex@ghiti.fr>`; v4 is the settled single-patch shape after the August review. Preview-only: the `v7.3` context differs, and the preview is where the zswap stack is exercised. The hunk was rebased over `2102`'s `lru_cast_wait_swapin()` insertion (context only; the semantic change is unchanged). |
+| `1314` | `drm/amdgpu: rewrite all PTEs of the BOs after a VM reset` (Jesse Zhang) | `amdgpu_vm_bo_reset_state_machine()` moves idle vm_bos to `needs_update`, but since `5be7f6720a0f` `amdgpu_vm_bo_needs_update()` no longer sets `moved`, so `amdgpu_vm_bo_update()` writes nothing for kernel and always-valid BOs and an SDMA write after a VRAM-losing reset faults. The patch sets `moved` for all vm_bos on the needs_update lists. `Reviewed-by: Christian König` in the reply `<4bdd68bf-9168-40db-8c00-0a82f86a532a@amd.com>`; `Fixes: 5be7f6720a0f`. Carried by both packages. |
+
+`2044` is also updated in place to **v6** in both packages (`<20261102070930.1803698-1-Vishal.Badole@amd.com>`):
+it now snapshots the SMT sibling masks as well as the cluster masks and uses the
+snapshot in `grp_spread_init_one()`, which closes the same offline-CPU
+affinity drift that the v5 cluster-only snapshot left in the sibling path.
+
+### Restored — `2047` and `2048` (nvme passthrough)
+
+The 2026-10-19 preview reconcile dropped the `2047`–`2050` nvme copyback
+series as "absorbed or superseded". That was wrong for the first two parts:
+the base still runs `blk_rq_unmap_user(bio)` before `blk_mq_free_request(req)`
+in `nvme_submit_user_cmd()`, and still discards `blk_rq_unmap_user()`'s return
+value. A content probe matches the pre-existing `blk_rq_unmap_user(bio)` line,
+but the change is the **reordering**, not the line.
+
+`2047` saves the request-backed result, frees the request and finishes the
+command-effect serialization before the user copyback; `2048` preserves the
+controller status and returns `-EFAULT` when the bounce-buffer copy fails.
+Both reproduce on this class of hardware (queue depth two, same-namespace
+destination) and carry `Fixes: d29ec8241c10`, `Cc: stable`. `2049`/`2050`
+remain deferred: the snapshot's `nvme_uring_cmd_pdu` moved status/result to
+`io_uring_cmd_set_res32()`, so they need a semantic port, not a rebase. The
+rc package has carried `2047`/`2048` all along.
+
+### Series state
+
+Both packages passed `audit_series.py` after the changes: **306/306** on
+`v7.3` and **130/130** on `next-20261102`.
