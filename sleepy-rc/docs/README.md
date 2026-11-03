@@ -3,11 +3,11 @@
 `linux-sleepy-rc` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
 built from **mainline Linux 7.3** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 306-patch
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 311-patch
 series. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0-14` · **Artifact:**
-`linux-sleepy-rc-7.3.0-14-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0-16` · **Artifact:**
+`linux-sleepy-rc-7.3.0-16-x86_64.pkg.tar.zst`
 
 ## Target hardware
 
@@ -24,7 +24,7 @@ series. It is not a general-purpose kernel.
 
 - **Clang ThinLTO `-O3 -march=znver4`** via the kernel.org ClangBuiltLinux
   pre-built LLVM 23.1.4.
-- **lru_cast 0.2.8 (CAST)** page eviction — Masahito Suzuki's successor to
+- **lru_cast 0.2.9 (CAST)** page eviction — Masahito Suzuki's successor to
   LRU-MARIE, carried as `2102`. It keeps Marie's per-PFN state array, SIMD PTE
   walker, rmap-fed bloom filter, look-around, kcompressd and clean-file floor,
   and replaces the generational ring with a measured, self-tuning LRFU
@@ -124,7 +124,7 @@ fix lands.
 
 ## Patch series
 
-306 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+311 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 
 | Range | Category |
 |---|---|

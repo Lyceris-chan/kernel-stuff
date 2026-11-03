@@ -18,6 +18,119 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.11.03-1-sleepy-next (linux-next `next-20261103`)]: 2026-11-03
+
+Bumps the preview from `next-20261102` to **`next-20261103`** (1208 commits).
+Seven new sweep carries — five shared with `sleepy-rc`, two preview-only. No
+carried patch was absorbed by the snapshot. Series **137 patches**; audit
+**137/137**.
+
+### Changed
+
+- **Snapshot** — `next-20261103` (`6eeac5a2a558`). Reverse-applying all 137
+  patches against a clean snapshot tree succeeds for none, so nothing the series
+  carries is already in the new base.
+- **Carries shared with `sleepy-rc`** — `1237` (restore the forced performance
+  level after a reset), `1315` (CS chunk walk on allocation failure), `1316`
+  (KFD SVM foreign device pages), `2807` (large swap-in across swap-file
+  extents; context regenerated over `2700`), `9090` (validate idle-list BOs on
+  a user-queue restore).
+- **Preview-only carries** — `1317` (`gpu/buddy` two-pass clear/dirty guard;
+  the range-bias path is 7.4-only) and `1318` (JPEG/VCN idle work versus GPU
+  reset; needs 7.4's `early_fini` hook).
+- **Version sweep** — 32 higher-version postings across the lore mirrors, all
+  older than or content-identical to what is carried. `2806` v2 is a resend with
+  zero changed lines; its new part 2 became `2807`.
+- **NAP v0.5.1 → v0.6.6** — `2200` moves to the author's 2026-11-01 release
+  (`firelzrd/nap` `9803912`, `patches/testing/0001-6.12-nap-v0.6.6.patch`). The
+  v0.6 line is a rewrite: 11 features, 32 hidden units, 16 outputs, a smaller
+  network (0.32 µs per select), SIMD variants (scalar/SSE2/AVX2+FMA/AVX-512)
+  self-verified against the trained model at boot, and a reworked sysfs surface
+  (`budget_ppm`, `max_simd`, `weights`). It applies unchanged to both bases.
+
+### Verification
+
+Package `linux-sleepy-next-2026.11.03-1` and headers built with Clang 23.1.4;
+all 137 patches applied; `.BTF`/`.BTF_ids`, `CONFIG_TCP_CONG_BBR3=y` with old
+BBR unset, the lru_cast v0.2.9 symbols, NAP v0.6.6 and the built-in cmdline
+re-checked. Installed side by side; no reboot.
+
+## [7.3.0-16-sleepy-rc (Linux 7.3)]: 2026-11-03
+
+Five sweep carries from the 2026-11-03 pass, plus the NAP governor update. The
+base stays `v7.3`; the series is **311 patches** and audits **311/311**.
+
+### Changed
+
+- **NAP v0.5.1 → v0.6.6** — `2200` moves to the author's 2026-11-01 release
+  (`firelzrd/nap` `9803912`, `patches/testing/0001-6.12-nap-v0.6.6.patch`). The
+  v0.6 line is a rewrite: 11 features, 32 hidden units, 16 outputs, a ~0.32 µs
+  select, SIMD variants (scalar/SSE2/AVX2+FMA/AVX-512) self-verified against
+  the trained model at boot, and a reworked sysfs surface (`budget_ppm`,
+  `max_simd`, `weights`). The `CPU_IDLE_GOV_NAP` symbol and the
+  `cpuidle.governor=nap` cmdline are unchanged.
+- **`1237`** — `drm/amd/pm: restore the forced performance level after a reset`
+  (Priya Hosur). `smu_late_init()` does not reprogram a retained DPM level after
+  a reset, because the cached level still matches.
+- **`1315`** — `drm/amdgpu: don't walk the CS chunks when allocating them
+  failed` (Jesse Zhang). A NULL chunk array was freed with `nchunks` still set;
+  the oops in the posting is on navi48.
+- **`1316`** — `drm/amdkfd: reject foreign device pages in
+  svm_range_dma_map_dev()` (Aveline Noir). A page from another `svm_bo` could be
+  mapped with this range's VRAM base, and a NULL `svm_bo` dereferenced after a
+  `fork()`.
+- **`2807`** — `mm, swap: fix large swap-in across swap file extents` (Chris
+  Mason; `Reviewed-by: Nhat Pham`). A large swap-in could read blocks belonging
+  to another file when the swap-file extent ended inside the folio. The guard
+  only runs when zswap has never been enabled, so it is a stable security fix
+  rather than a change to this machine's normal swap path.
+- **`9090`** — `drm/amdgpu/userq: validate evicted BOs on the individual idle
+  list on restore` (Jesse Zhang). Idle-list BOs could keep invalid PTEs across a
+  user-queue restore.
+
+### Verification
+
+Package `linux-sleepy-rc-7.3.0-16` and headers built with Clang 23.1.4; all 311
+patches applied; `.BTF`/`.BTF_ids`, the lru_cast v0.2.9 symbols, NAP v0.6.6 and
+the built-in cmdline re-checked. Installed side by side; no reboot.
+
+## [2026.11.02-2-sleepy-next (linux-next `next-20261102`)]: 2026-11-02
+
+Updates lru_cast to **v0.2.9** in both packages; the preview carries a port of
+the author's 7.3-rc7 patch to the 7.4 base. Series **130 patches**; audit
+**130/130**.
+
+### Changed
+
+- **lru_cast v0.2.8 → v0.2.9** — adds the shadowed/returned ghost accounting
+  (`lru_cast_shadowed()`, `lru_cast_returned()`,
+  `lru_cast_too_many_isolated()`), a rewritten core inline header
+  (`mm/lru_cast/core/inl.h`), and reworks `tune/sim.c`, `policy/ring.c`,
+  `policy/ghost.c` and the walk/reclaim paths.
+- **7.4 port** — `valid_section_nr`, `vma_is_hugetlb`, `RB_AUG_FUNC`, expanded
+  `VM_SPECIAL`, `__swap_writeout` with the local helper renamed
+  `cast_swap_writeout`, no `PF_KSWAPD`, the `mm/migrate.c` hook's
+  `newfolio`/`folio` arguments renamed to 7.4's `dst`/`src`, and the
+  `swap_bdev_submit_write` eviction accounting adapted to the 7.4 dropbehind
+  loop. Recorded in `PATCH_SOURCES.md`.
+
+### Verification
+
+Package `linux-sleepy-next-2026.11.02-2` and headers built with Clang 23.1.4;
+all 130 patches applied; `.BTF`/`.BTF_ids`, the `lru_cast_shadowed()`,
+`lru_cast_returned()` and `lru_cast_too_many_isolated()` symbols, NAP v0.5.1
+and the built-in cmdline re-checked. Installed side by side; no reboot.
+
+## [7.3.0-15-sleepy-rc (Linux 7.3)]: 2026-11-02
+
+Updates lru_cast to **v0.2.9** (the author's 7.3-rc7 patch, unchanged). The
+base stays `v7.3`; the series is **306 patches** and audits **306/306**.
+
+### Changed
+
+- **lru_cast v0.2.8 → v0.2.9** — shadowed/returned ghost accounting, the new
+  `core/inl.h` header, and reworked simulation, ring, ghost and walk paths.
+
 ## [2026.11.02-1-sleepy-next (linux-next `next-20261102`)]: 2026-11-02
 
 Bumps the preview from `next-20261030` to `next-20261102` (1404 commits). The

@@ -11466,8 +11466,8 @@ Two new patches apply only to the 7.4-based preview and were adopted there:
 - **`lru_cast` v0.2.9** (2026-11-01, `a05e9b0`) — a 557-line delta adding the
   shadowed/returned ghost accounting and a rewritten core inline header. It
   applies to `v7.3` but not to the preview base, it has no changelog or review,
-  and the preview (the boot default) cannot take it. Keep v0.2.8 in both
-  packages and revisit with the next release.
+  and the preview (the boot default) cannot take it. *Superseded later the same
+  day: v0.2.9 was adopted in both packages after the preview port below.*
 - **Vitaly Prosyak's userq/reset 2-patch** (2026-10-30) — `drm/amdgpu: unmap
   mappings before locking reset domain` fails `git apply` on both bases, and the
   series fixes `aebf196c550e` ("userq: wait for GPU reset before mapping or
@@ -11540,3 +11540,178 @@ preview, taking it from 128 to 130 patches. `sleepy-rc` never dropped them.
 ### Audits
 
 `audit_series.py`: **306/306** on `v7.3` and **130/130** on `next-20261102`.
+
+## 2026-11-02 (later) — lru_cast v0.2.8 → v0.2.9 in both packages
+
+The author released v0.2.9 on 2026-11-01 (`lru_cast` `a05e9b0`, author patch
+`0001-7.3-rc7-lru_cast-v0.2.9.patch`). v0.2.8 was carried in both packages;
+v0.2.9 adds the shadowed/returned ghost accounting (`lru_cast_shadowed()`,
+`lru_cast_returned()`, `lru_cast_too_many_isolated()`), a rewritten core inline
+header (`mm/lru_cast/core/inl.h`), and reworks `tune/sim.c`, `policy/ring.c`,
+`policy/ghost.c` and the walk/reclaim paths.
+
+- **rc** — the author's 7.3-rc7 patch, byte-identical to the release file.
+  Applies cleanly to `v7.3` and to the 306-patch series. Carried as
+  `2102-mm-7.3-lru_cast-v0.2.9.patch`.
+- **preview** — ported to `next-20261102` with the same 7.4 adapters used for
+  v0.2.8: `present_section_nr` → `valid_section_nr`, `is_vm_hugetlb_page` →
+  `vma_is_hugetlb`, the old `RB_DECLARE_CALLBACKS` compute callback replaced
+  with `RB_AUG_FUNC(lru_cast_tune_oone, size, lru_cast_tune_oadd)`, `VM_SPECIAL`
+  expanded, the physical `__swap_writepage` call renamed to `__swap_writeout`,
+  the local helper renamed `cast_swap_writeout` to avoid the 7.4 name,
+  `PF_KSWAPD` dropped from kcompressd's flags, and the `mm/migrate.c` hook's
+  `newfolio`/`folio` arguments renamed to 7.4's `dst`/`src`. The
+  `swap_bdev_submit_write` eviction accounting was adapted to the 7.4 body
+  (which now has the dropbehind loop) and `mm/swap.h`'s handoff declarations
+  were placed around 7.4's `__swap_writeout`. Carried as `2102-mm-7.4-lru_cast-v0.2.9.patch`; the port
+  applies to the clean snapshot and to the full 130-patch series.
+
+### Audits
+
+`audit_series.py`: **306/306** on `v7.3` and **130/130** on `next-20261102`.
+
+## Sweep 2026-11-03 — `next-20261103`; seven new carries
+
+Sources refreshed: `torvalds`, `linux-next` (tag `next-20261103`, `6eeac5a2a558`),
+`drm-next`, `agd5f-linux`, `amd-staging-drm-next`, `drm-misc`, `akpm-mm`
+(`mm-everything` and the unstable branches), `linux-pm`, `tip`, the thirteen
+lore mirrors, the two freedesktop monthly archives, the drm/amd work-items
+tracker, sirlucjan, CachyOS and Phoronix. All clones were verified fresh against
+their remotes; `lore-stable` is the one stale mirror (last post 2022 under
+epoch 0) and was not used.
+
+### Adopted — seven patches
+
+| Patch | Change | Why |
+|---|---|---|
+| `1237` | `drm/amd/pm: restore the forced performance level after a reset` v3 (Priya Hosur, AMD) | `smu_late_init()` re-applies the DPM level through `smu_handle_task()`, but `smu_adjust_power_state_dynamic()` only programs the hardware when `force_performance_level` is set or the cached level differs. After a reset the PMFW is reinitialised while `dpm_level` still matches, so a forced level is silently not restored. The fix passes `amdgpu_reset_in_recovery()`, which exists in both bases. Message-ID `<f370dc0e7025b9b39cac723b1b60ccbd339d233f.1793689935.git.Priya.Hosur@amd.com>`. Applies to both bases; carried by both packages. |
+| `1315` | `drm/amdgpu: don't walk the CS chunks when allocating them failed` (Jesse Zhang, AMD) | `amdgpu_cs_pass1()` sets `p->nchunks` before allocating `p->chunks`, and the allocation-failure path leaves it set, so `amdgpu_cs_parser_fini()` frees `kdata` from a NULL array; the oops in the posting is on navi48. Set `nchunks` only once the array exists. `Fixes: d38ceaf99ed0`. Message-ID `<20261103083132.3056003-1-Jesse.Zhang@amd.com>`. Both bases. |
+| `1316` | `drm/amdkfd: reject foreign device pages in svm_range_dma_map_dev()` (Aveline Noir) | The `dev_private_owner` passed to HMM is per device or XGMI hive, so HMM can return a zone-device page of another `svm_bo` — after a `fork()` the child can see the parent's VRAM pages — while the VRAM address and the PTE flags are computed from `prange->svm_bo`, which can be NULL. Reject foreign pgmap pages with `-EFAULT` and clear the entry. `Fixes: 1d5dbfe6c06a`. Message-ID `<20261103-kfd-svm-foreign-vram-20261103-v1-1-d6282053cad3@gmail.com>`. Both bases. |
+| `2807` | `mm, swap: fix large swap-in across swap file extents` v2 2/4 (Chris Mason; `S-o-b` David Hildenbrand and Kairui Song; `Reviewed-by: Nhat Pham`) | A large swap-in issues one bio from the first slot's sector, but adjacent swap slots of a swap *file* can live in different extents, so the tail of the folio is filled from whatever blocks follow the extent — reproduced returning blocks of a root-owned 0600 file to an unprivileged process. Permit a large swap-in only when `SWP_BLKDEV` is set. `Fixes: 242d12c98174`, `Cc: stable`. Message-ID `<20261104-swap-fixes-v2-2-204be064be5b@tencent.com>`. The context differs between the packages because `2700` rewrote the same `do_swap_page()` guard in the preview; the added lines are the author's, unchanged, in both regenerated copies. **Reachability note:** `thp_swapin_suitable_orders()` already returns 0 when zswap has ever been enabled, which is the normal state here, so the new `SWP_BLKDEV` guard only runs with zswap disabled. It is carried as a stable security fix, not as a change to this machine's normal swap path. |
+| `9090` | `drm/amdgpu/userq: validate evicted BOs on the individual idle list on restore` (Jesse Zhang, AMD) | A GEM_VA operation or a kernel CS can update the PTEs of an evicted BO without validating it, which moves the `bo_va` to the idle list with PTEs pointing nowhere; user-queue restore only validates the evicted list, and the eviction-fence rearm runs after the last PTE update. Walk `vm->individual.idle` and validate those BOs too. The posting is against the pre-rename list name (`needs_update`); the copy carried here is context-regenerated against the series (`evicted`), added lines unchanged. Message-ID `<20261103083439.3057038-1-Jesse.Zhang@amd.com>`. Both bases. |
+| `1317` | `gpu/buddy: restore two-pass clear/dirty guard for range-biased allocation` v3 (Arunpravin Paneer Selvam, AMD) | Range-restricted allocations (the visible-VRAM aperture) skip `dirty_steer_window()` and reach `__alloc_range_bias()` with no clear/dirty eligibility guard, so a dirty allocation can split clear extents and vice versa, interleaving the classes until a 4K scanout pin fails with `-ENOSPC`. **Preview only**: the range-bias code is 7.4-only, and five of six hunks fail on `v7.3`. |
+| `1318` | `drm/amdgpu: stop GPU recovery wait for the JPEG/VCN idle work` (Prike Liang, AMD) | The shared JPEG and VCN idle workers program power gating and DPG pause and must not run during a reset, but recovery must not wait for them either, since everything they depend on then becomes a dependency of recovery. The workers take `reset_domain->sem` for read, and cancellation is non-`_sync` while in reset. It touches every VCN/JPEG generation; the `vcn_v5_0_0.c` and `jpeg_v5_0_0.c` hunks are the ones that run on this machine. **Preview only**: it needs 7.4's `early_fini` IP-block hook. |
+
+### NAP v0.5.1 → v0.6.6 — both packages
+
+The author released **v0.6.6** on 2026-11-01 (`firelzrd/nap` commit `9803912`,
+`patches/testing/0001-6.12-nap-v0.6.6.patch`; v0.6.5 is the file under
+`patches/stable/`). The v0.5.1 carried since October has been replaced in both
+packages as `2200-6.12-nap-v0.6.6.patch` — same number, version swap.
+
+The v0.6 line is a rewrite, not a patch update: 11 features (against 16), 32
+hidden units (against 128), 16 outputs, piecewise-linear time embeddings, a
+select cost the README measures at ~0.32 µs (against ~1.0 µs for v0.6.1),
+scalar/SSE2/AVX2+FMA/AVX-512 code paths that each verify themselves against the
+trained model at boot, and a reworked sysfs surface (`budget_ppm`, `max_simd`,
+`weights`, `stats`). It keeps the `CPU_IDLE_GOV_NAP` symbol, so the PKGBUILD
+override is unchanged, and `cpuidle.governor=nap` in the built-in cmdline still
+selects it.
+
+The author's release patches carry no `Signed-off-by` trailer, the same as
+v0.5.1; provenance is the named author and the mbox commit id. The patch applies
+to `v7.3` and `next-20261103` with `git apply --check` clean and GNU `patch`
+zero fuzz, and both series audit clean with it. The README marks v0.6.6 as
+testing, which is why it is recorded here rather than silently treated as a
+stable release.
+
+### Version sweep — 32 higher-version postings, one real and it was a resend
+
+`versweep.py` indexed every `[PATCH …]` posting since 2026-09-01 across the lore
+mirrors by normalised subject and compared it with the carried revision.
+
+- **Twenty postings were older than, or same-day as, the carried revision** —
+  the version comparison ignores dates, and a v6 from 2026-09-23 is not an
+  update to a v1 carried from 2026-09-15.
+- **Eleven were already recorded as resends in earlier sweeps**: `1099` v3
+  (`delta` empty), `1179` v2 (content-identical), `2056` v4 (resend), `2154` v3,
+  `2185` v6, `2191`/`2193` v3, `2197` v2, `9087` v2 (whitespace only),
+  `9088` v4, `9089` v2, `3000` v3.
+- **`2302`–`2322` v4 (kbuild)** still does not apply: the v4 series is based on
+  three unmerged dependency series its cover names, and the test already
+  recorded on 2026-09-23 stands.
+- **The one genuinely new posting is `2806` v2** (`[PATCH v2 1/4]`, 2026-11-04,
+  `<20261104-swap-fixes-v2-1-204be064be5b@tencent.com>`). Its changed-line set
+  is identical to the carried v1 — zero lines on either side — so there is
+  nothing to update. The v2 series adds a new part 2, which became `2807`;
+  parts 3 and 4 are PSI accounting only and were not adopted.
+
+### Reverts and drops versus the series
+
+- **`v7.3..v7.4-rc1`**: 31 revert commits, the same set recorded on 2026-11-02.
+  The only one touching carried work is `2e8e30b3cf9f`, the nvme
+  `max_hw_sectors` clamp, which is `2046`: the preview base has the upstream
+  revert and `sleepy-rc` carries it. No change.
+- **Since `v7.4-rc1`**: four revert subjects — `a287f97d4256` (taint forced
+  bind), `564313447e54` (TCP MSS advertisement), `b4aac29a21d9` (its packetdrill
+  test) and `27285b099fbc` (media I2C/SPI hiding). None is carried.
+- **`next-20261102..next-20261103`**: the only revert is the already-known
+  `de18ae504127` `lib/sort.c` one. No AMD or display patch was reverted.
+- **Absorption check**: reverse-applying all 137 preview patches against a clean
+  `next-20261103` tree succeeds for none, so the snapshot absorbed nothing the
+  series carries.
+
+### Comments on carried patches
+
+- **`1301`** (`amdkfd: don't reuse a VRAM page that is still referenced`) has a
+  live thread on 2026-11-03 with four replies. No revised posting, no
+  maintainer objection.
+- **`#5356`** (flip-completion regression) was answered by AMD pointing at
+  `48ab86360af1` (*check GRPH_FLIP status before sending event*); that commit is
+  already in `v7.2` and therefore in both bases. No action.
+- **`#5477`** (Navi 48 vblank wedge) was answered with `63e19ef3ddab`, already
+  carried since the 2026-10-30 pass. No action.
+
+### Deferred or rejected
+
+- **`1547492d`, `drm/amdgpu/mes: initialize the dbgext work before it can be
+  cancelled`** (Jesse Zhang) — real, and it fixes a
+  `cancel_work_sync` warning on every reset/suspend with the debug extension
+  off, but hunk 2 needs `adev->mes.dbgext_drain_lock` and
+  `dbgext_notify_lock`, which come from an unmerged dbgext rework series that is
+  in neither base. Report, do not port around missing prerequisites.
+- **`eb16046a`, `drm/amdgpu: don't drop the gang dependency fence twice`** —
+  already carried as `1064` (Donggeun Yoo's *don't release the fence reference
+  consumed by the scheduler*). The series grep, not the subject match, is what
+  caught it.
+- **`c24efbc9` v3, `Only enable HDMI audio if display supports it`** — the
+  change is to the legacy DCE path (`dce_v6/v8/v10`), not DCN; this machine runs
+  DCN 4.0.1 and never executes the patched functions. Inert here.
+- **`8eca2803`, enable MGCG/FGCG/PERF_CLK for GC 11.0.2** — wrong chip (Navi 33);
+  this machine is GC 12.0.
+- **`d9c131f4` is adopted, but `a6ef8932` (DP/eDP DDC over AUX) stays deferred** —
+  HDMI-only displays.
+- **Apple UCLK DPM v5, UALink loopback v3, CWSR/second-level traps v3, the
+  v10 DRM luminance series, amdxdna/rocket/msm/tidss/panel work, BACO SMU v11,
+  JPEG v2–v4 cleanup** — wrong hardware or policy-only changes.
+- **`0d0cadecc071`/`b8b9b6f0b57c` (zswap writeback plug/batch)** — not adopted:
+  zswap writeback is not in use here, so the paths are unreachable.
+
+### Tracker and Phoronix
+
+The drm/amd tracker returned 39 issues updated since 2026-11-02. On-target
+activity: `#6087` (TTM `list_add` corruption in
+`ttm_resource_move_to_lru_tail`, Renoir — generic TTM, no fix posted yet),
+`#6081` (an `iommu/amd: Force identity mode for selected GPUs only` regression
+in 7.4-rc1, Navi 23; agd5f's PSP-VRAM patch is still failing, so it is a watch
+item for the preview, not a carry), `#6068` (Navi 48 HDMI black screen, bisect
+requested), `#6017` (RX 9070 XT EINVAL page flips, debug data requested).
+`#5339` (RA24) and `#6072` (VRR porch) are unchanged. No new fix commit was
+found for Navi 48 / DCN 4.0.1.
+
+The amd-gfx November archive adds one on-target-in-shape report with no patch:
+`[REGRESSION] drm/amd/display: HDMI 2.1 TV on Navi31` (Message-ID
+`<29d0a6d2-b6d3-45d4-8ee8-6ab7f0ee281e@gmx.de>`), a periodic "audio coding
+type 0 not expected" loop that escalates to an SMU hang. It points at
+`3471b9a31ce3` (*Rework HDMI data channel reads*, 2025-09-24), which is in both
+bases, and the follow-up it asks about ("Improve HDMI info retrieval") is in no
+tree. Navi 31 besides, so it is a watch item only — the display data-channel
+path is shared and this machine is HDMI-only.
+
+Phoronix carried no new on-target kernel story: the 7.4 feature review, FAT32
+and MMX-removal items, and the usual RADV/Intel/mobile material. The MMX
+removal (`raid6`/`xor`) is in the new snapshot and is not something to carry.
+
+### Audits
+
+`audit_series.py`: **311/311** on `v7.3` and **137/137** on `next-20261103`.

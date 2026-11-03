@@ -18,8 +18,8 @@ moved, so the full ledger is not duplicated here.
 | Snapshot | `next-20261102`, tag `2637bdec0535` (tag object `d1333a4249ad`) |
 | Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261102.tar.gz` |
 | Snapshot tree `Makefile` | `7.4.0-rc1` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.11.02-1-sleepy-next` |
-| Package | `linux-sleepy-next-2026.11.02-1` |
+| Kernel release | `2026.11.02-2-sleepy-next` |
+| Package | `linux-sleepy-next-2026.11.02-2` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -1264,3 +1264,68 @@ rc package has carried `2047`/`2048` all along.
 
 Both packages passed `audit_series.py` after the changes: **306/306** on
 `v7.3` and **130/130** on `next-20261102`.
+
+## 2026-11-02 (later) — lru_cast v0.2.9, ported to `next-20261102`
+
+`2102` moves from v0.2.8 to **v0.2.9** (author release 2026-11-01, `lru_cast`
+`a05e9b0`). The rc package takes the author's 7.3-rc7 patch unchanged; this
+package carries the port to the 7.4 base, `2102-mm-7.4-lru_cast-v0.2.9.patch`.
+
+The port applies the same 7.4 adapters as v0.2.8 — `present_section_nr` →
+`valid_section_nr`, `is_vm_hugetlb_page` → `vma_is_hugetlb`, the old
+`RB_DECLARE_CALLBACKS` compute callback replaced with
+`RB_AUG_FUNC(lru_cast_tune_oone, size, lru_cast_tune_oadd)`, `VM_SPECIAL`
+expanded, `__swap_writepage` → `__swap_writeout`, the local helper renamed
+`cast_swap_writeout`, `PF_KSWAPD` dropped, and the `mm/migrate.c` hook's
+`newfolio`/`folio` arguments renamed to 7.4's `dst`/`src` — plus the
+v0.2.9-specific `swap_bdev_submit_write` eviction accounting placed around the
+7.4 dropbehind loop, and the `mm/swap.h` handoff declarations around
+`__swap_writeout`.
+The port applies to the clean snapshot and to the full 130-patch series.
+
+### Series state
+
+Both packages passed `audit_series.py` after the update: **306/306** on
+`v7.3` and **130/130** on `next-20261102`.
+
+## Bump 2026-11-03 — `next-20261103`; seven carries, 137 patches
+
+The preview moves from `next-20261102` to **`next-20261103`**
+(`6eeac5a2a558`, 1208 commits). All 130 patches of the old series apply to the
+new snapshot unchanged; reverse-applying the whole series against a clean
+`next-20261103` tree succeeds for none, so the snapshot absorbed nothing.
+
+### Added — seven patches
+
+The full rationale, provenance and Message-IDs are in the
+`sleepy-rc/PATCH_SOURCES.md` sweep entry for 2026-11-03. Both packages carry
+`1237`, `1315`, `1316`, `2807` and `9090`; this package additionally carries the
+two preview-only patches below.
+
+| Patch | Change | Why here |
+|---|---|---|
+| `1237` | `drm/amd/pm: restore the forced performance level after a reset` v3 | `smu_late_init()` does not reprogram a retained level after a reset. Both bases. |
+| `1315` | `drm/amdgpu: don't walk the CS chunks when allocating them failed` | NULL-array free in `amdgpu_cs_parser_fini()` on allocation failure; the oops is on navi48. Both bases. |
+| `1316` | `drm/amdkfd: reject foreign device pages in svm_range_dma_map_dev()` | HMM can return another `svm_bo`'s VRAM page, and `prange->svm_bo` can be NULL. Both bases. |
+| `2807` | `mm, swap: fix large swap-in across swap file extents` v2 2/4 | A large swap-in can read blocks of another file across a swap-file extent boundary. This copy's context reflects `2700`'s rewrite of the same `do_swap_page()` guard; added lines unchanged. |
+| `9090` | `drm/amdgpu/userq: validate evicted BOs on the individual idle list on restore` | Idle-list BOs can keep invalid PTEs across a user-queue restore. Context-regenerated against the series (`evicted` list name). |
+| `1317` | `gpu/buddy: restore two-pass clear/dirty guard for range-biased allocation` v3 | **Preview only** — the visible-VRAM range-bias path is 7.4 code; five of six hunks fail on `v7.3`. |
+| `1318` | `drm/amdgpu: stop GPU recovery wait for the JPEG/VCN idle work` | **Preview only** — needs 7.4's `early_fini` IP-block hook; the `vcn_v5_0_0`/`jpeg_v5_0_0` hunks are the on-target ones. |
+
+### NAP v0.5.1 → v0.6.6
+
+`2200` moves to the author's **v0.6.6** release (2026-11-01, `firelzrd/nap`
+`9803912`, `patches/testing/0001-6.12-nap-v0.6.6.patch`) in both packages. The
+v0.6 line is a rewrite — smaller network, SIMD variants self-verified at boot,
+new sysfs surface — and it applies unchanged to `next-20261103`. Full rationale
+in the rc ledger.
+
+### Deferred
+
+`1547492d` (MES dbgext work init) needs the unmerged dbgext drain/notify series
+in `amdgpu_mes_init()`; `eb16046a` is already carried as `1064`. Both are
+recorded in the rc ledger.
+
+### Series state
+
+`audit_series.py`: **137/137** on `next-20261103` and **311/311** on `v7.3`.

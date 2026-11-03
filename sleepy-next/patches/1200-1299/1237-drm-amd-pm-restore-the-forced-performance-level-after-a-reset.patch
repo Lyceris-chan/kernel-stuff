@@ -1,0 +1,59 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Priya Hosur <Priya.Hosur@amd.com>
+Date: Tue, 3 Nov 2026 15:58:29 +0530
+Subject: [PATCH v3 1/1] drm/amd/pm: restore the forced performance level after a reset
+Message-ID: <f370dc0e7025b9b39cac723b1b60ccbd339d233f.1793689935.git.Priya.Hosur@amd.com>
+
+From: Priya Hosur <Priya.Hosur@amd.com>
+
+smu_late_init() re-applies the DPM level with
+
+  smu_handle_task(smu, smu->smu_dpm.dpm_level, AMD_PP_TASK_COMPLETE_INIT);
+
+but smu_adjust_power_state_dynamic() only programs the hardware when
+
+  if (force_performance_level || smu_dpm_ctx->dpm_level != level)
+
+AMD_PP_TASK_COMPLETE_INIT passes force_performance_level = false and
+smu_dpm_ctx is &smu->smu_dpm, so the level is compared against itself and
+smu_asic_set_performance_level() is never called.
+
+PMFW is reinitialised by a reset and comes back on its default curve, while
+smu_dpm.dpm_level still holds the level the user forced. The device then
+runs at the default level while sysfs keeps reporting the forced one. On an
+SMU 14.0.1 APU gfxclk drops from 2.8GHz to 600MHz while sysfs still reports
+high. Writing the same level again does not help either, as
+amdgpu_dpm_force_performance_level() returns early when the requested level
+matches the cached one.
+
+amdgpu_dpm_reapply_umd_profile() restores the PROFILE_* levels after
+recovery, but returns early for any other level, so high, low and manual
+are left on the PMFW default.
+
+Force the level to be programmed for AMD_PP_TASK_COMPLETE_INIT during reset
+recovery. The cached level is left untouched, so if programming fails the
+level the user asked for is still retained and the failure is logged.
+
+Signed-off-by: Priya Hosur <Priya.Hosur@amd.com>
+---
+ drivers/gpu/drm/amd/pm/swsmu/amdgpu_smu.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/pm/swsmu/amdgpu_smu.c b/drivers/gpu/drm/amd/pm/swsmu/amdgpu_smu.c
+index a901f8535598..654ff6824fdd 100644
+--- a/drivers/gpu/drm/amd/pm/swsmu/amdgpu_smu.c
++++ b/drivers/gpu/drm/amd/pm/swsmu/amdgpu_smu.c
+@@ -2553,7 +2553,12 @@ static int smu_handle_task(struct smu_context *smu,
+ 		ret = smu_adjust_power_state_dynamic(smu, level, false, false);
+ 		break;
+ 	case AMD_PP_TASK_COMPLETE_INIT:
+-		ret = smu_adjust_power_state_dynamic(smu, level, true, false);
++		/*
++		 * PMFW is reinitialised by a reset, so program the retained
++		 * level again even though it matches the cached one.
++		 */
++		ret = smu_adjust_power_state_dynamic(smu, level, true,
++						     amdgpu_reset_in_recovery(smu->adev));
+ 		break;
+ 	case AMD_PP_TASK_READJUST_POWER_STATE:
+ 		ret = smu_adjust_power_state_dynamic(smu, level, true, false);
