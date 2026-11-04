@@ -1,0 +1,231 @@
+From: Asad Kamal <asad.kamal@amd.com>
+Date: Mon, 2 Nov 2026 20:21:28 +0800
+Subject: [PATCH] drm/amd/pm: time SMU metrics caches with ktime
+
+The metrics caches store their interval in milliseconds but test it
+with jiffies. On a HZ=250 kernel msecs_to_jiffies(5) is 2 ticks, and
+time_after() keeps the cache valid through the end of that tick, so a
+5 ms GPU metrics cache holds for about 8 ms to 12 ms. The same rounding
+turns the 1 ms raw metrics-table cache into up to about 8 ms.
+
+Stamp and compare these caches with ktime_get_boottime() so the
+configured interval is the real interval.
+
+Signed-off-by: Asad Kamal <asad.kamal@amd.com>
+---
+ drivers/gpu/drm/amd/pm/swsmu/inc/amdgpu_smu.h | 38 ++++++++++---------
+ .../drm/amd/pm/swsmu/smu13/smu_v13_0_12_ppt.c |  2 +-
+ .../drm/amd/pm/swsmu/smu13/smu_v13_0_6_ppt.c  |  6 +--
+ .../drm/amd/pm/swsmu/smu15/smu_v15_0_0_ppt.c  |  5 +--
+ .../drm/amd/pm/swsmu/smu15/smu_v15_0_8_ppt.c  |  7 ++--
+ drivers/gpu/drm/amd/pm/swsmu/smu_cmn.c        |  5 +--
+ 6 files changed, 30 insertions(+), 33 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/pm/swsmu/inc/amdgpu_smu.h b/drivers/gpu/drm/amd/pm/swsmu/inc/amdgpu_smu.h
+index 9d47d2ab1b49..5ad50a304168 100644
+--- a/drivers/gpu/drm/amd/pm/swsmu/inc/amdgpu_smu.h
++++ b/drivers/gpu/drm/amd/pm/swsmu/inc/amdgpu_smu.h
+@@ -31,6 +31,7 @@
+ #include "dm_pp_smu.h"
+ #include "smu_types.h"
+ #include "linux/firmware.h"
++#include <linux/ktime.h>
+ 
+ #define SMU_THERMAL_MINIMUM_ALERT_TEMP		0
+ #define SMU_THERMAL_MAXIMUM_ALERT_TEMP		255
+@@ -275,7 +276,7 @@ struct smu_table_cache {
+ 	size_t size;
+ 	/* interval in ms*/
+ 	uint32_t interval;
+-	unsigned long last_cache_time;
++	ktime_t last_cache_time;
+ };
+ 
+ struct smu_table {
+@@ -403,7 +404,7 @@ struct smu_table_context {
+ 	void				*power_play_table;
+ 	uint32_t			power_play_table_size;
+ 	void				*hardcode_pptable;
+-	unsigned long			metrics_time;
++	ktime_t				metrics_time;
+ 	void				*metrics_table;
+ 	void				*clocks_table;
+ 	void				*watermarks_table;
+@@ -1815,22 +1816,26 @@ smu_metrics_get_temp_table_id(enum smu_temp_metric_type type)
+ 	return SMU_DRIVER_TABLE_COUNT;
+ }
+ 
+-static inline void smu_table_cache_update_time(struct smu_table *table,
+-					       unsigned long time)
++static inline bool smu_ms_cache_expired(ktime_t last, uint32_t interval_ms)
+ {
+-	table->cache.last_cache_time = time;
++	if (!last || !interval_ms)
++		return true;
++
++	return ktime_after(ktime_get_boottime(), ktime_add_ms(last, interval_ms));
++}
++
++static inline void smu_table_cache_update_time(struct smu_table *table)
++{
++	table->cache.last_cache_time = ktime_get_boottime();
+ }
+ 
+ static inline bool smu_table_cache_is_valid(struct smu_table *table)
+ {
+-	if (!table->cache.buffer || !table->cache.last_cache_time ||
+-	    !table->cache.interval || !table->cache.size ||
+-	    time_after(jiffies,
+-		       table->cache.last_cache_time +
+-			       msecs_to_jiffies(table->cache.interval)))
++	if (!table->cache.buffer || !table->cache.size)
+ 		return false;
+ 
+-	return true;
++	return !smu_ms_cache_expired(table->cache.last_cache_time,
++				     table->cache.interval);
+ }
+ 
+ static inline int smu_table_cache_init(struct smu_context *smu,
+@@ -1906,14 +1911,11 @@ static inline void smu_driver_table_fini(struct smu_context *smu,
+ 
+ static inline bool smu_driver_table_is_valid(struct smu_driver_table *table)
+ {
+-	if (!table->cache.buffer || !table->cache.last_cache_time ||
+-	    !table->cache.interval || !table->cache.size ||
+-	    time_after(jiffies,
+-		       table->cache.last_cache_time +
+-			       msecs_to_jiffies(table->cache.interval)))
++	if (!table->cache.buffer || !table->cache.size)
+ 		return false;
+ 
+-	return true;
++	return !smu_ms_cache_expired(table->cache.last_cache_time,
++				     table->cache.interval);
+ }
+ 
+ static inline void *smu_driver_table_ptr(struct smu_context *smu,
+@@ -1938,7 +1940,7 @@ smu_driver_table_update_cache_time(struct smu_context *smu,
+ 	if (table_id >= SMU_DRIVER_TABLE_COUNT)
+ 		return;
+ 
+-	driver_tables[table_id].cache.last_cache_time = jiffies;
++	driver_tables[table_id].cache.last_cache_time = ktime_get_boottime();
+ }
+ 
+ #if !defined(SWSMU_CODE_LAYER_L2) && !defined(SWSMU_CODE_LAYER_L3) && !defined(SWSMU_CODE_LAYER_L4)
+diff --git a/drivers/gpu/drm/amd/pm/swsmu/smu13/smu_v13_0_12_ppt.c b/drivers/gpu/drm/amd/pm/swsmu/smu13/smu_v13_0_12_ppt.c
+index 1691a0be4f7d..7d1594a24431 100644
+--- a/drivers/gpu/drm/amd/pm/swsmu/smu13/smu_v13_0_12_ppt.c
++++ b/drivers/gpu/drm/amd/pm/swsmu/smu13/smu_v13_0_12_ppt.c
+@@ -485,7 +485,7 @@ static int smu_v13_0_12_get_system_metrics_table(struct smu_context *smu)
+ 	if (ret)
+ 		return ret;
+ 
+-	smu_table_cache_update_time(sys_table, jiffies);
++	smu_table_cache_update_time(sys_table);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/gpu/drm/amd/pm/swsmu/smu13/smu_v13_0_6_ppt.c b/drivers/gpu/drm/amd/pm/swsmu/smu13/smu_v13_0_6_ppt.c
+index 95e288327e45..01110afe8502 100644
+--- a/drivers/gpu/drm/amd/pm/swsmu/smu13/smu_v13_0_6_ppt.c
++++ b/drivers/gpu/drm/amd/pm/swsmu/smu13/smu_v13_0_6_ppt.c
+@@ -750,9 +750,7 @@ int smu_v13_0_6_get_metrics_table(struct smu_context *smu, void *metrics_table,
+ 	struct smu_table *table = &smu_table->driver_table;
+ 	int ret;
+ 
+-	if (bypass_cache || !smu_table->metrics_time ||
+-	    time_after(jiffies,
+-		       smu_table->metrics_time + msecs_to_jiffies(1))) {
++	if (bypass_cache || smu_ms_cache_expired(smu_table->metrics_time, 1)) {
+ 		ret = smu_cmn_send_smc_msg(smu, SMU_MSG_GetMetricsTable, NULL);
+ 		if (ret) {
+ 			dev_info(smu->adev->dev,
+@@ -770,7 +768,7 @@ int smu_v13_0_6_get_metrics_table(struct smu_context *smu, void *metrics_table,
+ 				min(16, table_size)))
+ 			return -EHWPOISON;
+ 
+-		smu_table->metrics_time = jiffies;
++		smu_table->metrics_time = ktime_get_boottime();
+ 	}
+ 
+ 	if (metrics_table)
+diff --git a/drivers/gpu/drm/amd/pm/swsmu/smu15/smu_v15_0_0_ppt.c b/drivers/gpu/drm/amd/pm/swsmu/smu15/smu_v15_0_0_ppt.c
+index 1004c5d59728..5e6fdbeb2f41 100644
+--- a/drivers/gpu/drm/amd/pm/swsmu/smu15/smu_v15_0_0_ppt.c
++++ b/drivers/gpu/drm/amd/pm/swsmu/smu15/smu_v15_0_0_ppt.c
+@@ -361,8 +361,7 @@ static int smu_v15_0_0_get_metrics_table(struct smu_context *smu,
+ 	size_t table_size = metrics_info->table_size;
+ 	int ret;
+ 
+-	if (smu_table->metrics_time &&
+-	    !time_after(jiffies, smu_table->metrics_time + msecs_to_jiffies(1)))
++	if (!smu_ms_cache_expired(smu_table->metrics_time, 1))
+ 		return 1;
+ 
+ 	if (!cpu_addr)
+@@ -386,7 +385,7 @@ static int smu_v15_0_0_get_metrics_table(struct smu_context *smu,
+ 			      cpu_addr, sizeof(MetricsTable_t));
+ 
+ 	metrics_info->active_idx = !metrics_info->active_idx;
+-	smu_table->metrics_time = jiffies;
++	smu_table->metrics_time = ktime_get_boottime();
+ 
+ 	return 0;
+ }
+diff --git a/drivers/gpu/drm/amd/pm/swsmu/smu15/smu_v15_0_8_ppt.c b/drivers/gpu/drm/amd/pm/swsmu/smu15/smu_v15_0_8_ppt.c
+index c778091a4272..c2a956a78b5f 100644
+--- a/drivers/gpu/drm/amd/pm/swsmu/smu15/smu_v15_0_8_ppt.c
++++ b/drivers/gpu/drm/amd/pm/swsmu/smu15/smu_v15_0_8_ppt.c
+@@ -358,8 +358,7 @@ static int smu_v15_0_8_get_metrics_table_internal(struct smu_context *smu, uint3
+ 
+ 	mutex_lock(&smu_table->metrics_lock);
+ 
+-	if (!tmo || !smu_table->metrics_time ||
+-	    time_after(jiffies, smu_table->metrics_time + msecs_to_jiffies(tmo))) {
++	if (smu_ms_cache_expired(smu_table->metrics_time, tmo)) {
+ 		int ret = smu_cmn_send_smc_msg(smu, SMU_MSG_GetMetricsTable, NULL);
+ 		if (ret) {
+ 			dev_info(adev->dev,
+@@ -376,7 +375,7 @@ static int smu_v15_0_8_get_metrics_table_internal(struct smu_context *smu, uint3
+ 			return ret;
+ 		}
+ 
+-		smu_table->metrics_time = jiffies;
++		smu_table->metrics_time = ktime_get_boottime();
+ 	}
+ 
+ 	if (data)
+@@ -586,7 +585,7 @@ static int smu_v15_0_8_get_system_metrics_table(struct smu_context *smu)
+ 	if (ret)
+ 		return ret;
+ 
+-	smu_table_cache_update_time(sys_table, jiffies);
++	smu_table_cache_update_time(sys_table);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/gpu/drm/amd/pm/swsmu/smu_cmn.c b/drivers/gpu/drm/amd/pm/swsmu/smu_cmn.c
+index b0abc2f504c3..417e988c361d 100644
+--- a/drivers/gpu/drm/amd/pm/swsmu/smu_cmn.c
++++ b/drivers/gpu/drm/amd/pm/swsmu/smu_cmn.c
+@@ -1230,8 +1230,7 @@ int smu_cmn_get_metrics_table(struct smu_context *smu,
+ 	int ret = 0;
+ 
+ 	if (bypass_cache ||
+-	    !smu_table->metrics_time ||
+-	    time_after(jiffies, smu_table->metrics_time + msecs_to_jiffies(1))) {
++	    smu_ms_cache_expired(smu_table->metrics_time, 1)) {
+ 		ret = smu_cmn_update_table(smu,
+ 				       SMU_TABLE_SMU_METRICS,
+ 				       0,
+@@ -1241,7 +1240,7 @@ int smu_cmn_get_metrics_table(struct smu_context *smu,
+ 			dev_info(smu->adev->dev, "Failed to export SMU metrics table!\n");
+ 			return ret;
+ 		}
+-		smu_table->metrics_time = jiffies;
++		smu_table->metrics_time = ktime_get_boottime();
+ 	}
+ 
+ 	if (metrics_table)

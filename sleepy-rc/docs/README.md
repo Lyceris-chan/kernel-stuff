@@ -3,11 +3,11 @@
 `linux-sleepy-rc` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
 built from **mainline Linux 7.3** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 313-patch
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 324-patch
 series. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0-17` · **Artifact:**
-`linux-sleepy-rc-7.3.0-17-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0-18` · **Artifact:**
+`linux-sleepy-rc-7.3.0-18-x86_64.pkg.tar.zst`
 
 ## Target hardware
 
@@ -17,7 +17,7 @@ series. It is not a general-purpose kernel.
 | GPU | Radeon RX 9070 XT (Navi 48) | `gfx1201` (GC 12.0), `DCN401` (DCN 4.0.1), `SMU14`, `PSP14` |
 | NIC | Realtek RTL8125B | in-kernel `r8169` |
 | NVMe | Phison E16 PCIe 4.0 | `kyber` (`bfq`, `mq-deadline` built) |
-| Scheduler | **BORE** (burst-oriented) | `CONFIG_SCHED_BORE=y`, `CONFIG_MIN_BASE_SLICE_NS=2000000` |
+| Scheduler | **`scx_cake`** (sched_ext) | `CONFIG_SCHED_CLASS_EXT=y`, `CONFIG_EXT_SUB_SCHED=y`; BORE unset |
 | CPUIdle | NAP governor | `CONFIG_CPU_IDLE_GOV_NAP=y` |
 
 ## Highlights
@@ -124,7 +124,7 @@ fix lands.
 
 ## Patch series
 
-313 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+324 patches. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 
 | Range | Category |
 |---|---|

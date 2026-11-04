@@ -1,0 +1,86 @@
+From fde467d9112b432ffa25a0b9bd9e59e8a20e3923 Mon Sep 17 00:00:00 2001
+From: Jesse Zhang <Jesse.Zhang@amd.com>
+Date: Fri, 30 Oct 2026 16:47:59 +0800
+Subject: [PATCH] drm/amdgpu/gfx12: program the SPM VMID once the RLC runs
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+GFX12 programs the SPM VMID into RLC_SPM_MC_CNTL only in
+gfx_v12_0_rlc_init(), which runs during sw_init, before hw_init starts the
+RLC. The RLC comes up with the register cleared, and nothing programs it
+again after a GPU reset or a resume either. Until commit 38e07c072833
+("drm/amdgpu: remove the now-redundant runtime SPM VMID update") the
+update on submission covered that up; since then a process which reserved
+the VMID for SPM never gets it. GFX9 and GFX10 program it in the RLC
+resume instead.
+
+On navi48 with GFXOFF disabled (amdgpu.ppfeaturemask=0xfff73fff), reading
+the register and a COPY_DATA of it from a job of a process with a reserved
+VMID:
+
+                   before       after
+  load:            0x00000000   0x0000000f
+  after GPU reset: 0x00000000   0x0000000f
+  after S3:        0x00000000   0x0000000f
+
+  $ amd_uapi_regression --run-subtest reserved-vmid-spm-vmid
+  RLC_SPM_MC_CNTL in the job: 0x00000000
+  Subtest reserved-vmid-spm-vmid: FAIL
+
+Program it at the end of the RLC resume, which runs on hw_init, GPU reset
+and resume, like GFX9 and GFX10 do, and call the gfx function directly
+instead of going through the update_spm_vmid() callback.
+
+This doesn't cover GFXOFF, the RLC doesn't save and restore
+RLC_SPM_MC_CNTL over it.
+Fixes: 38e07c072833 ("drm/amdgpu: remove the now-redundant runtime SPM VMID update")
+
+v2: new patch, split the init ordering out of the GFXOFF issue
+
+Reviewed-by: Christian König <christian.koenig@amd.com>
+Signed-off-by: Jesse Zhang <Jesse.Zhang@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c b/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c
+index 4062edc37ca6..cb15dad0e57b 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c
+@@ -286,6 +286,8 @@ static void gfx_v12_0_ring_invalidate_tlbs(struct amdgpu_ring *ring,
+ 					   bool all_hub, uint8_t dst_sel);
+ static void gfx_v12_0_set_safe_mode(struct amdgpu_device *adev, int xcc_id);
+ static void gfx_v12_0_unset_safe_mode(struct amdgpu_device *adev, int xcc_id);
++static void gfx_v12_0_update_spm_vmid(struct amdgpu_device *adev, int xcc_id,
++				      unsigned int vmid);
+ static void gfx_v12_0_userq_priv_fault_work(struct work_struct *work);
+ static void gfx_v12_0_update_perf_clk(struct amdgpu_device *adev,
+ 				      bool enable);
+@@ -776,10 +778,6 @@ static int gfx_v12_0_rlc_init(struct amdgpu_device *adev)
+ 			return r;
+ 	}
+ 
+-	/* init spm vmid with 0xf */
+-	if (adev->gfx.rlc.funcs->update_spm_vmid)
+-		adev->gfx.rlc.funcs->update_spm_vmid(adev, 0, adev->vm_manager.spm_vmid);
+-
+ 	return 0;
+ }
+ 
+@@ -2152,6 +2150,12 @@ static int gfx_v12_0_rlc_resume(struct amdgpu_device *adev)
+ 		adev->gfx.rlc.funcs->start(adev);
+ 	}
+ 
++	/*
++	 * The RLC comes up with RLC_SPM_MC_CNTL cleared, program the SPM VMID
++	 * once it runs, also after a GPU reset or a resume.
++	 */
++	gfx_v12_0_update_spm_vmid(adev, 0, adev->vm_manager.spm_vmid);
++
+ 	return 0;
+ }
+ 
+-- 
+2.56.0
+

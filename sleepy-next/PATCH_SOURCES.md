@@ -18,8 +18,8 @@ moved, so the full ledger is not duplicated here.
 | Snapshot | `next-20261104`, tag `8b7179210b22` (tag object `4004549ef9cf`) |
 | Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261104.tar.gz` |
 | Snapshot tree `Makefile` | `7.4.0-rc1` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.11.04-1-sleepy-next` |
-| Package | `linux-sleepy-next-2026.11.04-1` |
+| Kernel release | `2026.11.04-3-sleepy-next` |
+| Package | `linux-sleepy-next-2026.11.04-3` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -1361,3 +1361,102 @@ base now has `blk_zone_write_plug_init_request()` before the keyslot call and
 ### Series state
 
 `audit_series.py`: **138/138** on `next-20261104` and **313/313** on `v7.3`.
+
+## 2026-11-04 (pkgrel 2): scheduler back to sched-ext; BORE dropped; `2421`
+
+User decision: drop BORE and run sched_ext (`scx_cake` via `scx_loader`)
+again. The preview keeps its earlier `2061` absorption, the series is **137
+patches**, and the build was not rebooted into; the running kernel keeps BORE
+until the next boot.
+
+### Removed
+
+- `2419` BORE 7.0.1 and `2420` (`sched/fair: do not scan twice in
+  detach_tasks()`), plus `scripts/config -e SCHED_BORE`. `2420` was adopted
+  only because BORE made `fair.c` live; under scx full-switch `fair.c` does not
+  schedule, so it leaves with BORE.
+- `scripts/config -d SCHED_CLASS_EXT -d EXT_SUB_SCHED`. The disable was a
+  next-20261019 workaround; this snapshot is consistent (below).
+
+### Changed
+
+- `0110` regains its pre-BORE `fair.c` hunk (base-slice 400000 and
+  migration_cost 400000 under `CONFIG_CACHY`). It applies in series order; it
+  is inert while scx owns scheduling, as it was before 2026-09-30, and correct
+  whenever sched_ext is not loaded.
+
+### Added — `2421` (new sched-ext fix)
+
+`sched_ext: Read exit_kind before flushing in scx_flush_disable_work()`
+(Kuba Piecuch, posted 2026-11-04, Message-ID
+`20261104111449.3984318-1-jpiecuch@google.com`, `[PATCH
+sched_ext/for-7.4-fixes]`). Reads `exit_kind` with acquire ordering before
+`irq_work_sync()`/`kthread_flush_work()`, closing the window where a
+`disable_work` queued after the flush lets `bpf_scx_unreg()` return while
+`scx_root_disable()` still runs. `Fixes: d99f7a32f09d`, `Cc: stable # v7.1+`.
+Applies to `next-20261104` at offset -9 and to `v7.3` at offset -984 (GNU
+`patch -p1 --forward --dry-run`). This is the only new sched-ext fix in the
+2026-11-04 sweep that is not already in the snapshot.
+
+### Not re-added — the seven 2026-09-30 carries are upstream here
+
+The seven patches removed when BORE landed are all in `next-20261104`; adding
+them back would duplicate the change. Verified by symbol, not by subject:
+
+| Our number | Upstream commit | Probe in `next-20261104` |
+|---|---|---|
+| `2005` | `92344fad5b54` | `dsq->pcpu_user` (`ext.h:94`, `ext.c:1338`) |
+| `2413` | `8b9b3698796a` | `guard(irqsave)` in `ext/idle.c:166` |
+| `2414` | `8848333264b7` | `in_nmi()` in `scx_locked_rq()` (`internal.h:2483`) |
+| `2415` | `c659e506f9a7` | `__scx_kf_allowed_ctx()` (`internal.h:2376`) |
+| `2416` | in base | `list_add_tail() must be used` (`ext.c:2136`) |
+| `2417` | `84a0d325b0b7` | `dispatch_dequeue_locked(p, src_dsq)` (`ext.c:3067`) |
+| `2418` | `a87743bd9e9b` | `dsq_vtime` beside `dsq_priq` (`ext.h:229-230`) |
+
+### sched_ext tree consistency (the 2026-10-19 blocker)
+
+Both merge gaps are gone: the DSQ paths use `dsq->pcpu_user`, and
+`scx_reenq_wait_dispatching()` no longer exists in the snapshot.
+
+### Series state
+
+`audit_series.py --tag next-20261104`: **137/137**.
+
+### Sweep — sched-ext sources (2026-11-04)
+
+Queried, and what each returned:
+
+- **`linux-next` `next-20261104`** — the base. All sched_ext fixes merged
+  through 2026-11-02 are already in it.
+- **tj/sched_ext** `for-7.4-fixes`, `for-7.4`, `for-7.5` and `for-next` — all
+  four tips are `4c2e0751d5e6` (2026-11-02, "Reject scx_bpf_destroy_dsq() in
+  tracing programs"), already in the base. No branch carries a newer commit.
+- **`lore-sched-ext`** — the only post-base fix is the 2026-11-04 `exit_kind`
+  patch adopted as `2421`. The 2026-11-03 `6.18.y` backports are stable-only
+  (the 7.x base already has the underlying fix); "Say hosting instead of
+  running" is comment-only; the 2026-11-02 `proxy_reset_donor()` fix is inert
+  because `CONFIG_SCHED_PROXY_EXEC` is unset.
+- **NUMA preferred-node series (2026-10-27)** — not in the base, and this is a
+  single-socket / one-NUMA-node machine, so it earns nothing. Rejected.
+- `repos/torvalds` and `repos/tip` are stale (last fetched 2026-09-21) and were
+  not used for the verdict; `linux-next` is the current merged view.
+
+## Sweep 2026-11-05 — seven shared carries and two preview-only
+
+The shared carries — `1238`, `1320`–`1325` — are documented with full
+provenance in `sleepy-rc/PATCH_SOURCES.md`, "Sweep 2026-11-05". The preview
+also carries two patches the rc base cannot take:
+
+| Patch | Change | Why |
+|---|---|---|
+| `1326` | `drm/amdgpu/gfx12: program the SPM VMID once the RLC runs` (Jesse Zhang; `Reviewed-by: Christian König`) | `Fixes: 38e07c072833`; program the `gfx_v12_0` SPM VMID after the RLC starts. `v7.3` still has the old 4-argument runtime update, so the bug does not exist there and the patch fails the rc base. Commit `fde467d9112b`. |
+| `2507` | `Revert "iommu/amd: Force identity mode for selected GPUs only"` (CachyOS `cf18d488df9d`) | Reverts `bf5bdfd1f8d4`; discrete GPUs behind an ATI PCIe switch stay in a translated domain and amdgpu PSP firmware loading faults. This machine's RX 9070 XT (`1002:7550`) is behind an ATI bridge (`1002:1479`) and the preview runs `DMA-FQ`; the rc base predates the commit and runs the old identity logic. Applies to `next-20261104` at offset -6. `Closes: https://github.com/CachyOS/linux-cachyos/issues/1095`; the author is a GitHub handle, so provenance is the CachyOS commit plus the issue. |
+
+The preview's `1326` and `2507` are absent from `sleepy-rc`; all seven shared
+patches apply to both clean bases and both series. The SCDC scrambling fixes
+are preview-only in shape but inert (no amdgpu caller), the UCLK DPM patch
+returns early on DCN 4.0.1, and the lz4/zstd candidates remain unready — all
+rejected for the same reasons recorded in the rc ledger.
+
+`audit_series.py`: **146/146** on `next-20261104`; the rc series is
+**324/324** on `v7.3`.

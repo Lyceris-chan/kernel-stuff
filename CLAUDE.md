@@ -31,7 +31,7 @@ instruction this repo has carried started as a copy of one of those values.
 | GPU | AMD Radeon RX 9070 XT (Navi 48, RDNA 4) | `gfx1201`, `DCN401` (DCN 4.0.1), `SMU14`, `PSP14`, `GC 12.0`, `SDMA 7.0`, `VCN 5.0`, `MMHUB 4.1` |
 | NIC | Realtek RTL8125B 2.5 GbE | `r8169` (in-kernel driver, since 7.2) |
 | NVMe | Phison E16 PCIe 4.0 | `kyber` (CachyOS `60-ioschedulers.rules`) |
-| Scheduler | BORE | `CONFIG_SCHED_BORE=y`; sched-ext compiled but unused |
+| Scheduler | `scx_cake` (sched_ext) | `CONFIG_SCHED_CLASS_EXT=y`, `CONFIG_EXT_SUB_SCHED=y`; BORE unset |
 | CPUIdle | NAP governor | `CONFIG_CPU_IDLE_GOV_NAP=y` |
 
 **If a patch does not target one of these components, it does not go in.**
@@ -137,7 +137,7 @@ section of `LESSONS.md`. Read that section before repeating the mistake.
 - **GC 12.0 ≠ GC 12.1.** Navi 48 → `gfx_v12_0.c`; check `IP_VERSION`. → *Hardware traps*.
 - **Never carry `9051`/`9052`** (DCN4 flip-schedule) — AMD reverted both. → *Hardware traps*.
 - **Audit with `audit_series.py`**, the cumulative apply — single-patch dry-runs and `git apply --check` give false negatives, and `Skipping patch`/`Reversed` is an inert no-op, not a success.
-- **A patch that applies can still do nothing.** `select`ed symbols, `--set-str` on a removed symbol, MGLRU under LRU-MARIE are inert. **Since 2026-09-30 `fair.c` is the LIVE scheduler (BORE) — `kernel/sched/ext/` is the inert one.** BORE's own `#ifdef` wraps the lines an EEVDF hunk targets, so the hunk lands in the dead `#else` — that is how `0110`'s `fair.c` section ended up dead and was stripped. An inert *hunk* is not an inert *patch*. → *Behaviour that silently does nothing*.
+- **A patch that applies can still do nothing.** `select`ed symbols, `--set-str` on a removed symbol, MGLRU under LRU-MARIE are inert. **Since 2026-11-04 `kernel/sched/ext/` is the LIVE scheduler (`scx_cake`) — `fair.c` is inert while scx full-switch is active.** BORE was dropped and `0110`'s `fair.c` hunk is restored, but it does not schedule under scx. An inert *hunk* is not an inert *patch*. → *Behaviour that silently does nothing*.
 - **A patch that applies can still be a duplicate** — absorption inserts a second copy. Count the identifier: expect `base + 1`. → *A patch that applies cleanly can be installing a duplicate*.
 - **Reverse-apply is not authoritative — it fails both ways.** Count the identifier. → *Reverse-apply is not authoritative for older commits*.
 - **"Exists in no tree or mirror" ≠ fabricated** — check GitHub's commit search. → *"No tree or mirror has it"*.

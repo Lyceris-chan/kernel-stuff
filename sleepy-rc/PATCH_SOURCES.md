@@ -22,14 +22,14 @@ are supplied by the generator instead, so every row below has a source.
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 30 |
-| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 16 |
+| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 22 |
 | `1100–1199` | AMD display (DCN4, colorops) | 30 |
-| `1200–1299` | AMD power management (amd-pstate, CPPC) | 31 |
-| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 49 |
+| `1200–1299` | AMD power management (amd-pstate, CPPC) | 32 |
+| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 50 |
 | `2100–2199` | Memory management and swap (zstd, LRU-MARIE, gup, zswap) | 50 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 21 |
-| `2400–2499` | Core scheduler and sched-ext | 3 |
+| `2400–2499` | Core scheduler and sched-ext | 6 |
 | `2500–2599` | x86 and arch core | 2 |
 | `2600–2699` | Time and timers | 0 |
 | `2800–2899` | Memory management, second series (mm/swap follow-ups) | 8 |
@@ -38,7 +38,7 @@ are supplied by the generator instead, so every row below has a source.
 | `9000–9099` | agd5f staging + userq lifecycle backports | 37 |
 | `9100–9199` | Retry-fault handling v4 (agd5f staging) | 11 |
 
-**Total: 313** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 317** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-19). The counts are now generated from the patch tree
@@ -11908,3 +11908,109 @@ debugfs reader.
 
 `audit_series.py`: **313/313** on `v7.3` and **138/138** on `next-20261104`
 (the 139th, `2061`, is absorbed in the snapshot and removed from the preview).
+
+## 2026-11-04: BORE dropped, sched-ext fixes restored (source only, not built)
+
+User decision: drop BORE and go back to sched_ext (`scx_cake`). **This pass
+changed the rc series but did not build or install the rc package**: `pkgrel`
+stays 17 and the installed `7.3.0-17-sleepy-rc` still runs BORE. Bump `pkgrel`
+before the next rc build.
+
+### Removed
+
+- `2419` BORE 7.0.1, `2420` (`sched/fair: do not scan twice in
+  detach_tasks()`) and `scripts/config -e SCHED_BORE`. `2420` was adopted for
+  BORE; under scx full-switch `fair.c` is inert.
+
+### Added
+
+- `2005`, `2413`, `2414`, `2415`, `2418` — the sched-ext carries that this
+  `v7.3` base does **not** contain (the `next-20261104` base has all seven
+  upstream). All five apply cleanly to `v7.3`.
+- **`2005` needed a 7.3 adaptation.** This base has a second `dsq->pcpu` loop
+  in `exit_dsq()` that the upstream v2 posting does not cover. The carried copy
+  adds the missing `dsq->pcpu_user` rename; without it the rc build fails with
+  `no member named 'pcpu'` in `kernel/sched/ext/ext.c`. The upstream
+  `From:`/`Date:`/`Subject:`/`Signed-off-by:` are unchanged.
+- `2421` — the new `scx_flush_disable_work()` UAF-ordering fix, the same
+  upstream posting as the preview. Applies to `v7.3` at offset -984.
+- `2416` and `2417` are already in `v7.3` (`list_add_tail()` comment at
+  `ext.c:2136`; `dispatch_dequeue_locked(p, src_dsq)` at `ext.c:2679`), so they
+  are not re-added.
+
+### Changed
+
+- `0110` regains its pre-BORE `fair.c` hunk, same as the preview.
+
+### Series state
+
+**317 patches** (313 - 2 + 6). `audit_series.py`: **317/317** on `v7.3`.
+
+### Sweep — sched-ext sources (2026-11-04)
+
+Same sources and verdicts as the preview; the full report is in
+`sleepy-next/PATCH_SOURCES.md`, "Sweep — sched-ext sources (2026-11-04)".
+`2421` is the only post-base fix; it applies to `v7.3` as well as the snapshot.
+
+## Sweep 2026-11-05 — nine carries: GPU, KFD and the AMD-Vi revert
+
+Sources refreshed 2026-11-04/05: torvalds `origin/master` `05441d697f7f`
+(matches `ls-remote`; the local `master` is stale at `f0100363` and was not
+used), linux-next `next-20261104` `8b7179210b22`, drm-next `6628e7d4c6b2`,
+agd5f and amd-staging `178d00b16ddb`, drm-misc `e32e83a6c5ec`, linux-pm
+`6628e7d4c6b2`, akpm-mm `mm-everything`/`mm-unstable` and tip `4f08fc2dfebc`;
+all matched their remotes. The fifteen lore mirrors were refreshed. `lib/lz4`
+and `lib/zstd` are byte-identical between torvalds and `next-20261104`.
+
+### Adopted — both packages
+
+| Patch | Change | Why |
+|---|---|---|
+| `1238` | `drm/amd/pm: time SMU metrics caches with ktime` (Asad Kamal, AMD) | The metrics caches store their interval in milliseconds but test it with jiffies; at `CONFIG_HZ=1000` the 1 ms raw metrics-table cache stays valid for up to two ticks. Stamp and compare with `ktime_get_boottime()`. `smu_cmn_get_metrics_table()` is live on `smu_v14_0_0`; the `smu_table_cache` helpers are used only by SMU 13/15, so the effect here is small but real. Message-ID `<20261102122128.961804-1-asad.kamal@amd.com>`; applies to both clean bases and both series. |
+| `1320` | `drm/amdgpu: return cached hw vblank count when reset blocks the read` (James Lin, AMD) | `amdgpu_get_vblank_counter_kms()` returned DRM's software count when the reset semaphore was held, poisoning `vblank->last` and tripping `drm_WARN_ON_ONCE()` in `drm_update_vblank_count()`. Return the cached hardware count from `drm_crtc_vblank_crtc()->last`. `Fixes: f2bc71d16e73`, which is in `v7.3`; the callback is live in `amdgpu_dm_crtc.c`. Message-ID `<20261103211302.2899044-1-PingLei.Lin@amd.com>`; both bases. |
+| `1321` | `drm/amdgpu: Report MES ring wait timeouts` (Erhan Bilgili; `Reviewed-by: Alex Deucher`) | `mes_v12_0`'s ring wait returned `r < 1` as success, so a timeout was silently treated as completion. Report `-ETIMEDOUT`. `Fixes: 34e087e8920e`. `mes_v12_0` is this GPU's MES. The earlier v1 was a watch item; this is the merged v2, commit `516c164fcb0d`. Applies to both clean bases and both series. |
+| `1322` | `drm/amdgpu: drop the dma-buf reference when a KFD import fails` (Jesse Zhang; `Reviewed-by: Felix Kuehling`) | Error path leaked the dma-buf reference. `Fixes: 0e2e7c5b3d71`. Commit `54957f0872b1`; both bases. |
+| `1323` | `drm/amdgpu: unlock the VM and BO when attaching a KFD BO fails` (Jesse Zhang; `Reviewed-by: Felix Kuehling`) | Error path returned without unlocking the VM and BO. `Fixes: fd1fa48b935f`. Commit `ebaf21666188`; both bases. |
+| `1324` | `drm/amdkfd: Don't check for vm ready on svm unmap` (David Francis; `Reviewed-by: Felix Kuehling`) | An improper `amdgpu_vm_ready()` check spams dmesg and fails during eviction. The merged ASDN commit `b72ede440c56` uses `-EBUSY`; the v2 posting's `EBUSY` is stale. Both bases. |
+| `1325` | `drm/amdgpu: amdgpu_fence: remove ops->release()` (Philipp Stanner; `Reviewed-by: Christian König`) | Removes the deprecated callback that blocks clean unload. Cleanup, not a fix; on-target and applies to both. Commit `95bc87325b9f`. |
+
+### Adopted — preview only
+
+| Patch | Change | Why |
+|---|---|---|
+| `1326` | `drm/amdgpu/gfx12: program the SPM VMID once the RLC runs` (Jesse Zhang; `Reviewed-by: Christian König`) | `Fixes: 38e07c072833`; the `gfx_v12_0` SPM VMID must be programmed after the RLC starts, not at runtime. **Preview only**: `v7.3` still has the old 4-argument runtime update, so the bug does not exist there and the patch fails the rc base. Applies to `next-20261104` and the preview series. Commit `fde467d9112b`. |
+| `2507` | `Revert "iommu/amd: Force identity mode for selected GPUs only"` (CachyOS `cf18d488df9d`) | Reverts `bf5bdfd1f8d4`, which leaves discrete GPUs behind an ATI PCIe switch in a translated domain; amdgpu then fails PSP firmware loading with AMD-Vi `IO_PAGE_FAULT`s (RX 6600/RX 9060 XT; `iommu=pt` works around it). This machine's RX 9070 XT (`1002:7550`) is behind an ATI bridge (`1002:1479`) and the preview currently runs `DMA-FQ`; the rc base predates the commit and runs the old identity logic. Applies to `next-20261104` at offset -6; preview only. `Closes: https://github.com/CachyOS/linux-cachyos/issues/1095`. The author is a GitHub handle, not a full name; provenance is the CachyOS commit plus the issue. |
+
+### Rejected this sweep
+
+- **`gpu/buddy` / UCLK DPM `924b0e2b830a`** — the new
+  `amdgpu_dm_update_memclk_states()` returns early unless
+  `DCN_VERSION_3_2`/`3_21`; DCN 4.0.1 never executes it. Inert here.
+- **HDMI SCDC scrambling fixes (3 patches)** — the helpers are used only by
+  vc4, sun4i and `bridge_connector`; amdgpu has no caller. Inert here.
+- **lz4 fast-loop backport** — applies cleanly but is unmerged and has an
+  unrebutted Sashiko medium finding (pointer overflow before `MINMATCH`); no
+  v2. The vendor v1.10.0 RFC is still RFC v1 with a v2 pending. Not carried.
+- **zstd v3 BMI2 dispatch** — patch 1 is already in the 1.6.0 merge; patch 2
+  conflicts with carried `2129`/`2130`. Next-bump cleanup.
+- **kbuild v5 rework (`2310`–`2320`)** — the 20-part v3 series was reworked and
+  renumbered to 11 parts; no single part applies to the carried series. Keep
+  the carried v3; revisit at the bump.
+- **`1175` v5** — content-identical resend; the new companion
+  (`Simplify debugfs token parsing`) is cleanup only.
+- **`2806` v2** — content-identical resend; the new parts 2/4 and 4/4 are
+  already covered by `2807`/`2808`.
+
+### Reverts and newer revisions
+
+No upstream revert of carried work was found in `v7.4-rc1`,
+`next-20261104` or ASDN since 2026-11-01; the only on-target revert is the
+CachyOS AMD-Vi revert adopted as `2507`. The DCN32/1 DMUB revert
+(`546917a24764`) is off-target and absent from both bases. The version sweep
+found only the resends/rework above; no carried patch was displaced by an
+upstream revision.
+
+### Series state
+
+**324 patches** (317 + 7). `audit_series.py`: **324/324** on `v7.3`; the
+preview is **146/146** on `next-20261104`.

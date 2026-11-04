@@ -203,7 +203,7 @@ _snapdate=${_srctag#next-}                                            # 20261104
 _snapver="${_snapdate:0:4}.${_snapdate:4:2}.${_snapdate:6:2}"
 pkgver=${_snapver}
 _tagrel=1
-pkgrel=1
+pkgrel=3
 # Build parallelism. Previously capped at 8 on a diagnosis that did not hold up.
 #
 # The cap was added after an rc4-7 build thrashed badly — 6 watchdog firings and
@@ -332,6 +332,7 @@ source=(
   "patches/1200-1299/1235-cpufreq-amd-pstate-clamp-desired-perf-on-resume.patch"
   "patches/1200-1299/1236-drm-amd-pm-update-stapm-power-limit-values-in-gpu-metrics.patch"
   "patches/1200-1299/1237-drm-amd-pm-restore-the-forced-performance-level-after-a-reset.patch"
+  "patches/1200-1299/1238-drm-amd-pm-time-SMU-metrics-caches-with-ktime.patch"
   "patches/1300-1399/1301-drm-amdkfd-dont-reuse-a-VRAM-page-that-is-still-referenced.patch"
   "patches/1300-1399/1302-drm-amdkfd-back-off-SVM-restore-work-retry.patch"
   "patches/1300-1399/1303-drm-amdkfd-downgrade-mmap-lock-in-SVM-restore-work.patch"
@@ -350,6 +351,13 @@ source=(
   "patches/1300-1399/1317-gpu-buddy-restore-two-pass-clear-dirty-guard-for-range-biased-allocation.patch"
   "patches/1300-1399/1318-drm-amdgpu-stop-GPU-recovery-wait-for-the-JPEG-VCN-idle-work.patch"
   "patches/1300-1399/1319-drm-amdgpu-jpeg-unwind-late-software-init-failures-in-v5.0.0.patch"
+  "patches/1300-1399/1320-drm-amdgpu-return-cached-hw-vblank-count-when-reset-blocks-the-read.patch"
+  "patches/1300-1399/1321-drm-amdgpu-report-MES-ring-wait-timeouts.patch"
+  "patches/1300-1399/1322-drm-amdgpu-drop-the-dma-buf-reference-when-a-KFD-import-fails.patch"
+  "patches/1300-1399/1323-drm-amdgpu-unlock-the-VM-and-BO-when-attaching-a-KFD-BO-fails.patch"
+  "patches/1300-1399/1324-drm-amdkfd-dont-check-for-vm-ready-on-svm-unmap.patch"
+  "patches/1300-1399/1325-drm-amdgpu-amdgpu_fence-remove-ops-release.patch"
+  "patches/1300-1399/1326-drm-amdgpu-gfx12-program-the-SPM-VMID-once-the-RLC-runs.patch"
   "patches/2000-2099/2000-block-mq-deadline-pass-in-queue-directly-to-dd_inser.patch"
   "patches/2000-2099/2001-block-mq-deadline-skip-expensive-merge-lookups-if-co.patch"
   "patches/2000-2099/2002-block-bfq-pass-in-queue-directly-to-bfq_insert_reque.patch"
@@ -401,9 +409,9 @@ source=(
   "patches/2300-2399/2318-objtool-decode-instructions-and-resolve-branch.patch"
   "patches/2300-2399/2319-rust-make-exports-o-depend-on-the-headers.patch"
   "patches/2300-2399/2320-kbuild-build-rust-crates-in-parallel-with-the.patch"
-  "patches/2400-2499/2419-sched-bore-7.0.1-burst-oriented-response-enhancer.patch"
-  "patches/2400-2499/2420-sched-fair-do-not-scan-twice-in-detach_tasks.patch"
+  "patches/2400-2499/2421-sched_ext-read-exit_kind-before-flushing-in-scx_flush_disable_work.patch"
   "patches/2500-2599/2506-x86-boot-validate-SRAT-subtables-before-parsing.patch"
+  "patches/2500-2599/2507-Revert-iommu-amd-Force-identity-mode-for-selected-GPUs-only.patch"
   "patches/2700-2799/2700-mm-bypass-swap-readahead-for-zswap-v4.patch"
   "patches/2800-2899/2806-mm-zswap-drop-the-stale-zswap-entry-of-a-zero-folio.patch"
   "patches/2800-2899/2807-mm-swap-fix-large-swap-in-across-swap-file-extents.patch"
@@ -436,7 +444,7 @@ source=(
   # all five.
   # Absorbed by next-20261021 and dropped on the 2026-10-21 bump:
   # 1063, 1082, 1083, 1085, 1091, 1092, 1176, 1181, 1182, 1233, 2046, 2058, 2803.
-  # 0101 and 2419 were rebased for this snapshot; 1175 lost its
+  # 0101 was rebased for this snapshot; 1175 lost its
   # hdmi_automation_enable hunk, whose handler the base replaced with
   # debugfs_create_bool.
   # 1174 (scanout alpha) was preview-only and its change is in the base.
@@ -686,12 +694,11 @@ EOF
     # scheduler is set by udev's /usr/lib/udev/rules.d/60-ioschedulers.rules, which
     # assigns kyber to nvme[0-9]*. MQ_IOSCHED_KYBER must still be built in.
     scripts/config -e LRU_GEN -e LRU_GEN_ENABLED -e LRU_GEN_WALKS_MMU -e LRU_CAST -e CPU_IDLE_GOV_NAP -e MQ_IOSCHED_KYBER -m USB_VIDEO_CLASS -m I2C_CHARDEV -m SENSORS_PROM21_XHCI -e R8169 -e REALTEK_PHY -d TCP_CONG_BBR -e TCP_CONG_BBR3 -e DEFAULT_BBR3 --set-str DEFAULT_TCP_CONG "bbr3"
-    # next-20261019's sched_ext tree has two merge gaps: free_dsq_irq_workfn()
-    # uses dsq->pcpu although the field was renamed to pcpu_user, and
-    # scx_reenq_wait_dispatching() is called but not defined anywhere. BORE is
-    # the live scheduler; disable the unused class on this snapshot. Re-enable
-    # when the snapshot's sched_ext is consistent again.
-    scripts/config -d SCHED_CLASS_EXT -d EXT_SUB_SCHED
+    # sched_ext is the live scheduler again (scx_cake via scx_loader). The
+    # next-20261019 merge gaps are fixed on this snapshot: dsq->pcpu_user is
+    # used and scx_reenq_wait_dispatching() is gone. The seven sched_ext
+    # carries removed on 2026-09-30 are all upstream in this base, so they are
+    # not re-added; see PATCH_SOURCES.md, "sched_ext re-enabled".
     # R8169 + REALTEK_PHY built in, not modules. As modules they are loaded
     # by udev after the root switch (measured: probe at 6.26s, PHY attach
     # 7.05s, carrier 10.13s), which pushes the link negotiation past most of
@@ -711,11 +718,8 @@ EOF
     scripts/config -d LTO_NONE -e LTO_CLANG_THIN
     scripts/config -d CC_OPTIMIZE_FOR_PERFORMANCE -e CC_OPTIMIZE_FOR_PERFORMANCE_O3
     scripts/config -e CACHY   # gates the 0110 CachyOS config-hooks backport
-    # BORE replaces the scx/sched_ext scheduler. CONFIG_SCHED_BORE turns the
-    # EEVDF task selection in fair.c into burst-aware selection; CONFIG_MIN_BASE_SLICE_NS
-    # defaults to 2000000 and is left at its default. Note 0110 no longer carries
-    # its fair.c hunk -- BORE owns sysctl_sched_base_slice now (see PATCH_SOURCES).
-    scripts/config -e SCHED_BORE
+    # BORE was dropped on 2026-11-04; CONFIG_SCHED_BORE is left unset and the
+    # pre-BORE 0110 fair.c hunk is restored. See PATCH_SOURCES.md.
     # pcie_aspm=off: disable PCIe ASPM entirely — the !5538 SMU bus-drop stopgap.
     # amdgpu.aspm=0 / amdgpu.runpm=0: conservative amdgpu-side stopgaps for the
     # silent gaming freeze (SMU IF mismatch 0x2e vs 0x33, !5538) — no GPU ASPM or
@@ -1152,7 +1156,7 @@ b2sums=('1d7a796234edac50f6fbc9fe0610cf99a87a8256e9958abbc8996d6c1d875562bd65d00
         'ee5f2c4aead1f2fc8d8096ae2a953d4c45d4c79de29e0578da543767a2d96664f903f043af36cf481adc13f203e2eca8fb616c26257e6cce5b3cae26b1d46ddf'
         'fdc7fc1d942be4fe8dadcb228b7f9c02273eaec91631ff609a07722b74b1db64828e144856e01a8ffd039762d1970a7ec511a3d240481544c570592914573b69'
         '7246f1d3dcf36c1b663ba8456dddbee8eba4d1fba97d3ba4224c96dbdbfa0a51534cd2cfa403dc00a651e43473222243f74e57cafb3eb5700c8c253d5f0e3737'
-        '85590203e850f296930aaa6c8535908ba56e6f3f424159e556321cd8729ab0207cdfcd922fbc09427e27e9259bf167e17d71411406899d1b94ea98eab71466bb'
+        '9e09ebb057ad702b03c3caaaa30660d6f4b1b475002e95f7c1f3fe757980ac3e75a2cead66b01f5ba85bfa2c42bb18b672c316edc3fa645801efee0dfc894e8b'
         '0070a22fe00e90fb691ba892496d9239c81a0bd1242dba1a843a001ae5ee11c81ce3848b763db0d868dba7d366b333cc9ee99f1e29e1963123cb9e49751784e0'
         '5f7ffc86f93529d5caabc0094670bc2cc13e2ac855354810577dbde37bbef843c8cadfc9c1a279e370d6dff64ae4129e9ab9e6b33c46ad9201c36609b3c443ee'
         'a47c00f575dc689566a58d4e511f29cc40d642a11aa66b806ffbc5de4659c09ee6a486fdca237c3322336d716d15eb78f794bde7148885b51dfee24a0ad65edd'
@@ -1186,6 +1190,7 @@ b2sums=('1d7a796234edac50f6fbc9fe0610cf99a87a8256e9958abbc8996d6c1d875562bd65d00
         '2f7217aee8314d48d6f471bcc19597e0a00ebd1187288365d4444e582fea8e9ef39c01b9678ccab52ece1b97ed1ffae12b3978ef8b385eaf8dfb9a08c8e29345'
         '792254342b10c5ef8583b0ba04cf67f9eba46720700295b0d590c585bf9a5aa8e378e75eace55b3a2e595e0d757e4e8076d0cc55b45eed35660f802b4348437f'
         '5ea6ccbf8b5a389e057556118ab01bb80435d157ef6d5213d4434cf50a9742480f7eb1dab2e257365419ebd639d89de68272b26a6309717b7d61bb90b560085e'
+        'bed4b29c89b2f2516cd619957428749ff9e262d5dd8f0a7bc6d1b270124a4cf954f767de235c9bd01b50209b1ab86b4ddd5f05738dd7072907d9773f15f088b5'
         'e4ab88fa78543be89074ee59d3bc55a114e8750abfc57b54b5f34e14b292a127f5ee6a2a1b3d88784499a32cde40eae4558c0585f3ac033a777a742707edd045'
         '04224c3abeeed9ca5dad7f8b2638cac86bdd9e1f2c78b43e9ba64450b68dc60a00643755a6d3b2bd1c44ea209ca673f7cf2439c5f56891d8cda4c0f312f03626'
         'ebc1dfea60a624abcfa5ccecaa563a5086989066e87ba4df378d1289d90487943ae12444b3be0c46bf725968ab3df18f0e1dd36d8bd15e328c9d02077070b8f3'
@@ -1204,6 +1209,13 @@ b2sums=('1d7a796234edac50f6fbc9fe0610cf99a87a8256e9958abbc8996d6c1d875562bd65d00
         'e07675f520392e8b108f40e87f93f823cf8999ae4869370f3c810c7fd8aa90220d749c47465933e9c0eb7010caca1d00094143a5aed1bf90bea2494bc6d72692'
         'ef25e855b6b6b6c879baf5fada402439e37a6d913135db3ef2cd5b98504497616adda9f11db960d432e753dd60517604d8d160bd89e4181114d7c99ff61d4b12'
         'f7380a26e828fba6fb8c066d9eff2647f908da5db2625819feabe056969f0705a0775c9b6e7e91793d9dd7a0ce50f54e4ed3218ebd9e8157e733b1c0db1bfe06'
+        '91ad065351cef207dd1a38ed9f7d8de881b6a5cf419e71ec16f31b66404c709fa27df34af0b77d1845175e8d488fd2aaba1273d8eaee6edd462d550eb74b70eb'
+        'f46365c2ec1cd1af2492fe2bf00714d8b7377ceb6749767895a390f2ed120cf9f28ba258ec76c986828947681eca4dfb0544f16dad231a44b7b2ae167b9d9fb8'
+        '5cc7e57b8814a934b4f1da441e5ae27d250053da1644b62bfb4ae42c35ec7b8c5515949bf5c50af6dc6d0a4b8129a948f1c6e8fc923d36c5c5612c1b3cb23e9b'
+        '5f7db0b9e6f1e66ce0f8ea52f0f40798dd2926439d7864241cd33d9b438542cf08e964df2aef705bc4008d87e88420d4eb584ddb14c1f505adc3ee8ba67976f5'
+        '836d7809f4c137dba80b0ef981478fa892be34ed52e9cc4c915bf29a5b76dc7bfcebf1c1692d55aa97203fdac004d81f8ab669215595318f9eb78361a526766b'
+        '6bbf8da44bd7c427039ee0334d8197e0d58b50a56dd661fd139551a6d51920e37ed53d2876f302a2ec4d433f9aefb69b639343e02665042ee636b808b7d913fc'
+        'c20acecad228d85095d23f1f7835090652ca1a9ecf9f3f1ca4a092af8e6afd1c3e8154298cdccc62a6a2ee29c99c4832ee8eb94566d5f87350030320ac225f5a'
         'c20b3b791715d02756742bfa34f4921bcaebeee62edf079fe15c89afdc11451a2656122f4f21335cd116676ff69c3b7eee80c6adfdcbfe838c0f1e9012ce0428'
         'df68cfd344b37cae25fa446c82c5897510de23c55761570969dc5a6f2a5bf4c11b31e50c1670a18bef1065af6597e72e0ed839e8fdbc0328cf2dcf34484e5758'
         '8bff27696075ec53ca042b0c9e0deae345712e652b3b66bab1da82c4deefdf35533d04c00d59de70cbf968380236131bc819e0eeaa8aa40edfd84df3bd0972ef'
@@ -1246,9 +1258,9 @@ b2sums=('1d7a796234edac50f6fbc9fe0610cf99a87a8256e9958abbc8996d6c1d875562bd65d00
         'c2d08fb86475f193814927cb9d5b9b744f4598e766c644cb12ba7871f55b34e0753b1292318073b9c3cdae5e077bdb598ad8b354b1bcb26635865beadf4e2d53'
         '3036834e0eea734893a0e61158c664c5292ff116f7d7c7d764d31ab4dd8a42b849789557e3877a87370a580247561c2a03fe58d1ac341e2d5684e27c8d48c1f9'
         '9c68b602fac54fde41039e569afe46b3710e0c35775ff35bb592752109676070a8caf86a8e7b1a73b7ccd9637881fc8a28e95be14cae7e1a9fdb4b1145ee3c3b'
-        '6e37cd446120125889fd3d512fb354d51255e6ec4e5415dcf9f0c9d02d793f44844bbcf6f7552d329f35e85ef9468df2c25d0dd35a47d917dbe93fd2f7cd82da'
-        '2dd42e38ee5cb8d5413ef45c1a6684445661030e3b813635632e4f62dc94f677cd011afdc74593d28ada0ae00bee597b196c39a0da728703c993880b9564ae9d'
+        'd0f31801fcdb114f22707569a56202c0393d100fba98137fc4d8fddd83ded4d1f66822e51dce275fb983eb0241503372ff7f7ea17360c7e8170d849c15424818'
         '9065ec476686e7fbbf4efdaffeff9e0edf9a0fb802c6749bcfe443102595fbaaadda0bde6fab5cfb3ead598035d40fa1fa9392ff69b1cf1b745d648e4b78d5d8'
+        '6742c42e6c8862a8c677bf243cf1cf11875c2b4788b01f45cec02579e4e8428deaa50b231e8119d288c64678e1b3b888fcef9632706d06970327b5f696ba330f'
         '08d97dc750acece76e466aaf211f94e3a35dc51518b599b6313f04c5470ba9b9aec4af74d7505e2c9101eb4847dd48f1393d39a73c2cd749c722bba57791f03e'
         'a607eff6f904c8b02e05c3b379dce39dff5a518bf01588c054a8be5f4de51c9bad985df014551cc3ddeba4cfb46f3121a022414e958608da67520a1e35e3a2e3'
         '5d7126ffc7deab9ac4b6976e0690848c6821c04a38e9a3c90fa50dc399ede15ad2b5efc7168a30c9fd8f5293edcff92111f96b79ac784f7f844d7cc2e38e90b3'

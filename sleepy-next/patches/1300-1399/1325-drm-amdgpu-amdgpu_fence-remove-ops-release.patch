@@ -1,0 +1,75 @@
+From 95bc87325b9f58850137b7476d6c00f8474a9552 Mon Sep 17 00:00:00 2001
+From: Philipp Stanner <phasta@kernel.org>
+Date: Tue, 27 Oct 2026 14:37:28 +0100
+Subject: [PATCH] drm/amdgpu: amdgpu_fence: remove ops->release()
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+amdgpu's fence implements the deprecated fence_ops->release() callback
+which prevents the driver from ever unloading robustly.
+
+amdgpu's implementation merely uses a call_rcu() that performs a kfree()
+on the fence - this functionality is already centrally implemented by
+the dma_fence backend.
+
+The dma_fence backend invokes a kfree_rcu() on the dma_fence, which is
+fine since this is always the first member of a struct amdgpu_fence.
+Thus, amdgpu's implementation is redundant.
+
+Remove fence_ops->release().
+
+Signed-off-by: Philipp Stanner <phasta@kernel.org>
+Reviewed-by: Christian König <christian.koenig@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_fence.c | 29 -----------------------
+ 1 file changed, 29 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_fence.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_fence.c
+index bff2d38f3571..c3f56253d3b8 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_fence.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_fence.c
+@@ -897,39 +897,10 @@ static bool amdgpu_fence_enable_signaling(struct dma_fence *f)
+ 	return true;
+ }
+ 
+-/**
+- * amdgpu_fence_free - free up the fence memory
+- *
+- * @rcu: RCU callback head
+- *
+- * Free up the fence memory after the RCU grace period.
+- */
+-static void amdgpu_fence_free(struct rcu_head *rcu)
+-{
+-	struct dma_fence *f = container_of(rcu, struct dma_fence, rcu);
+-
+-	/* free fence_slab if it's separated fence*/
+-	kfree(to_amdgpu_fence(f));
+-}
+-
+-/**
+- * amdgpu_fence_release - callback that fence can be freed
+- *
+- * @f: fence
+- *
+- * This function is called when the reference count becomes zero.
+- * It just RCU schedules freeing up the fence.
+- */
+-static void amdgpu_fence_release(struct dma_fence *f)
+-{
+-	call_rcu(&f->rcu, amdgpu_fence_free);
+-}
+-
+ static const struct dma_fence_ops amdgpu_fence_ops = {
+ 	.get_driver_name = amdgpu_fence_get_driver_name,
+ 	.get_timeline_name = amdgpu_fence_get_timeline_name,
+ 	.enable_signaling = amdgpu_fence_enable_signaling,
+-	.release = amdgpu_fence_release,
+ };
+ 
+ /*
+-- 
+2.56.0
+

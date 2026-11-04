@@ -18,6 +18,119 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.11.04-3-sleepy-next (linux-next `next-20261104`)]: 2026-11-05
+
+Adds the 2026-11-05 sweep on top of the sched_ext package (`2026.11.04-2`).
+The preview carries **146 patch entries in `source=()`** (153 files; seven are
+excluded from the build).
+
+### Added
+
+- **`1238`, SMU metrics cache timing** — stamp and compare the metrics caches
+  with `ktime_get_boottime()` instead of jiffies. At `CONFIG_HZ=1000` the 1 ms
+  raw metrics cache stayed valid for up to two ticks. `smu_cmn` is live on
+  `smu_v14_0_0`.
+- **`1320`, vblank reset fix** — return the cached hardware vblank counter when
+  a reset holds the semaphore, instead of DRM's software count. The software
+  count poisoned `vblank->last` and tripped `drm_WARN_ON_ONCE()`.
+- **`1321`, MES ring timeout** — report `-ETIMEDOUT` from the `mes_v12_0` ring
+  wait instead of treating `r < 1` as success.
+- **`1322`/`1323`, KFD error paths** — drop the dma-buf reference on a failed
+  KFD import, and unlock the VM and BO when a KFD BO attach fails.
+- **`1324`, KFD SVM unmap** — remove the improper `amdgpu_vm_ready()` check and
+  swallow `-EBUSY` during eviction.
+- **`1325`, fence cleanup** — remove the deprecated `ops->release()` callback.
+- **`1326`, gfx12 SPM VMID (preview only)** — program the SPM VMID after the
+  RLC starts; the bug does not exist on the rc base.
+- **`2507`, AMD-Vi identity-mode revert (preview only)** — revert
+  `bf5bdfd1f8d4`. This machine's RX 9070 XT sits behind an ATI PCIe bridge, and
+  the preview had moved it to a translated domain; the rc base predates the
+  commit and keeps the old identity logic.
+
+### Verified
+
+- Cumulative audit: **146/146** on `next-20261104`; rc **324/324** on `v7.3`.
+- The build config has `CONFIG_SCHED_CLASS_EXT=y`, `CONFIG_EXT_SUB_SCHED=y`,
+  `CONFIG_TCP_CONG_BBR3=y` and `CONFIG_DEBUG_INFO_BTF=y`; BORE and the old BBR
+  are unset.
+- Built `linux-sleepy-next-2026.11.04-3` and its headers; `amdgpu.ko` carries
+  `.BTF`/`.BTF_ids`, `resolve_btfids` passed and no patch was skipped.
+
+## [7.3.0-18-sleepy-rc]: 2026-11-05
+
+Adds the seven shared 2026-11-05 sweep carries and rebuilds the rc series with
+the sched_ext changes (BORE dropped). **324 patches.**
+
+### Added
+
+- `1238`, `1320`–`1325` — the shared SMU, vblank, MES, KFD and fence carries
+  described under `2026.11.04-3-sleepy-next`. Full provenance is in
+  `PATCH_SOURCES.md`.
+
+### Also
+
+- `1326` (gfx12 SPM VMID) and `2507` (AMD-Vi revert) are preview-only.
+
+### Verified
+
+- `audit_series.py`: **324/324** on `v7.3`.
+- Built `linux-sleepy-rc-7.3.0-18` and its headers; `amdgpu.ko` carries
+  `.BTF`/`.BTF_ids`, `resolve_btfids` passed and no patch was skipped.
+- The first build caught a missed `dsq->pcpu` rename in the v7.3 sched_ext
+  base; `2005` now completes the `->pcpu_user` rename. The adaptation is
+  recorded in `PATCH_SOURCES.md`.
+
+## [2026.11.04-2-sleepy-next (linux-next `next-20261104`)]: 2026-11-04
+
+### Changed — scheduler back to sched_ext (`scx_cake`), BORE dropped
+
+User decision: drop BORE and run sched_ext again. `2419` (BORE 7.0.1) and
+`2420` (`sched/fair: do not scan twice in detach_tasks()`) are removed, and
+`CONFIG_SCHED_BORE` is no longer enabled. `CONFIG_SCHED_CLASS_EXT` and
+`CONFIG_EXT_SUB_SCHED` are enabled again; the next-20261019 merge gaps that
+forced their disable are fixed in this snapshot. `0110` regains its pre-BORE
+`fair.c` hunk — inert while scx owns scheduling, live whenever sched_ext is not
+loaded.
+
+The seven sched_ext carries removed on 2026-09-30 are **not** re-added to the
+preview: all seven are upstream in `next-20261104` (verified by symbol, not by
+subject). `scx_loader` is configured to start `scx_cake` after the next boot;
+the running kernel keeps BORE until then because this package was installed
+without a reboot.
+
+### Added
+
+- **`2421` sched_ext: Read exit_kind before flushing in
+  `scx_flush_disable_work()`** (Kuba Piecuch, 2026-11-04) — reads `exit_kind`
+  with acquire ordering before the sync/flush, closing the UAF window in
+  `bpf_scx_unreg()` teardown. `Fixes: d99f7a32f09d`, `Cc: stable # v7.1+`.
+
+### Also
+
+- `sleepy-rc`'s source series is updated the same way (`2419`/`2420` out;
+  `2005`, `2413`, `2414`, `2415`, `2418`, `2421` in; `0110` restored; 317
+  patches). It was **not** rebuilt in this pass; `pkgrel` stays 17.
+- `scx-scheds-git` rebuilt from AUR (`1.1.4.r216.gb1c64ecb9`, `scx_cake`
+  1.2.2) and installed; `scxtui` is excluded from the local build because
+  `scx-tools-git` owns it in the official packaging split.
+  `/etc/scx_loader.toml` is restored to `default_sched = "scx_cake"` with
+  `[scheds.scx_cake] auto_mode = []` (scx_cake 1.2.2 dropped `--profile`, and
+  the loader's built-in Auto mode would otherwise pass it);
+  `scx_loader.service` is unmasked and enabled but not started, and
+  `scx.service` stays disabled. The running kernel keeps BORE until the next
+  boot.
+
+### Verified
+
+- Cumulative audit: **137/137** on `next-20261104`; rc **317/317** on `v7.3`.
+- sched_ext tree consistent in the snapshot: `dsq->pcpu_user` in use,
+  `scx_reenq_wait_dispatching()` gone.
+- Built `2026.11.04-2-sleepy-next`: installed `build/.config` has
+  `CONFIG_SCHED_CLASS_EXT=y`, `CONFIG_EXT_SUB_SCHED=y` and
+  `CONFIG_SCHED_BORE` unset; `.BTF`/`.BTF_ids` are present; the extracted
+  vmlinux contains `sched_ext:` strings and no `sched_burst` strings. **0**
+  patches were skipped during `prepare()`.
+
 ## [2026.11.04-1-sleepy-next (linux-next `next-20261104`)]: 2026-11-04
 
 Bumps the preview from `next-20261103` to **`next-20261104`** (959 commits)

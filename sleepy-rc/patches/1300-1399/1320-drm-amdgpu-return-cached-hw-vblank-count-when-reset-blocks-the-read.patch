@@ -1,0 +1,53 @@
+From: James Lin <pinglei.lin@amd.com>
+Date: Wed, 4 Nov 2026 05:13:00 +0800
+Subject: [PATCH] drm/amdgpu: return cached hw vblank count when reset blocks the read
+
+amdgpu_get_vblank_counter_kms() is DRM's hardware ->get_vblank_counter
+callback, so drm_update_vblank_count() stores its return value into
+vblank->last and derives diff = cur_vblank - vblank->last.
+
+Commit f2bc71d16e73 ("drm/amdgpu: serialize vblank counter reads
+against GPU reset") made the callback fall back to
+drm_crtc_vblank_count() when the reset semaphore is held. That returns
+DRM's software vblank count, which is a different numeric domain than
+the hardware counter. It poisons vblank->last, so a later update hits
+diff == 0 while cur_vblank != vblank->last and trips
+drm_WARN_ON_ONCE() in drm_update_vblank_count(). Reset still succeeds,
+but the WARN fails the mode1_reset dmesg check.
+
+Return the cached hardware value vblank->last via drm_crtc_vblank_crtc()
+instead, so the core sees "no new vblanks" and keeps its accounting
+consistent. vblank->last is protected by drm_device.vbl_lock, already
+held across this callback.
+
+Fixes: f2bc71d16e73 ("drm/amdgpu: serialize vblank counter reads against GPU reset")
+Signed-off-by: James Lin <pinglei.lin@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_kms.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_kms.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_kms.c
+index 14a72a406d37..365b4fc86a9e 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_kms.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_kms.c
+@@ -1699,9 +1699,18 @@ u32 amdgpu_get_vblank_counter_kms(struct drm_crtc *crtc)
+ 		DRM_ERROR("Invalid crtc %u\n", pipe);
+ 		return -EINVAL;
+ 	}
+-	if (!down_read_trylock(&adev->reset_domain->sem))
+-		return drm_crtc_vblank_count(crtc);
+ 
++	/*
++	 * A GPU reset is in progress and the display hardware cannot be read
++	 * safely. Return the hardware counter value DRM already cached rather
++	 * than the software vblank count: the core feeds this callback's
++	 * result back into vblank->last, and a software count lives in a
++	 * different numeric domain, which later trips
++	 * drm_WARN_ON_ONCE(cur_vblank != vblank->last) in
++	 * drm_update_vblank_count().
++	 */
++	if (!down_read_trylock(&adev->reset_domain->sem))
++		return drm_crtc_vblank_crtc(crtc)->last;
+ 
+ 	/* The hw increments its frame counter at start of vsync, not at start
+ 	 * of vblank, as is required by DRM core vblank counter handling.
