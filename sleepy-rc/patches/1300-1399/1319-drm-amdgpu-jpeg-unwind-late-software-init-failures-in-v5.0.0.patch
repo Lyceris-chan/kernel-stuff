@@ -1,0 +1,51 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Wentao Liang <vulab@iscas.ac.cn>
+Date: Wed,  4 Nov 2026 02:53:40 +0000
+Subject: [PATCH] drm/amdgpu/jpeg: unwind late software init failures in v5.0.0
+Message-ID: <20261104025340.1527373-1-vulab@iscas.ac.cn>
+
+The v5.0.0 software initialization callback creates its ring before
+allocating the register dump storage and creating the reset mask sysfs
+file. If either of the latter steps fails, the callback returns without
+releasing the initialized JPEG resources, including the ring buffers and
+the vmid_wait fence reference. The IP block's status.sw flag has not been
+set, so the common error cleanup skips its sw_fini callback.
+
+Suspend the JPEG work and release the JPEG software resources on these
+late failures. amdgpu_jpeg_sw_fini() also releases the register dump
+storage if it was successfully allocated before sysfs creation failed.
+
+Fixes: 64dc2f0029ec ("drm/amdgpu: Enable devcoredump for JPEG5_0_0")
+Cc: stable@vger.kernel.org
+Assisted-by: DeepSeek-V4.1-Flash and OpenAI Codex
+Signed-off-by: Wentao Liang <vulab@iscas.ac.cn>
+---
+ drivers/gpu/drm/amd/amdgpu/jpeg_v5_0_0.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/jpeg_v5_0_0.c b/drivers/gpu/drm/amd/amdgpu/jpeg_v5_0_0.c
+index dcdb089b4308..1567a4b9129a 100644
+--- a/drivers/gpu/drm/amd/amdgpu/jpeg_v5_0_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/jpeg_v5_0_0.c
+@@ -119,13 +119,20 @@ static int jpeg_v5_0_0_sw_init(struct amdgpu_ip_block *ip_block)
+ 
+ 	r = amdgpu_jpeg_reg_dump_init(adev, jpeg_reg_list_5_0, ARRAY_SIZE(jpeg_reg_list_5_0));
+ 	if (r)
+-		return r;
++		goto err_jpeg;
+ 
+ 	adev->jpeg.supported_reset =
+ 		amdgpu_get_soft_full_reset_mask(&adev->jpeg.inst[0].ring_dec[0]);
+ 	if (!amdgpu_sriov_vf(adev))
+ 		adev->jpeg.supported_reset |= AMDGPU_RESET_TYPE_PER_QUEUE;
+ 	r = amdgpu_jpeg_sysfs_reset_mask_init(adev);
++	if (r)
++		goto err_jpeg;
++
++	return 0;
+ 
++err_jpeg:
++	amdgpu_jpeg_suspend(adev);
++	amdgpu_jpeg_sw_fini(adev);
+ 	return r;
+ }

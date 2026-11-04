@@ -15,11 +15,11 @@ moved, so the full ledger is not duplicated here.
 
 | | |
 |---|---|
-| Snapshot | `next-20261102`, tag `2637bdec0535` (tag object `d1333a4249ad`) |
-| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261102.tar.gz` |
+| Snapshot | `next-20261104`, tag `8b7179210b22` (tag object `4004549ef9cf`) |
+| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261104.tar.gz` |
 | Snapshot tree `Makefile` | `7.4.0-rc1` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.11.02-2-sleepy-next` |
-| Package | `linux-sleepy-next-2026.11.02-2` |
+| Kernel release | `2026.11.04-1-sleepy-next` |
+| Package | `linux-sleepy-next-2026.11.04-1` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -1329,3 +1329,35 @@ recorded in the rc ledger.
 ### Series state
 
 `audit_series.py`: **137/137** on `next-20261103` and **311/311** on `v7.3`.
+
+## Bump 2026-11-04 — `next-20261104`; `2061` absorbed; the sweep carries
+
+The preview moves from `next-20261103` to **`next-20261104`**
+(`8b7179210b22`, tag object `4004549ef9cf`, 959 commits). All 139
+patches of the old series apply to the new snapshot except `2061`, whose
+change is now in the base; it was removed from this package with user approval
+(the rc package keeps it, because `v7.3` does not have the fix). The remaining
+138 apply in order.
+
+### Added and updated
+
+- `1237` v4, `1317` v4, `2419` BORE 7.0.1, `2102` lru_cast 0.2.10 (the 7.4
+  port replaces the same three files as the v0.2.9 port), `0101` CachyOS
+  7.4/bbr3 refresh (the `bbr_tso_segs()` zero-MSS guard), `1319` JPEG 5.0.0
+  unwind (this package's copy calls `amdgpu_jpeg_cancel_idle_work()` because
+  the carried `1318` replaced `amdgpu_jpeg_suspend()`), and `2808` swapfile
+  large-folio fix. Full rationale and provenance in the rc ledger's 2026-11-04
+  sweep entry.
+
+### Absorption check
+
+Reverse-applying all 138 patches against a clean `next-20261104` tree flags
+only `1093` (`amdgpu_debugfs_gfxoff_count_read`), and that is a false positive:
+the actual function still has `size & 0x3`, and the reverse matched a similar
+8-byte block in another debugfs reader. `2061` is the only real absorption: the
+base now has `blk_zone_write_plug_init_request()` before the keyslot call and
+`blk_mq_end_request(rq, ret)` on failure.
+
+### Series state
+
+`audit_series.py`: **138/138** on `next-20261104` and **313/313** on `v7.3`.

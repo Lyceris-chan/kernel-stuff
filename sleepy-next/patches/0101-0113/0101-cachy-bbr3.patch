@@ -14,14 +14,14 @@ Subject: [PATCH] cachyos-bbr3: BBRv3 TCP congestion control (2 patches)
  net/ipv4/Kconfig                                 |   40 +-
  net/ipv4/Makefile                                |    1 +
  net/ipv4/tcp.c                                   |    3 +
- net/ipv4/tcp_bbr3.c                              | 2418 ++++++++++++++++++++++
+ net/ipv4/tcp_bbr3.c                              | 2421 +++++++++++++++++++++++
  net/ipv4/tcp_cong.c                              |    1 +
  net/ipv4/tcp_input.c                             |   51 +-
  net/ipv4/tcp_minisocks.c                         |    2 +
  net/ipv4/tcp_output.c                            |   51 +-
  net/ipv4/tcp_timer.c                             |    1 +
  tools/testing/selftests/bpf/progs/tcp_ca_kfunc.c |    2 +
- 17 files changed, 2645 insertions(+), 34 deletions(-)
+ 17 files changed, 2648 insertions(+), 34 deletions(-)
 
 diff --git a/include/linux/tcp.h b/include/linux/tcp.h
 index d18f7bc1e5d0..6c30ff933115 100644
@@ -417,7 +417,7 @@ new file mode 100644
 index 000000000000..0697a9c9535d
 --- /dev/null
 +++ b/net/ipv4/tcp_bbr3.c
-@@ -0,0 +1,2418 @@
+@@ -0,0 +1,2421 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/* BBR (Bottleneck Bandwidth and RTT) congestion control
 + *
@@ -927,8 +927,11 @@ index 000000000000..0697a9c9535d
 +}
 +
 +/* Custom tcp_tso_autosize() for BBR, used at transmit time to cap skb size. */
-+__bpf_kfunc static u32 bbr_tso_segs(struct sock *sk, unsigned int mss_now)
++__bpf_kfunc static u32 bbr_tso_segs(struct sock *sk, u32 mss_now)
 +{
++	/* BPF callers of this kfunc may pass mss_now == 0. */
++	if (unlikely(!mss_now))
++		return sock_net(sk)->ipv4.sysctl_tcp_min_tso_segs;
 +	return bbr_tso_segs_generic(sk, mss_now, sk->sk_gso_max_size);
 +}
 +

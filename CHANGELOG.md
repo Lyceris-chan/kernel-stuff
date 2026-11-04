@@ -18,6 +18,121 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.11.04-1-sleepy-next (linux-next `next-20261104`)]: 2026-11-04
+
+Bumps the preview from `next-20261103` to **`next-20261104`** (959 commits)
+and carries today's sweep. `amdgpu.user_queue=1` remains on the
+built-in cmdline; 138 patches apply.
+
+### Removed
+
+- **`2061` absorbed by the snapshot** — `blk-mq: end the request if getting a
+  keyslot fails` is now in `blk_mq_submit_bio()`: the zone write plug is
+  initialised before the keyslot call and a failed keyslot is ended through
+  `blk_mq_end_request()`. Removed from the preview only; `sleepy-rc` keeps it
+  because 7.3 does not have the fix.
+
+### Added
+
+- **`1319`, JPEG 5.0.0 unwind** — the same late-init leak fix as in the rc
+  package. This copy calls `amdgpu_jpeg_cancel_idle_work()` because the
+  preview's carried `1318` replaced `amdgpu_jpeg_suspend()`; the first build
+  without the adaptation failed on the undeclared function.
+- **`2808`, large swap-in unuse_pte fix** — a swap-cache folio that no PTE
+  maps can be mapped by `swapoff` and then hit `BUG` in `do_swap_page()`.
+  `Fixes: f1879e8a0c60`, `Cc: stable`; the zswap-enabled path is not this
+  machine's normal one, so it is carried as a stable crash fix.
+
+### Updated
+
+- **`1237` v4** — restores a forced GPU performance level after a reset
+  through the common reapply path.
+- **`1317` v4** — the strict range-bias pass no longer splits a free mixed
+  block that only partially overlaps the range, fixing the `gpu_buddy_fini()`
+  free-root assert and the leaked children.
+- **`2419` BORE 7.0.1** — virtual-time wake credit, inherited credit cleared on
+  fork, RCU children walk.
+- **`2102` lru_cast 0.2.10** — pinned GUP pages are subtracted from anon's
+  reclaimable size in the balance decision.
+- **`0101` CachyOS 7.4/bbr3 refresh** — `bbr_tso_segs()` now takes `u32` and
+  returns the minimum TSO segment count when a BPF caller passes `mss_now == 0`.
+
+### Verification
+
+The package and headers build with Clang 23.1.4; all 138 patches apply in
+order. `vmlinux` carries `.BTF` and `.BTF_ids`; `CONFIG_TCP_CONG_BBR` is unset
+and `CONFIG_TCP_CONG_BBR3=y`; the built-in `CONFIG_CMDLINE` carries
+`amdgpu.user_queue=1`.
+
+## [7.3.0-17-sleepy-rc]: 2026-11-04
+
+Sweep update on the 7.3.0 base; the series grows from 311 to 313 patches.
+
+### Added
+
+- **`1319`, JPEG 5.0.0 unwind** — `jpeg_v5_0_0_sw_init()` leaked the ring
+  buffers and the `vmid_wait` fence when the register-dump or reset-mask sysfs
+  initialisation failed, because `status.sw` is only set on success and the
+  common cleanup therefore skipped `sw_fini()`. It now unwinds through
+  `amdgpu_jpeg_suspend()` and `amdgpu_jpeg_sw_fini()`, as the other JPEG
+  generations do. `Fixes: 64dc2f0029ec`, `Cc: stable`.
+- **`2067`, VLAN hardware tag insertion** — `447cbe95ebb9` made
+  `vlan_dev_hard_header()` insert an in-band 802.1Q tag even when the real
+  device can offload it. r8169 then stalls on checksum/TSO offload of tagged
+  frames and hits NETDEV WATCHDOG. This restores the hardware tag path for
+  capable devices. It is `c2124f80be4c`, already in 7.4-rc1 and the preview
+  base, so only the rc package needs it.
+
+### Updated
+
+- **`1237` v3 → v4** — restores a forced GPU performance level after a reset
+  through the common reapply path instead of `smu_handle_task()`, replays
+  non-profile levels, replaces `smu_reapply_power_state_dynamic()`'s body and
+  adds the `Fixes:` tag.
+- **`2419` BORE 7.0.0 → 7.0.1** — wake-up sleep credit is converted to virtual
+  time before it is deducted from the deadline, inherited credit is cleared on
+  fork, and the children walk uses the RCU list iterator.
+- **`2102` lru_cast 0.2.9 → 0.2.10** — the balance decision now subtracts pages
+  pinned by GUP (`NR_FOLL_PIN_ACQUIRED - NR_FOLL_PIN_RELEASED`) from anon's
+  reclaimable size, since pinned folios stay on the lists but cannot be
+  reclaimed.
+
+### Verification
+
+The package and headers build with Clang 23.1.4; all 313 patches apply in
+order. `vmlinux` carries `.BTF` and `.BTF_ids`; `CONFIG_TCP_CONG_BBR` is unset
+and `CONFIG_TCP_CONG_BBR3=y`.
+
+## [2026.11.03-2-sleepy-next (linux-next `next-20261103`)]: 2026-11-03
+
+`pkgrel` 2. Enables AMDGPU user queues by default; no patch-series change.
+
+### Changed
+
+- **AMDGPU user queues** — `amdgpu.user_queue=1` is added to the built-in
+  cmdline. The snapshot already carries the userq UAPI at DRM interface 3.65,
+  the version RADV requires for syncobj timeline signalling; the driver's `-1`
+  (auto) default sets `disable_uq=true` on GFX12/SDMA7. The installed
+  `linux-firmware-amdgpu` 20261019 meets the gfx12 userq gates (ME 3110,
+  PFP 3220, MEC 3490, MES 151). RADV stays opt-in per game via `AMD_USERQ=1`;
+  the Steam launch options for the installed games were updated. `sleepy-rc`
+  remains on DRM 3.64, where RADV refuses userq.
+- **drm/amd tracker (2026-11-03)** — 66 issues updated since 2026-10-30;
+  comments fetched and triaged. No new adoptable Navi 48 / DCN 4.0.1 fix.
+  Watch items: `#6085` (syncobj eventfd GPU wake; fixed in 7.4), `#6087` (TTM
+  list corruption; both fixes already in the bases), `#5339` (RA24 RGBA
+  patches still unsubmitted), `#6068`/`#4763` (Navi 48 HDMI black screen /
+  pageflip freezes; no fix).
+
+### Verification
+
+Package `linux-sleepy-next-2026.11.03-2` and headers built with Clang 23.1.4;
+all 137 patches applied. The extracted `vmlinux` carries `.BTF` and `.BTF_ids`;
+`CONFIG_TCP_CONG_BBR` is unset and `CONFIG_TCP_CONG_BBR3=y`; `CONFIG_CMDLINE`
+contains `amdgpu.user_queue=1`; the packaged `amdgpu.ko` exposes the
+`user_queue` parameter. Installed; `bootctl` reports `linux-sleepy-next.conf`
+as both the current and default entry. Reboot pending.
+
 ## [2026.11.03-1-sleepy-next (linux-next `next-20261103`)]: 2026-11-03
 
 Bumps the preview from `next-20261102` to **`next-20261103`** (1208 commits).

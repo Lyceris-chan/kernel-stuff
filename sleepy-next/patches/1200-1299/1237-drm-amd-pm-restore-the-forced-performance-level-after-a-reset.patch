@@ -1,59 +1,192 @@
 From nobody Mon Sep 17 00:00:00 2001
 From: Priya Hosur <Priya.Hosur@amd.com>
-Date: Tue, 3 Nov 2026 15:58:29 +0530
-Subject: [PATCH v3 1/1] drm/amd/pm: restore the forced performance level after a reset
-Message-ID: <f370dc0e7025b9b39cac723b1b60ccbd339d233f.1793689935.git.Priya.Hosur@amd.com>
+Date: Wed, 4 Nov 2026 15:52:22 +0530
+Subject: [PATCH v4 1/1] drm/amd/pm: restore the forced performance level after a reset
+Message-ID: <abbf127cdaa05bc133605a961ef912dd773dab29.1793787406.git.Priya.Hosur@amd.com>
 
-From: Priya Hosur <Priya.Hosur@amd.com>
+After a GPU reset PMFW is reinitialised and comes back on its default
+curve, while smu_dpm.dpm_level still holds the level the user forced. On
+an SMU 14.0.1 APU with the level set to high, gfxclk drops from 2.8GHz to
+600MHz while sysfs still reports high. Writing the same level again does
+not help, as amdgpu_dpm_force_performance_level() returns early when the
+requested level matches the cached one.
 
-smu_late_init() re-applies the DPM level with
+smu_late_init() does not re-program the level either, as the
+AMD_PP_TASK_COMPLETE_INIT path compares the cached level against itself.
 
-  smu_handle_task(smu, smu->smu_dpm.dpm_level, AMD_PP_TASK_COMPLETE_INIT);
+amdgpu_dpm_reapply_umd_profile() replays the retained level after reset
+and resume, but only for the PROFILE_* levels, and returns early for any
+other level.
 
-but smu_adjust_power_state_dynamic() only programs the hardware when
+Restore every level through this common path and rename it to
+amdgpu_dpm_reapply_performance_level(). The PROFILE_* levels keep their
+UMD pstate handling, other levels only replay the level itself. auto is
+skipped, as PMFW comes back in auto, as it does at probe. If replaying a
+non-profile level fails, the failure is logged and the level the user
+asked for is kept.
 
-  if (force_performance_level || smu_dpm_ctx->dpm_level != level)
+smu_reapply_power_state_dynamic() duplicates
+smu_adjust_power_state_dynamic() with the display settings skipped and
+the level forced, so call that instead.
 
-AMD_PP_TASK_COMPLETE_INIT passes force_performance_level = false and
-smu_dpm_ctx is &smu->smu_dpm, so the level is compared against itself and
-smu_asic_set_performance_level() is never called.
+v2: restore the forced level instead of reporting the default after the
+    reset (Lijo).
 
-PMFW is reinitialised by a reset and comes back on its default curve, while
-smu_dpm.dpm_level still holds the level the user forced. The device then
-runs at the default level while sysfs keeps reporting the forced one. On an
-SMU 14.0.1 APU gfxclk drops from 2.8GHz to 600MHz while sysfs still reports
-high. Writing the same level again does not help either, as
-amdgpu_dpm_force_performance_level() returns early when the requested level
-matches the cached one.
+v3: use the force_performance_level argument of
+    smu_adjust_power_state_dynamic() instead of switching the cached level
+    to auto first.
 
-amdgpu_dpm_reapply_umd_profile() restores the PROFILE_* levels after
-recovery, but returns early for any other level, so high, low and manual
-are left on the PMFW default.
+v4: restore the level through the common reapply path instead of
+    smu_handle_task(), rename amdgpu_dpm_reapply_umd_profile() to
+    amdgpu_dpm_reapply_performance_level(), replay non-profile levels
+    directly and replace the body of smu_reapply_power_state_dynamic()
+    (Lijo). Add the Fixes tag (Kevin).
 
-Force the level to be programmed for AMD_PP_TASK_COMPLETE_INIT during reset
-recovery. The cached level is left untouched, so if programming fails the
-level the user asked for is still retained and the failure is logged.
-
+Fixes: 580ad7cbd4b7 ("drm/amdgpu/swsmu: Only force workload setup on init")
+Suggested-by: Lijo Lazar <lijo.lazar@amd.com>
 Signed-off-by: Priya Hosur <Priya.Hosur@amd.com>
 ---
- drivers/gpu/drm/amd/pm/swsmu/amdgpu_smu.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/amd/amdgpu/amdgpu_device.c |  4 +--
+ drivers/gpu/drm/amd/pm/amdgpu_dpm.c        | 21 +++++++++---
+ drivers/gpu/drm/amd/pm/inc/amdgpu_dpm.h    |  2 +-
+ drivers/gpu/drm/amd/pm/swsmu/amdgpu_smu.c  | 39 ++++------------------
+ 4 files changed, 26 insertions(+), 40 deletions(-)
 
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
+index 5069042b5279..2f7ef4bb2a65 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
+@@ -2774,9 +2774,9 @@ static int amdgpu_device_ip_late_init(struct amdgpu_device *adev)
+ 	amdgpu_device_set_cg_state(adev, AMD_CG_STATE_GATE);
+ 	amdgpu_device_set_pg_state(adev, AMD_PG_STATE_GATE);
+ 
+-	r = amdgpu_dpm_reapply_umd_profile(adev);
++	r = amdgpu_dpm_reapply_performance_level(adev);
+ 	if (r) {
+-		dev_err(adev->dev, "Failed to restore UMD profile state: %d\n", r);
++		dev_err(adev->dev, "Failed to restore performance level: %d\n", r);
+ 		return r;
+ 	}
+ 
+diff --git a/drivers/gpu/drm/amd/pm/amdgpu_dpm.c b/drivers/gpu/drm/amd/pm/amdgpu_dpm.c
+index 75d8bb4868e8..ea698fe48e07 100644
+--- a/drivers/gpu/drm/amd/pm/amdgpu_dpm.c
++++ b/drivers/gpu/drm/amd/pm/amdgpu_dpm.c
+@@ -1083,14 +1083,16 @@ static void amdgpu_dpm_exit_umd_state(struct amdgpu_device *adev)
+ }
+ 
+ /**
+- * amdgpu_dpm_reapply_umd_profile - Restore the active UMD profile
++ * amdgpu_dpm_reapply_performance_level - Restore the retained DPM level
+  * @adev: amdgpu device
+  *
+  * Resume and reset retain the selected DPM level in software, but the
+- * underlying GFX and PMFW state is lost. Reapply a retained UMD profile
+- * after the common resume path has restored its default CG and PG state.
++ * underlying GFX and PMFW state is lost. Reapply the retained level after
++ * the common resume path has restored its default CG and PG state. UMD
++ * profile levels also restore their GFX state, other levels only replay
++ * the level itself.
+  */
+-int amdgpu_dpm_reapply_umd_profile(struct amdgpu_device *adev)
++int amdgpu_dpm_reapply_performance_level(struct amdgpu_device *adev)
+ {
+ 	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
+ 	enum amd_dpm_forced_level level;
+@@ -1120,7 +1122,18 @@ int amdgpu_dpm_reapply_umd_profile(struct amdgpu_device *adev)
+ 	case AMD_DPM_FORCED_LEVEL_PROFILE_MIN_MCLK:
+ 	case AMD_DPM_FORCED_LEVEL_PROFILE_PEAK:
+ 		break;
++	case AMD_DPM_FORCED_LEVEL_AUTO:
++		/* PMFW comes back in auto, as it does at probe. */
++		ret = 0;
++		goto unlock;
+ 	default:
++		/* No UMD pstate state to restore, only the level itself. */
++		ret = pp_funcs->reapply_performance_level(adev->powerplay.pp_handle,
++							     level);
++		if (ret)
++			dev_warn(adev->dev,
++				 "Failed to restore performance level %d: %d\n",
++				 level, ret);
+ 		ret = 0;
+ 		goto unlock;
+ 	}
+diff --git a/drivers/gpu/drm/amd/pm/inc/amdgpu_dpm.h b/drivers/gpu/drm/amd/pm/inc/amdgpu_dpm.h
+index ba8624d28f28..8ae3fcc016f8 100644
+--- a/drivers/gpu/drm/amd/pm/inc/amdgpu_dpm.h
++++ b/drivers/gpu/drm/amd/pm/inc/amdgpu_dpm.h
+@@ -484,7 +484,7 @@ void amdgpu_dpm_set_power_state(struct amdgpu_device *adev,
+ enum amd_dpm_forced_level amdgpu_dpm_get_performance_level(struct amdgpu_device *adev);
+ int amdgpu_dpm_force_performance_level(struct amdgpu_device *adev,
+ 				       enum amd_dpm_forced_level level);
+-int amdgpu_dpm_reapply_umd_profile(struct amdgpu_device *adev);
++int amdgpu_dpm_reapply_performance_level(struct amdgpu_device *adev);
+ int amdgpu_dpm_get_pp_num_states(struct amdgpu_device *adev,
+ 				 struct pp_states_info *states);
+ int amdgpu_dpm_dispatch_task(struct amdgpu_device *adev,
 diff --git a/drivers/gpu/drm/amd/pm/swsmu/amdgpu_smu.c b/drivers/gpu/drm/amd/pm/swsmu/amdgpu_smu.c
-index a901f8535598..654ff6824fdd 100644
+index a901f8535598..e45aeb2c565b 100644
 --- a/drivers/gpu/drm/amd/pm/swsmu/amdgpu_smu.c
 +++ b/drivers/gpu/drm/amd/pm/swsmu/amdgpu_smu.c
-@@ -2553,7 +2553,12 @@ static int smu_handle_task(struct smu_context *smu,
- 		ret = smu_adjust_power_state_dynamic(smu, level, false, false);
+@@ -2507,33 +2507,7 @@ static int
+ smu_reapply_power_state_dynamic(struct smu_context *smu,
+ 				enum amd_dpm_forced_level level)
+ {
+-	struct smu_dpm_context *smu_dpm_ctx = &smu->smu_dpm;
+-	int ret;
+-
+-	ret = smu_apply_clocks_adjust_rules(smu);
+-	if (ret) {
+-		dev_err(smu->adev->dev, "Failed to apply clocks adjust rules!");
+-		return ret;
+-	}
+-
+-	ret = smu_asic_set_performance_level(smu, level);
+-	if (ret) {
+-		if (ret == -EOPNOTSUPP)
+-			dev_info(smu->adev->dev, "set performance level %d not supported",
+-				 level);
+-		else
+-			dev_err(smu->adev->dev, "Failed to set performance level %d",
+-				level);
+-		return ret;
+-	}
+-
+-	smu_dpm_ctx->dpm_level = level;
+-
+-	if (smu_dpm_ctx->dpm_level == AMD_DPM_FORCED_LEVEL_MANUAL ||
+-	    smu_dpm_ctx->dpm_level == AMD_DPM_FORCED_LEVEL_PERF_DETERMINISM)
+-		return 0;
+-
+-	return smu_bump_power_profile_mode(smu, NULL, 0);
++	return smu_adjust_power_state_dynamic(smu, level, true, true);
+ }
+ 
+ static int smu_handle_task(struct smu_context *smu,
+@@ -2698,20 +2672,19 @@ smu_reapply_performance_level(void *handle,
+ 	if (!smu->is_apu && !smu_dpm_ctx->dpm_context)
+ 		return -EINVAL;
+ 
++	if (smu_dpm_ctx->dpm_level != level)
++		return -EINVAL;
++
+ 	switch (level) {
+ 	case AMD_DPM_FORCED_LEVEL_PROFILE_STANDARD:
+ 	case AMD_DPM_FORCED_LEVEL_PROFILE_MIN_SCLK:
+ 	case AMD_DPM_FORCED_LEVEL_PROFILE_MIN_MCLK:
+ 	case AMD_DPM_FORCED_LEVEL_PROFILE_PEAK:
++		smu_enter_umd_pstate(smu);
  		break;
- 	case AMD_PP_TASK_COMPLETE_INIT:
--		ret = smu_adjust_power_state_dynamic(smu, level, true, false);
-+		/*
-+		 * PMFW is reinitialised by a reset, so program the retained
-+		 * level again even though it matches the cached one.
-+		 */
-+		ret = smu_adjust_power_state_dynamic(smu, level, true,
-+						     amdgpu_reset_in_recovery(smu->adev));
- 		break;
- 	case AMD_PP_TASK_READJUST_POWER_STATE:
- 		ret = smu_adjust_power_state_dynamic(smu, level, true, false);
+ 	default:
+-		return -EINVAL;
++		break;
+ 	}
+ 
+-	if (smu_dpm_ctx->dpm_level != level)
+-		return -EINVAL;
+-
+-	smu_enter_umd_pstate(smu);
+-
+ 	return smu_reapply_power_state_dynamic(smu, level);
+ }

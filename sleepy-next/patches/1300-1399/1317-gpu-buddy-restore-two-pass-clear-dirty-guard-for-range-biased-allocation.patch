@@ -1,8 +1,8 @@
 From nobody Mon Sep 17 00:00:00 2001
 From: Arunpravin Paneer Selvam <arunpravin.paneerselvam@amd.com>
-Date: Tue, 3 Nov 2026 18:26:17 +0530
-Subject: [PATCH v3] gpu/buddy: restore two-pass clear/dirty guard for range-biased allocation
-Message-ID: <20261103125617.2480786-1-arunpravin.paneerselvam@amd.com>
+Date: Wed, 4 Nov 2026 12:58:47 +0530
+Subject: [PATCH v4] gpu/buddy: restore two-pass clear/dirty guard for range-biased allocation
+Message-ID: <20261104072847.2617886-1-arunpravin.paneerselvam@amd.com>
 
 From: Arunpravin Paneer Selvam <Arunpravin.PaneerSelvam@amd.com>
 
@@ -40,18 +40,25 @@ v3: igt@kms_plane@plane-panning-bottom-right failed on Radeon RX 9070 XT
     fragmentation and preserves large contiguous spaces. The now-unneeded
     unsplit_block helper is dropped.
 
+v4: a higher-order free mixed block straddling the range edge was split in
+    the strict pass then abandoned, leaving both children free under a split
+    parent that never coalesces, tripping gpu_buddy_fini()'s free-root assert
+    and leaking the children (reported by Sashiko). Fix: in the strict pass
+    don't split a free block that only partially overlaps the range; the
+    fallback pass consumes it (either class accepted).
+
 Fixes: 1ad5e807f716 ("gpu/buddy: replace dual-tree/force_merge with decoupled dirty tracker")
 Assisted-by: LLM
 Cc: Matthew Auld <matthew.auld@intel.com>
 Cc: Christian König <christian.koenig@amd.com>
 Signed-off-by: Arunpravin Paneer Selvam <Arunpravin.PaneerSelvam@amd.com>
 ---
- drivers/gpu/buddy.c                | 75 +++++++++++++-------------
+ drivers/gpu/buddy.c                | 83 ++++++++++++++++-------------
  drivers/gpu/tests/gpu_buddy_test.c | 84 ++++++++++++++++++++++++++++++
- 2 files changed, 122 insertions(+), 37 deletions(-)
+ 2 files changed, 130 insertions(+), 37 deletions(-)
 
 diff --git a/drivers/gpu/buddy.c b/drivers/gpu/buddy.c
-index 28cff97d57dc..f2914f919b04 100644
+index 28cff97d57dc..d9749cbaf05d 100644
 --- a/drivers/gpu/buddy.c
 +++ b/drivers/gpu/buddy.c
 @@ -1240,11 +1240,23 @@ static void __gpu_buddy_undo_splits(struct gpu_buddy *mm,
@@ -90,8 +97,18 @@ index 28cff97d57dc..f2914f919b04 100644
  	 */
  	for (i = mm->n_roots - 1; i >= 0; --i)
  		list_add_tail(&mm->roots[i]->tmp_link, &dfs);
-@@ -1298,6 +1308,9 @@ __alloc_range_bias(struct gpu_buddy *mm,
+@@ -1296,8 +1306,19 @@ __alloc_range_bias(struct gpu_buddy *mm,
+ 			if (round_down(adjusted_end + 1, req_size) <=
+ 			    round_up(adjusted_start, req_size))
  				continue;
++
++			/*
++			 * Strict pass: don't split a partially-overlapping free
++			 * block; rejecting its child would strand the split. Let
++			 * the fallback pass consume it (either class accepted).
++			 */
++			if (!fallback && gpu_buddy_block_is_free(block))
++				continue;
  		}
  
 +		if (!fallback && block_incompatible(block, flags))
@@ -100,7 +117,7 @@ index 28cff97d57dc..f2914f919b04 100644
  		if (contains(start, end, block_start, block_end) &&
  		    order == gpu_buddy_block_order(block)) {
  			/*
-@@ -1315,38 +1328,8 @@ __alloc_range_bias(struct gpu_buddy *mm,
+@@ -1315,38 +1336,8 @@ __alloc_range_bias(struct gpu_buddy *mm,
  				goto err_undo;
  		}
  
@@ -141,7 +158,7 @@ index 28cff97d57dc..f2914f919b04 100644
  	} while (1);
  
  	return ERR_PTR(-ENOSPC);
-@@ -1361,6 +1344,24 @@ __alloc_range_bias(struct gpu_buddy *mm,
+@@ -1361,6 +1352,24 @@ __alloc_range_bias(struct gpu_buddy *mm,
  	return ERR_PTR(err);
  }
  
@@ -166,7 +183,7 @@ index 28cff97d57dc..f2914f919b04 100644
  /* Return the highest-address free block of at least @order. */
  static struct gpu_buddy_block *
  get_maxblock(struct gpu_buddy *mm,
-@@ -1924,7 +1925,7 @@ __gpu_buddy_alloc_blocks(struct gpu_buddy *mm,
+@@ -1924,7 +1933,7 @@ __gpu_buddy_alloc_blocks(struct gpu_buddy *mm,
  
  	if (flags & GPU_BUDDY_RANGE_ALLOCATION) {
  		/* Allocate traversing within the range */
@@ -277,5 +294,3 @@ index 2c6f1da1a6d1..9aaca2fc6a02 100644
  	KUNIT_CASE_SLOW(gpu_test_buddy_fragmentation_performance),
  	KUNIT_CASE_SLOW(gpu_test_buddy_dirty_tracker_performance),
  	KUNIT_CASE(gpu_test_buddy_alloc_exceeds_max_order),
-
-base-commit: 6f7098738fff3ec7393f924343188cb8e6ebc5d2

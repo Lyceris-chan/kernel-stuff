@@ -2,12 +2,12 @@
 
 `linux-sleepy-next` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
-built from a **linux-next snapshot (`next-20261103`)** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 137-patch
+built from a **linux-next snapshot (`next-20261104`)** plus a sanitized
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 138-patch
 series. It is not a general-purpose kernel.
 
-**Base version:** `2026.11.03-1` · **Artifact:**
-`linux-sleepy-next-2026.11.03-1-x86_64.pkg.tar.zst`
+**Base version:** `2026.11.04-1` · **Artifact:**
+`linux-sleepy-next-2026.11.04-1-x86_64.pkg.tar.zst`
 
 The release is named for the **snapshot date**, not the mainline release the
 snapshot was cut from — linux-next is a daily tree, and its base release goes
@@ -110,12 +110,21 @@ builds install the shipped config.
 ## Kernel command line (baked in)
 
 ```
-cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0
+cpuidle.governor=nap amd_pstate.epp_boost=1 pcie_aspm=off amdgpu.aspm=0 amdgpu.runpm=0 amdgpu.user_queue=1
 ```
 
 `pcie_aspm=off` + `amdgpu.aspm=0/runpm=0` are the drm/amd !5538 SMU bus-drop
 stopgaps (DPM stays on). `cpuidle.governor=nap` activates the NAP governor, and
 `amd_pstate.epp_boost=1` enables the per-core EPP boost.
+
+`amdgpu.user_queue=1` enables AMDGPU user queues. The snapshot already has the
+userq UAPI at DRM interface 3.65 — the version RADV requires for syncobj
+timeline signalling — but the driver's `-1` (auto) default sets `disable_uq=true`
+on GFX12/SDMA7. The gfx12 firmware in `linux-firmware-amdgpu` 20261019 meets the
+driver's userq gates (ME 3110, PFP 3220, MEC 3490, MES 151). RADV still opts in
+per game with `AMD_USERQ=1`; the installed Steam games carry it in their launch
+options. `sleepy-rc` is on 7.3.0, whose DRM interface is 3.64, so RADV refuses
+userq there — this knob is preview-only until the 3.65 patches are carried.
 
 `amdgpu.dcdebugmask=0x800` (DC_DISABLE_IPS) is deliberately **not** set in the
 preview: it exists to exercise the snapshot's display code with IPS enabled.
@@ -124,7 +133,7 @@ preview: it exists to exercise the snapshot's display code with IPS enabled.
 
 ## Patch series
 
-137 patch entries in `source=()` (144 files; seven are excluded from the build). `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+138 patch entries in `source=()` (145 files; seven are excluded from the build). `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 On a linux-next snapshot a large fraction are skipped rather than failed, since
 the snapshot already carries much of what the series adds — a skip is only safe
 for a self-contained patch, so interdependent groups are excluded outright

@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
 - **Base:** Linux `v7.3`
-- **Series:** 305 patches
+- **Series:** 313 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -22,23 +22,23 @@ are supplied by the generator instead, so every row below has a source.
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 30 |
-| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 12 |
+| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 16 |
 | `1100–1199` | AMD display (DCN4, colorops) | 30 |
-| `1200–1299` | AMD power management (amd-pstate, CPPC) | 30 |
-| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 48 |
+| `1200–1299` | AMD power management (amd-pstate, CPPC) | 31 |
+| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 49 |
 | `2100–2199` | Memory management and swap (zstd, LRU-MARIE, gup, zswap) | 50 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 21 |
 | `2400–2499` | Core scheduler and sched-ext | 3 |
 | `2500–2599` | x86 and arch core | 2 |
 | `2600–2699` | Time and timers | 0 |
-| `2800–2899` | Memory management, second series (mm/swap follow-ups) | 7 |
+| `2800–2899` | Memory management, second series (mm/swap follow-ups) | 8 |
 | `2900–2999` | VFS / core filesystem | 0 |
 | `3000–3099` | Platform, USB and hwmon (PROM21 chipset temperature) | 1 |
-| `9000–9099` | agd5f staging + userq lifecycle backports | 36 |
+| `9000–9099` | agd5f staging + userq lifecycle backports | 37 |
 | `9100–9199` | Retry-fault handling v4 (agd5f staging) | 11 |
 
-**Total: 305** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 313** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-19). The counts are now generated from the patch tree
@@ -11712,6 +11712,199 @@ Phoronix carried no new on-target kernel story: the 7.4 feature review, FAT32
 and MMX-removal items, and the usual RADV/Intel/mobile material. The MMX
 removal (`raid6`/`xor`) is in the new snapshot and is not something to carry.
 
+### Tracker re-check (2026-11-03, after the snapshot sweep)
+
+The `updated_after=2026-10-30` query returned **66 open issues**; all 66 comment
+sets were fetched through GraphQL in seven batches. The delta since the pass
+above is three new threads and status-only updates:
+
+- **`#6085`** — `DRM_IOCTL_SYNCOBJ_EVENTFD` wakes the GPU even for an imported
+  syncobj that has no work. Reported on an RX 9070 XT under 7.3.0 as well.
+  agd5f: fixed in ASDN and 7.4; no commit id in the thread and no matching
+  commit subject in the local ASDN/next/torvalds clones, so it is not verified
+  against `next-20261103`. Watch the next snapshot; `sleepy-rc` stays on 3.64
+  and has no backport.
+- **`#6086`** — DCN 3.0.2 / RX 6600 HDMI FRL stays SDR with HDR metadata; a
+  patch was posted to amd-gfx on 2026-11-03
+  (`<20261103143248.59765-1-jward92@gmail.com>`) changing the DCN 3.0 HPO FRL
+  stream encoder. DCN 3.0 only; this machine runs DCN 4.0.1. Reject.
+- **`#6069`** — RX 9070 MCLK pinned at maximum with three displays. DML2 PMO
+  cannot use SubVP across more than two displays; the thread ends with no fix.
+  Power-only, not a carry.
+- Status-only: `#5477` (fix `63e19ef3ddab` is in both bases), `#6087` (both
+  drm-misc fixes `3db7d7d5`/`fcfe6471` are in `linux-next` and `torvalds`),
+  `#5339` (RA24 RGBA patches still unsubmitted; agd5f asked for a landing
+  plan), `#6017`, `#4763`, `#6068` and `#5988` (user patches not posted).
+
+No new adoptable Navi 48 / DCN 4.0.1 fix.
+
 ### Audits
 
 `audit_series.py`: **311/311** on `v7.3` and **137/137** on `next-20261103`.
+
+## Sweep 2026-11-04 — `1237` v4, `1317` v4, BORE 7.0.1, lru_cast 0.2.10, JPEG 5.0.0, the VLAN fix
+
+Sources refreshed against their remotes: `torvalds` (`05441d697f7f`),
+`linux-next` (`next-20261103`, the newest tag at the time of the sweep),
+`drm-next`, `agd5f-linux`, `amd-staging-drm-next`, `drm-misc`, `linux-pm`,
+`akpm-mm` (including `mm-everything` and the unstable branches), `tip`, the
+fourteen lore mirrors, sirlucjan, CachyOS and Phoronix. `lore-stable` remains
+frozen at 2022-05-18 and was not used.
+
+**The CachyOS clone was fetching only `7.0/cachy`.** Its
+`remote.origin.fetch` was the single branch line, so `fetch --all` exited 0
+while `origin/7.3/fixes` stayed three weeks stale. A fetch with
+`+refs/heads/*:refs/remotes/origin/*` moved `7.3/fixes` to `a558a2bb` and
+`7.3/base` to `36ae4c21` (both 2026-10-30), and exposed `7.4/bbr3` at
+`f5b72320` (2026-11-04). This is the `fetch --all` trap in another form: the
+refspec, not the network, was the reason nothing moved.
+
+### Adopted
+
+| Patch | Change | Why |
+|---|---|---|
+| `1237` v3 → **v4** | `drm/amd/pm: restore the forced performance level after a reset` (Priya Hosur, AMD) | v4 restores the level through the common reapply path instead of `smu_handle_task()`, renames `amdgpu_dpm_reapply_umd_profile()` to `amdgpu_dpm_reapply_performance_level()`, replays non-profile levels directly, and replaces the body of `smu_reapply_power_state_dynamic()`; it adds `Fixes: 580ad7cbd4b7` and `Suggested-by: Lijo Lazar`. Message-ID `<abbf127cdaa05bc133605a961ef912dd773dab29.1793787406.git.Priya.Hosur@amd.com>`. Both bases. |
+| `1317` v3 → **v4** | `gpu/buddy: restore two-pass clear/dirty guard for range-biased allocation` (Arunpravin Paneer Selvam, AMD) | v4 stops the strict pass from splitting a higher-order free mixed block that only partially overlaps the range; the abandoned split tripped `gpu_buddy_fini()`'s free-root assert and leaked both children (Sashiko). Message-ID `<20261104072847.2617886-1-arunpravin.paneerselvam@amd.com>`. **Preview only** — the range-bias path is 7.4 code. |
+| `2419` BORE 7.0.0 → **7.0.1** | `sched/bore` (Masahito S, firelzrd) | Converts the wake-up sleep credit to virtual time with `calc_delta_fair()` before deducting it from the deadline, clears inherited sleep credit on fork, and walks the children list with the RCU iterator. `c7aab1e73`, 2026-11-04. The rc copy is file-for-file the author's `patches/testing/0001-linux7.3-rc2-bore-7.0.1.patch`; the preview copy carries the same added lines with 7.4's `hrtimer_sleeper_task_get(timeout)` context in the futex hunk — the same one-line rebase the 7.0.0 carry needed, and the reason a straight apply fails on the preview base. |
+| `2102` lru_cast 0.2.9 → **0.2.10** | `mm/lru_cast` (Masahito Suzuki, firelzrd) | Adds pinned-page accounting: `lru_cast_pinned_part()` subtracts the node's `NR_FOLL_PIN_ACQUIRED - NR_FOLL_PIN_RELEASED` share from anon before the balance decision, because pinned folios stay on the lists but cannot be reclaimed. `cfe2deb`, 2026-11-04. The rc copy is the author's `0001-7.3-rc7-lru_cast-v0.2.10.patch`; the preview copy replaces the same three files (`balance.c`, `reclaim.c`, `version.h`) in the v0.2.9 port and is otherwise byte-identical to it. |
+| `1319` | **new** — `drm/amdgpu/jpeg: unwind late software init failures in v5.0.0` (Wentao Liang) | `jpeg_v5_0_0_sw_init()` returns after `amdgpu_jpeg_reg_dump_init()` or the reset-mask sysfs init fails, leaving the ring buffers and the `vmid_wait` fence allocated; `status.sw` is not set, so the common cleanup skips `sw_fini()`. Unwinds with `amdgpu_jpeg_suspend()` + `amdgpu_jpeg_sw_fini()`. `Fixes: 64dc2f0029ec`, `Cc: stable`. JPEG 5.0.0 is this machine's IP. Applies to both bases. **The preview copy calls `amdgpu_jpeg_cancel_idle_work()` instead**: the preview's carried `1318` replaced `amdgpu_jpeg_suspend()` with that helper, and on 7.3 the suspend function is exactly `cancel_delayed_work_sync()` on `jpeg.idle_work`, so the unwind is the same. The first preview build without that adaptation failed with `call to undeclared function 'amdgpu_jpeg_suspend'`. Message-ID `<20261104025340.1527373-1-vulab@iscas.ac.cn>`. |
+| `2067` | **new** — `vlan: restore HW VLAN tag insertion with reorder_hdr off` (Eric Dumazet) | `447cbe95ebb9` made `vlan_dev_hard_header()` push an in-band tag even when the device can offload it; r8169 stalls on checksum/TSO offload of frames carrying an in-band tag, producing NETDEV WATCHDOG TX timeouts. This is commit `c2124f80be4c`, in `v7.4-rc1` and every `next-*` since, but **not in `v7.3`** — rc-only. Applies cleanly to the clean tag and to the series. |
+| `2808` | **new, preview only** — `mm/swapfile: drop a large unmapped swap-in folio in unuse_pte()` v2 (Mani Tofigh) | A large swap-in can leave a folio in the swap cache while no PTE maps it; `swapoff` then maps all of it and the next fault hits `BUG` in `do_swap_page()`. `Fixes: f1879e8a0c60`, `Cc: stable`. Written against newer code than `v7.3`; applies to the preview series. **Reachability note:** with zswap enabled, `thp_swapin_suitable_orders()` returns 0, so the trigger is not on this machine's normal path; carried as a stable crash fix, the same disposition as `2807`. |
+| preview `0101` | **CachyOS 7.4/bbr3 refresh** | CachyOS rebased `7.4/bbr3` on 2026-11-04 (`f5b72320`). The only content delta against our port is in `bbr_tso_segs()`: it now takes `u32 mss_now` and returns `sysctl_tcp_min_tso_segs` when `mss_now == 0`, because BPF callers of the kfunc may pass zero. The preview squash is regenerated with that hunk; the rc `0101` is unchanged — the 7.3 author files and our rc squash are content-identical. |
+
+### Version sweep
+
+`versweep.py` indexed 321 carried subjects against 14,703 postings since
+2026-11-01 across all lore mirrors. Three subjects had a higher revision:
+`1237` v4 and `1317` v4 (both adopted above), and `2806` v2 — a resend whose
+changed-line set is identical to the carried v1, so there is nothing to update
+(same finding as 2026-11-03; the v2 series' new parts became `2807`).
+`2806` v1 stays.
+
+### Deferred or rejected
+
+- **userq `[PATCH v4 0/4] query status`** (Prike Liang) — unchanged since the
+  2026-10-10 posting, and today's amd-gfx traffic is review pings. Still a UAPI
+  addition split across four parts whose tail does not apply to either base.
+  A user decision, not a sweep carry.
+- **SPM VMID SH_MEM series** (Jesse Zhang) — on-target in shape (navi48 is
+  named in the commit message), and its prerequisites **are** in
+  `next-20261103`: `spm_vmid` and `amdgpu_vmid_free_spm()` are present in
+  `amdgpu_ids.c`. A `cat-file`/`log --grep` check said otherwise because the
+  clone is shallow — the content probe is the reliable test. Three competing
+  revisions are in flight: a `[PATCH 1/3]` (2026-10-29), the `[PATCH 1/6]`
+  expansion (2026-10-30) and a `[PATCH v2 1/2]` alternative (2026-10-30), with
+  only `Signed-off-by` and no review tag. It matters only when userspace
+  reserves a VMID for SPM profiling. Defer until the series settles.
+- **`drm/sched: Adjust run-queue when changing priority at runtime` v2** —
+  a two-line `Fixes:` for the `2fa4d8e2c109` revert, but the thread is still
+  arguing about a TODO comment and the impact is SDMA-only dynamic priority
+  changes. Watch.
+- **`drm/client: Don't warn when a client's VBLANK wait times out`** (Prike
+  Liang) — the warning is cosmetic after a GPU recovery, and the patch has no
+  review tag yet. Defer.
+- **Multi-ring reset / engine-scope soft reset, 15 patches** — an active review
+  series today (`pass the device to the multi ring reset helpers`, `add an
+  engine scope to the IP block soft reset`, `gfx11: enable the gfx engine soft
+  reset`). It is a reset refactor and feature, not a fix for a failure seen
+  here; the enablement named is `gfx11`. Watch, do not carry.
+- **`DRM_COLOROP_3D_LUT_DMA` v1, 13 patches** — display colour-management
+  feature work; no bug and no hardware tie beyond DCN generally. Reject.
+- **`drm/amdgpu: refuse runtime suspend when the master has no displays`** —
+  inert here: the built-in cmdline sets `amdgpu.runpm=0`.
+- **JPEG v5.3.0 / v4.0.5 unwind patches** — wrong JPEG IP versions; this
+  machine runs `jpeg_v5_0_0`.
+- **PSR/self-refresh, eDP luminance, backlight curves** — eDP/laptop display
+  work; this machine is HDMI-only.
+- **`drm/amdgpu: drop async_gfx_ring`** — Alex Deucher's cleanup touches
+  `gfx_v10/v11/v12_1` only; there is no `gfx_v12_0` hunk.
+- **UALink loopback, Apple UCLK, amdxdna/ISP, Navi 31/33/21 fault and power
+  patches** — wrong hardware or datacenter-only files.
+- **`mm: zswap: Move the crypto_acomp to be per pool`** — an optimisation
+  (56 bytes per CPU), not a fix; Herbert Xu likes the direction but there is no
+  functional benefit on this machine. Reject.
+- **`mm/migrate: don't move memcg NR_FILE_PAGES for swapcache`** — fixes
+  cross-zone memcg counter drift; this machine is a single NUMA node and the
+  patch has no stable tag or review. Defer.
+- **`cpufreq: CPPC: Enable boost by default when supported` v2** — Christian
+  Loehle's reply questions whether the highest-nominal interpretation should
+  exist at all; not settled. Defer.
+- **nvme ANA/SRCU teardown fixes, RTL8126 bus-reset avoidance, io_uring
+  alloc-cache and dma-buf work** — not reachable on this machine's hardware or
+  normal workload; the r8169 VLAN regression they would matter for is fixed by
+  `2067`.
+- **CachyOS `7.3/fixes` new commits** — `84967922` is already carried as
+  `1230` (the upstream form is `b400642c5e93`), `e93468e0` is a Logitech G920
+  HID fix, and `a558a2bb` is a generic xHCI ownership assertion with no
+  target-hardware tie. None adopted.
+- **CachyOS `7.3/cachy` new commits** — `f2bd287f` is an ACS-override fixup
+  and `db7c39da` is the Intel remapped-NVMe patch, both off-target.
+  `962bee17` (`rust: Allow BTF generation with Rust + LTO`) was evaluated: it
+  drops `!LTO` from `RUST`'s `DEBUG_INFO_BTF` dependency, which would turn the
+  config's `CONFIG_RUST=y` back on under `LTO_CLANG_THIN`. It has no effect on
+  this machine's target components and adds Rust/BTF build surface; not
+  adopted.
+
+### Gaming distros
+
+- **Nobara 7.3** (`Nobara-Project/rpm-sources`, `baseos/kernel/mainline/7.3`) —
+  its BORE-Cachy is still **7.0.0** (we moved to 7.0.1); the rest is off-target:
+  the 1.3 MB `0001-handheld`, `drm-amdgpu-restore-csib-submission-on-gfx10-dgpus`
+  (GFX10), `igc-disable-aspm-l1-asus-i226-v` (Intel NIC), the Mercusys MA530
+  Bluetooth ID, `xpadneo` (Xbox controllers), the Logitech-wheel patch and the
+  USB poll-rate tweaks. `valve-gamescope-framerate-control-fixups` (the 2022
+  atomic async page-flip series) is **redundant**: the base already accepts
+  `DRM_MODE_PAGE_FLIP_ASYNC` in `drm_mode_atomic_ioctl()` and `amdgpu_dm`
+  handles `crtc_state.async_flip`. The base has no
+  `atomic_async_page_flip_not_supported` flag and does not need the 2022 series.
+- **SteamOS** (`evlaV/linux-integration`, `6.16/integration`) — Deck and ROG
+  Ally hardware, branch commits from August 2026. Nothing for a 7.3/7.4 desktop.
+- **Bazzite** — Fedora kernel plus akmods and userspace specs; no kernel
+  patchset in the repo. **ChimeraOS**'s kernel tree is stale since 2025.
+- **Pop!_OS** — Ubuntu packaging, mt76 Wi-Fi and Rust tooling; nothing on-target.
+- **XanMod** (GitLab `7.3`, `7.3.1-xanmod1`) — commits since October are stable
+  merges only; its feature set is older than the CachyOS BBRv3 we already carry.
+- **linux-tkg** — today's two commits are the upstream BORE 7.0.1 (adopted
+  directly from firelzrd) and MuQSS, which is inert under BORE.
+
+### Reverts, drops and absorption
+
+`v7.4-rc1..master` contains no new `Revert` commit since 2026-11-01. The only
+revert in `next-20261103` is the already-known `de18ae504127` (`lib/sort.c`).
+The lore mirrors carried only the 6.18 `proto_ops bind()` revert, which is not
+in either base. No carried patch was reverted in the window.
+
+### Tracker and Phoronix
+
+The drm/amd tracker returned 27 issues updated since 2026-11-03; comments were
+fetched for the 14 on-target threads. No new fix commit: `#5380` and `#6045`
+are AMD follow-ups describing an ODM-combine / bandwidth-validate root cause
+for the RX 9060 XT pageflip timeouts, but no patch has been posted; `#6088` is a
+firmware (`linux-firmware-amdgpu`) fan-control regression; `#6085` is fixed in
+7.4; `#6087` has both drm-misc fixes in the bases; `#6017`, `#5807`, `#5477`
+and `#5170`/`#5072` are retest requests against `63e19ef3ddab`, already carried.
+A second pass at 12:12 UTC found `#6089` (Strix Halo `gfx1151`, MES reset) new —
+GC 11.5, wrong chip — and no new comments on the on-target threads.
+
+Phoronix carried the 7.4-rc1 feature review (including the AMDGPU HDMI 2.1
+default, already in the preview base), the MMX removal and the usual
+RADV/desktop material. Nothing new on-target for this hardware.
+
+### Preview bump to `next-20261104`
+
+The tag `next-20261104` (`8b7179210b22`, tag object `4004549ef9cf`, 959
+commits) was cut after the sweep. The preview's 139-patch series
+applies except `2061` (`blk-mq: end the request if getting a keyslot fails`),
+which the snapshot absorbed — its post-image is now in `blk_mq_submit_bio()`:
+`blk_zone_write_plug_init_request()` before the keyslot call, and
+`blk_mq_end_request(rq, ret)` on failure. With user approval `2061` was removed
+from the preview only; `sleepy-rc` keeps it because `v7.3` lacks the fix. A
+reverse-apply sweep against a clean 1104 tree flags only `1093` as clean, and
+that is a false positive: the real `amdgpu_debugfs_gfxoff_count_read()` still
+has `size & 0x3`, and the reverse matched a similar 8-byte block in another
+debugfs reader.
+
+### Audits
+
+`audit_series.py`: **313/313** on `v7.3` and **138/138** on `next-20261104`
+(the 139th, `2061`, is absorbed in the snapshot and removed from the preview).
