@@ -11586,7 +11586,7 @@ epoch 0) and was not used.
 |---|---|---|
 | `1237` | `drm/amd/pm: restore the forced performance level after a reset` v3 (Priya Hosur, AMD) | `smu_late_init()` re-applies the DPM level through `smu_handle_task()`, but `smu_adjust_power_state_dynamic()` only programs the hardware when `force_performance_level` is set or the cached level differs. After a reset the PMFW is reinitialised while `dpm_level` still matches, so a forced level is silently not restored. The fix passes `amdgpu_reset_in_recovery()`, which exists in both bases. Message-ID `<f370dc0e7025b9b39cac723b1b60ccbd339d233f.1793689935.git.Priya.Hosur@amd.com>`. Applies to both bases; carried by both packages. |
 | `1315` | `drm/amdgpu: don't walk the CS chunks when allocating them failed` (Jesse Zhang, AMD) | `amdgpu_cs_pass1()` sets `p->nchunks` before allocating `p->chunks`, and the allocation-failure path leaves it set, so `amdgpu_cs_parser_fini()` frees `kdata` from a NULL array; the oops in the posting is on navi48. Set `nchunks` only once the array exists. `Fixes: d38ceaf99ed0`. Message-ID `<20261103083132.3056003-1-Jesse.Zhang@amd.com>`. Both bases. |
-| `1316` | `drm/amdkfd: reject foreign device pages in svm_range_dma_map_dev()` (Aveline Noir) | The `dev_private_owner` passed to HMM is per device or XGMI hive, so HMM can return a zone-device page of another `svm_bo` — after a `fork()` the child can see the parent's VRAM pages — while the VRAM address and the PTE flags are computed from `prange->svm_bo`, which can be NULL. Reject foreign pgmap pages with `-EFAULT` and clear the entry. `Fixes: 1d5dbfe6c06a`. Message-ID `<20261103-kfd-svm-foreign-vram-20261103-v1-1-d6282053cad3@gmail.com>`. Both bases. |
+| `1316` | `drm/amdkfd: Check ownership of device pages for DMA mapping` (Felix Kuehling, AMD) | **Replaces the community v1 adopted earlier the same day.** The `dev_private_owner` passed to HMM is per device or XGMI hive, so HMM can return a zone-device page of another `svm_bo`. `svm_page_is_range_owned()` now checks `page->zone_device_data == prange->svm_bo` under `prange->lock` instead of comparing pgmaps, treats non-private pages from other devices as system memory, and warns on a device-private page from another driver or range. Message-ID `<20261105185828.85367-1-felix.kuehling@amd.com>`. Both bases; the v1's `Fixes: 1d5dbfe6c06a` still applies. |
 | `2807` | `mm, swap: fix large swap-in across swap file extents` v2 2/4 (Chris Mason; `S-o-b` David Hildenbrand and Kairui Song; `Reviewed-by: Nhat Pham`) | A large swap-in issues one bio from the first slot's sector, but adjacent swap slots of a swap *file* can live in different extents, so the tail of the folio is filled from whatever blocks follow the extent — reproduced returning blocks of a root-owned 0600 file to an unprivileged process. Permit a large swap-in only when `SWP_BLKDEV` is set. `Fixes: 242d12c98174`, `Cc: stable`. Message-ID `<20261104-swap-fixes-v2-2-204be064be5b@tencent.com>`. The context differs between the packages because `2700` rewrote the same `do_swap_page()` guard in the preview; the added lines are the author's, unchanged, in both regenerated copies. **Reachability note:** `thp_swapin_suitable_orders()` already returns 0 when zswap has ever been enabled, which is the normal state here, so the new `SWP_BLKDEV` guard only runs with zswap disabled. It is carried as a stable security fix, not as a change to this machine's normal swap path. |
 | `9090` | `drm/amdgpu/userq: validate evicted BOs on the individual idle list on restore` (Jesse Zhang, AMD) | A GEM_VA operation or a kernel CS can update the PTEs of an evicted BO without validating it, which moves the `bo_va` to the idle list with PTEs pointing nowhere; user-queue restore only validates the evicted list, and the eviction-fence rearm runs after the last PTE update. Walk `vm->individual.idle` and validate those BOs too. The posting is against the pre-rename list name (`needs_update`); the copy carried here is context-regenerated against the series (`evicted`), added lines unchanged. Message-ID `<20261103083439.3057038-1-Jesse.Zhang@amd.com>`. Both bases. |
 | `1317` | `gpu/buddy: restore two-pass clear/dirty guard for range-biased allocation` v3 (Arunpravin Paneer Selvam, AMD) | Range-restricted allocations (the visible-VRAM aperture) skip `dirty_steer_window()` and reach `__alloc_range_bias()` with no clear/dirty eligibility guard, so a dirty allocation can split clear extents and vice versa, interleaving the classes until a 4K scanout pin fails with `-ENOSPC`. **Preview only**: the range-bias code is 7.4-only, and five of six hunks fail on `v7.3`. |
@@ -12050,9 +12050,10 @@ as `2102` in both packages. No newer release and no CAST posting on the lists.
 ### Not adopted
 
 - **`drm/amdkfd: Check ownership of device pages for DMA mapping`** (Felix
-  Kuehling, 2026-11-05) — supersedes the community patch carried as `1316` with
-  a stricter `zone_device_data == prange->svm_bo` check. It conflicts with
-  `1316`, and replacing a carried patch needs explicit approval.
+  Kuehling, 2026-11-05) — initially held because it supersedes the community
+  patch carried as `1316` and replacing a carried patch needs explicit
+  approval. **Adopted after approval**; it replaces `1316` in place, and both
+  series still audit cleanly.
 - **`io_uring/kbuf: fix cross-mm interpretation of provided buffers`** — Jens
   Axboe rejected it on the list: "This is nonsense. This isn't a bug."
 - **`io_uring/sqpoll: make io_sq_thread_stop() idempotent`** — WARN-only fix,
@@ -12085,6 +12086,28 @@ revert of the DCN401 RDPCS reads and is carried as `1184`. Work item #5339
 `dc_dmub_srv_apply_idle_power_optimizations()` warning with no fix yet; #5807,
 #5800, #5511 and #5900 wait on `63e19ef3ddab`, which is already in `7.3-rc4+`
 and therefore in both bases; #6090 is a kernel-7.0 firmware-loading report.
+
+### `1316` replaced, and the post-approval recheck
+
+After the user approved replacing the carried community patch, `1316` now
+carries Felix Kuehling's maintainer version (`Message-ID
+<20261105185828.85367-1-felix.kuehling@amd.com>`). It applies in place in both
+series, so the series still audits **327/327** and **150/150**. A second
+version and revert pass over the same mirrors found only the already-known
+kbuild v5 rework, `1175` v5 and `2806` v2 resends; no revert of carried work
+appeared. Versions `7.3.0-20` and `2026.11.05-2` ship the replacement.
+
+Sashiko posted an automated review of Felix's posting (unrebutted, no human
+`Reviewed-by`). Its two High findings concern the `WARN_ON_ONCE()` branch for a
+device-private page from another range: the branch returns without clearing
+`addr[i]`, so a later `svm_range_dma_unmap()` can unmap that entry twice, and a
+same-hive page from another `svm_bo` now fails instead of being DMA-mapped. The
+branch is WARN-gated and should never run; the maintainer version is still
+strictly better than the community v1 it replaces, which mis-computed the VRAM
+address. Watch for a v2 at the next sweep.
+
+The RA24 patch's Sashiko finding (broken `dm_test_get_plane_formats()` counts)
+is inert here: `CONFIG_KUNIT`/the amdgpu DM KUnit tests are not built.
 
 ### Series state
 

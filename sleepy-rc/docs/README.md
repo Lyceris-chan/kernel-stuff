@@ -6,8 +6,8 @@ built from **mainline Linux 7.3** plus a sanitized
 [CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 327-patch
 series. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0-19` · **Artifact:**
-`linux-sleepy-rc-7.3.0-19-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0-20` · **Artifact:**
+`linux-sleepy-rc-7.3.0-20-x86_64.pkg.tar.zst`
 
 ## Target hardware
 

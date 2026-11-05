@@ -203,7 +203,7 @@ _snapdate=${_srctag#next-}                                            # 20261105
 _snapver="${_snapdate:0:4}.${_snapdate:4:2}.${_snapdate:6:2}"
 pkgver=${_snapver}
 _tagrel=1
-pkgrel=1
+pkgrel=2
 # Build parallelism. Previously capped at 8 on a diagnosis that did not hold up.
 #
 # The cap was added after an rc4-7 build thrashed badly — 6 watchdog firings and
@@ -349,7 +349,7 @@ source=(
   "patches/1300-1399/1313-drm-amdkfd-use-the-queue-s-process-info-for-WPTR-BO.patch"
   "patches/1300-1399/1314-drm-amdgpu-rewrite-all-PTEs-after-VM-reset.patch"
   "patches/1300-1399/1315-drm-amdgpu-dont-walk-the-CS-chunks-when-allocating-them-failed.patch"
-  "patches/1300-1399/1316-drm-amdkfd-reject-foreign-device-pages-in-svm_range_dma_map_dev.patch"
+  "patches/1300-1399/1316-drm-amdkfd-check-ownership-of-device-pages-for-DMA-mapping.patch"
   "patches/1300-1399/1317-gpu-buddy-restore-two-pass-clear-dirty-guard-for-range-biased-allocation.patch"
   "patches/1300-1399/1318-drm-amdgpu-stop-GPU-recovery-wait-for-the-JPEG-VCN-idle-work.patch"
   "patches/1300-1399/1319-drm-amdgpu-jpeg-unwind-late-software-init-failures-in-v5.0.0.patch"
@@ -1211,7 +1211,7 @@ b2sums=('eb66338d1cba00ad3025461dbaa209b349fffcc4e74bb8d9b3355e8f8ae7ddd7af8a303
         'd34e2ed111d28b4a01e9f8993c4dbe617509e212fd1222be2fb5da58b471e304b256c09aa1d305a7b84aa0e70e3cd40c26928d2cbb0c6ae08f04dc45657bab66'
         'c2c0f480dcca4b828ad3b37256ec7bcfb8c1fd5760cdda2e2e894eb2197c26bb49ce93f38a57614684c088914cfa49b52e1679ff3e921c7fa01f9a3667a45354'
         'f6b05bb6f637c618ecc6e5c5f1ac1c92cb110d1bddcbd7f9ecd074fef95cc82608e73b54196386b951638de75457182abdcac4fa34f06a41a0a58c1ad06a2a9a'
-        '3e746bce93c32bd4b2933dfcbc4203df5487dd6360675804c1e219efc5b2a81c7987a7255b7265c1827e1d772f6423dfe26797754c06bab6b7889a1269547ad5'
+        '4d600d2a10396e4be0e5fcce1d6bfaed13f32ecedb7cb40cd71ea6c6718e102e74561e0925011610c45254f47d981b5adf414577ae01b4da9d36bf018b4e4d12'
         'e07675f520392e8b108f40e87f93f823cf8999ae4869370f3c810c7fd8aa90220d749c47465933e9c0eb7010caca1d00094143a5aed1bf90bea2494bc6d72692'
         'ef25e855b6b6b6c879baf5fada402439e37a6d913135db3ef2cd5b98504497616adda9f11db960d432e753dd60517604d8d160bd89e4181114d7c99ff61d4b12'
         'f7380a26e828fba6fb8c066d9eff2647f908da5db2625819feabe056969f0705a0775c9b6e7e91793d9dd7a0ce50f54e4ed3218ebd9e8157e733b1c0db1bfe06'
@@ -1271,8 +1271,8 @@ b2sums=('eb66338d1cba00ad3025461dbaa209b349fffcc4e74bb8d9b3355e8f8ae7ddd7af8a303
         '08d97dc750acece76e466aaf211f94e3a35dc51518b599b6313f04c5470ba9b9aec4af74d7505e2c9101eb4847dd48f1393d39a73c2cd749c722bba57791f03e'
         'a607eff6f904c8b02e05c3b379dce39dff5a518bf01588c054a8be5f4de51c9bad985df014551cc3ddeba4cfb46f3121a022414e958608da67520a1e35e3a2e3'
         '5d7126ffc7deab9ac4b6976e0690848c6821c04a38e9a3c90fa50dc399ede15ad2b5efc7168a30c9fd8f5293edcff92111f96b79ac784f7f844d7cc2e38e90b3'
-        '2e53f0a94c1a3be2e311a164e6a0b8007dd0771cd7da3c9b3d74971f7ae38e7a279c3ad807133517aeb7454462044f78c6993eb134dc2dc363f99ae79310eec3'
-        '326aa87715b1f9423cdf3a0e71049d26b0ddb6c6399cb577af3e29c33eb6feb51babf9451d403c8d7422ffbde474cc47393a67162b6bd38b54757df331beb39c'
+        '2271f823213d7dfc557395b89becc1c625ff465d7709d684c6b1a927ebc5d45cc380810fb9bca9119f6438fd18a71d5853ea610f001a545404bc512b952769f5'
+        '3a5f75c872c8e4af63befa0c102884b2f1ca2181b546ee5f92aa69354deae5d43349986d440cd0cd85ee6a87f091ac6217e3270e1cb257ddffd2d475eaf0fc4a'
         '0c25491212274500756b31955cafa5f757480985f21d616ab179df8773f1d8a869ab5eb319add233c5f998ec286e12e0fbaf40c1f01cc4f6d577c799cd0a40a7'
         '2f6ecc84e0141cbee5ce379a2959550cb4830e923afa3d5275283d74d69b8e3bba51f84af96df329d1ea30af0a26f320678907833b40172cbff4a751de3682a7'
         '21ca802919183021abd12cfc782de48a895daddfa9b401700e4bef50e750537183bc3c7157e723bcae769d2bd72f9efd34e677d80d63d74eaa7344b8205eb1fe'

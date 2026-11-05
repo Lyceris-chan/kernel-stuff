@@ -1,7 +1,7 @@
 From 7440773b85c7937e1dcb91c87585a5380029c5e1 Mon Sep 17 00:00:00 2001
 From: Rishabh Jain <rishabh.jain1198@gmail.com>
 Date: Fri, 30 Oct 2026 12:36:47 -0700
-Subject: [PATCH] usb: pci-quirks: always assert xHCI OS ownership
+Subject: [PATCH v6] usb: pci-quirks: always assert xHCI OS ownership
 
 The xHCI ownership protocol requires the OS driver to assert the HC OS
 Owned semaphore before using the host controller, then wait for HC BIOS

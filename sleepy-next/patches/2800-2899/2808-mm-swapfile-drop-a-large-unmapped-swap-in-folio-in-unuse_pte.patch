@@ -1,7 +1,7 @@
 From 7c68ad073342d6af2adcd5a7ed63bcb7f5d28338 Mon Sep 17 00:00:00 2001
 From: Mani Tofigh <mt4022@columbia.edu>
 Date: Thu, 5 Nov 2026 12:19:27 -0500
-Subject: [PATCH] mm/swapfile: drop a large unmapped swap-in folio in unuse_pte()
+Subject: [PATCH v3] mm/swapfile: drop a large unmapped swap-in folio in unuse_pte()
 
 Since commit f1879e8a0c60 ("mm, swap: never bypass the swap cache even
 for SWP_SYNCHRONOUS_IO"), a fault can read a swapped-out mTHP range into

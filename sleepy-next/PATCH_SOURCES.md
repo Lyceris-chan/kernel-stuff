@@ -1306,7 +1306,7 @@ two preview-only patches below.
 |---|---|---|
 | `1237` | `drm/amd/pm: restore the forced performance level after a reset` v3 | `smu_late_init()` does not reprogram a retained level after a reset. Both bases. |
 | `1315` | `drm/amdgpu: don't walk the CS chunks when allocating them failed` | NULL-array free in `amdgpu_cs_parser_fini()` on allocation failure; the oops is on navi48. Both bases. |
-| `1316` | `drm/amdkfd: reject foreign device pages in svm_range_dma_map_dev()` | HMM can return another `svm_bo`'s VRAM page, and `prange->svm_bo` can be NULL. Both bases. |
+| `1316` | `drm/amdkfd: Check ownership of device pages for DMA mapping` (Felix Kuehling, AMD; replaces the community v1) | Checks `page->zone_device_data == prange->svm_bo` under `prange->lock` instead of comparing pgmaps, which are per device or XGMI hive. Message-ID `<20261105185828.85367-1-felix.kuehling@amd.com>`. Both bases. |
 | `2807` | `mm, swap: fix large swap-in across swap file extents` v2 2/4 | A large swap-in can read blocks of another file across a swap-file extent boundary. This copy's context reflects `2700`'s rewrite of the same `do_swap_page()` guard; added lines unchanged. |
 | `9090` | `drm/amdgpu/userq: validate evicted BOs on the individual idle list on restore` | Idle-list BOs can keep invalid PTEs across a user-queue restore. Context-regenerated against the series (`evicted` list name). |
 | `1317` | `gpu/buddy: restore two-pass clear/dirty guard for range-biased allocation` v3 | **Preview only** — the visible-VRAM range-bias path is 7.4 code; five of six hunks fail on `v7.3`. |
@@ -1481,3 +1481,17 @@ are in the rc ledger. RA24 and IMU apply to the rc series as well; RDPCS and
 
 `audit_series.py`: **150/150** on `next-20261105`; the rc series is
 **327/327** on `v7.3`.
+
+The follow-up build `2026.11.05-2` replaces `1316` with Felix Kuehling's
+maintainer version (`Message-ID
+<20261105185828.85367-1-felix.kuehling@amd.com>`); the replacement applies in
+place, so the series count is unchanged. The same pass rechecked every carried
+patch for newer revisions and found only the known kbuild v5 rework, `1175` v5
+and `2806` v2 resends, and found no revert of carried work.
+
+Sashiko posted an unrebutted automated review of Felix's patch: its High
+findings concern the `WARN_ON_ONCE()` branch for a foreign device-private page,
+which returns without clearing `addr[i]` and can therefore double-unmap on a
+later range teardown. The branch is WARN-gated; the maintainer version still
+fixes the community v1's wrong VRAM computation. Watch for a v2. RA24's KUnit
+finding is inert because `CONFIG_KUNIT` is not built.

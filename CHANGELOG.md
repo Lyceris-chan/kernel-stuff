@@ -18,6 +18,42 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.11.05-2-sleepy-next (linux-next `next-20261105`)]: 2026-11-05
+
+Rebuild with the maintainer version of the KFD device-page ownership check.
+
+### Changed
+
+- **`1316` replaced** — Felix Kuehling's `drm/amdkfd: Check ownership of device
+  pages for DMA mapping` replaces the community v1. It checks
+  `page->zone_device_data == prange->svm_bo` under `prange->lock` instead of
+  comparing pgmaps, which are per device or XGMI hive.
+
+### Verified
+
+- Cumulative audit: **150/150** on `next-20261105`; rc **327/327** on `v7.3`.
+- Re-swept versions and reverts: the only higher-version postings are the known
+  kbuild v5 rework, the `1175` v5 resend and the `2806` v2 resend; no revert of
+  carried work was found.
+- Built and installed `linux-sleepy-next-2026.11.05-2` and its headers;
+  `amdgpu.ko` carries `.BTF`/`.BTF_ids`.
+
+## [7.3.0-20-sleepy-rc]: 2026-11-05
+
+Replaces `1316` with the AMD maintainer's version.
+
+### Changed
+
+- **`1316` replaced** — `drm/amdkfd: Check ownership of device pages for DMA
+  mapping` (Felix Kuehling) checks that a zone-device page belongs to this
+  range's `svm_bo` instead of comparing per-device pgmaps.
+
+### Verified
+
+- Cumulative audit: **327/327** on `v7.3`.
+- Built and installed `linux-sleepy-rc-7.3.0-20` and its headers; no patch was
+  skipped, and `amdgpu.ko` carries `.BTF`/`.BTF_ids`.
+
 ## [2026.11.05-1-sleepy-next (linux-next `next-20261105`)]: 2026-11-05
 
 Bumps the preview to `next-20261105` (989 new commits) and adds the second-pass

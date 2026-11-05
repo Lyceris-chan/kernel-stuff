@@ -1,0 +1,70 @@
+From 56949619732a3692c67b1b88ea9308f9c20399d7 Mon Sep 17 00:00:00 2001
+From: Felix Kuehling <felix.kuehling@amd.com>
+Date: Thu, 5 Nov 2026 13:58:28 -0500
+Subject: [PATCH] drm/amdkfd: Check ownership of device pages for DMA mapping
+
+This issue was raised independently in two contexts: pages from DAX
+devices and pages from other GPU hives or inherited from other
+processed. This patch addresses both concerns together along with
+Sashiko comments raised for one of the previous reviews:
+https://sashiko.dev/#/patchset/20261103-kfd-svm-foreign-vram-20261103-v1-1-d6282053cad3@gmail.com?part=1
+
+Before treating a page as a zone device page belonging to the SVM range,
+check that it actually belongs to that range based on the
+zone_device_data. Non-private pages belonging to other devices or ranges
+can be treated like system memory for the purpose of DMA mapping.
+
+Cc: matthewkrebs8@gmail.com
+Cc: jm5905938@gmail.com
+Signed-off-by: Felix Kuehling <felix.kuehling@amd.com>
+---
+ drivers/gpu/drm/amd/amdkfd/kfd_svm.c | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c b/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
+index ed5e3318877b..5807a26d7deb 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
+@@ -156,6 +156,18 @@ svm_is_valid_dma_mapping_addr(struct device *dev, dma_addr_t dma_addr)
+ 	       !(dma_addr & SVM_RANGE_VRAM_DOMAIN);
+ }
+ 
++static bool svm_page_is_range_owned(struct page *page, struct svm_range *prange)
++{
++	bool is_owned;
++
++	mutex_lock(&prange->lock);
++	is_owned = is_zone_device_page(page) && prange->ttm_res &&
++		page->zone_device_data == prange->svm_bo;
++	mutex_unlock(&prange->lock);
++
++	return is_owned;
++}
++
+ static int
+ svm_range_dma_map_dev(struct amdgpu_device *adev, struct svm_range *prange,
+ 		      unsigned long offset, unsigned long npages,
+@@ -180,7 +192,7 @@ svm_range_dma_map_dev(struct amdgpu_device *adev, struct svm_range *prange,
+ 			dma_unmap_page(dev, addr[i], PAGE_SIZE, dir);
+ 
+ 		page = hmm_pfn_to_page(hmm_pfns[i]);
+-		if (is_zone_device_page(page)) {
++		if (svm_page_is_range_owned(page, prange)) {
+ 			struct amdgpu_device *bo_adev = prange->svm_bo->node->adev;
+ 
+ 			addr[i] = (hmm_pfns[i] << PAGE_SHIFT) +
+@@ -189,6 +201,11 @@ svm_range_dma_map_dev(struct amdgpu_device *adev, struct svm_range *prange,
+ 			addr[i] |= SVM_RANGE_VRAM_DOMAIN;
+ 			pr_debug_ratelimited("vram address: 0x%llx\n", addr[i]);
+ 			continue;
++		} else if (WARN_ON_ONCE(is_device_private_page(page))) {
++			/* Device private memory from another driver or range.
++			 * This should never happen.
++			 */
++			return -EINVAL;
+ 		}
+ 		addr[i] = dma_map_page(dev, page, 0, PAGE_SIZE, dir);
+ 		r = dma_mapping_error(dev, addr[i]);
+-- 
+2.56.0
+

@@ -182,7 +182,7 @@ _rcver=
 
 pkgver=7.3.0
 _tagrel=1
-pkgrel=19
+pkgrel=20
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -391,7 +391,7 @@ source=(
   "patches/1300-1399/1313-drm-amdkfd-use-the-queue-s-process-info-for-WPTR-BO.patch"
   "patches/1300-1399/1314-drm-amdgpu-rewrite-all-PTEs-after-VM-reset.patch"
   "patches/1300-1399/1315-drm-amdgpu-dont-walk-the-CS-chunks-when-allocating-them-failed.patch"
-  "patches/1300-1399/1316-drm-amdkfd-reject-foreign-device-pages-in-svm_range_dma_map_dev.patch"
+  "patches/1300-1399/1316-drm-amdkfd-check-ownership-of-device-pages-for-DMA-mapping.patch"
   "patches/1300-1399/1319-drm-amdgpu-jpeg-unwind-late-software-init-failures-in-v5.0.0.patch"
   "patches/1300-1399/1320-drm-amdgpu-return-cached-hw-vblank-count-when-reset-blocks-the-read.patch"
   "patches/1300-1399/1321-drm-amdgpu-report-MES-ring-wait-timeouts.patch"
@@ -1355,7 +1355,7 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         'd34e2ed111d28b4a01e9f8993c4dbe617509e212fd1222be2fb5da58b471e304b256c09aa1d305a7b84aa0e70e3cd40c26928d2cbb0c6ae08f04dc45657bab66'
         'c2c0f480dcca4b828ad3b37256ec7bcfb8c1fd5760cdda2e2e894eb2197c26bb49ce93f38a57614684c088914cfa49b52e1679ff3e921c7fa01f9a3667a45354'
         'f6b05bb6f637c618ecc6e5c5f1ac1c92cb110d1bddcbd7f9ecd074fef95cc82608e73b54196386b951638de75457182abdcac4fa34f06a41a0a58c1ad06a2a9a'
-        '3e746bce93c32bd4b2933dfcbc4203df5487dd6360675804c1e219efc5b2a81c7987a7255b7265c1827e1d772f6423dfe26797754c06bab6b7889a1269547ad5'
+        '4d600d2a10396e4be0e5fcce1d6bfaed13f32ecedb7cb40cd71ea6c6718e102e74561e0925011610c45254f47d981b5adf414577ae01b4da9d36bf018b4e4d12'
         '35204126286965d6702bcbc008fecc7d879ba9fb2c836c8062fb7b9c69c47dfc3328c13aedaabd4356a5ca832f204066e8b3e503b0a46d04cf53a68326de8906'
         '91ad065351cef207dd1a38ed9f7d8de881b6a5cf419e71ec16f31b66404c709fa27df34af0b77d1845175e8d488fd2aaba1273d8eaee6edd462d550eb74b70eb'
         'f46365c2ec1cd1af2492fe2bf00714d8b7377ceb6749767895a390f2ed120cf9f28ba258ec76c986828947681eca4dfb0544f16dad231a44b7b2ae167b9d9fb8'
@@ -1551,7 +1551,7 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         'f78d409734e9810f448e564aae9bdad28af03193913053f25deee0eebaa8b999cbf135e6e0c27e5c5ffe9bac5918fd0ddf9a73307a67d8e1be2876d8b99b1646'
         '5a986874cf6e64a32b084a25147132d21d32dce0378f91f63e8a918e91bd0e18423e96ef3dc6fb319c3ae0663f6326edcebe8b9a1e08d7d318295ddda21ac4bb'
         '334fc42a82212dbfb0ff37865a7ccbf4df09164c252b9c7493ba0ee0d58aaa9a0aa89e012c50be8b4671e01dceab45175634617e15032182590989adad35a7ab'
-        '326aa87715b1f9423cdf3a0e71049d26b0ddb6c6399cb577af3e29c33eb6feb51babf9451d403c8d7422ffbde474cc47393a67162b6bd38b54757df331beb39c'
+        '3a5f75c872c8e4af63befa0c102884b2f1ca2181b546ee5f92aa69354deae5d43349986d440cd0cd85ee6a87f091ac6217e3270e1cb257ddffd2d475eaf0fc4a'
         'f8948396584fc2c3e82bf857c6f3ad7fd77e887b5d30fdbf288ed01f939b101e28e0f7b67d7e52c28d8479918da3cad72d6650daa6200739139426d5d491ef75')
 
 if [ "$_use_kernel_org_llvm" = "yes" ]; then
