@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
 - **Base:** Linux `v7.3`
-- **Series:** 313 patches
+- **Series:** 327 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -22,8 +22,8 @@ are supplied by the generator instead, so every row below has a source.
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 30 |
-| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 22 |
-| `1100–1199` | AMD display (DCN4, colorops) | 30 |
+| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 23 |
+| `1100–1199` | AMD display (DCN4, colorops) | 31 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 32 |
 | `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 50 |
 | `2100–2199` | Memory management and swap (zstd, LRU-MARIE, gup, zswap) | 50 |
@@ -34,11 +34,11 @@ are supplied by the generator instead, so every row below has a source.
 | `2600–2699` | Time and timers | 0 |
 | `2800–2899` | Memory management, second series (mm/swap follow-ups) | 8 |
 | `2900–2999` | VFS / core filesystem | 0 |
-| `3000–3099` | Platform, USB and hwmon (PROM21 chipset temperature) | 1 |
+| `3000–3099` | Platform, USB and hwmon (PROM21 chipset temperature) | 2 |
 | `9000–9099` | agd5f staging + userq lifecycle backports | 37 |
 | `9100–9199` | Retry-fault handling v4 (agd5f staging) | 11 |
 
-**Total: 317** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 327** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-19). The counts are now generated from the patch tree
@@ -12014,3 +12014,79 @@ upstream revision.
 
 **324 patches** (317 + 7). `audit_series.py`: **324/324** on `v7.3`; the
 preview is **146/146** on `next-20261104`.
+
+## Sweep 2026-11-05 (second pass) — `next-20261105`; `1183`, `1327`, `3001`, preview `1184`
+
+Sources refreshed later on 2026-11-05: torvalds `origin/master`
+`05441d697f7f` (unchanged; matches `ls-remote`), linux-next `next-20261105`
+`ddfe51b0a0f5`, agd5f and amd-staging `178d00b16ddb`, and the fifteen lore
+mirrors. The new snapshot adds 989 commits; only the display, IMU and xHCI
+carries below survived triage.
+
+Phoronix's "Linux 7.4 Core MM nasty fixes" article points at the Core MM pull
+`ba07120d28` (`[GIT PULL] Core MM updates for 7.4-rc2`). The pull's content is
+**already in `next-20261104`**: `mm/linux.git for-next` contributes 0 commits
+against that snapshot, and only two `mm/` commits are new in `next-20261105`.
+No core-MM carry is needed, and CAST still applies on top.
+
+CAST: `firelzrd/lru_cast` remains at **v0.2.10** (2026-11-04), already carried
+as `2102` in both packages. No newer release and no CAST posting on the lists.
+
+### Adopted — both packages
+
+| Patch | Change | Why |
+|---|---|---|
+| `1183` | `drm/amd/display: drop RGBA8888 from plane format lists` (MuXian Chen) | DC has no `surface_pixel_format` for RGBA8888, so `fill_dc_plane_info_and_addr()` returns `-EINVAL` while `rgb_formats[]` and `overlay_formats[]` advertise it. KWin then picks it and every atomic commit fails with `Unsupported screen format RA24` — the repeated log spam in work item #5339, which includes RX 9070 XT reports. The patch removes the two entries; tested on DCN 3.1.5. Message-ID `<20261030164327.8461-1-a18165943161@gmail.com>`; applies to both clean bases and both series. |
+| `1327` | `drm/amdgpu: release the IMU firmware with the other GFX microcode` (Jesse Zhang; `Reviewed-by: Alex Deucher`) | `gfx_v11_0_free_microcode()`, `gfx_v12_0_free_microcode()` and `gfx_v12_1_free_microcode()` release ME/RLC/MEC but never `adev->gfx.imu_fw`. `gfx_v12_0` is this GPU's core. `Fixes: 289bcffb9d76`, `32d163768989`, `a0f8297068cf`. Message-ID `<20261105091632.954712-1-Jesse.Zhang@amd.com>`; both bases. |
+| `3001` | `usb: pci-quirks: always assert xHCI OS ownership` (Rishabh Jain; `Reviewed-by: Mario Limonciello (AMD)`, four `Tested-by`) | `quirk_usb_handoff_xhci()` asserts HC OS Owned only when BIOS Owned is already set, so firmware that leaves BIOS Owned clear runs the xHC with neither semaphore set. On the AMD PROM21 xHCI (`1022:43fc`) every S3 resume then ends Controller Restore State with `USBSTS 0x401` and resets the controller, both root hubs and the Bluetooth adapter. Assert OS Owned for the standard handoff and keep it asserted after the timeout path. `Fixes: 66d4eadd8d06`, `Cc: stable`. v6 Message-ID `<179338900780.73175.16604680938007633313@gmail.com>`; applies to both clean bases and both series. |
+
+### Adopted — preview only
+
+| Patch | Change | Why |
+|---|---|---|
+| `1184` | `drm/amd/display: Remove DCN401 RDPCS PHY state reads` (Tony Cheng; `Signed-off-by: Alex Hung`, `Reviewed-by: Leo Li`, `Tested-by: Dan Wheeler`) | DMCUB owns the PHY on DCN 3.1+ and can gate REFCLK; reading RDPCS while REFCLK is off can hang the register interface. Removes the reads added by `4b21ed5d08af` (merged in `next-20261105` as `c775493b6dc0`). ASDN commit `1dc7605abf45`; `v7.3` does not contain the read commit, so the removal does not apply there. |
+| `2808` | **v2 → v3** — `mm/swapfile: drop a large unmapped swap-in folio in unuse_pte()` (Mani Tofigh; `Reviewed-by: Nhat Pham`) | v3 stops special-casing a dirty folio: `swap_cache_folio_mappable()` warns with `VM_WARN_ON_ONCE_FOLIO()` and the caller drops the folio unconditionally. The comment wording is David Hildenbrand's. Message-ID `<20261105-swapin-large-unmapped-v3-1-d5906e4cf18d@columbia.edu>`; applies to `next-20261105`. |
+
+### Not adopted
+
+- **`drm/amdkfd: Check ownership of device pages for DMA mapping`** (Felix
+  Kuehling, 2026-11-05) — supersedes the community patch carried as `1316` with
+  a stricter `zone_device_data == prange->svm_bo` check. It conflicts with
+  `1316`, and replacing a carried patch needs explicit approval.
+- **`io_uring/kbuf: fix cross-mm interpretation of provided buffers`** — Jens
+  Axboe rejected it on the list: "This is nonsense. This isn't a bug."
+- **`io_uring/sqpoll: make io_sq_thread_stop() idempotent`** — WARN-only fix,
+  no review, and the posting's Subject line contains the whole commit message.
+- **zswap shrinker count / `SHRINKER_NONSLAB`** — parts of multi-patch series;
+  not merged in `next-20261105`. The next snapshot should pick them up.
+- **cpufreq CPPC Enable register / boost by default** — `CONFIG_ACPI_CPPC_CPUFREQ`
+  is not built; amd-pstate owns this CPU.
+- **NVMe ANA/SRCU/reconnect_delay fixes** — fabric or hot-remove paths; this
+  machine's Phison E16 is a single local device.
+- **TTM partially backed-up `ttm_tt`s** — 4-part series aimed at xe; only the
+  generic part 1 could apply, and it is not worth a partial carry.
+- **FB carveout disablement / IP discovery via PSP mailbox** — passthrough
+  A+A with a zero-sized BAR0; not this machine.
+- **MES KIQ partition-switch reinit** — SR-IOV partition switching.
+- **devcoredump vm_fault info** — diagnostics only.
+- **`drm_gem_ttm_dumb_map_offset()` conversion** — cleanup.
+- **kbuild v5 rework** — still unmerged in `next-20261105`; the carried v3
+  series applies, so keep it and revisit at the next bump.
+- **r8169 RxOverflow**, **sched_ext `exit_kind`** and the ASDN gang-fence fix
+  — already carried as `2066`, `2421` and `1064` respectively. Jacob Keller's
+  `Reviewed-by` on the r8169 thread adds no code change; Tejun Heo applied the
+  sched_ext fix to `for-7.4-fixes`.
+
+### Reverts and tracker
+
+No new upstream revert of carried work. ASDN's `1dc7605abf45` is itself the
+revert of the DCN401 RDPCS reads and is carried as `1184`. Work item #5339
+(RA24) is fixed by `1183`; #6092 reports a new
+`dc_dmub_srv_apply_idle_power_optimizations()` warning with no fix yet; #5807,
+#5800, #5511 and #5900 wait on `63e19ef3ddab`, which is already in `7.3-rc4+`
+and therefore in both bases; #6090 is a kernel-7.0 firmware-loading report.
+
+### Series state
+
+**327 patches** (324 + 3). `audit_series.py`: **327/327** on `v7.3`; the
+preview is **150/150** on `next-20261105`.

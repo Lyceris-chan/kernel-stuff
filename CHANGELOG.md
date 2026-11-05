@@ -18,6 +18,68 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.11.05-1-sleepy-next (linux-next `next-20261105`)]: 2026-11-05
+
+Bumps the preview to `next-20261105` (989 new commits) and adds the second-pass
+sweep. The preview carries **150 patch entries in `source=()`** (157 files;
+seven are excluded from the build).
+
+### Added
+
+- **`1183`, RA24 plane-format fix** — drop `DRM_FORMAT_RGBA8888` from
+  `rgb_formats[]` and `overlay_formats[]`. DC has no surface format for it, so
+  every atomic commit that selected it failed with `Unsupported screen format
+  RA24` (work item #5339, including RX 9070 XT reports).
+- **`1184`, DCN401 RDPCS state reads (preview only)** — remove the RDPCS PHY
+  reads. DMCUB can gate REFCLK, and reading RDPCS while it is off can hang the
+  register interface. Reverts the reads added by `4b21ed5d08af`, which is in
+  this snapshot.
+- **`1327`, IMU firmware release** — `gfx_v12_0_free_microcode()` released
+  ME/RLC/MEC but not `adev->gfx.imu_fw`. Release it with the rest. Applies to
+  both packages.
+- **`3001`, xHCI OS-ownership handoff** — assert HC OS Owned for the standard
+  xHCI handoff, not only when BIOS Owned is set. Without it the AMD PROM21
+  xHCI (`1022:43fc`) fails S3 Controller Restore State with `USBSTS 0x401`
+  and resets both root hubs. `Fixes: 66d4eadd8d06`, `Cc: stable`; AMD
+  `Reviewed-by`.
+
+### Updated
+
+- **`2808` v2 → v3** — the swap-in helper now warns on a dirty folio with
+  `VM_WARN_ON_ONCE_FOLIO()` and the caller drops the folio unconditionally.
+  Reviewed by Nhat Pham.
+
+### Verified
+
+- Cumulative audit: **150/150** on `next-20261105`; rc **327/327** on `v7.3`.
+- Built and installed `linux-sleepy-next-2026.11.05-1` and its headers. No
+  patch was skipped, and both `vmlinux` and `amdgpu.ko` carry
+  `.BTF`/`.BTF_ids`.
+- Phoronix's 7.4 Core MM article traces to the Core MM pull already present in
+  `next-20261104`; `lru_cast` remains v0.2.10 (both packages), so CAST needed
+  no rebase.
+
+## [7.3.0-19-sleepy-rc]: 2026-11-05
+
+Adds three shared carries from the second-pass sweep.
+
+### Added
+
+- **`1183`, RA24 plane-format fix** — stop advertising `DRM_FORMAT_RGBA8888`;
+  `fill_dc_plane_info_and_addr()` rejects it with `-EINVAL`, and KWin picks it
+  for alpha layers, flooding dmesg every frame.
+- **`1327`, IMU firmware release** — release `adev->gfx.imu_fw` in
+  `gfx_v11_0_free_microcode()` and `gfx_v12_0_free_microcode()`.
+- **`3001`, xHCI OS-ownership handoff** — assert HC OS Owned for the standard
+  xHCI handoff. On the AMD PROM21 xHCI this stops every S3 resume from ending
+  Controller Restore State with `USBSTS 0x401`.
+
+### Verified
+
+- Cumulative audit: **327/327** on `v7.3`.
+- Built and installed `linux-sleepy-rc-7.3.0-19` and its headers. No patch was
+  skipped, and both `vmlinux` and `amdgpu.ko` carry `.BTF`/`.BTF_ids`.
+
 ## [2026.11.04-3-sleepy-next (linux-next `next-20261104`)]: 2026-11-05
 
 Adds the 2026-11-05 sweep on top of the sched_ext package (`2026.11.04-2`).

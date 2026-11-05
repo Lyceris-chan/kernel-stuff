@@ -15,11 +15,11 @@ moved, so the full ledger is not duplicated here.
 
 | | |
 |---|---|
-| Snapshot | `next-20261104`, tag `8b7179210b22` (tag object `4004549ef9cf`) |
-| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261104.tar.gz` |
+| Snapshot | `next-20261105`, tag `ddfe51b0a0f5` (tag object `cae1456a7b59`) |
+| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261105.tar.gz` |
 | Snapshot tree `Makefile` | `7.4.0-rc1` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.11.04-3-sleepy-next` |
-| Package | `linux-sleepy-next-2026.11.04-3` |
+| Kernel release | `2026.11.05-1-sleepy-next` |
+| Package | `linux-sleepy-next-2026.11.05-1` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -1460,3 +1460,24 @@ rejected for the same reasons recorded in the rc ledger.
 
 `audit_series.py`: **146/146** on `next-20261104`; the rc series is
 **324/324** on `v7.3`.
+
+## Sweep 2026-11-05 (second pass) — bumped to `next-20261105`; 150 patches
+
+The second pass adopts the shared `1183`, `1327` and `3001` (documented with
+full provenance in `sleepy-rc/PATCH_SOURCES.md`, "Sweep 2026-11-05 (second
+pass)"), the preview-only `1184`, and updates `2808` to v3.
+
+| Patch | Change | Why |
+|---|---|---|
+| `1183` | `drm/amd/display: drop RGBA8888 from plane format lists` (MuXian Chen) | DC rejects RGBA8888 with `-EINVAL` but the plane format lists advertise it; remove the two entries to stop the `Unsupported screen format RA24` flood (work item #5339, including RX 9070 XT reports). Applies to the preview series. Message-ID `<20261030164327.8461-1-a18165943161@gmail.com>`. |
+| `1184` | `drm/amd/display: Remove DCN401 RDPCS PHY state reads` (Tony Cheng; `Reviewed-by: Leo Li`) | DMCUB can gate REFCLK; reading RDPCS with REFCLK off can hang. Removes the reads added by `4b21ed5d08af` (merged as `c775493b6dc0`). ASDN commit `1dc7605abf45`; preview only because `v7.3` lacks the read commit. |
+| `1327` | `drm/amdgpu: release the IMU firmware with the other GFX microcode` (Jesse Zhang; `Reviewed-by: Alex Deucher`) | `gfx_v12_0_free_microcode()` leaked `adev->gfx.imu_fw`. Message-ID `<20261105091632.954712-1-Jesse.Zhang@amd.com>`. |
+| `3001` | `usb: pci-quirks: always assert xHCI OS ownership` (Rishabh Jain; `Reviewed-by: Mario Limonciello (AMD)`) | Assert the HC OS Owned semaphore for the standard xHCI handoff; without it the AMD PROM21 xHCI (`1022:43fc`) fails S3 Controller Restore State with `USBSTS 0x401` and resets its root hubs. v6 Message-ID `<179338900780.73175.16604680938007633313@gmail.com>`. |
+| `2808` | **v2 → v3** — `mm/swapfile: drop a large unmapped swap-in folio in unuse_pte()` (Mani Tofigh; `Reviewed-by: Nhat Pham`) | v3 lets the helper warn on a dirty folio and drops it unconditionally; comment wording from David Hildenbrand. Message-ID `<20261105-swapin-large-unmapped-v3-1-d5906e4cf18d@columbia.edu>`. |
+
+Everything else in the second pass is rejected or already carried; the reasons
+are in the rc ledger. RA24 and IMU apply to the rc series as well; RDPCS and
+`2808` v3 are preview-only.
+
+`audit_series.py`: **150/150** on `next-20261105`; the rc series is
+**327/327** on `v7.3`.

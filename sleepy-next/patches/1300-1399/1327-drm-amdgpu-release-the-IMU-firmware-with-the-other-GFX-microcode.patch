@@ -1,0 +1,70 @@
+From 33c8f3e41c07c5311aff87a041437cd34dc0891d Mon Sep 17 00:00:00 2001
+From: Jesse Zhang <Jesse.Zhang@amd.com>
+Date: Thu, 5 Nov 2026 17:15:58 +0800
+Subject: [PATCH] drm/amdgpu: release the IMU firmware with the other GFX microcode
+
+The IMU firmware of GFX11 and GFX12 is only released when loading the
+microcode fails. Every unload or unbind of such a device leaks it. On
+navi31, binding and unbinding the device leaves:
+
+  unreferenced object 0xffff88810dd6cd80 (size 32):
+    comm "modprobe", pid 2891, jiffies 4294943088
+    backtrace:
+      _request_firmware+0x207/0xad0
+      request_firmware+0x3b/0x60
+      amdgpu_ucode_request+0x150/0x330 [amdgpu]
+      amdgpu_device_init+0x2d70/0xa650 [amdgpu]
+      amdgpu_driver_load_kms+0x1e/0x140 [amdgpu]
+
+a struct firmware of 132352 bytes, the size of gc_11_0_0_imu.bin.
+Release it in the free_microcode() functions; with that it's gone.
+
+Fixes: 289bcffb9d76 ("drm/amdgpu: support imu for gfx11")
+Fixes: 32d163768989 ("drm/amd/amdgpu: imu fw loading support")
+Fixes: a0f8297068cf ("drm/amdgpu: add imu support for gc 12_1")
+Signed-off-by: Jesse Zhang <Jesse.Zhang@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c | 1 +
+ drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c | 1 +
+ drivers/gpu/drm/amd/amdgpu/gfx_v12_1.c | 1 +
+ 3 files changed, 3 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c b/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c
+index 315dfd806d56..74a242c6e0f5 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c
+@@ -691,6 +691,7 @@ static void gfx_v11_0_free_microcode(struct amdgpu_device *adev)
+ 	amdgpu_ucode_release(&adev->gfx.me_fw);
+ 	amdgpu_ucode_release(&adev->gfx.rlc_fw);
+ 	amdgpu_ucode_release(&adev->gfx.mec_fw);
++	amdgpu_ucode_release(&adev->gfx.imu_fw);
+ 
+ 	kfree(adev->gfx.rlc.register_list_format);
+ }
+diff --git a/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c b/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c
+index d334fb805020..60f43fa50a90 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c
+@@ -563,6 +563,7 @@ static void gfx_v12_0_free_microcode(struct amdgpu_device *adev)
+ 	amdgpu_ucode_release(&adev->gfx.me_fw);
+ 	amdgpu_ucode_release(&adev->gfx.rlc_fw);
+ 	amdgpu_ucode_release(&adev->gfx.mec_fw);
++	amdgpu_ucode_release(&adev->gfx.imu_fw);
+ 
+ 	kfree(adev->gfx.rlc.register_list_format);
+ }
+diff --git a/drivers/gpu/drm/amd/amdgpu/gfx_v12_1.c b/drivers/gpu/drm/amd/amdgpu/gfx_v12_1.c
+index 1589fc6413af..4076703fc029 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gfx_v12_1.c
++++ b/drivers/gpu/drm/amd/amdgpu/gfx_v12_1.c
+@@ -350,6 +350,7 @@ static void gfx_v12_1_free_microcode(struct amdgpu_device *adev)
+ {
+ 	amdgpu_ucode_release(&adev->gfx.rlc_fw);
+ 	amdgpu_ucode_release(&adev->gfx.mec_fw);
++	amdgpu_ucode_release(&adev->gfx.imu_fw);
+ 
+ 	kfree(adev->gfx.rlc.register_list_format);
+ }
+-- 
+2.56.0
+

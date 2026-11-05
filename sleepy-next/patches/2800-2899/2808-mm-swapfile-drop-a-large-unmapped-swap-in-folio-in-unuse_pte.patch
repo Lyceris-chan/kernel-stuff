@@ -1,10 +1,7 @@
-From nobody Mon Sep 17 00:00:00 2001
+From 7c68ad073342d6af2adcd5a7ed63bcb7f5d28338 Mon Sep 17 00:00:00 2001
 From: Mani Tofigh <mt4022@columbia.edu>
-Date: Tue, 03 Nov 2026 15:12:18 -0500
-Subject: [PATCH v2] mm/swapfile: drop a large unmapped swap-in folio in unuse_pte()
-Message-ID: <20261103-swapin-large-unmapped-v2-1-87c70e597250@columbia.edu>
-
-From: Mani Tofigh <mt4022@columbia.edu>
+Date: Thu, 5 Nov 2026 12:19:27 -0500
+Subject: [PATCH] mm/swapfile: drop a large unmapped swap-in folio in unuse_pte()
 
 Since commit f1879e8a0c60 ("mm, swap: never bypass the swap cache even
 for SWP_SYNCHRONOUS_IO"), a fault can read a swapped-out mTHP range into
@@ -40,12 +37,8 @@ do_swap_page():
 do_swap_page() already drops such a folio from the swap cache when it
 can't map all of it.  We move that check into a helper and use it in
 unuse_pte() too, so swapoff drops the folio and swaps the entries in
-again as small folios.
-
-Such a folio was never mapped, so it shouldn't be dirty.  If it is, the
-helper warns and the folio stays in the swap cache.  unuse_pte() then
-returns -EBUSY so swapoff fails instead of retrying forever.  With the
-fix, the next fault doesn't crash anymore.
+again as small folios.  With the fix, the next fault doesn't crash
+anymore.
 
 This bug was identified and confirmed with the help of a deterministic
 hypervisor currently under development.  The C reproducer below however
@@ -53,73 +46,51 @@ hits it within about 1s.
 
 Fixes: f1879e8a0c60 ("mm, swap: never bypass the swap cache even for SWP_SYNCHRONOUS_IO")
 Cc: stable@vger.kernel.org
+Reviewed-by: Nhat Pham <nphamcs@gmail.com>
 Signed-off-by: Mani Tofigh <mt4022@columbia.edu>
 ---
-Changes in v2:
-- Move the check in do_swap_page() into a helper and use it in
-  unuse_pte() too (David)
-- Use VM_WARN_ON_ONCE() for a dirty folio (David, Kairui)
-- Keep a dirty folio and return -EBUSY from unuse_pte() instead of
-  dropping it, since dropping it would lose data (Kairui)
-- Rebase on mm/core.git for-next-fixes
-- Link to v1: https://lore.kernel.org/r/20261030-swapin-large-unmapped-v1-1-41e4ae378e6c@columbia.edu
-
-Reproducer: https://github.com/manitofigh/files/blob/main/linux-repros/swapmthp.c
----
- mm/memory.c   | 17 ++---------------
- mm/swap.h     | 21 +++++++++++++++++++++
- mm/swapfile.c | 11 +++++++++++
- 3 files changed, 34 insertions(+), 15 deletions(-)
+ mm/memory.c   | 13 ++++---------
+ mm/swap.h     | 10 ++++++++++
+ mm/swapfile.c |  9 +++++++++
+ 3 files changed, 23 insertions(+), 9 deletions(-)
 
 diff --git a/mm/memory.c b/mm/memory.c
-index 91836d217d25..2e0dadbee382 100644
+index e69d3307fd33..18da64fc9936 100644
 --- a/mm/memory.c
 +++ b/mm/memory.c
-@@ -5166,21 +5166,8 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
- 	BUG_ON(!folio_test_anon(folio) && folio_test_mappedtodisk(folio));
- 	BUG_ON(folio_test_anon(folio) && PageAnonExclusive(page));
- 
--	/*
--	 * If a large folio already belongs to anon mapping, then we
--	 * can just go on and map it partially.
--	 * If not, with the large swapin check above failing, the page table
+@@ -5172,18 +5172,13 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
+ 	 * If a large folio already belongs to anon mapping, then we
+ 	 * can just go on and map it partially.
+ 	 * If not, with the large swapin check above failing, the page table
 -	 * have changed, so sub pages might got charged to the wrong cgroup,
 -	 * or even should be shmem. So we have to free it and fallback.
--	 * Nothing should have touched it, both anon and shmem checks if a
--	 * large folio is fully applicable before use.
++	 * have changed, so some folio pages might be charged to the wrong
++	 * cgroup, or even should be shmem. So we have to free it and fallback.
+ 	 * Nothing should have touched it, both anon and shmem checks if a
+ 	 * large folio is fully applicable before use.
 -	 *
 -	 * This will be removed once we unify folio allocation in the swap cache
 -	 * layer, where allocation of a folio stabilizes the swap entries.
--	 */
+ 	 */
 -	if (!folio_test_anon(folio) && folio_test_large(folio) &&
 -	    nr_pages != folio_nr_pages(folio)) {
 -		if (!WARN_ON_ONCE(folio_test_dirty(folio)))
+-			swap_cache_del_folio(folio);
 +	if (!swap_cache_folio_mappable(folio, nr_pages)) {
-+		if (!folio_test_dirty(folio))
- 			swap_cache_del_folio(folio);
++		swap_cache_del_folio(folio);
  		goto out_nomap;
  	}
+ 
 diff --git a/mm/swap.h b/mm/swap.h
-index d5bf21f517dc..f045a384fe79 100644
+index d5bf21f517dc..7779ccff5a0d 100644
 --- a/mm/swap.h
 +++ b/mm/swap.h
-@@ -464,6 +464,27 @@ static inline void __swap_cache_replace_folio(struct swap_cluster_info *ci,
+@@ -464,6 +464,16 @@ static inline void __swap_cache_replace_folio(struct swap_cluster_info *ci,
  }
  #endif /* CONFIG_SWAP */
  
-+/*
-+ * If a large folio from the swap cache already belongs to anon mapping, then
-+ * we can just go on and map it partially. If not, and we can't map all of
-+ * it, the page table have changed, so sub pages might got charged to the
-+ * wrong cgroup, or even should be shmem. So the caller has to free it and
-+ * fallback. Nothing should have touched it, both anon and shmem checks if a
-+ * large folio is fully applicable before use.
-+ *
-+ * This will be removed once we unify folio allocation in the swap cache
-+ * layer, where allocation of a folio stabilizes the swap entries.
-+ */
 +static inline bool swap_cache_folio_mappable(struct folio *folio,
-+					     unsigned int nr_pages)
++		unsigned int nr_pages)
 +{
 +	if (folio_test_anon(folio) || !folio_test_large(folio) ||
 +	    nr_pages == folio_nr_pages(folio))
@@ -132,10 +103,10 @@ index d5bf21f517dc..f045a384fe79 100644
  
  int shmem_writeout(struct swap_io_ctx *ctx, struct folio *folio,
 diff --git a/mm/swapfile.c b/mm/swapfile.c
-index 71ef9e2efb3a..fe2a00190806 100644
+index c2af13eb15b3..b7c2e8337854 100644
 --- a/mm/swapfile.c
 +++ b/mm/swapfile.c
-@@ -2513,6 +2513,17 @@ static int unuse_pte(struct vm_area_struct *vma, pmd_t *pmd,
+@@ -2518,6 +2518,15 @@ static int unuse_pte(struct vm_area_struct *vma, pmd_t *pmd,
  	if (!folio_matches_swap_entry(folio, entry))
  		return 0;
  
@@ -144,8 +115,6 @@ index 71ef9e2efb3a..fe2a00190806 100644
 +	 * time here, so drop it and swap in small folios instead.
 +	 */
 +	if (unlikely(!swap_cache_folio_mappable(folio, 1))) {
-+		if (folio_test_dirty(folio))
-+			return -EBUSY;
 +		swap_cache_del_folio(folio);
 +		return 0;
 +	}
@@ -153,3 +122,6 @@ index 71ef9e2efb3a..fe2a00190806 100644
  	swapcache = folio;
  	folio = ksm_might_need_to_copy(folio,
  				       folio_file_page(folio, swp_offset(entry)), vma, addr);
+-- 
+2.56.0
+
