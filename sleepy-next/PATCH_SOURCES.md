@@ -1495,3 +1495,65 @@ which returns without clearing `addr[i]` and can therefore double-unmap on a
 later range teardown. The branch is WARN-gated; the maintainer version still
 fixes the community v1's wrong VRAM computation. Watch for a v2. RA24's KUnit
 finding is inert because `CONFIG_KUNIT` is not built.
+
+## Sweep 2026-11-06 — `1316` v2, official CAST 7.4 port, swap fixes `2809`–`2811`
+
+Sources refreshed on 2026-11-06: torvalds `origin/master` `a91337fb5e8e`,
+linux-next `next-20261105` `ddfe51b0a0f5` — **`next-20261106` had not been
+published** when the sweep finished — drm-next `6628e7d4c6b2`, agd5f and
+amd-staging `178d00b16ddb`, drm-misc `de30740dccd8`, akpm-mm `95c0281e304d`,
+tip `8d4a63625d78`. The sixteen lore mirrors and both freedesktop archives were
+queried; none failed. The preview therefore stays on `next-20261105` and takes
+the patches below on top of it.
+
+### Changed — both packages
+
+- **`1316` v1 → v2** (Felix Kuehling). v2 clears `addr[i]` before the
+  foreign-device-private `-EINVAL` return, which closes Sashiko's double-unmap
+  finding against v1, and drops the `WARN_ON_ONCE()`. Message-ID
+  `<20261105204748.100841-1-felix.kuehling@amd.com>`. Applies in place.
+
+### Adopted — both packages
+
+- **`2809`**, **`2810`** and **`2811`** — the zswap swapcache-writeout fix, the
+  swap nonfull-cluster preference v2, and the cluster-table publication race.
+  Same patches, provenance and reasons as the rc ledger; all three apply to
+  `next-20261105` as well as to `v7.3`.
+
+### Changed — preview only
+
+- **`2102` moves to the author's official 7.4 port.** The carried file was the
+  local 7.3-rc7 patch hand-ported to 7.4 (documented under "lru_cast v0.2.9,
+  ported to `next-20261102`"). `firelzrd/lru_cast` commit `ce117bb` adds
+  `patches/0001-7.4-rc1-lru_cast-v0.2.10.patch`, the same v0.2.10 release
+  written against 7.4-rc1 (2026-11-06 08:04 +0900). The vendor port replaces the
+  hand port; it applies in position in the preview series and audits clean.
+  The rc keeps the author's 7.3-rc7 patch, since its base is `v7.3`.
+  - Delta against the hand port: the vendor patch uses
+    `LRU_CAST_RB_COUNT_CALLBACKS()` for the tune-tree augmentation, keeps
+    `swap_writeout_common()` instead of the renamed `cast_swap_writeout()`,
+    and identifies the kswapd context from `spin_is_contended(pvmw->ptl)`
+    rather than a function-pointer comparison. Every 7.4 API adapter the hand
+    port needed (`valid_section_nr`, `vma_is_hugetlb`, `__swap_writeout`,
+    `dst`/`src`, `VM_HUGETLB` flags) is present in the vendor patch.
+  - Verified: `audit_series.py` **153/153** on `next-20261105` with the file in
+    `2102`'s position.
+
+### Not adopted
+
+The rc ledger carries the full rejection list. Preview-specific notes:
+
+- The io_uring close(2) fix (`2028` in the rc) is already merged in
+  `next-20261105` as `cf6542493e35`; the preview does not carry it.
+- The `cpufreq` boost-lock fix, the two other io_uring fixes and the tip
+  scheduler/locking fixes from `tip`'s 2026-11-06 queue are merged in
+  `next-20261105`, so they are base content here.
+- The AMD SPM IB-path pair and the CWSR fixes are absent from this snapshot;
+  see the rc ledger for why they are deferred rather than carried.
+- `sched_ext` CID sharding fix: inert on a machine with all SMT siblings online;
+  it will arrive with a later snapshot.
+
+### Series state
+
+**153 patches** (150 + 3). `audit_series.py`: **153/153** on `next-20261105`.
+The rc series is **331/331** on `v7.3`.

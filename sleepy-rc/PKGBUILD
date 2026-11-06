@@ -182,7 +182,7 @@ _rcver=
 
 pkgver=7.3.0
 _tagrel=1
-pkgrel=20
+pkgrel=21
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -427,6 +427,7 @@ source=(
   "patches/2000-2099/2025-io_uring-run-cancelations-sync-on-release.patch"
   "patches/2000-2099/2026-io_uring-drop-files-buffers-at-release.patch"
   "patches/2000-2099/2027-io_uring-wait-inflight-requests-on-release.patch"
+  "patches/2000-2099/2028-io_uring-only-wait-for-inflight-requests-if-the-closing-task-uses.patch"
   "patches/2000-2099/2032-tcp-preserve-timestamps-across-recv-collapse.patch"
   "patches/2000-2099/2033-tcp-init-skb-tx-timestamp-key-before-clone.patch"
   "patches/2000-2099/2036-net-tcp-account-zerocopy-receive-vma-memory.patch"
@@ -509,6 +510,9 @@ source=(
   "patches/2800-2899/2805-mm-madvise-atomically-clear-the-young-bit-on-THP-MADV_COLD.patch"
   "patches/2800-2899/2806-mm-zswap-drop-the-stale-zswap-entry-of-a-zero-folio.patch"
   "patches/2800-2899/2807-mm-swap-fix-large-swap-in-across-swap-file-extents.patch"
+  "patches/2800-2899/2809-mm-vmscan-allow-writeout-of-swapcache-folios-without-anon.patch"
+  "patches/2800-2899/2810-mm-swap-only-prefer-nonfull-clusters-on-synchronous-devices.patch"
+  "patches/2800-2899/2811-mm-swap-publish-cluster-tables-after-reacquiring-allocator-locks.patch"
   "patches/2200-2299/2200-6.12-nap-v0.6.6.patch"
   "patches/2300-2399/2302-kbuild-do-not-allocate-modinfo-in-vmlinux.patch"
   "patches/2300-2399/2303-kallsyms-index-symbols-by-token-to-speed-up.patch"
@@ -1355,7 +1359,7 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         'd34e2ed111d28b4a01e9f8993c4dbe617509e212fd1222be2fb5da58b471e304b256c09aa1d305a7b84aa0e70e3cd40c26928d2cbb0c6ae08f04dc45657bab66'
         'c2c0f480dcca4b828ad3b37256ec7bcfb8c1fd5760cdda2e2e894eb2197c26bb49ce93f38a57614684c088914cfa49b52e1679ff3e921c7fa01f9a3667a45354'
         'f6b05bb6f637c618ecc6e5c5f1ac1c92cb110d1bddcbd7f9ecd074fef95cc82608e73b54196386b951638de75457182abdcac4fa34f06a41a0a58c1ad06a2a9a'
-        '4d600d2a10396e4be0e5fcce1d6bfaed13f32ecedb7cb40cd71ea6c6718e102e74561e0925011610c45254f47d981b5adf414577ae01b4da9d36bf018b4e4d12'
+        'd3acbcbb0e00e516684720def5a80d8267883795f346a8dcab74e860eda406d25eb6413b524dddaa09215f0b8548a8e3532bb504f5f86ad1fedcad37492a73d4'
         '35204126286965d6702bcbc008fecc7d879ba9fb2c836c8062fb7b9c69c47dfc3328c13aedaabd4356a5ca832f204066e8b3e503b0a46d04cf53a68326de8906'
         '91ad065351cef207dd1a38ed9f7d8de881b6a5cf419e71ec16f31b66404c709fa27df34af0b77d1845175e8d488fd2aaba1273d8eaee6edd462d550eb74b70eb'
         'f46365c2ec1cd1af2492fe2bf00714d8b7377ceb6749767895a390f2ed120cf9f28ba258ec76c986828947681eca4dfb0544f16dad231a44b7b2ae167b9d9fb8'
@@ -1390,6 +1394,7 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         '4f715093d40032414fc74918a288d30fad73f64b4f6cb303a7829f3005118235871ee9ba7b43ace96e5d0244d69801d64ecba79af0f867686916310cfd0a1363'
         'e6d19b9f779fede319820e924f35652493d89e70c42663468902565c6f3e71579a904c74472414f9e6cf7c6515fc6d2b0c4a203d6cfe301752895a805bd49cf1'
         '774faad36252bd8ad3976a49a0b3e2c9ffe873ea63ade7c93eee36c0a279664fb81d21dddf826531edb7f1b376cb158f7ffd7ded8edbd404de76886422323dac'
+        '313bf64210a46706b244ec136e13a8ddda90f2126e6b0103722c2459b66c1251898d5bb9bdb78349b7b9bdb69271b003e6f62a4482afbacfc881849018a8fce6'
         '4ce35080bedddaa29d42e8779ce91868d55af5caffffa0fdfe4bab4c3f1da64bf231cac54fb327e41f33f93195557fdf61c0715d0b6ec4d5e349673a9e094f8e'
         '41756f27cf26b832b7cdb42653a06a179c5e54f4a918b2fd8d548817935a7c270a0e7603a4e9f86ae7c981c61695a876c48ce52a21a7a1e5a431d1485c8efc8e'
         '623cebb6d1611a7d167f968c8752210b11371901fb44f49bfcf3d98ca2b47cd0b266ebb9fd43b66ae4542a207823723bed7ac9ce273bcb9cebe33c0a5f7e2296'
@@ -1472,6 +1477,9 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         '1c027a41fa18aece672206c4a230ab98e0e09956a25c347ea204dd9fe22877ad24ced0cfcf7cff316a4a2c6ff6388180a5f699af056107589b7281b20cb33e3e'
         'a607eff6f904c8b02e05c3b379dce39dff5a518bf01588c054a8be5f4de51c9bad985df014551cc3ddeba4cfb46f3121a022414e958608da67520a1e35e3a2e3'
         'bfd06c173a2df9cf4d5af77df47c4d14a4b79f01e0f38fa8bc74ebc4c0db076a4550d08f57a091670933efeeac234fd1bdbe2b4ddded769e833263bcf0b768e6'
+        '3e0627b2863fc990bfb82313eaf1de6e3f8256d634a2d52876827228cf542fde012586a8343275d09a4350767cb0b15c34659557c8501ea8c106fad4f0b788b4'
+        '6fbf21d2783a32aa12d3f8fcb3c6bdd2507cbbcb0d0ee3c4aca9b8f57a0081f25852803c6e8e66cf1d5e5a87d774e5fa7ab98871254bc2261c93b46d1b88af24'
+        '2d13bde89cc80fd44bf87be4e06f2da5a2ffec94264efb17ef04d3ab2443235f7b2c5a9c1c9a8ab439bfd4d5f12448d91a2a1d9878f8e122bc78cf57e8d18243'
         '0381b218b2be058bd9dd140b4931dc231285098a6b9f12dddf46760066429aaf28ef4cd09ec8ef58d8686a7b53c08b645083eaa2732bebafb200b32e02f694e0'
         'c57ef0e2d57de6064359a6132ed03138e2b6e65c10699e304901cf4d37f67b25a24fd20553d1b7b99b414d75ddb1f49bbe74cfa694315671026cbdfcb5b19f3c'
         'cf71c48fc7fe12a32f4fe7dd6505df11c4a74ed20abc91ee5bb4cf3688bfd766349fc698a55efd4c2fa6eab7502ec96febf06ee27a823ab13fabd8f148cb3a27'

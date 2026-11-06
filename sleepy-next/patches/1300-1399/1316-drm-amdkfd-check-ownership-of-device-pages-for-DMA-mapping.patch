@@ -1,7 +1,7 @@
-From 56949619732a3692c67b1b88ea9308f9c20399d7 Mon Sep 17 00:00:00 2001
+From 39b39600a991540d8e089de8a88403a6c32561d8 Mon Sep 17 00:00:00 2001
 From: Felix Kuehling <felix.kuehling@amd.com>
-Date: Thu, 5 Nov 2026 13:58:28 -0500
-Subject: [PATCH] drm/amdkfd: Check ownership of device pages for DMA mapping
+Date: Thu, 5 Nov 2026 15:47:48 -0500
+Subject: [PATCH v2] drm/amdkfd: Check ownership of device pages for DMA mapping
 
 This issue was raised independently in two contexts: pages from DAX
 devices and pages from other GPU hives or inherited from other
@@ -17,12 +17,15 @@ can be treated like system memory for the purpose of DMA mapping.
 Cc: matthewkrebs8@gmail.com
 Cc: jm5905938@gmail.com
 Signed-off-by: Felix Kuehling <felix.kuehling@amd.com>
+
 ---
- drivers/gpu/drm/amd/amdkfd/kfd_svm.c | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+v2: Addressed code review comments from Sashiko
+
+ drivers/gpu/drm/amd/amdkfd/kfd_svm.c | 24 +++++++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c b/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
-index ed5e3318877b..5807a26d7deb 100644
+index 876476046926..2aade0183578 100644
 --- a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
 +++ b/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
 @@ -156,6 +156,18 @@ svm_is_valid_dma_mapping_addr(struct device *dev, dma_addr_t dma_addr)
@@ -53,18 +56,20 @@ index ed5e3318877b..5807a26d7deb 100644
  			struct amdgpu_device *bo_adev = prange->svm_bo->node->adev;
  
  			addr[i] = (hmm_pfns[i] << PAGE_SHIFT) +
-@@ -189,6 +201,11 @@ svm_range_dma_map_dev(struct amdgpu_device *adev, struct svm_range *prange,
+@@ -189,6 +201,16 @@ svm_range_dma_map_dev(struct amdgpu_device *adev, struct svm_range *prange,
  			addr[i] |= SVM_RANGE_VRAM_DOMAIN;
  			pr_debug_ratelimited("vram address: 0x%llx\n", addr[i]);
  			continue;
-+		} else if (WARN_ON_ONCE(is_device_private_page(page))) {
++		} else if (is_device_private_page(page)) {
 +			/* Device private memory from another driver or range.
-+			 * This should never happen.
++			 * This should never happen in practice but it's
++			 * theoretically possible for read-only VMAs after a
++			 * process forks, creates a new KFD context and maps
++			 * the same page.
 +			 */
++			pr_debug("Trying to map device private page from another device or range\n");
++			addr[i] = 0;
 +			return -EINVAL;
  		}
  		addr[i] = dma_map_page(dev, page, 0, PAGE_SIZE, dir);
  		r = dma_mapping_error(dev, addr[i]);
--- 
-2.56.0
-

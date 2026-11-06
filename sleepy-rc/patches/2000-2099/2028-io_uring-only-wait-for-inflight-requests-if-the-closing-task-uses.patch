@@ -1,0 +1,46 @@
+From cf6542493e35ab9e72ac07da10a178ac78db5a16 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Orkun=20Emin=20Sar=C4=B1?= <sariorkunemin@gmail.com>
+Date: Wed, 4 Nov 2026 19:51:42 +0300
+Subject: [PATCH] io_uring: only wait for in-flight requests if the closing
+ task uses the ring
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Since commit 13d3783a55b7 ("io_uring: wait for in-flight requests on
+ring release"), the task dropping the last reference to a ring waits
+for every request on it to complete. A process that only received the
+ring fd, e.g. over a UNIX socket, can then block in close(2) on
+requests owned by other tasks, such as a read from an unresponsive
+FUSE server.
+
+Skip the wait for tasks that never attached to the ring and leave those
+requests to io_ring_exit_work(), as before.
+
+Fixes: 13d3783a55b7 ("io_uring: wait for in-flight requests on ring release")
+Signed-off-by: Orkun Emin Sarı <sariorkunemin@gmail.com>
+Link: https://patch.msgid.link/20261104-io-uring-wait-inflight-v2-1-f38f29fe8018@gmail.com
+Signed-off-by: Jens Axboe <axboe@kernel.dk>
+---
+ io_uring/io_uring.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/io_uring/io_uring.c b/io_uring/io_uring.c
+index 03724419c4e1..5db57bf675f0 100644
+--- a/io_uring/io_uring.c
++++ b/io_uring/io_uring.c
+@@ -2547,7 +2547,10 @@ static __cold void io_ring_ctx_wait_inflight(struct io_ring_ctx *ctx)
+ 
+ 	if (current->flags & (PF_KTHREAD | PF_EXITING))
+ 		return;
+-	if (tctx && atomic_read(&tctx->in_cancel))
++	/* Only wait if this task has attached to the ring */
++	if (!tctx || !xa_load(&tctx->xa, (unsigned long)ctx))
++		return;
++	if (atomic_read(&tctx->in_cancel))
+ 		return;
+ 
+ 	while (io_ring_ctx_inflight(ctx) && !fatal_signal_pending(current)) {
+-- 
+2.56.0
+

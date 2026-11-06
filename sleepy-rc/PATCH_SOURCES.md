@@ -12113,3 +12113,109 @@ is inert here: `CONFIG_KUNIT`/the amdgpu DM KUnit tests are not built.
 
 **327 patches** (324 + 3). `audit_series.py`: **327/327** on `v7.3`; the
 preview is **150/150** on `next-20261105`.
+
+## Sweep 2026-11-06 — `1316` v2; io_uring close fix `2028`; swap fixes `2809`–`2811`
+
+Sources refreshed on 2026-11-06: torvalds `origin/master` `a91337fb5e8e`
+(matches `ls-remote`; the local `master` is stale at `f0100363`), linux-next
+`next-20261105` `ddfe51b0a0f5` — **no `next-20261106` tag was published** by
+18:00 UTC, and the tree's `master` ref still points at the 2026-11-05 snapshot —
+drm-next `6628e7d4c6b2` (Linux 7.4-rc1, unchanged since 2026-11-01), agd5f and
+amd-staging `178d00b16ddb` (unchanged since 2026-11-04), drm-misc
+`de30740dccd8`, linux-pm `6628e7d4c6b2`, akpm-mm `mm-everything`
+`95c0281e304d` (316 commits after the snapshot tag), tip `8d4a63625d78`. The
+sixteen lore git mirrors and both freedesktop monthly archives were refreshed
+(amd-gfx 899 KB, dri-devel 3.2 MB); no source failed. The drm/amd work-item
+tracker returned 20 open issues updated since 2026-11-05 and 5 closed; no new
+fix commit was referenced.
+
+### Changed — both packages
+
+| Patch | Change | Why |
+|---|---|---|
+| `1316` | **v1 → v2** — `drm/amdkfd: Check ownership of device pages for DMA mapping` (Felix Kuehling) | v2 closes both Sashiko High findings against the v1 carried in `7.3.0-20`. The foreign device-private branch is no longer `WARN_ON_ONCE()`-gated: it clears `addr[i] = 0` before returning `-EINVAL`, so a later `svm_range_dma_unmap()` cannot unmap that entry a second time, and it logs the range mismatch with `pr_debug()`. The range-ownership helper is unchanged. Message-ID `<20261105204748.100841-1-felix.kuehling@amd.com>`; applies in place in both series. |
+
+### Adopted — both packages
+
+| Patch | Change | Why |
+|---|---|---|
+| `2809` | `mm: vmscan: allow writeout of swapcache folios without anon mappings` (Nhat Pham; `Reported-by: Sashiko`, `Cc: stable`) | `pageout()` rejected a dirty swapcache folio with no anonymous mapping before `swap_writeout()`, so an unfaulted zswap readahead folio could not be written out while its swap entry stayed referenced — the reclaim path this machine exercises with zswap and a swapfile. The check now tests `folio_test_swapcache()`; anon folios outside swapcache already return `PAGE_KEEP` through the missing-mapping check. `Fixes: 84798514db50`, which is in `v7.3`. Message-ID `<20261106160432.2552507-2-nphamcs@gmail.com>`; applies cleanly in the `2809` position in both series trees. |
+| `2810` | `mm, swap: only prefer nonfull clusters on synchronous devices` **v2** (Alexandre Ghiti; `Suggested-by: Kairui Song`, `LGTM` from Nhat Pham) | `9a42aed48421` made every allocation fill nonfull clusters first. An exclusive write fault now frees its swap slot (`3cedb745d354`), so a workload that rewrites swapped-out memory leaves holes and reclaim scatters a folio batch across them, losing write merging on a block-backed swapfile. Prefer free clusters again except on synchronous devices (`SWP_SYNCHRONOUS_IO`, e.g. zram), where contiguity buys nothing. Both Fixes commits are in `v7.3`. Message-ID `<20261105155032.240457-2-alex@ghiti.fr>`; applies cleanly in the `2810` position in both series trees. |
+| `2811` | `mm/swap: publish cluster tables after reacquiring allocator locks` (Nhat Pham; `Co-developed-by: Kairui Song`, `Reported-by: Sashiko`, `Cc: stable`) | `swap_cluster_populate()` published a count/cgroup table while its allocator locks were dropped for a sleeping allocation. A cached allocator could consume and free the table before the populating allocator resumed, leaving `alloc_swap_scan_cluster()` to read a NULL table. Keep the tables private until `swap_cluster_alloc_table()` restores the locks, and abandon installation if the list state changed. `Fixes: cdd77f84d966`, in `v7.3`. Message-ID `<20261106160432.2552507-3-nphamcs@gmail.com>`; applies cleanly in the `2811` position in both series trees. |
+
+### Adopted — rc only
+
+| Patch | Change | Why |
+|---|---|---|
+| `2028` | `io_uring: only wait for in-flight requests if the closing task uses the ring` (Orkun Emin Sarı; `Signed-off-by: Jens Axboe`) | Fixes `13d3783a55b7`, the commit our `2027` backports. Once a task drops the last ring reference it waited for every request; a process that only received the ring fd over a UNIX socket could then block in `close(2)` on requests owned by other tasks. Skip the wait for tasks that never attached to the ring. Merged in `next-20261105` as `cf6542493e35`, so the preview already has it — the rc backports `2027` and needs the fix. Applies to `v7.3` after `2027`. |
+
+### Rejected and watch items
+
+- **AMDGPU CWSR fixes** — `drm/amdgpu: don't take a per VM kernel BO for a page
+  table` (Jesse Zhang, 2026-11-06, navi48 WARN in `amdgpu_vm_pde_update` after a
+  VRAM-losing reset) and `fix memory leak open when CWSR allocation fails`
+  (2026-11-06). Both patch the CWSR TMA BO code added by `eed183d63b1f`
+  ("drm/amdgpu: Integrate CWSR with user queues"); `amdgpu_cwsr_alloc()` is
+  absent from both `v7.3` and `next-20261105`, so neither bug exists in the
+  carried bases. Re-evaluate when the CWSR series merges.
+- **`drm/amdgpu/vm: free pte update job on error` + `vm_pt: free PT on error`**
+  (Benjamin Cheng, 2026-11-05) — error-path leaks on the IGT PCI-unplug path.
+  This machine does not hot-unplug its GPU; deferred.
+- **`drm/amdgpu: re-enable SPM updates in the IB path` + `reemit RLC SPM
+  register in ring reemit`** (Alex Deucher, 2026-11-06) — real GFXOFF/SPM fix for
+  `2fb5a4572c76`, which **is** in the preview base and not in `v7.3` (where the
+  old runtime call still exists), so the series differ. It overlaps the carried
+  `1326`/`1308` SPM-VMID ordering work and is an unreviewed v1. Watch for the
+  merged form; the preview picks it up with a later snapshot.
+- **`sched_ext: Fix partial-SMT core counting in calc_shard_layout()`**
+  (Zhang Qiao, sched-ext `for-7.4-fixes`) — the CID layout undercounts cores
+  only when low-numbered SMT siblings are offline at root enable. All 16 CPUs
+  are online here and `scx_cake` does not enable CID sharding; the fix will
+  arrive with the merged tree. Inert.
+- **zswap performance series** (`separate compression and decompression
+  requests`, `stack requests for synchronous decompression`, `batched writeback
+  IO`, `plug the writeback IO of an LRU walk`) — perf work on the zswap paths
+  that `2102` (lru_cast) rewrites; still not rebased over the carried CAST
+  hooks. Defer.
+- **Hibernation swap-slot series** (`only allow swapped-out slots into the swap
+  cache`, `give hibernation swap slots their own swap table entry type`, `drop
+  the swap cache guard…`) — `CONFIG_HIBERNATION` is not used on this machine.
+- **`mm/swap: keep the swap-in pressure window open across a batch`**,
+  **`stop cluster list scans once swapoff clears SWP_WRITEOK`**, **`shmem: fix
+  swapin livelock`** — all plausible but unreviewed akpm queue items outside
+  this sweep's evidence bar; `2811` already fixes the cluster-table race they
+  touch. Revisit next sweep.
+- **`perf/amd/ibs: Fix kernel address leak via REGS_USER and REGS_INTR`** (tip
+  2026-11-06) — Zen 4 IBS leaks kernel addresses to unprivileged `perf` users.
+  A security fix worth a stable backport, but perf-IBS is not used here and the
+  patch is not in either base; watch the stable queue.
+- **`cpufreq: Hold the policy write lock when changing boost state`**,
+  **`io_uring/wait: don't sleep on an already expired timeout`**,
+  **`io_uring/rsrc: hold uring_lock across index-alloc put_user`** — merged in
+  `next-20261105`; the preview base already has them. Not carried in the rc:
+  no Cc-stable, and the impact here is small.
+- **`drm/dp: keep MOT set between messages`** — DisplayPort AUX; both displays
+  are HDMI.
+- **`drm/amdgpu: switch to __nonnull_args()`** — annotation only.
+- **Phoronix 2026-11-04..06** — the HDMI 2.2 FRL pair ("Parse HDMI 2.2 FRL
+  rates from the SCDS", "Accept HDMI 2.2 FRL rates from the sink EDID") is in
+  the `amd-drm-fixes-7.4-2026-11-05` pull, not yet in torvalds or either base;
+  the rc keeps FRL off by design (`dcfeaturemask=2`), and the preview takes the
+  pull with a later snapshot. The 7.4 Core MM pull is already in
+  `next-20261104`; `Linux 7.3 Will More Than Likely Be This Year's LTS`
+  matches the pinned base. No RDNA4/Navi 48 article in the window.
+
+### Reverts
+
+No upstream revert in the window targets carried work. The only on-target
+reverts are the DCN32/1 DMUB revert (`546917a24764`, off-target) and the DCN
+DSC/DCN60 series (wrong chip or base content). The `lib/sort.c`, TAINT_FORCED_BIND,
+TCP-MSS, media and PCI-layerscape reverts are unrelated. The dispute over
+`1065`/`1066` has no new posting: König has not replied to `1c36287c5eec`, so
+the carried up-front reservations stay.
+
+### Series state
+
+**331 patches** (327 + 4). `audit_series.py`: **331/331** on `v7.3`; the
+preview is **153/153** on `next-20261105` (see its own ledger for the CAST
+port).

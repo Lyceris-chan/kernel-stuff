@@ -18,6 +18,94 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.11.05-3-sleepy-next (linux-next `next-20261105`)]: 2026-11-06
+
+The 2026-11-06 sweep on top of `next-20261105`. **`next-20261106` had not been
+published when this release was cut** — the linux-next `master` ref still
+pointed at the 2026-11-05 snapshot — so the preview stays on the previous
+snapshot and carries the fixes below on top of it.
+
+### Changed
+
+- **`1316` v1 → v2** — same replacement as `7.3.0-21`: clear `addr[i]` before
+  the foreign device-private `-EINVAL` return, closing Sashiko's double-unmap
+  finding. Message-ID `<20261105204748.100841-1-felix.kuehling@amd.com>`.
+- **`2102` moves to the author's official 7.4 port.** `firelzrd/lru_cast`
+  commit `ce117bb` adds `patches/0001-7.4-rc1-lru_cast-v0.2.10.patch` (2026-11-06
+  08:04 +0900), the same v0.2.10 release written against 7.4-rc1. It replaces
+  the local hand port of the 7.3-rc7 patch: the vendor version uses
+  `LRU_CAST_RB_COUNT_CALLBACKS()`, keeps `swap_writeout_common()`, and
+  identifies the kswapd context from `spin_is_contended(pvmw->ptl)`. Verified
+  in `2102`'s position in the full series.
+
+### Added
+
+- **`2809`**, **`2810`** and **`2811`** — the zswap swapcache-writeout fix, the
+  swap nonfull-cluster preference v2, and the cluster-table publication race.
+  Same provenance and reasons as `7.3.0-21`; all three apply to
+  `next-20261105`.
+
+### Verified
+
+- Cumulative audit: **153/153** on `next-20261105`; rc **331/331** on `v7.3`.
+- CAST v0.2.10 official 7.4 port audits clean in position; NAP 0.6.6 is
+  byte-identical to the author's current release, so no NAP update.
+- Built and installed `linux-sleepy-next-2026.11.05-3` and its headers.
+  `vmlinux` and `amdgpu.ko` carry `.BTF`/`.BTF_ids`; the build has
+  `CONFIG_LRU_CAST=y`, `CONFIG_CPU_IDLE_GOV_NAP=y`, `CONFIG_SCHED_CLASS_EXT=y`,
+  `CONFIG_EXT_SUB_SCHED=y` and `CONFIG_TCP_CONG_BBR3=y` with
+  `CONFIG_TCP_CONG_BBR` unset. The built-in cmdline is unchanged, including
+  `amdgpu.user_queue=1`.
+- No reboot after the install.
+
+## [7.3.0-21-sleepy-rc]: 2026-11-06
+
+Second revision of the KFD ownership check, an io_uring `close(2)` fix, and
+three swap fixes from the 2026-11-06 sweep.
+
+### Changed
+
+- **`1316` v1 → v2** — `drm/amdkfd: Check ownership of device pages for DMA
+  mapping` (Felix Kuehling). The foreign device-private branch no longer uses
+  `WARN_ON_ONCE()`: it clears `addr[i]` before returning `-EINVAL`, so a later
+  `svm_range_dma_unmap()` cannot unmap that entry twice. This closes both
+  Sashiko High findings against the v1 carried in `7.3.0-20`. Message-ID
+  `<20261105204748.100841-1-felix.kuehling@amd.com>`.
+
+### Added
+
+- **`2028`, io_uring close** — `io_uring: only wait for in-flight requests if
+  the closing task uses the ring` (Orkun Emin Sarı; signed off by Jens Axboe).
+  Fixes `13d3783a55b7`, the commit our `2027` backports: a task that only
+  received the ring fd over a UNIX socket could block in `close(2)` on requests
+  owned by other tasks, such as a read from an unresponsive FUSE server. Merged
+  upstream as `cf6542493e35`.
+- **`2809`, zswap swapcache writeout** — `mm: vmscan: allow writeout of
+  swapcache folios without anon mappings` (Nhat Pham). A dirty swapcache folio
+  with no anonymous mapping was rejected before `swap_writeout()`, so an
+  unfaulted zswap readahead folio kept its swap entry referenced while reclaim
+  could not write it out. `Fixes: 84798514db50`, `Cc: stable`.
+- **`2810`, swap cluster preference v2** — `mm, swap: only prefer nonfull
+  clusters on synchronous devices` (Alexandre Ghiti; `Suggested-by: Kairui
+  Song`). Restores free-cluster preference on block-backed swapfiles so a
+  reclaim batch's writes can merge, while keeping nonfull-first on synchronous
+  devices such as zram.
+- **`2811`, cluster-table publication race** — `mm/swap: publish cluster tables
+  after reacquiring allocator locks` (Nhat Pham; co-developed by Kairui Song).
+  A cached allocator could consume and free a count table published while the
+  populating allocator held no locks, leaving the resumed scan with a NULL
+  table. `Fixes: cdd77f84d966`, `Cc: stable`.
+
+### Verified
+
+- Cumulative audit: **331/331** on `v7.3` (`audit_series.py`).
+- Built and installed `linux-sleepy-rc-7.3.0-21` and its headers. `vmlinux`
+  carries `.BTF`/`.BTF_ids`, `amdgpu.ko` carries `.BTF`/`.BTF_ids`, and the
+  build has `CONFIG_LRU_CAST=y`, `CONFIG_CPU_IDLE_GOV_NAP=y`,
+  `CONFIG_SCHED_CLASS_EXT=y`, `CONFIG_EXT_SUB_SCHED=y` and
+  `CONFIG_TCP_CONG_BBR3=y` with `CONFIG_TCP_CONG_BBR` unset.
+- No reboot after the install.
+
 ## [2026.11.05-2-sleepy-next (linux-next `next-20261105`)]: 2026-11-05
 
 Rebuild with the maintainer version of the KFD device-page ownership check.

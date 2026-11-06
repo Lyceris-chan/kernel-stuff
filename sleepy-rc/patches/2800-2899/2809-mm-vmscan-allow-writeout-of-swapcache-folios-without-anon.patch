@@ -1,0 +1,37 @@
+From ef572a2915ee50bd0669ebd314ff51a0db30ccf7 Mon Sep 17 00:00:00 2001
+From: Nhat Pham <nphamcs@gmail.com>
+Date: Fri,  6 Nov 2026 08:04:31 -0800
+Subject: [PATCH 1/2] mm: vmscan: allow writeout of swapcache folios without anon mappings
+
+Unfaulted zswap readahead folios can be dirty and in swapcache without
+an anonymous mapping. pageout() rejects them before swap_writeout(),
+so reclaim cannot write them out while their swap entries remain
+referenced.
+
+Allow swapcache folios through the filesystem folio check. They already
+have swap entries and can use the existing swap writeout path. Anonymous
+folios outside swapcache have no mapping and already return PAGE_KEEP.
+
+Reported-by: Sashiko <sashiko-bot@kernel.org>
+Link: https://lore.kernel.org/all/sashiko-outbox-181078@kernel.org/
+Fixes: 84798514db50 ("mm: Remove swap_writepage() and shmem_writepage()")
+Cc: stable@vger.kernel.org
+Signed-off-by: Nhat Pham <nphamcs@gmail.com>
+---
+ mm/vmscan.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 7db6be53f3a9..4b014e3c07bd 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -714,7 +714,8 @@ static pageout_t pageout(struct swap_io_ctx *ctx, struct address_space *mapping,
+ 	 */
+ 	if (folio_ref_count(folio) != 1 + folio_nr_pages(folio) || !mapping)
+ 		return PAGE_KEEP;
+-	if (!shmem_mapping(mapping) && !folio_test_anon(folio))
++	/* Anonymous folios outside swapcache returned PAGE_KEEP above. */
++	if (!shmem_mapping(mapping) && !folio_test_swapcache(folio))
+ 		return PAGE_ACTIVATE;
+ 	if (!folio_clear_dirty_for_io(folio))
+ 		return PAGE_CLEAN;

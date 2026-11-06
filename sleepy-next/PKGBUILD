@@ -203,7 +203,7 @@ _snapdate=${_srctag#next-}                                            # 20261105
 _snapver="${_snapdate:0:4}.${_snapdate:4:2}.${_snapdate:6:2}"
 pkgver=${_snapver}
 _tagrel=1
-pkgrel=2
+pkgrel=3
 # Build parallelism. Previously capped at 8 on a diagnosis that did not hold up.
 #
 # The cap was added after an rc4-7 build thrashed badly — 6 watchdog firings and
@@ -419,6 +419,9 @@ source=(
   "patches/2800-2899/2806-mm-zswap-drop-the-stale-zswap-entry-of-a-zero-folio.patch"
   "patches/2800-2899/2807-mm-swap-fix-large-swap-in-across-swap-file-extents.patch"
   "patches/2800-2899/2808-mm-swapfile-drop-a-large-unmapped-swap-in-folio-in-unuse_pte.patch"
+  "patches/2800-2899/2809-mm-vmscan-allow-writeout-of-swapcache-folios-without-anon.patch"
+  "patches/2800-2899/2810-mm-swap-only-prefer-nonfull-clusters-on-synchronous-devices.patch"
+  "patches/2800-2899/2811-mm-swap-publish-cluster-tables-after-reacquiring-allocator-locks.patch"
   "patches/3000-3099/3001-usb-pci-quirks-always-assert-xHCI-OS-ownership.patch"
   "patches/9000-9099/9034-drm-amdgpu-fix-VM-update-overrun-on-non-4K-page-kernels.patch"
   "patches/9000-9099/9035-drm-amdgpu-add-the-BO-va-mapping-offset-when-kmapping-an-IB.patch"
@@ -1211,7 +1214,7 @@ b2sums=('eb66338d1cba00ad3025461dbaa209b349fffcc4e74bb8d9b3355e8f8ae7ddd7af8a303
         'd34e2ed111d28b4a01e9f8993c4dbe617509e212fd1222be2fb5da58b471e304b256c09aa1d305a7b84aa0e70e3cd40c26928d2cbb0c6ae08f04dc45657bab66'
         'c2c0f480dcca4b828ad3b37256ec7bcfb8c1fd5760cdda2e2e894eb2197c26bb49ce93f38a57614684c088914cfa49b52e1679ff3e921c7fa01f9a3667a45354'
         'f6b05bb6f637c618ecc6e5c5f1ac1c92cb110d1bddcbd7f9ecd074fef95cc82608e73b54196386b951638de75457182abdcac4fa34f06a41a0a58c1ad06a2a9a'
-        '4d600d2a10396e4be0e5fcce1d6bfaed13f32ecedb7cb40cd71ea6c6718e102e74561e0925011610c45254f47d981b5adf414577ae01b4da9d36bf018b4e4d12'
+        'd3acbcbb0e00e516684720def5a80d8267883795f346a8dcab74e860eda406d25eb6413b524dddaa09215f0b8548a8e3532bb504f5f86ad1fedcad37492a73d4'
         'e07675f520392e8b108f40e87f93f823cf8999ae4869370f3c810c7fd8aa90220d749c47465933e9c0eb7010caca1d00094143a5aed1bf90bea2494bc6d72692'
         'ef25e855b6b6b6c879baf5fada402439e37a6d913135db3ef2cd5b98504497616adda9f11db960d432e753dd60517604d8d160bd89e4181114d7c99ff61d4b12'
         'f7380a26e828fba6fb8c066d9eff2647f908da5db2625819feabe056969f0705a0775c9b6e7e91793d9dd7a0ce50f54e4ed3218ebd9e8157e733b1c0db1bfe06'
@@ -1249,7 +1252,7 @@ b2sums=('eb66338d1cba00ad3025461dbaa209b349fffcc4e74bb8d9b3355e8f8ae7ddd7af8a303
         '1455fd65a42e9bba65673da473b99187acc2e25d6535c89d365eb925500f84e23e40bddca183e83bb8af641122254083cddd8bf26fbdbd413da6a20ccd73850f'
         '1febc80f2b503eb9fc869c9884278ba77152cc04d1ad4dd06d15030c7f51fbad9edf995d60963edf77d2b8885dae67d65e7758fbbcf62a43aaa4860def5b8e30'
         '04fe6270d9e54b974ee745261575fd710e3af252c6e2b2788a082455c6eeccfd2ea944245f5f58a9f4de418eca3058aaae8a27f90173b254aac15036c7a95c49'
-        'a88dfa3a405b944834f53749853a48fc6314ab96512eae27dad3b34b8f7e82d1d6a97b2d9ae4d48619357e541866d56fc71f9c32297055f2517a809c0e6a3340'
+        'a1cb3c860ccdfd1b5527acd32fad65f11f9d51b41dcaafe71a45c05f43fc450129d92dfe9cfbfbf265fe4152fc578a2317ff1219f7d33a4c3be94814eec1136f'
         'eb5b6994b1341e7c05c49ba79336febc87dffe40e5008a81a9afdf931c8d2c00fb69fcf4d70923ba999993dd2e8e9ebf768d5809ee219a22e94f632944553539'
         '5626968774bad1795494928621f43e19945a1ecbd26c4dccd432a329277c26f04fc4ae02fde5560c503aed0fcd9bfda219de5c47e29a226149723fa5a7dbb721'
         '147d5cd83a6b680ec8eb69ed93450e761bbac6c3b6ae0de6a9d946613f120cbbd022d33a94e78b06d49c491c5b2d82b78c1be8327c7d0523bef93644149f3abe'
@@ -1272,6 +1275,9 @@ b2sums=('eb66338d1cba00ad3025461dbaa209b349fffcc4e74bb8d9b3355e8f8ae7ddd7af8a303
         'a607eff6f904c8b02e05c3b379dce39dff5a518bf01588c054a8be5f4de51c9bad985df014551cc3ddeba4cfb46f3121a022414e958608da67520a1e35e3a2e3'
         '5d7126ffc7deab9ac4b6976e0690848c6821c04a38e9a3c90fa50dc399ede15ad2b5efc7168a30c9fd8f5293edcff92111f96b79ac784f7f844d7cc2e38e90b3'
         '2271f823213d7dfc557395b89becc1c625ff465d7709d684c6b1a927ebc5d45cc380810fb9bca9119f6438fd18a71d5853ea610f001a545404bc512b952769f5'
+        '3e0627b2863fc990bfb82313eaf1de6e3f8256d634a2d52876827228cf542fde012586a8343275d09a4350767cb0b15c34659557c8501ea8c106fad4f0b788b4'
+        '6fbf21d2783a32aa12d3f8fcb3c6bdd2507cbbcb0d0ee3c4aca9b8f57a0081f25852803c6e8e66cf1d5e5a87d774e5fa7ab98871254bc2261c93b46d1b88af24'
+        '2d13bde89cc80fd44bf87be4e06f2da5a2ffec94264efb17ef04d3ab2443235f7b2c5a9c1c9a8ab439bfd4d5f12448d91a2a1d9878f8e122bc78cf57e8d18243'
         '3a5f75c872c8e4af63befa0c102884b2f1ca2181b546ee5f92aa69354deae5d43349986d440cd0cd85ee6a87f091ac6217e3270e1cb257ddffd2d475eaf0fc4a'
         '0c25491212274500756b31955cafa5f757480985f21d616ab179df8773f1d8a869ab5eb319add233c5f998ec286e12e0fbaf40c1f01cc4f6d577c799cd0a40a7'
         '2f6ecc84e0141cbee5ce379a2959550cb4830e923afa3d5275283d74d69b8e3bba51f84af96df329d1ea30af0a26f320678907833b40172cbff4a751de3682a7'
