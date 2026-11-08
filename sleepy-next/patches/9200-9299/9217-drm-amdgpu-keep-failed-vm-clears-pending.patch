@@ -1,0 +1,63 @@
+From 0823d48bd2e85e0f3940cf4b8473f0c73d3c2835 Mon Sep 17 00:00:00 2001
+From: Erhan Bilgili <erhan.bilgili@gmail.com>
+Date: Wed, 28 Oct 2026 00:58:48 +0100
+Subject: [PATCH] drm/amdgpu: Keep failed VM clears pending.
+
+(cherry picked from commit d9a1af319720f34df76d05bb6a22d841a06e6c2b)
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c |  2 +-
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c  | 14 ++++++--------
+ 2 files changed, 7 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
+index b01564617368..213bebe2623c 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
+@@ -378,7 +378,7 @@ static void amdgpu_gem_object_close(struct drm_gem_object *obj,
+ 
+ out_unlock:
+ 	if (r && !drm_dev_is_unplugged(adev_to_drm(adev)))
+-		dev_err(adev->dev, "leaking bo va (%ld)\n", r);
++		dev_err(adev->dev, "BO VA cleanup failed (%ld)\n", r);
+ 	drm_exec_fini(&exec);
+ }
+ 
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+index 618470514305..f98d675c2e97 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+@@ -1676,8 +1676,8 @@ static void amdgpu_vm_prt_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
+  *
+  * @adev: amdgpu_device pointer
+  * @vm: requested vm
+- * @fence: optional resulting fence (unchanged if no work needed to be done
+- * or if an error occurred)
++ * @fence: optional fence for successful clear operations, including when
++ *         a later clear fails
+  *
+  * Make sure all freed BOs are cleared in the PT.
+  * PTs have to be reserved and mutex must be locked!
+@@ -1711,19 +1711,17 @@ int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
+ 	while (!list_empty(&vm->freed)) {
+ 		mapping = list_first_entry(&vm->freed,
+ 			struct amdgpu_bo_va_mapping, list);
+-		list_del(&mapping->list);
+ 
+ 		r = amdgpu_vm_update_range(adev, vm, false, false, true, false,
+ 					   &sync, mapping->start, mapping->last,
+ 					   0, 0, 0, NULL, NULL, &f);
+-		if (r) {
+-			list_add(&mapping->list, &vm->freed);
+-			dma_fence_put(f);
+-			goto error_free;
+-		}
++		if (r)
++			break;
++		list_del(&mapping->list);
+ 		amdgpu_vm_free_mapping(adev, vm, mapping, f);
+ 	}
+ 
++	/* Preserve the fence for earlier successful clears on error. */
+ 	if (fence && f) {
+ 		dma_fence_put(*fence);
+ 		*fence = f;

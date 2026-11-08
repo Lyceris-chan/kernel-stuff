@@ -1,0 +1,134 @@
+From eaa4d43d25623e75c0f4e0b6dc952104bb5fac62 Mon Sep 17 00:00:00 2001
+From: Erhan Bilgili <erhan.bilgili@gmail.com>
+Date: Wed, 28 Oct 2026 00:58:48 +0100
+Subject: [PATCH] drm/amdgpu: Complete prepared VM updates after errors.
+
+(cherry picked from commit dd9dc655b9275eaccfbc6dc41fc19f4dcaa8af6b)
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c    | 23 ++++++++++++++---------
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c | 16 +++++++++-------
+ 2 files changed, 23 insertions(+), 16 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+index f98d675c2e97..0b46b3b2866f 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+@@ -1102,7 +1102,7 @@ int amdgpu_vm_update_pdes(struct amdgpu_device *adev,
+ 	struct amdgpu_vm_update_params params;
+ 	struct amdgpu_vm_bo_base *entry, *tmp;
+ 	bool flush_tlb_needed = false;
+-	int r, idx;
++	int r, ret, idx;
+ 
+ 	amdgpu_vm_assert_locked(vm);
+ 
+@@ -1128,15 +1128,17 @@ int amdgpu_vm_update_pdes(struct amdgpu_device *adev,
+ 
+ 		r = amdgpu_vm_pde_update(&params, entry);
+ 		if (r)
+-			goto error;
++			break;
+ 	}
+ 
+-	r = vm->update_funcs->commit(&params, &vm->last_update);
+-	if (r)
+-		goto error;
++	ret = vm->update_funcs->commit(&params, &vm->last_update);
++	if (!r)
++		r = ret;
+ 
+ 	if (flush_tlb_needed)
+ 		atomic64_inc(&vm->tlb_seq);
++	if (r)
++		goto error;
+ 
+ 	list_for_each_entry_safe(entry, tmp, &vm->kernel.needs_update,
+ 				 vm_status)
+@@ -1242,7 +1244,7 @@ int amdgpu_vm_update_range(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+ 	struct amdgpu_vm_tlb_seq_struct *tlb_cb;
+ 	struct amdgpu_vm_update_params params;
+ 	struct amdgpu_res_cursor cursor;
+-	int r, idx;
++	int r, ret, idx;
+ 
+ 	if (!drm_dev_enter(adev_to_drm(adev), &idx))
+ 		return -ENODEV;
+@@ -1342,14 +1344,17 @@ int amdgpu_vm_update_range(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+ 		tmp = start + num_entries;
+ 		r = amdgpu_vm_ptes_update(&params, start, tmp, addr, flags);
+ 		if (r)
+-			goto error_free;
++			break;
+ 
+ 		amdgpu_res_next(&cursor, num_entries * AMDGPU_GPU_PAGE_SIZE);
+ 		start = tmp;
+ 	}
+ 
+-	r = vm->update_funcs->commit(&params, fence);
+-	if (r)
++	/* Publish any queued prefix, including when a later range failed. */
++	ret = vm->update_funcs->commit(&params, fence);
++	if (!r)
++		r = ret;
++	if (ret)
+ 		goto error_free;
+ 
+ 	if (params.needs_flush) {
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c
+index 98b8d18c4301..1a0a194f89a6 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c
+@@ -370,7 +370,7 @@ int amdgpu_vm_pt_clear(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+ 	struct amdgpu_bo *bo = &vmbo->bo;
+ 	uint64_t value = 0, flags = 0;
+ 	uint64_t addr;
+-	int r, idx;
++	int r, ret, idx;
+ 
+ 	/* Figure out our place in the hierarchy */
+ 	if (ancestor->parent) {
+@@ -424,10 +424,10 @@ int amdgpu_vm_pt_clear(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+ 
+ 	r = vm->update_funcs->update(&params, vmbo, addr, 0, entries,
+ 				     value, flags);
+-	if (r)
+-		goto exit;
+ 
+-	r = vm->update_funcs->commit(&params, &vm->last_update);
++	ret = vm->update_funcs->commit(&params, &vm->last_update);
++	if (!r)
++		r = ret;
+ exit:
+ 	drm_dev_exit(idx);
+ 	return r;
+@@ -701,7 +701,7 @@ static void amdgpu_vm_pte_update_noretry_flags(struct amdgpu_device *adev,
+  *
+  * Make sure to set the right flags for the PTEs at the desired level.
+  */
+-static void amdgpu_vm_pte_update_flags(struct amdgpu_vm_update_params *params,
++static int amdgpu_vm_pte_update_flags(struct amdgpu_vm_update_params *params,
+ 				       struct amdgpu_bo_vm *pt,
+ 				       unsigned int level,
+ 				       uint64_t pe, uint64_t addr,
+@@ -735,7 +735,7 @@ static void amdgpu_vm_pte_update_flags(struct amdgpu_vm_update_params *params,
+ 	if (level == AMDGPU_VM_PTB)
+ 		amdgpu_vm_pte_update_noretry_flags(adev, &flags);
+ 
+-	params->vm->update_funcs->update(params, pt, pe, addr, count, incr,
++	return params->vm->update_funcs->update(params, pt, pe, addr, count, incr,
+ 					 flags);
+ }
+ 
+@@ -921,9 +921,11 @@ int amdgpu_vm_ptes_update(struct amdgpu_vm_update_params *params,
+ 			trace_amdgpu_vm_update_ptes(params, frag_start, upd_end,
+ 						    min(nptes, 32u), dst, incr,
+ 						    upd_flags);
+-			amdgpu_vm_pte_update_flags(params, to_amdgpu_bo_vm(pt),
++			r = amdgpu_vm_pte_update_flags(params, to_amdgpu_bo_vm(pt),
+ 						   cursor.level, pe_start, dst,
+ 						   nptes, incr, upd_flags);
++			if (r)
++				return r;
+ 
+ 			pe_start += nptes * 8;
+ 			dst += nptes * incr;

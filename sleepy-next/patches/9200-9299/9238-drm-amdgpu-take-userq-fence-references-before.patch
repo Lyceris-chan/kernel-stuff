@@ -1,4 +1,4 @@
-From 8c41d193b8caf59fe1e4d97ef6a9656f87da5daf Mon Sep 17 00:00:00 2001
+From 143bb2997dbeca35cb899f6dd130385cac082e47 Mon Sep 17 00:00:00 2001
 From: Erhan Bilgili <erhan.bilgili@gmail.com>
 Date: Wed, 4 Nov 2026 02:13:31 +0100
 Subject: [PATCH] drm/amdgpu: Take UserQ fence references before
@@ -11,7 +11,7 @@ Subject: [PATCH] drm/amdgpu: Take UserQ fence references before
  2 files changed, 232 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c
-index d715b09fa8a9..e563398d0763 100644
+index efdf865400a9..dbb18fe1ca57 100644
 --- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c
 +++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c
 @@ -1005,12 +1005,13 @@ amdgpu_userq_wait_return_fence_info(struct drm_device *dev, struct drm_file *fil

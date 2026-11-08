@@ -1,4 +1,4 @@
-From 71d2bffff7cfdde07d973e1363fe54bfac1f78d4 Mon Sep 17 00:00:00 2001
+From d56b9554c43c118e725ac4e5cf9adcd46b89b303 Mon Sep 17 00:00:00 2001
 From: Erhan Bilgili <erhan.bilgili@gmail.com>
 Date: Wed, 4 Nov 2026 02:13:37 +0100
 Subject: [PATCH] drm/amdgpu: Preserve UserQ write-pointer offsets.

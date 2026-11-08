@@ -1,0 +1,36 @@
+From 5457e48031ef3dc680e446fa924f418826bee940 Mon Sep 17 00:00:00 2001
+From: Erhan Bilgili <erhan.bilgili@gmail.com>
+Date: Wed, 28 Oct 2026 00:58:48 +0100
+Subject: [PATCH] drm/amdgpu: Propagate KFD unmap clear failures.
+
+(cherry picked from commit f251fcea0acae83d9b0559dceb31c197c08da7f6)
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gpuvm.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gpuvm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gpuvm.c
+index 1ec22b5c945f..c9092eb33eb3 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gpuvm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gpuvm.c
+@@ -1285,6 +1285,7 @@ static int unmap_bo_from_gpuvm(struct kgd_mem *mem,
+ 	struct amdgpu_bo_va *bo_va = entry->bo_va;
+ 	struct amdgpu_device *adev = entry->adev;
+ 	struct amdgpu_vm *vm = bo_va->base.vm;
++	int ret;
+ 
+ 	if (bo_va->queue_refcount) {
+ 		pr_debug("bo_va->queue_refcount %d\n", bo_va->queue_refcount);
+@@ -1297,11 +1298,11 @@ static int unmap_bo_from_gpuvm(struct kgd_mem *mem,
+ 	if (!amdgpu_vm_ready(vm))
+ 		return 0;
+ 
+-	(void)amdgpu_vm_clear_freed(adev, vm, &bo_va->last_pt_update);
++	ret = amdgpu_vm_clear_freed(adev, vm, &bo_va->last_pt_update);
+ 
+ 	(void)amdgpu_sync_fence(sync, bo_va->last_pt_update, GFP_KERNEL);
+ 
+-	return 0;
++	return ret;
+ }
+ 
+ static int update_gpuvm_pte(struct kgd_mem *mem,

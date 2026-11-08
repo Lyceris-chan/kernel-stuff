@@ -1,0 +1,24 @@
+From f26bdb9a60b5d212ba6f60c5ece84f3ef9fd5c1f Mon Sep 17 00:00:00 2001
+From: Erhan Bilgili <erhan.bilgili@gmail.com>
+Date: Wed, 28 Oct 2026 00:58:48 +0100
+Subject: [PATCH] drm/amdgpu: Avoid duplicate GEM close error messages.
+
+(cherry picked from commit be71c8d93165b457aa586a8a93f51509bad14967)
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
+index d2c046df5ec5..5a7781f09d3e 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
+@@ -368,9 +368,6 @@ static void amdgpu_gem_object_close(struct drm_gem_object *obj,
+ 		goto out_unlock;
+ 
+ 	r = amdgpu_vm_clear_freed(adev, vm, &fence);
+-	if (unlikely(r < 0) && !drm_dev_is_unplugged(adev_to_drm(adev)))
+-		dev_err(adev->dev, "failed to clear page "
+-			"tables on GEM object close (%ld)\n", r);
+ 	if (r || !fence)
+ 		goto out_unlock;
+ 

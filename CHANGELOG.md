@@ -18,6 +18,37 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.11.05-6-sleepy-next (linux-next `next-20261105`)]: 2026-11-08
+
+The salkim userq carry is now complete: the preview matches the branch's
+userq and VM-batch kernel work **1:1** (39 of 39 commits), plus one adaptation.
+
+### Added
+
+- **`9216`–`9235`** — the VM/VA-batch rework that `9235`'s userq batch
+  completion needs: batched span and freed-range updates, shared page-table
+  update batches across BOs, delayed IB growth, batch retirement and
+  dependency handling, failure retention, the `DRM_AMDGPU_GEM_VA_BATCH` ioctl
+  and `AMDGPU_INFO_GEM_VA_BATCH`, plus the partial-VA replacement fix.
+- **`9236`** — resume the device before sparse VA batches.
+- **`9239`** — this tree's adaptation of the batch rework to the carried TLB
+  fence model (`last_tlb_flush`), the 3-argument
+  `amdgpu_vm_tlb_fence_create()` and the `amdgpu_vm_bo_needs_eviction()` logic
+  from `1058`, plus the missing `out:` label.
+- **`9200`–`9215`** and **`9237`**, **`9238`** are unchanged from
+  `2026.11.05-5`.
+
+### Verified
+
+- Cumulative audit: **199/199** on `next-20261105`; rc **338/338** on `v7.3`.
+- Built and installed `linux-sleepy-next-2026.11.05-6` and its headers.
+  `vmlinux` and `amdgpu.ko` carry `.BTF`/`.BTF_ids`; the configs and the
+  built-in cmdline (including `amdgpu.user_queue=1`) are unchanged, and the
+  installed module exports the batch ioctl and the userq batch symbols.
+- Full per-patch provenance and the conflict/adaptation notes are in
+  `sleepy-next/PATCH_SOURCES.md`.
+- No reboot after the install; the machine still runs `2026.11.05-3`.
+
 ## [2026.11.05-5-sleepy-next (linux-next `next-20261105`)]: 2026-11-08
 
 Experimental user-queue carry for Proton. Adds nanomatters/kernel-salkim's

@@ -1,0 +1,105 @@
+From 0b73fba3dcb800093195e1a8851e60c564128c29 Mon Sep 17 00:00:00 2001
+From: Erhan Bilgili <erhan.bilgili@gmail.com>
+Date: Wed, 28 Oct 2026 00:58:48 +0100
+Subject: [PATCH] drm/amdgpu: Scope sparse batch retirement records.
+
+(cherry picked from commit 895699f292916a7e16a73e87dd5158d76a8205ac)
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c |  5 ++++-
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c  | 14 +++++++++-----
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h  |  3 ++-
+ 3 files changed, 15 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
+index a947a634db29..739230a88cf5 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
+@@ -1087,6 +1087,7 @@ int amdgpu_gem_va_batch_ioctl(struct drm_device *dev, void *data,
+ 	struct amdgpu_bo_va *bo_va;
+ 	struct drm_exec exec;
+ 	DEFINE_XARRAY(bos);
++	LIST_HEAD(freed);
+ 	u64 end, vm_size = adev->vm_manager.max_pfn * AMDGPU_GPU_PAGE_SIZE;
+ 	u32 i, j;
+ 	int r;
+@@ -1181,7 +1182,9 @@ int amdgpu_gem_va_batch_ioctl(struct drm_device *dev, void *data,
+ 	for (i = 0; i < args->count; ++i)
+ 		amdgpu_vm_bo_replace_map_prealloc(adev, entries[i].bo_va,
+ 			ops[i].va_address, ops[i].offset_in_bo, ops[i].map_size,
+-			ops[i].flags, entries[i].maps);
++			ops[i].flags, entries[i].maps, &freed);
++	/* Retire batch and legacy unmaps with the same dependencies. */
++	list_splice_init(&freed, &vm->freed);
+ 
+ 	/* Like GEM_VA, leave updates pending until CS validates the VM. */
+ 	if (!amdgpu_vm_ready(vm)) {
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+index cd346beea4cc..6c33313725c8 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+@@ -2350,6 +2350,7 @@ int amdgpu_vm_bo_unmap(struct amdgpu_device *adev,
+  * @size: size of the range
+  * @before: prepared record for the surviving prefix
+  * @after: prepared record for the surviving suffix
++ * @freed: destination for mappings requiring GPU retirement
+  *
+  * Remove all mappings in a range, split them as appropriate.
+  *
+@@ -2358,7 +2359,8 @@ int amdgpu_vm_bo_unmap(struct amdgpu_device *adev,
+ static void amdgpu_vm_bo_clear_mappings_prealloc(struct amdgpu_device *adev,
+ 				struct amdgpu_vm *vm, uint64_t saddr, uint64_t size,
+ 				struct amdgpu_bo_va_mapping *before,
+-				struct amdgpu_bo_va_mapping *after)
++				struct amdgpu_bo_va_mapping *after,
++				struct list_head *freed)
+ {
+ 	struct amdgpu_bo_va_mapping *tmp, *next;
+ 	LIST_HEAD(removed);
+@@ -2411,7 +2413,7 @@ static void amdgpu_vm_bo_clear_mappings_prealloc(struct amdgpu_device *adev,
+ 		    tmp->last = eaddr;
+ 
+ 		tmp->bo_va = NULL;
+-		list_add(&tmp->list, &vm->freed);
++		list_add(&tmp->list, freed);
+ 		trace_amdgpu_vm_bo_unmap(NULL, tmp);
+ 	}
+ 
+@@ -2462,19 +2464,21 @@ int amdgpu_vm_bo_clear_mappings(struct amdgpu_device *adev,
+ 		kfree(before);
+ 		return -ENOMEM;
+ 	}
+-	amdgpu_vm_bo_clear_mappings_prealloc(adev, vm, saddr, size, before, after);
++	amdgpu_vm_bo_clear_mappings_prealloc(adev, vm, saddr, size, before, after,
++					   &vm->freed);
+ 	return 0;
+ }
+ 
+ /* Parameters are validated and all three records allocated before mutation. */
+ void amdgpu_vm_bo_replace_map_prealloc(struct amdgpu_device *adev,
+ 		struct amdgpu_bo_va *bo_va, uint64_t saddr, uint64_t offset,
+-		uint64_t size, uint32_t flags, struct amdgpu_bo_va_mapping **maps)
++		uint64_t size, uint32_t flags, struct amdgpu_bo_va_mapping **maps,
++		struct list_head *freed)
+ {
+ 	struct amdgpu_bo_va_mapping *mapping = maps[0];
+ 
+ 	amdgpu_vm_bo_clear_mappings_prealloc(adev, bo_va->base.vm, saddr, size,
+-					   maps[1], maps[2]);
++					   maps[1], maps[2], freed);
+ 	mapping->start = saddr / AMDGPU_GPU_PAGE_SIZE;
+ 	mapping->last = mapping->start + (size - 1) / AMDGPU_GPU_PAGE_SIZE;
+ 	mapping->offset = offset;
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
+index 45b689862ffd..034f88a10500 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
+@@ -508,7 +508,8 @@ int amdgpu_vm_verify_parameters(struct amdgpu_device *adev, struct amdgpu_bo *bo
+ 			       uint64_t addr, uint64_t offset, uint64_t size);
+ void amdgpu_vm_bo_replace_map_prealloc(struct amdgpu_device *adev,
+ 		struct amdgpu_bo_va *bo_va, uint64_t addr, uint64_t offset,
+-		uint64_t size, uint32_t flags, struct amdgpu_bo_va_mapping **maps);
++		uint64_t size, uint32_t flags, struct amdgpu_bo_va_mapping **maps,
++		struct list_head *freed);
+ int amdgpu_vm_bo_unmap(struct amdgpu_device *adev,
+ 		       struct amdgpu_bo_va *bo_va,
+ 		       uint64_t addr);

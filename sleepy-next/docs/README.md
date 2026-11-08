@@ -3,11 +3,11 @@
 `linux-sleepy-next` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
 built from a **linux-next snapshot (`next-20261105`)** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 177-patch
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 199-patch
 series. It is not a general-purpose kernel.
 
-**Base version:** `2026.11.05-5` · **Artifact:**
-`linux-sleepy-next-2026.11.05-5-x86_64.pkg.tar.zst`
+**Base version:** `2026.11.05-6` · **Artifact:**
+`linux-sleepy-next-2026.11.05-6-x86_64.pkg.tar.zst`
 
 The release is named for the **snapshot date**, not the mainline release the
 snapshot was cut from — linux-next is a daily tree, and its base release goes
@@ -133,7 +133,7 @@ preview: it exists to exercise the snapshot's display code with IPS enabled.
 
 ## Patch series
 
-177 patch entries in `source=()` (184 files; seven are excluded from the build). `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+199 patch entries in `source=()` (206 files; seven are excluded from the build). `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 On a linux-next snapshot a large fraction are skipped rather than failed, since
 the snapshot already carries much of what the series adds — a skip is only safe
 for a self-contained patch, so interdependent groups are excluded outright

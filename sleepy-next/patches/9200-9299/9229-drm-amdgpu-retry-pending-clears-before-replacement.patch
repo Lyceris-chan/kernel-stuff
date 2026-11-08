@@ -1,0 +1,49 @@
+From 2805ec3c7c29abe3c171e157c460f32b9c42a420 Mon Sep 17 00:00:00 2001
+From: Erhan Bilgili <erhan.bilgili@gmail.com>
+Date: Wed, 28 Oct 2026 00:58:48 +0100
+Subject: [PATCH] drm/amdgpu: Retry pending clears before replacement
+ mappings.
+
+(cherry picked from commit c5aba8010cccad5f39166543dc46a5db9f2376f6)
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c | 10 ++++++++++
+ drivers/gpu/drm/amd/amdkfd/kfd_svm.c   |  5 +++++
+ 2 files changed, 15 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+index f2891d3fb7bc..880440cf595c 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+@@ -1643,6 +1643,16 @@ static void amdgpu_vm_bo_update_done(struct amdgpu_bo_va *bo_va, bool clear)
+ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
+ 			bool clear)
+ {
++	struct amdgpu_vm *vm = bo_va->base.vm;
++	int r;
++
++	/* A retried clear must not erase a replacement mapping. */
++	if (!clear && !list_empty(&vm->freed)) {
++		r = amdgpu_vm_clear_freed(adev, vm, &vm->last_update);
++		if (r)
++			return r;
++	}
++
+ 	return amdgpu_vm_bo_update_internal(adev, bo_va, clear, NULL);
+ }
+ 
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c b/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
+index 1ddba0adc5c1..cd3a9dd297d5 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
+@@ -1546,6 +1546,11 @@ svm_range_map_to_gpu(struct kfd_process_device *pdd, struct svm_range *prange,
+ 			 kfd_svm_gpu_va_limit_pfn(pdd)))
+ 		return -EINVAL;
+ 
++	/* SVM writes PTEs directly, bypassing amdgpu_vm_bo_update(). */
++	r = amdgpu_vm_clear_freed(adev, vm, &vm->last_update);
++	if (r)
++		return r;
++
+ 	for (i = offset; i < offset + npages; i++) {
+ 		uint64_t gpu_start;
+ 		uint64_t gpu_end;

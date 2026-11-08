@@ -1,0 +1,39 @@
+From c10c14deec6a6581a863a253591653033ca8614d Mon Sep 17 00:00:00 2001
+From: Erhan Bilgili <erhan.bilgili@gmail.com>
+Date: Wed, 28 Oct 2026 00:58:48 +0100
+Subject: [PATCH] drm/amdgpu: Clean up failed page-table allocations.
+
+(cherry picked from commit 2d255bd79245d3e006dac5d5975cf29506657107)
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c
+index 1a0a194f89a6..2cea6367a0f4 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c
+@@ -502,6 +502,8 @@ int amdgpu_vm_pt_create(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+ 	return 0;
+ }
+ 
++static void amdgpu_vm_pt_free(struct amdgpu_vm_bo_base *entry);
++
+ /**
+  * amdgpu_vm_pt_alloc - Allocate a specific page table
+  *
+@@ -545,10 +547,14 @@ static int amdgpu_vm_pt_alloc(struct amdgpu_vm_update_params *p,
+ 	amdgpu_vm_bo_base_init(p->adev, entry, p->vm, pt_bo);
+ 	r = amdgpu_vm_pt_clear(p->adev, p->vm, pt, p->immediate);
+ 	if (r)
+-		goto error_unpin;
++		goto error_free_pt;
+ 
+ 	return 0;
+ 
++error_free_pt:
++	amdgpu_vm_pt_free(entry);
++	return r;
++
+ error_unpin:
+ 	if (p->vm->is_npa)
+ 		amdgpu_bo_unpin(pt_bo);

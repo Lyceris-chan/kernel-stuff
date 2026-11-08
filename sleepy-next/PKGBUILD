@@ -203,7 +203,7 @@ _snapdate=${_srctag#next-}                                            # 20261105
 _snapver="${_snapdate:0:4}.${_snapdate:4:2}.${_snapdate:6:2}"
 pkgver=${_snapver}
 _tagrel=1
-pkgrel=5
+pkgrel=6
 # Build parallelism. Previously capped at 8 on a diagnosis that did not hold up.
 #
 # The cap was added after an rc4-7 build thrashed badly — 6 watchdog firings and
@@ -452,8 +452,8 @@ source=(
   "patches/9000-9099/9093-drm-amdgpu-userq-validate-the-moved-individual-BOs-on-restore.patch"
   # Experimental salkim userq series: preview only, ported 2026-11-08 on top
   # of this series (see PATCH_SOURCES.md). Not upstream, no Signed-off-by.
-  # The VM/VA-batch subset is not included: it needs salkim's full batch
-  # rework, which conflicts with this series.
+  # Includes the VM/VA-batch rework the userq batch completion needs, plus
+  # our 9239 adaptation to this tree's TLB-fence and vm_bo state models.
   "patches/9200-9299/9200-drm-amdgpu-enable-userq-by-default.patch"
   "patches/9200-9299/9201-drm-amdgpu-userq-reject-imported-dma-bufs-as-wptr-bo.patch"
   "patches/9200-9299/9202-drm-amdgpu-preserve-userq-mappings-during-restore.patch"
@@ -470,8 +470,30 @@ source=(
   "patches/9200-9299/9213-drm-amdgpu-add-mes-gang-priority-updates.patch"
   "patches/9200-9299/9214-drm-amdgpu-report-tlb-completion-failures.patch"
   "patches/9200-9299/9215-drm-amdgpu-cancel-suspended-compute-queues-safely.patch"
-  "patches/9200-9299/9216-drm-amdgpu-preserve-userq-write-pointer-offsets.patch"
-  "patches/9200-9299/9217-drm-amdgpu-take-userq-fence-references-before.patch"
+  "patches/9200-9299/9216-drm-amdgpu-preserve-submitted-sdma-fences-on-rollover.patch"
+  "patches/9200-9299/9217-drm-amdgpu-keep-failed-vm-clears-pending.patch"
+  "patches/9200-9299/9218-drm-amdgpu-complete-prepared-vm-updates-after-errors.patch"
+  "patches/9200-9299/9219-drm-amdgpu-factor-vm-update-setup-and-completion.patch"
+  "patches/9200-9299/9220-drm-amdgpu-batch-pending-mappings-per-bo.patch"
+  "patches/9200-9299/9221-drm-amdgpu-batch-freed-vm-range-clears.patch"
+  "patches/9200-9299/9222-drm-amdgpu-batch-sparse-va-operations.patch"
+  "patches/9200-9299/9223-drm-amdgpu-share-page-table-update-batches-across-bos.patch"
+  "patches/9200-9299/9224-drm-amdgpu-include-prt-mappings-in-shared-update.patch"
+  "patches/9200-9299/9225-drm-amdgpu-grow-delayed-vm-update-ibs-on-rollover.patch"
+  "patches/9200-9299/9226-drm-amdgpu-scope-sparse-batch-retirement-records.patch"
+  "patches/9200-9299/9227-drm-amdgpu-honor-completed-batch-dependencies.patch"
+  "patches/9200-9299/9228-drm-amdgpu-propagate-kfd-unmap-clear-failures.patch"
+  "patches/9200-9299/9229-drm-amdgpu-retry-pending-clears-before-replacement.patch"
+  "patches/9200-9299/9230-drm-amdgpu-clean-up-failed-page-table-allocations.patch"
+  "patches/9200-9299/9231-drm-amdgpu-avoid-duplicate-gem-close-error-messages.patch"
+  "patches/9200-9299/9232-drm-amdgpu-restrict-sparse-batches-to-supported-vms.patch"
+  "patches/9200-9299/9233-drm-amdgpu-preserve-mappings-after-partial-va.patch"
+  "patches/9200-9299/9234-drm-amdgpu-retain-vm-batch-failures.patch"
+  "patches/9200-9299/9235-drm-amdgpu-add-userq-va-batch-completion.patch"
+  "patches/9200-9299/9236-drm-amdgpu-resume-the-device-before-sparse-va-batches.patch"
+  "patches/9200-9299/9237-drm-amdgpu-preserve-userq-write-pointer-offsets.patch"
+  "patches/9200-9299/9238-drm-amdgpu-take-userq-fence-references-before.patch"
+  "patches/9200-9299/9239-drm-amdgpu-adapt-the-userq-batch-rework-to-this-tree.patch"
   # 1008/1012/1013/1014/1017 (amdgpu TLB-invalidation rework) are excluded from the
   # preview package only: 1008 no longer applies to this snapshot while 1012/1013 do,
   # and 1012/1013 consume the tlb_inv_num_dw member and amdgpu_emit_tlb_inv() helper
@@ -1350,8 +1372,30 @@ b2sums=('eb66338d1cba00ad3025461dbaa209b349fffcc4e74bb8d9b3355e8f8ae7ddd7af8a303
         'e8dbef6185447af9f206be73a1673f1aa4899ba710eefe950564815dfc3f3e85fb0aeaca45e1f11b604b43070700b18665b2883b3583b367874f6f109043f29b'
         '4d22193b848d4d55fd22d5678e82070421bcb97e419582cb8b2993aa225feef97d3bdb00bb0fb35cd8a9b68cb4f064d382fb66c09d5fa94fddb3efc92ad44c41'
         '0f4c30445ea4159f02e86a1ed6296987f77f5ad3b7bb3c06e88de774055b25c707c174afb6724ea6da150616cdc2e1e1000a4f73b31ee99e31dcb86289b1e658'
-        '803c7b5c3a6acf9366f7706e088fba7a953323e3a6cdb1a096fead790b963dab9f1b5ec5492a724c7352bc0befad6f028aa94556be6bb53cef318b4135626490'
-        '50fc5f672fc9cdb0f243b46b8d25902cd00dd9f2c86245a14cdede6e72b3c178309dfb781018bc8a7fe7f1c82a2c38a27e6b314ed785bed51cc81815502fc043'
+        '9dfa4ad765ff527866b6dc488f4e057c7604db7fa5e84066527f6bdd48094cb6da6af85f1bb8027c8ea1352881531d2ac819650925294fd6c64ca9fe3e032bd3'
+        '9d260b203dcd899ffda074cc3108f6fc51a0095c65ba1606b68db5d7be7e85c4c49c86311ea372edf8aea49527df244d45e64ca2c666ca9aff4459e3c675a50f'
+        '4a2fea76599e2460e2d3226104c31eec0e66443cfbc0d3000311995f60ce07e379d16aa8da394e5d062daf8b054a3a9376b85373bb533a247e3b4fb40e4cd60e'
+        'ce7f616b46a799f0f5cfda3b38be8113b65f02232785148a36ea4676d4746397644e0b1c0c4aae50ae457601aa6dd69817c92aab69020ccce46b3968dcb01cce'
+        'cb27476e09fe8aff47cd32e1f35138ab6092eb07c6b20820b4db6a94551f1df52c789298178bad34204c6ea0f9cce8092bf296152e68d14dbbb6be2da58f5699'
+        '3442d0ee8ff6af3d8839948d1994e6cedf05c0ee2725de11917c24a2fa94e5dd4c35d0b00f94ba2d1f1f9a0a55c801e951db84339cdb27c3fecd9c62a8d446d5'
+        'cc013312786ce7076b1b66b40d3e427638e23cf6317cfcbb23e0212cb8edd7ab52a8f5ee06a876f05d0e92da9929b71803318882d1923bf124bf60d3b3e81b49'
+        'e43b6331749daa2d39539dc6a26a604017c2f9c411d0f8ee536630ef26dd655b60cd5395b02d62006bb714df23350fb93f6fd42e7c34674979ff8a76dca1f759'
+        '1df0af04857d584232c2b9a497370a0f27ee04c23ae4438d4a632cf6818792d3500284f7b74ad53d6cc0879dc60b67d667d437513867a90621a9491590c851f5'
+        'c429745fdbea8fefffe3a881b7ce59eb2d58bdc052d567687bd2969d5e65a551c307e5ea4498d5991080808d64294537b9d3bf3f3ea77279e611a901e814077f'
+        '67ba08f48b27b610b187d65f4ed1ab4a1db0e95e34af5c628bc8a311906dfc6d3a7dd78a9aea96a112d0479760ee6b426ff52477f2adafac838c3b2da183136f'
+        'da0c122343e32278df322c8c8e09643a21f35d7b54792c95a8b8382467c7ecf1e60a768d972e25aa56437ebdbacc4b2e8a69593f32a0509a6ea92e696a1960e9'
+        '89c0698786aab96a502ec797e2952198dd9591514c52b8e59decd01d4c2e6354d44be1f0392a91e9060be0624a58b217eb7e12e8f7cdf6203814d01e584e2ea2'
+        '9e157d0866d22bad4015ad01cc51f7676efd11a179143bb26772e6616e356290243a47a37094cf539f139d351e98626e115684d2ada406e74803cd41c78d82b6'
+        'bb4e13b164404b5c02cfda4c3d0b2690b5fa73adce5b2d84f52dbb8ada82f5ffcbe0978b688d5f43819e4667cab61c4d606ce7438f4ff809f0a1e826bf84138f'
+        '6f5b8a4a6bffb04f934d88c7e2c5716dcbc85617928ec699ba425e27fecb9ef2aa26866694b763a532733bee3a060cf7441719b4396a7be4b51e930c8b620650'
+        'ba6e8a36b69b6a5195c4f994f005feb7fcd128b6b12926432387e1bf50b6c2fa96d4bcfc0ef5b22c29eceaeeb350e0212b6657062d76e8ce4f2c9d0a7fd6dded'
+        '4a792023a85efef8c9f85aae0003131ad6a6df81d36da3b3d5f81f01fc43d2d2aea4f0cbeaacce0674db4aa702b0844e73a776cb98d7a5b76afdbfad9be06924'
+        '029c255097cefc9af22a29d6c227e75cca0f2fa2c40fe8651f2040690cfa74ee64c112d7ff7bb4c4547818d65f9cd144f217ca0df62d3ca8c44e5e7eaaab94bf'
+        '2914b345830bcfda2a3fd66ea7394ddddc75970c35cb0bcb8a7ab62bc9383fbb8116873e3a73ee726f879c98b9bb32ee751777dcbd090c9b7e3a51fb4413b905'
+        '2a7c85aca02bb734e599e400a85995df332d51f41e581bd9c837ed3c27d751a5b1779d81ce681c53b3015f3d689187dec96d378173a2a68ecd711bad0c3eb24b'
+        'f5ff5fa2685678fe47adfd559403ce43b6ea4b943733d0a2a78a8cb30ca7f475decae2956ae75d3b77c6ce0138db7720dc8c4673fc63a61effe5aae180b4729f'
+        '521b40436f23a66f5b542d1cd420fb7b995abd2b239c3480709a56f910ba095691ddd36100a6360f7c35cf8c7a1d0f6915ab18f57bbb041779cf071a41bcdac0'
+        '3e3daa003cc255a8b21a374048f9ddfa57a5ed32a2558ba564577bf1b4703110ffb9e33288ca49cd13c10bde7bc5e218b3b6cbc84eedd09c3be6821692b90d1e'
         'f8948396584fc2c3e82bf857c6f3ad7fd77e887b5d30fdbf288ed01f939b101e28e0f7b67d7e52c28d8479918da3cad72d6650daa6200739139426d5d491ef75')
 
 if [ "$_use_kernel_org_llvm" = "yes" ]; then

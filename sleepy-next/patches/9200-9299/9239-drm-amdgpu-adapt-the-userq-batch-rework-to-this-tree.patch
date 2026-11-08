@@ -1,0 +1,110 @@
+From f6b6d3ee8b1066c648925cc4e624a33a802a890d Mon Sep 17 00:00:00 2001
+From: Sleepy <sleepy@localhost>
+Date: Sun, 8 Nov 2026 12:48:35 +0100
+Subject: [PATCH] drm/amdgpu: adapt the userq batch rework to this tree
+
+Two interfaces differ between salkim's branch and the series carried here:
+
+- The batch completion stores the latest TLB invalidation fence in
+  vm->last_tlb_inv and calls the 4-argument
+  amdgpu_vm_tlb_fence_create(adev, vm, dep, &fence). This tree carries the
+  older TLB-fence model: the field is vm->last_tlb_flush, and
+  amdgpu_vm_tlb_fence_create() takes the dependency through *fence and
+  returns int. Map the field and adapt the call.
+- The extracted amdgpu_vm_bo_update_done() kept this tree's
+  amdgpu_vm_bo_needs_eviction() logic from 1058 but lost the adev and
+  current_domain locals that the caller used to provide. Derive adev from
+  the root BO and declare current_domain.
+
+Also add the out: label the merged VA update path lost.
+
+Signed-off-by: Sleepy <sleepy@localhost>
+Assisted-by: Claude <noreply@anthropic.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c | 20 +++++++++++---------
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c  |  2 ++
+ 2 files changed, 13 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
+index 7c7b2b700db1..d76cc6eb9bdc 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
+@@ -815,12 +815,12 @@ amdgpu_gem_va_update_fence(struct amdgpu_vm *vm,
+ 		bo_fence = bo_va->last_pt_update;
+ 
+ 	/* Do not carry completed failures into subsequent updates. */
+-	fence = dma_fence_unwrap_merge(vm->last_update, vm->last_tlb_inv,
++	fence = dma_fence_unwrap_merge(vm->last_update, vm->last_tlb_flush,
+ 				      bo_fence, survivor_fences[0], survivor_fences[1]);
+ 	if (!fence) {
+ 		/* Allocation failure must not drop any pending dependency. */
+ 		dma_fence_wait(vm->last_update, false);
+-		dma_fence_wait(vm->last_tlb_inv, false);
++		dma_fence_wait(vm->last_tlb_flush, false);
+ 		if (bo_fence)
+ 			dma_fence_wait(bo_fence, false);
+ 		for (i = 0; i < ARRAY_SIZE(survivor_fences); ++i)
+@@ -921,6 +921,7 @@ amdgpu_gem_va_update_vm(struct amdgpu_device *adev,
+ 	if (r && r != -ERESTARTSYS)
+ 		DRM_ERROR("Couldn't update BO_VA (%d)\n", r);
+ 
++out:
+ 	return amdgpu_gem_va_update_fence(vm, bo_va, operation, survivors);
+ }
+ 
+@@ -1183,7 +1184,7 @@ amdgpu_gem_va_batch_fence(struct amdgpu_vm *vm, struct xarray *bos,
+ 	unsigned int count = 0;
+ 
+ 	fences[count++] = dma_fence_get(vm->last_update);
+-	fences[count++] = dma_fence_get(vm->last_tlb_inv);
++	fences[count++] = dma_fence_get(vm->last_tlb_flush);
+ 	xa_for_each(bos, index, bo_va)
+ 		if (bo_va->last_pt_update)
+ 			fences[count++] = dma_fence_get(bo_va->last_pt_update);
+@@ -1393,7 +1394,7 @@ int amdgpu_gem_va_batch_ioctl(struct drm_device *dev, void *data,
+ 		r = amdgpu_vm_batch_prepare(vm);
+ 		if (r)
+ 			goto unlock;
+-		previous_tlb = dma_fence_get(vm->last_tlb_inv);
++		previous_tlb = dma_fence_get(vm->last_tlb_flush);
+ 		tlb_seq = atomic64_read(&vm->tlb_seq);
+ 	}
+ 
+@@ -1435,17 +1436,18 @@ int amdgpu_gem_va_batch_ioctl(struct drm_device *dev, void *data,
+ 		fences = NULL;
+ 		if (vm->need_tlb_fence &&
+ 		    (atomic64_read(&vm->tlb_seq) != tlb_seq ||
+-		     vm->last_tlb_inv != previous_tlb)) {
++		     vm->last_tlb_flush != previous_tlb)) {
+ 			/* Earlier PTE flushes may precede the final PDE update. */
+-			r = amdgpu_vm_tlb_fence_create(adev, vm, fence, &vm->last_tlb_inv);
+-			dma_fence_put(fence);
++			r = amdgpu_vm_tlb_fence_create(adev, vm, &fence);
+ 			if (r) {
++				dma_fence_put(fence);
+ 				r = -EIO;
+ 				goto unlock;
+ 			}
++			dma_fence_put(vm->last_tlb_flush);
++			vm->last_tlb_flush = dma_fence_get(fence);
+ 			dma_resv_add_fence(vm->root.bo->tbo.base.resv,
+-					   vm->last_tlb_inv, DMA_RESV_USAGE_BOOKKEEP);
+-			fence = dma_fence_get(vm->last_tlb_inv);
++					   fence, DMA_RESV_USAGE_BOOKKEEP);
+ 		}
+ 		amdgpu_vm_batch_track(vm, batch_entry, fence);
+ 		batch_entry = NULL;
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+index 9d4d916616e5..385d30d666d4 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+@@ -1589,7 +1589,9 @@ static void amdgpu_vm_bo_update_done(struct amdgpu_bo_va *bo_va, bool clear)
+ {
+ 	struct amdgpu_bo *bo = bo_va->base.bo;
+ 	struct amdgpu_vm *vm = bo_va->base.vm;
++	struct amdgpu_device *adev = amdgpu_ttm_adev(vm->root.bo->tbo.bdev);
+ 	struct amdgpu_bo_va_mapping *mapping;
++	uint32_t current_domain;
+ 
+ 	/* If the BO is not in its preferred location add it back to
+ 	 * the evicted list so that it gets validated again on the

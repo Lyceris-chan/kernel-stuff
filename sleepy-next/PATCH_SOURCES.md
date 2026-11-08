@@ -18,8 +18,8 @@ moved, so the full ledger is not duplicated here.
 | Snapshot | `next-20261105`, tag `ddfe51b0a0f5` (tag object `cae1456a7b59`) |
 | Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261105.tar.gz` |
 | Snapshot tree `Makefile` | `7.4.0-rc1` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.11.05-5-sleepy-next` |
-| Package | `linux-sleepy-next-2026.11.05-5` |
+| Kernel release | `2026.11.05-6-sleepy-next` |
+| Package | `linux-sleepy-next-2026.11.05-6` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -1583,59 +1583,81 @@ UAF) is already in this snapshot.
 **159 patches** (153 + 6). `audit_series.py`: **159/159** on
 `next-20261105`. The rc series is **338/338** on `v7.3`.
 
-## 2026-11-08 — experimental salkim userq series (`9200`–`9217`, preview only)
+## 2026-11-08 — experimental salkim userq series (`9200`–`9239`, preview only)
 
-At the user's request the preview now carries nanomatters/kernel-salkim's local
-user-queue series, which targets Proton/`AMD_USERQ` workloads and is **not
-upstream**. Source: `https://github.com/nanomatters/kernel-salkim`, branch
-`salkim-7.4`, tip `0940b82e7d10` (2026-11-08). The commits are authored by
-Erhan Bilgili <erhan.bilgili@gmail.com> (the two test-only commits aside).
-**None carries a `Signed-off-by` trailer**, so provenance rests on the public
+At the user's request the preview carries nanomatters/kernel-salkim's local
+user-queue series **in full** — including the VM/VA-batch rework that the
+userq batch completion needs. It is **not upstream**. Source:
+`https://github.com/nanomatters/kernel-salkim`, branch `salkim-7.4`, tip
+`0940b82e7d10` (2026-11-08). All commits are authored by Erhan Bilgili except
+`9201` (Jesse Zhang) and `9239` (this tree). **None of the salkim commits
+carries a `Signed-off-by` trailer**, so their provenance rests on the public
 commit hashes below; this is a deliberate deviation from the sweep's usual
 Check 4, accepted because the carry is preview-only and experimental. The rc
 does not carry any `92xx` patch.
 
 The commits were cherry-picked in order onto the exact 159-patch series state
-(`next-20261105` + the 2026-11-08 series) and exported as `9200`–`9217`; each
+(`next-20261105` + the 2026-11-08 series) and exported as `9200`–`9239`; each
 file keeps its original author, date, subject and a
-`(cherry picked from commit …)` trailer.
+`(cherry picked from commit …)` trailer. `9239` is this tree's own adaptation
+patch for the two interfaces that differ; it is the only `92xx` entry without
+a cherry-pick trailer.
 
 | Patch | Original commit | Subject | Port note |
 |---|---|---|---|
-| `9200` | `62a6b0edc972` | drm/amdgpu: Enable UserQ by default | Flips the module-param default from `-1` to `1`; the preview CMDLINE already sets `amdgpu.user_queue=1`. |
-| `9201` | `bc6f5f3ccb6f` | drm/amdgpu/userq: reject imported dma-bufs as WPTR BO | Selftest conflict only. |
-| `9202` | `51f92810b1c9` | drm/amdgpu: Preserve UserQ mappings during restore | |
-| `9203` | `27f2e9658f05` | drm/amdgpu: Validate pending UserQ mappings | Kept both lists: the loop walks `individual.evicted` and `individual.needs_update`. Supersedes the `needs_update`-only loop from `9093`. |
-| `9204` | `e28465e97b3b` | drm/amdgpu: Avoid skipping BOs during VM locking | |
-| `9205` | `3f46f5a28d47` | drm/amdgpu: Identify failed TLB invalidations | |
-| `9206` | `9acc5e726b86` | drm/amdgpu: Skip implicit UserQ waits within a client | |
-| `9207` | `200120508a3c` | drm/amdgpu: Report explicit UserQ wait failures | |
-| `9208` | `19c0697b1e2a` | drm/amdgpu: Drop UserQ eviction fences on BO release | |
-| `9209` | `943593f1d1d7` | drm/amdgpu: Revalidate UserQ watchdog timeouts | Kept our `destroy_work` next to the new watchdog state; both the reset-semaphore and `state_mutex` guards are held in map/unmap; the suspend loop keeps the carried kref `put` and iteration and calls `amdgpu_userq_request_reset()` before dropping the reference. |
-| `9210` | `cdcd08459b1a` | drm/amdgpu: Trace UserQ restore and mapping clears | |
-| `9211` | `d7f2ef62a1d4` | drm/amdgpu: Reject UserQ signals after cancelled work | |
-| `9212` | `6918d668e4cc` | drm/amdgpu: Correct UserQ slot availability checks | Selftest conflict only. |
-| `9213` | `0c65a779b7f4` | drm/amdgpu: Add MES gang priority updates | |
-| `9214` | `41cef94209e7` | drm/amdgpu: Report TLB completion failures | Ported to this tree's 3-argument `amdgpu_vm_tlb_fence_create(adev, vm, fence)`: `*fence` is the dependency, so `dep` is dropped and the function returns `int`. Adds `amdgpu_tlb_fence_flush()` and keeps our caller's fence handling. |
-| `9215` | `01665009ae32` | drm/amdgpu: Cancel suspended compute queues safely | Keeps our doorbell lookup and its kref `put` on every path, and adopts the watchdog stop plus the `CANCELED` state check in `mes_userq_reset_queue()`. |
-| `9216` | `f0de1dafe3a1` | drm/amdgpu: Preserve UserQ write-pointer offsets | |
-| `9217` | `e63069042b7c` | drm/amdgpu: Take UserQ fence references before unlocking | |
+| `9200` | `62a6b0edc972` | drm/amdgpu: Enable UserQ by default. |  |
+| `9201` | `bc6f5f3cceae` | drm/amdgpu/userq: reject imported dma-bufs as WPTR BO |  |
+| `9202` | `51f92810b64c` | drm/amdgpu: Preserve UserQ mappings during restore. |  |
+| `9203` | `27f2e9658fc4` | drm/amdgpu: Validate pending UserQ mappings. | Kept both lists: the loop walks `individual.evicted` and `individual.needs_update`. Supersedes the `needs_update`-only loop from `9093`. |
+| `9204` | `e28465e9720b` | drm/amdgpu: Avoid skipping BOs during VM locking. |  |
+| `9205` | `3f46f5a2898a` | drm/amdgpu: Identify failed TLB invalidations. |  |
+| `9206` | `9acc5e7264d8` | drm/amdgpu: Skip implicit UserQ waits within a client. |  |
+| `9207` | `20012050854a` | drm/amdgpu: Report explicit UserQ wait failures. |  |
+| `9208` | `19c0697b1f4f` | drm/amdgpu: Drop UserQ eviction fences on BO release. |  |
+| `9209` | `943593f1d1d7` | drm/amdgpu: Revalidate UserQ watchdog timeouts. | Kept our `destroy_work` next to the new watchdog state; both the reset-semaphore and `state_mutex` guards are held in map/unmap; the suspend loop keeps the carried kref `put` and iteration and calls `amdgpu_userq_request_reset()` before dropping the reference. |
+| `9210` | `cdcd0845980c` | drm/amdgpu: Trace UserQ restore and mapping clears. |  |
+| `9211` | `d7f2ef62acb6` | drm/amdgpu: Reject UserQ signals after cancelled work. |  |
+| `9212` | `6918d668e3ae` | drm/amdgpu: Correct UserQ slot availability checks. |  |
+| `9213` | `0c65a779b90f` | drm/amdgpu: Add MES gang priority updates. |  |
+| `9214` | `41cef94209e7` | drm/amdgpu: Report TLB completion failures. | Ported to this tree's 3-argument `amdgpu_vm_tlb_fence_create(adev, vm, fence)`: `*fence` is the dependency, so `dep` is dropped and the function returns `int`. Adds `amdgpu_tlb_fence_flush()`. |
+| `9215` | `01665009ae32` | drm/amdgpu: Cancel suspended compute queues safely. | Keeps our doorbell lookup and its kref `put` on every path, and adopts the watchdog stop plus the `CANCELED` state check in `mes_userq_reset_queue()`. |
+| `9216` | `4eab3be7bfd8` | drm/amdgpu: Preserve submitted SDMA fences on rollover |  |
+| `9217` | `d9a1af319720` | drm/amdgpu: Keep failed VM clears pending. | Kept the failed clear pending on the list (`break` + `list_del`) instead of aborting the whole update. |
+| `9218` | `dd9dc655b927` | drm/amdgpu: Complete prepared VM updates after errors. |  |
+| `9219` | `bc7f3af14f16` | drm/amdgpu: Factor VM update setup and completion. | Adapted the TLB flush call to this tree's `amdgpu_vm_tlb_flush(params, fence, cb)` signature. |
+| `9220` | `940ee844a9b8` | drm/amdgpu: Batch pending mappings per BO. |  |
+| `9221` | `7d83fa6e4146` | drm/amdgpu: Batch freed VM range clears. |  |
+| `9222` | `47b10740affd` | drm/amdgpu: Batch sparse VA operations. |  |
+| `9223` | `5851101c24e6` | drm/amdgpu: Share page-table update batches across BOs. |  |
+| `9224` | `bed1ffd8d827` | drm/amdgpu: Include PRT mappings in shared update |  |
+| `9225` | `39c0c05f42d9` | drm/amdgpu: Grow delayed VM update IBs on rollover. |  |
+| `9226` | `895699f29291` | drm/amdgpu: Scope sparse batch retirement records. |  |
+| `9227` | `824afde5e486` | drm/amdgpu: Honor completed batch dependencies. |  |
+| `9228` | `f251fcea0aca` | drm/amdgpu: Propagate KFD unmap clear failures. |  |
+| `9229` | `c5aba8010ccc` | drm/amdgpu: Retry pending clears before replacement | Kept our SVM GPU-VA-limit bounds check and added `amdgpu_vm_clear_freed()` before the replacement mappings. |
+| `9230` | `2d255bd79245` | drm/amdgpu: Clean up failed page-table allocations. |  |
+| `9231` | `be71c8d93165` | drm/amdgpu: Avoid duplicate GEM close error messages. | Dropped the duplicate GEM-close error message (the `out_unlock` block still logs) and kept our fence-path structure. |
+| `9232` | `93e0b4b20cfa` | drm/amdgpu: Restrict sparse batches to supported VMs. |  |
+| `9233` | `937c6da5776a` | drm/amdgpu: Preserve mappings after partial VA | Added the batch-boundary helper and `amdgpu_gem_va_update_fence()`; kept both the `fence` and `i` declarations. |
+| `9234` | `510830536008` | drm/amdgpu: Retain VM batch failures. |  |
+| `9235` | `5d64c2646acf` | drm/amdgpu: Add UserQ VA batch completion. |  |
+| `9236` | `fb21eba1bbd2` | drm/amdgpu: Resume the device before sparse VA batches. |  |
+| `9237` | `f0de1dafec7b` | drm/amdgpu: Preserve UserQ write-pointer offsets. |  |
+| `9238` | `e63069042512` | drm/amdgpu: Take UserQ fence references before |  |
+| `9239` | `port fixup` | drm/amdgpu: adapt the userq batch rework to this tree | **This tree's adaptation**, not from salkim: maps `last_tlb_inv` to this tree's `last_tlb_flush`, adapts `amdgpu_vm_tlb_fence_create()` to the 3-argument form, derives `adev` in `amdgpu_vm_bo_update_done()` for the carried `amdgpu_vm_bo_needs_eviction()` logic from `1058`, and restores the `out:` label. |
 
-### Not carried: the VM/VA-batch subset
+### Coverage
 
-Four commits from the same series are **not** in this carry: `937c6da57`
-(Preserve mappings after partial VA replacement), `510830536` (Retain VM batch
-failures), `5d64c2646` (Add UserQ VA batch completion) and `fb21eba1b` (Resume
-the device before sparse VA batches). They build on the 17-commit VM batch
-rework (`4eab3be7b`…`93e0b4b20`) and on the `DRM_AMDGPU_GEM_VA_BATCH` UAPI
-introduced by `47b10740a`. That rework refactors
-`amdgpu_vm_bo_clear_mappings()` into a prealloc variant, replaces
-`amdgpu_vm_update_range()` with batched page updates and changes the
-`amdgpu_vm_tlb_fence_create()` caller contract; it does not merge cleanly with
-the carried VM patches. Porting it is a separate project, and without it
-`5d64c2646` does not compile (the ioctl command number and struct are absent).
+This is the complete userq/VM kernel set from the branch: **39 of 39** such
+commits, plus this tree's `9239` adaptation. The branch's remaining commits
+are 3 display commits (`939d96c95`, `aafab763c`, `710c48fc9`) and 9 standalone
+test commits; the tests attached to kernel commits came along with them. The
+VM/VA-batch block (`9216`–`9235`) is a large refactor of the page-table update
+path: batched span mapping, shared update batches, delayed IB growth, batch
+retirement and the `DRM_AMDGPU_GEM_VA_BATCH` ioctl. It is experimental and
+preview-only.
 
 ### Series state
 
-**177 patches** (159 + 18). `audit_series.py`: **177/177** on
+**199 patches** (159 + 40). `audit_series.py`: **199/199** on
 `next-20261105`. The rc series remains **338/338** on `v7.3`.

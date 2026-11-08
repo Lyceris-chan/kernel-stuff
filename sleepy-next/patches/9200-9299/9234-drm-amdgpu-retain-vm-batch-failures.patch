@@ -1,0 +1,752 @@
+From ef56927453f9812345d2a4dee727e8ed581466cb Mon Sep 17 00:00:00 2001
+From: Erhan Bilgili <erhan.bilgili@gmail.com>
+Date: Sat, 31 Oct 2026 00:27:19 +0100
+Subject: [PATCH] drm/amdgpu: Retain VM batch failures.
+
+(cherry picked from commit 5108305360089514021d090cc094c67288a77584)
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c        |   9 +
+ drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c       |   4 +
+ drivers/gpu/drm/amd/amdgpu/amdgpu_job.c       |   7 +
+ .../gpu/drm/amd/amdgpu/amdgpu_userq_fence.c   |   7 +
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c        | 111 +++++++++
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h        |  15 ++
+ .../drivers/amdgpu/test_va_replace.py         |   1 +
+ .../drivers/amdgpu/test_vm_batch_job.py       | 200 ++++++++++++++++
+ .../drivers/amdgpu/test_vm_batch_status.py    | 226 ++++++++++++++++++
+ 9 files changed, 580 insertions(+)
+ create mode 100644 tools/testing/selftests/drivers/amdgpu/test_vm_batch_job.py
+ create mode 100644 tools/testing/selftests/drivers/amdgpu/test_vm_batch_status.py
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c
+index 9f8504a66e29..6030affbf0d0 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c
+@@ -1452,6 +1452,7 @@ static void amdgpu_cs_parser_fini(struct amdgpu_cs_parser *parser)
+ int amdgpu_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
+ {
+ 	struct amdgpu_device *adev = drm_to_adev(dev);
++	struct amdgpu_fpriv *fpriv = filp->driver_priv;
+ 	struct amdgpu_bo_list_entry *e;
+ 	struct amdgpu_cs_parser parser;
+ 	int r;
+@@ -1462,6 +1463,10 @@ int amdgpu_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
+ 	if (!adev->accel_working)
+ 		return -EBUSY;
+ 
++	r = amdgpu_vm_batch_status(&fpriv->vm);
++	if (r)
++		return r;
++
+ 	PM_RUNTIME_ACQUIRE_IF_ENABLED_AUTOSUSPEND(dev->dev, lock);
+ 
+ 	r = PM_RUNTIME_ACQUIRE_ERR(&lock);
+@@ -1505,6 +1510,10 @@ int amdgpu_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
+ 
+ 	trace_amdgpu_cs_ibs(&parser);
+ 
++	r = amdgpu_vm_batch_status(&fpriv->vm);
++	if (r)
++		goto error_free_user_pages;
++
+ 	r = amdgpu_cs_submit(&parser, data);
+ 	if (r)
+ 		goto error_free_user_pages;
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
+index 68db16e773b0..8e4ecdeca836 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
+@@ -950,6 +950,10 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
+ 	unsigned int i;
+ 	int r = 0;
+ 
++	r = amdgpu_vm_batch_status(&fpriv->vm);
++	if (r)
++		return r;
++
+ 	/* Validate virtual address range against reserved regions. */
+ 	if (args->va_address < AMDGPU_VA_RESERVED_BOTTOM) {
+ 		dev_dbg(dev->dev,
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_job.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_job.c
+index 8689a3c933b2..1886c4d42915 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_job.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_job.c
+@@ -439,6 +439,13 @@ static struct dma_fence *amdgpu_job_run(struct drm_sched_job *sched_job)
+ 	    (job->job_run_counter && job->gang_submit))
+ 		dma_fence_set_error(finished, -ECANCELED);
+ 
++	if (job->vm && finished->error >= 0) {
++		int status = amdgpu_vm_batch_status(job->vm);
++
++		if (status < 0)
++			dma_fence_set_error(finished, status);
++	}
++
+ 	if (finished->error < 0) {
+ 		dev_dbg(adev->dev, "Skip scheduling IBs in ring(%s)",
+ 			ring->name);
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c
+index d715b09fa8a9..efdf865400a9 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq_fence.c
+@@ -1053,6 +1053,7 @@ int amdgpu_userq_wait_ioctl(struct drm_device *dev, void *data,
+ 	u32 *syncobj_handles, *timeline_handles;
+ 	u64 *timeline_points;
+ 	struct drm_amdgpu_userq_wait *wait_info = data;
++	struct amdgpu_fpriv *fpriv = filp->driver_priv;
+ 	struct drm_gem_object **gobj_write;
+ 	struct drm_gem_object **gobj_read;
+ 	void __user *ptr;
+@@ -1060,6 +1061,9 @@ int amdgpu_userq_wait_ioctl(struct drm_device *dev, void *data,
+ 
+ 	if (!amdgpu_userq_enabled(dev))
+ 		return -ENOTSUPP;
++	r = amdgpu_vm_batch_status(&fpriv->vm);
++	if (r)
++		return r;
+ 
+ 	if (wait_info->num_bo_write_handles > AMDGPU_USERQ_MAX_HANDLES ||
+ 	    wait_info->num_bo_read_handles > AMDGPU_USERQ_MAX_HANDLES)
+@@ -1121,6 +1125,9 @@ int amdgpu_userq_wait_ioctl(struct drm_device *dev, void *data,
+ 							gobj_read);
+ 	}
+ 
++	if (!r)
++		r = amdgpu_vm_batch_status(&fpriv->vm);
++
+ 	while (num_write_bo_handles--)
+ 		drm_gem_object_put(gobj_write[num_write_bo_handles]);
+ 	kvfree(gobj_write);
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+index 880440cf595c..9d4d916616e5 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+@@ -27,6 +27,7 @@
+  */
+ 
+ #include <linux/dma-fence-array.h>
++#include <linux/dma-fence-unwrap.h>
+ #include <linux/interval_tree_generic.h>
+ #include <linux/idr.h>
+ #include <linux/dma-buf.h>
+@@ -2959,6 +2960,114 @@ void amdgpu_vm_set_task_info(struct amdgpu_vm *vm)
+ 	get_task_comm(vm->task_info->process_name, current->group_leader);
+ }
+ 
++/* Keep completion references independently of garbage-collected syncobj points. */
++struct amdgpu_vm_batch_state {
++	/* Protects pending completion references and the terminal error. */
++	struct mutex lock;
++	struct list_head pending;
++	int error;
++};
++
++static struct amdgpu_vm_batch_state *amdgpu_vm_batch_state_get(struct amdgpu_vm *vm)
++{
++	/* Pairs with batch_prepare() so readers see the initialized mutex and list. */
++	return smp_load_acquire(&vm->batch_state);
++}
++
++static void amdgpu_vm_batch_clear(struct amdgpu_vm_batch_state *state)
++{
++	struct amdgpu_vm_batch_entry *entry, *tmp;
++
++	list_for_each_entry_safe(entry, tmp, &state->pending, node) {
++		list_del(&entry->node);
++		dma_fence_put(entry->fence);
++		kfree(entry);
++	}
++}
++
++int amdgpu_vm_batch_status(struct amdgpu_vm *vm)
++{
++	struct amdgpu_vm_batch_state *state = amdgpu_vm_batch_state_get(vm);
++	struct amdgpu_vm_batch_entry *entry, *tmp;
++	int status;
++
++	if (!state)
++		return 0;
++	mutex_lock(&state->lock);
++	list_for_each_entry_safe(entry, tmp, &state->pending, node) {
++		struct dma_fence_unwrap iter;
++		struct dma_fence *fence;
++
++		status = dma_fence_get_status(entry->fence);
++		if (status < 0)
++			state->error = -EIO;
++		/* Already-completed arrays can omit errors from their children. */
++		dma_fence_unwrap_for_each(fence, &iter, entry->fence)
++			if (dma_fence_get_status(fence) < 0)
++				state->error = -EIO;
++		if (status) {
++			list_del(&entry->node);
++			dma_fence_put(entry->fence);
++			kfree(entry);
++		}
++	}
++	if (state->error)
++		amdgpu_vm_batch_clear(state);
++	status = state->error;
++	mutex_unlock(&state->lock);
++	return status;
++}
++
++int amdgpu_vm_batch_prepare(struct amdgpu_vm *vm)
++{
++	struct amdgpu_vm_batch_state *state;
++
++	dma_resv_assert_held(vm->root.bo->tbo.base.resv);
++	if (!vm->batch_state) {
++		state = kzalloc_obj(*state);
++		if (!state)
++			return -ENOMEM;
++		mutex_init(&state->lock);
++		INIT_LIST_HEAD(&state->pending);
++		/* Publish initialized state to readers outside the PD reservation. */
++		smp_store_release(&vm->batch_state, state);
++	}
++	return amdgpu_vm_batch_status(vm);
++}
++
++void amdgpu_vm_batch_error(struct amdgpu_vm *vm)
++{
++	struct amdgpu_vm_batch_state *state = amdgpu_vm_batch_state_get(vm);
++
++	mutex_lock(&state->lock);
++	state->error = -EIO;
++	amdgpu_vm_batch_clear(state);
++	mutex_unlock(&state->lock);
++}
++
++void amdgpu_vm_batch_track(struct amdgpu_vm *vm,
++			   struct amdgpu_vm_batch_entry *entry,
++			   struct dma_fence *fence)
++{
++	struct amdgpu_vm_batch_state *state = amdgpu_vm_batch_state_get(vm);
++
++	entry->fence = dma_fence_get(fence);
++	mutex_lock(&state->lock);
++	list_add_tail(&entry->node, &state->pending);
++	mutex_unlock(&state->lock);
++}
++
++static void amdgpu_vm_batch_fini(struct amdgpu_vm *vm)
++{
++	struct amdgpu_vm_batch_state *state = vm->batch_state;
++
++	if (!state)
++		return;
++	amdgpu_vm_batch_clear(state);
++	mutex_destroy(&state->lock);
++	kfree(state);
++}
++
+ /**
+  * amdgpu_vm_init - initialize a vm instance
+  *
+@@ -2979,6 +3088,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+ 	int r, i;
+ 
+ 	vm->va = RB_ROOT_CACHED;
++	vm->batch_state = NULL;
+ 	for (i = 0; i < AMDGPU_MAX_VMHUBS; i++)
+ 		vm->reserved_vmid[i] = NULL;
+ 
+@@ -3195,6 +3305,7 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
+ 	int i;
+ 
+ 	amdgpu_amdkfd_gpuvm_destroy_cb(adev, vm);
++	amdgpu_vm_batch_fini(vm);
+ 
+ 	root = amdgpu_bo_ref(vm->root.bo);
+ 	amdgpu_bo_reserve(root, true);
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
+index dff6cce30269..b1733e90bd91 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
+@@ -286,6 +286,13 @@ struct amdgpu_mem_stats {
+ 	uint64_t evicted;
+ };
+ 
++struct amdgpu_vm_batch_state;
++
++struct amdgpu_vm_batch_entry {
++	struct list_head node;
++	struct dma_fence *fence;
++};
++
+ struct amdgpu_vm {
+ 	/* tree of virtual addresses mapped */
+ 	struct rb_root_cached	va;
+@@ -329,6 +336,7 @@ struct amdgpu_vm {
+ 	/* contains the page directory */
+ 	struct amdgpu_vm_bo_base     root;
+ 	struct dma_fence	*last_update;
++	struct amdgpu_vm_batch_state *batch_state;
+ 
+ 	/* Scheduler entities for page table updates */
+ 	struct drm_sched_entity	immediate;
+@@ -448,6 +456,13 @@ int amdgpu_vm_lock_pd(struct amdgpu_vm *vm, struct drm_exec *exec,
+ int amdgpu_vm_lock_individual(struct amdgpu_vm *vm, struct drm_exec *exec,
+ 			      unsigned int num_fences);
+ bool amdgpu_vm_ready(struct amdgpu_vm *vm);
++int amdgpu_vm_batch_prepare(struct amdgpu_vm *vm);
++int amdgpu_vm_batch_status(struct amdgpu_vm *vm);
++void amdgpu_vm_batch_error(struct amdgpu_vm *vm);
++void amdgpu_vm_batch_track(struct amdgpu_vm *vm,
++			   struct amdgpu_vm_batch_entry *entry,
++			   struct dma_fence *fence);
++
+ uint64_t amdgpu_vm_generation(struct amdgpu_device *adev, struct amdgpu_vm *vm);
+ void amdgpu_vm_spm_update(struct amdgpu_device *adev, struct amdgpu_vm *vm);
+ int amdgpu_vm_validate(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+diff --git a/tools/testing/selftests/drivers/amdgpu/test_va_replace.py b/tools/testing/selftests/drivers/amdgpu/test_va_replace.py
+index 4894066d0172..16c230d7fcf6 100644
+--- a/tools/testing/selftests/drivers/amdgpu/test_va_replace.py
++++ b/tools/testing/selftests/drivers/amdgpu/test_va_replace.py
+@@ -197,6 +197,7 @@ static struct dma_fence *merge(unsigned count, struct dma_fence **array)
+ }
+ #define dma_fence_unwrap_merge(...) merge(ARRAY_SIZE(((struct dma_fence *[]){__VA_ARGS__})), \
+                                            (struct dma_fence *[]){__VA_ARGS__})
++static int amdgpu_vm_batch_status(struct amdgpu_vm *vm) { return 0; }
+ static bool amdgpu_vm_ready(struct amdgpu_vm *vm) { return vm_ready; }
+ static int amdgpu_vm_clear_freed(struct amdgpu_device *dev, struct amdgpu_vm *vm,
+                                 struct dma_fence **out)
+diff --git a/tools/testing/selftests/drivers/amdgpu/test_vm_batch_job.py b/tools/testing/selftests/drivers/amdgpu/test_vm_batch_job.py
+new file mode 100644
+index 000000000000..430f9fbba701
+--- /dev/null
++++ b/tools/testing/selftests/drivers/amdgpu/test_vm_batch_job.py
+@@ -0,0 +1,200 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0-only
++import os
++import pathlib
++import re
++import shlex
++import subprocess
++import tempfile
++import unittest
++
++ROOT = pathlib.Path(os.environ.get('VA_BATCH_TEST_ROOT', pathlib.Path(__file__).resolve().parents[5]))
++AMD = ROOT / 'drivers/gpu/drm/amd/amdgpu'
++
++
++class VmBatchJobTests(unittest.TestCase):
++    def test_scheduler_rechecks_vm_completion(self):
++        source = (AMD / 'amdgpu_job.c').read_text()
++        function = re.search(r'^static struct dma_fence \*amdgpu_job_run\(.*?^\}', source, re.M | re.S)
++        self.assertIsNotNone(function)
++        command = shlex.split(os.environ.get('CC', 'cc'))
++        command += ['-std=gnu11', '-O1', '-g', '-Wall', '-Wextra', '-Werror']
++        if os.environ.get('USERQ_TEST_SANITIZERS'):
++            command += ['-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-fno-sanitize-recover=all']
++        with tempfile.TemporaryDirectory(prefix='vm-batch-job-') as temporary:
++            directory = pathlib.Path(temporary)
++            program, binary = directory / 'test.c', directory / 'test'
++            program.write_text(HARNESS.replace('ACTUAL_SOURCE', function.group()))
++            subprocess.run(command + [str(program), '-o', str(binary)], check=True, timeout=30)
++            subprocess.run([str(binary)], check=True, timeout=30)
++
++
++HARNESS = r'''
++#include <assert.h>
++#include <errno.h>
++#include <stdbool.h>
++#include <stddef.h>
++#include <stdint.h>
++#include <stdio.h>
++
++struct dma_fence { int error; };
++struct drm_sched_fence { struct dma_fence finished; };
++struct amdgpu_vm { bool opted_in; int status; };
++struct amdgpu_device { unsigned generation; };
++struct amdgpu_ring;
++struct drm_gpu_scheduler { struct amdgpu_ring *ring; };
++struct drm_sched_job { struct drm_gpu_scheduler *sched; struct drm_sched_fence *s_fence; };
++struct amdgpu_ring { struct amdgpu_device *adev; const char *name; struct drm_gpu_scheduler sched; };
++struct amdgpu_job {
++    struct drm_sched_job base;
++    struct amdgpu_vm *vm;
++    unsigned generation, job_run_counter, num_ibs;
++    struct dma_fence *gang_submit;
++    void *ibs;
++};
++static unsigned cases, status_calls, schedules, frees, traces, error_sets;
++static int schedule_result;
++static unsigned expected_runs;
++static struct dma_fence hardware_fence;
++#define to_amdgpu_ring(sched) ((sched)->ring)
++#define to_amdgpu_job(p) ((struct amdgpu_job *)((char *)(p) - offsetof(struct amdgpu_job, base)))
++#define ERR_PTR(error) ((void *)(intptr_t)(error))
++#define dev_dbg(...) ((void)0)
++#define dev_err(...) ((void)0)
++static void trace_amdgpu_sched_run_job(struct amdgpu_job *job)
++{ assert(job->base.sched); traces++; }
++static unsigned amdgpu_vm_generation(struct amdgpu_device *adev, struct amdgpu_vm *vm)
++{ (void)vm; return adev->generation; }
++static int amdgpu_vm_batch_status(struct amdgpu_vm *vm)
++{ assert(vm); status_calls++; return vm->opted_in ? vm->status : 0; }
++static void dma_fence_set_error(struct dma_fence *fence, int error)
++{ assert(error < 0); error_sets++; fence->error = error; }
++static int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned count, void *ibs,
++                              struct amdgpu_job *job, struct dma_fence **fence)
++{
++    assert(ring == job->base.sched->ring && count == job->num_ibs && ibs == job->ibs);
++    assert(!job->base.s_fence->finished.error);
++    assert(!job->vm || !job->vm->opted_in || job->vm->status >= 0);
++    schedules++;
++    if (schedule_result)
++        return schedule_result;
++    *fence = &hardware_fence;
++    return 0;
++}
++static void amdgpu_job_free_resources(struct amdgpu_job *job)
++{ assert(job->job_run_counter == expected_runs + 1); frees++; }
++
++ACTUAL_SOURCE
++
++struct fixture {
++    struct amdgpu_device device;
++    struct amdgpu_ring ring;
++    struct amdgpu_vm vm;
++    struct drm_sched_fence fence;
++    struct amdgpu_job job;
++};
++static void init(struct fixture *f)
++{
++    *f = (struct fixture){0};
++    status_calls = schedules = frees = traces = error_sets = 0;
++    schedule_result = 0;
++    f->device.generation = 7;
++    f->ring.adev = &f->device;
++    f->ring.name = "gfx";
++    f->ring.sched.ring = &f->ring;
++    f->job.base.sched = &f->ring.sched;
++    f->job.base.s_fence = &f->fence;
++    f->job.generation = 7;
++    f->job.vm = &f->vm;
++    f->job.num_ibs = 2;
++    f->job.ibs = &f->vm;
++}
++static struct dma_fence *run(struct fixture *f)
++{
++    expected_runs = f->job.job_run_counter;
++    struct dma_fence *result = amdgpu_job_run(&f->job.base);
++    assert(frees == 1 && traces == 1 && f->job.job_run_counter == expected_runs + 1);
++    cases++;
++    return result;
++}
++static void healthy_jobs(void)
++{
++    struct fixture f;
++    /* VM update jobs have no application VM and cannot depend on its failure. */
++    init(&f);
++    f.job.vm = NULL;
++    f.vm.status = -EIO;
++    assert(run(&f) == &hardware_fence && schedules == 1 && !status_calls);
++    /* Clients that have not opted in retain the existing submission path. */
++    init(&f);
++    f.vm.status = -EIO;
++    assert(run(&f) == &hardware_fence && schedules == 1 && status_calls == 1);
++    for (unsigned status = 0; status <= 1; ++status) {
++        init(&f);
++        f.vm.opted_in = true;
++        f.vm.status = status;
++        assert(run(&f) == &hardware_fence && schedules == 1 && status_calls == 1);
++    }
++}
++static void failed_jobs(void)
++{
++    struct fixture f;
++    const int errors[] = {-EIO, -ECANCELED, -ENOMEM};
++    for (unsigned i = 0; i < sizeof(errors) / sizeof(errors[0]); ++i) {
++        init(&f);
++        f.vm.opted_in = true;
++        /* The ioctl accepted the job before its VM update dependency failed. */
++        assert(!f.vm.status && !f.fence.finished.error);
++        f.vm.status = errors[i];
++        assert(run(&f) == NULL && !schedules && status_calls == 1);
++        assert(f.fence.finished.error == errors[i] && error_sets == 1);
++    }
++    /* A failure must remain sticky on later jobs. */
++    init(&f);
++    f.vm.opted_in = true;
++    f.vm.status = -EIO;
++    f.job.job_run_counter = 2;
++    assert(run(&f) == NULL && !schedules && f.fence.finished.error == -EIO);
++}
++static void recovery_and_driver_errors(void)
++{
++    struct fixture f;
++    for (unsigned reason = 0; reason < 3; ++reason) {
++        init(&f);
++        f.vm.opted_in = true;
++        f.vm.status = -EIO;
++        if (reason == 0)
++            f.job.generation--;
++        else if (reason == 1) {
++            f.job.job_run_counter = 1;
++            f.job.gang_submit = &hardware_fence;
++        } else
++            f.fence.finished.error = -ENODEV;
++        assert(run(&f) == NULL && !schedules && !status_calls);
++        assert(f.fence.finished.error == (reason == 2 ? -ENODEV : -ECANCELED));
++    }
++    /* A gang's first submission is valid. */
++    init(&f);
++    f.job.gang_submit = &hardware_fence;
++    assert(run(&f) == &hardware_fence && schedules == 1);
++    /* A normal nongang job may be resubmitted after recovery. */
++    init(&f);
++    f.job.job_run_counter = 1;
++    assert(run(&f) == &hardware_fence && schedules == 1);
++    /* Actual IB submission errors still return ERR_PTR to the scheduler. */
++    init(&f);
++    schedule_result = -ENOSPC;
++    assert(run(&f) == ERR_PTR(-ENOSPC) && schedules == 1 && !f.fence.finished.error);
++}
++int main(void)
++{
++    healthy_jobs();
++    failed_jobs();
++    recovery_and_driver_errors();
++    printf("VM batch scheduler guard: %u cases passed\n", cases);
++    return 0;
++}
++'''
++
++if __name__ == '__main__':
++    unittest.main()
+diff --git a/tools/testing/selftests/drivers/amdgpu/test_vm_batch_status.py b/tools/testing/selftests/drivers/amdgpu/test_vm_batch_status.py
+new file mode 100644
+index 000000000000..17d91b8adb0c
+--- /dev/null
++++ b/tools/testing/selftests/drivers/amdgpu/test_vm_batch_status.py
+@@ -0,0 +1,226 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0-only
++import os
++import pathlib
++import re
++import shlex
++import subprocess
++import tempfile
++import unittest
++
++ROOT = pathlib.Path(os.environ.get('VA_BATCH_TEST_ROOT', pathlib.Path(__file__).resolve().parents[5]))
++AMD = ROOT / 'drivers/gpu/drm/amd/amdgpu'
++
++
++class VmBatchStatusTests(unittest.TestCase):
++    def test_persistent_status(self):
++        source = (AMD / 'amdgpu_vm.c').read_text()
++        header = (AMD / 'amdgpu_vm.h').read_text()
++        entry = re.search(r'^struct amdgpu_vm_batch_entry \{.*?^\};', header, re.M | re.S)
++        self.assertIsNotNone(entry)
++        begin = source.index('struct amdgpu_vm_batch_state {')
++        final = re.search(r'^static void amdgpu_vm_batch_fini\(.*?^\}', source[begin:], re.M | re.S)
++        self.assertIsNotNone(final)
++        actual = entry.group() + '\n' + source[begin:begin + final.end()]
++        command = shlex.split(os.environ.get('CC', 'cc'))
++        command += ['-std=gnu11', '-O1', '-g', '-Wall', '-Wextra', '-Werror', '-pthread']
++        if os.environ.get('USERQ_TEST_SANITIZERS'):
++            command += ['-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-fno-sanitize-recover=all']
++        with tempfile.TemporaryDirectory(prefix='vm-batch-status-') as temporary:
++            directory = pathlib.Path(temporary)
++            program, binary = directory / 'test.c', directory / 'test'
++            program.write_text(HARNESS.replace('ACTUAL_SOURCE', actual))
++            subprocess.run(command + [str(program), '-o', str(binary)], check=True, timeout=30)
++            subprocess.run([str(binary)], check=True, timeout=30)
++
++
++HARNESS = r'''
++#include <assert.h>
++#include <errno.h>
++#include <pthread.h>
++#include <stdatomic.h>
++#include <stdbool.h>
++#include <stddef.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++struct list_head { struct list_head *next, *prev; };
++struct mutex { pthread_mutex_t value; };
++struct dma_resv { bool locked; };
++struct amdgpu_bo { struct { struct { struct dma_resv *resv; } base; } tbo; };
++struct amdgpu_vm_batch_state;
++struct amdgpu_vm { struct { struct amdgpu_bo *bo; } root; struct amdgpu_vm_batch_state *batch_state; };
++struct dma_fence {
++    _Atomic unsigned refs;
++    _Atomic bool signaled;
++    _Atomic int error;
++    struct dma_fence *children[3];
++    unsigned count;
++};
++struct dma_fence_unwrap { unsigned index; };
++static _Atomic unsigned allocations, frees;
++static bool fail_allocation;
++static unsigned cases;
++#define container_of(p, t, member) ((t *)((char *)(p) - offsetof(t, member)))
++#define INIT_LIST_HEAD(head) ((head)->next = (head)->prev = (head))
++#define list_for_each_entry_safe(entry, tmp, head, member) \
++    for (struct list_head *node = (head)->next, *next; \
++         node != (head) && ((next = node->next), \
++         (entry = container_of(node, typeof(*entry), member)), \
++         (tmp = next != (head) ? container_of(next, typeof(*tmp), member) : NULL), true); node = next)
++#define smp_load_acquire(p) __atomic_load_n(p, __ATOMIC_ACQUIRE)
++#define smp_store_release(p, value) __atomic_store_n(p, value, __ATOMIC_RELEASE)
++#define dma_resv_assert_held(resv) assert((resv)->locked)
++#define kzalloc_obj(obj) allocate(sizeof(obj))
++#define kfree release
++#define dma_fence_unwrap_for_each(f, it, root) \
++    for ((it)->index = 0; (it)->index < ((root)->count ? (root)->count : 1) && \
++         ((f) = (root)->count ? (root)->children[(it)->index] : (root)); ++(it)->index)
++static void mutex_init(struct mutex *m) { assert(!pthread_mutex_init(&m->value, NULL)); }
++static void mutex_lock(struct mutex *m) { assert(!pthread_mutex_lock(&m->value)); }
++static void mutex_unlock(struct mutex *m) { assert(!pthread_mutex_unlock(&m->value)); }
++static void mutex_destroy(struct mutex *m) { assert(!pthread_mutex_destroy(&m->value)); }
++static void list_add_tail(struct list_head *node, struct list_head *head)
++{ node->next = head; node->prev = head->prev; head->prev->next = node; head->prev = node; }
++static void list_del(struct list_head *node)
++{ node->next->prev = node->prev; node->prev->next = node->next; }
++static void *allocate(size_t size)
++{ if (fail_allocation) return NULL; void *p = calloc(1, size); assert(p); allocations++; return p; }
++static void release(void *p) { if (p) { frees++; free(p); } }
++static struct dma_fence *dma_fence_get(struct dma_fence *f) { assert(f->refs); f->refs++; return f; }
++static void dma_fence_put(struct dma_fence *f) { assert(f->refs); f->refs--; }
++static int dma_fence_get_status(struct dma_fence *f)
++{ return !f->signaled ? 0 : f->error ? f->error : 1; }
++
++ACTUAL_SOURCE
++
++struct fixture { struct amdgpu_vm vm; struct amdgpu_bo root; struct dma_resv resv; };
++static void init(struct fixture *f)
++{ *f = (struct fixture){0}; f->resv.locked = true; f->root.tbo.base.resv = &f->resv; f->vm.root.bo = &f->root; }
++static void finish(struct fixture *f)
++{ amdgpu_vm_batch_fini(&f->vm); cases++; }
++static unsigned pending(struct amdgpu_vm *vm)
++{
++    struct amdgpu_vm_batch_state *s = vm->batch_state;
++    unsigned count = 0;
++    for (struct list_head *node = s->pending.next; node != &s->pending; node = node->next) count++;
++    return count;
++}
++static void track(struct amdgpu_vm *vm, struct dma_fence *f)
++{ struct amdgpu_vm_batch_entry *e = allocate(sizeof(*e)); amdgpu_vm_batch_track(vm, e, f); }
++static void basic_tests(void)
++{
++    struct fixture f;
++    init(&f);
++    assert(!amdgpu_vm_batch_status(&f.vm) && !allocations && !f.vm.batch_state);
++    fail_allocation = true;
++    assert(amdgpu_vm_batch_prepare(&f.vm) == -ENOMEM && !f.vm.batch_state);
++    fail_allocation = false;
++    assert(!amdgpu_vm_batch_prepare(&f.vm) && f.vm.batch_state);
++    unsigned before = allocations;
++    assert(!amdgpu_vm_batch_prepare(&f.vm) && allocations == before);
++    struct dma_fence good = {.refs = 1};
++    track(&f.vm, &good);
++    assert(good.refs == 2 && pending(&f.vm) == 1 && !amdgpu_vm_batch_status(&f.vm));
++    good.signaled = true;
++    assert(!amdgpu_vm_batch_status(&f.vm) && good.refs == 1 && !pending(&f.vm));
++    finish(&f);
++
++    init(&f); assert(!amdgpu_vm_batch_prepare(&f.vm));
++    struct dma_fence bad = {.refs = 1};
++    track(&f.vm, &bad);
++    bad.error = -ETIMEDOUT; bad.signaled = true;
++    assert(amdgpu_vm_batch_status(&f.vm) == -EIO && bad.refs == 1 && !pending(&f.vm));
++    assert(amdgpu_vm_batch_prepare(&f.vm) == -EIO);
++    track(&f.vm, &good);
++    assert(amdgpu_vm_batch_status(&f.vm) == -EIO && good.refs == 1 && !pending(&f.vm));
++    finish(&f);
++
++    init(&f); assert(!amdgpu_vm_batch_prepare(&f.vm));
++    good.signaled = false;
++    track(&f.vm, &good);
++    amdgpu_vm_batch_error(&f.vm);
++    assert(amdgpu_vm_batch_status(&f.vm) == -EIO && good.refs == 1);
++    finish(&f);
++
++    init(&f); assert(!amdgpu_vm_batch_prepare(&f.vm));
++    track(&f.vm, &good);
++    finish(&f);
++    assert(good.refs == 1);
++}
++static void timeline_recycling_test(void)
++{
++    struct fixture f;
++    init(&f); assert(!amdgpu_vm_batch_prepare(&f.vm));
++    struct dma_fence old = {.refs = 1}, newer = {.refs = 1, .signaled = true};
++    track(&f.vm, &old);
++    /* A userspace timeline can drop its old node. The VM retains its own reference. */
++    dma_fence_put(&old);
++    assert(old.refs == 1);
++    for (unsigned i = 0; i < 100; i++) {
++        track(&f.vm, &newer);
++        assert(!amdgpu_vm_batch_status(&f.vm) && newer.refs == 1 && pending(&f.vm) == 1);
++    }
++    old.error = -EIO; old.signaled = true;
++    assert(amdgpu_vm_batch_status(&f.vm) == -EIO && !old.refs);
++    assert(amdgpu_vm_batch_prepare(&f.vm) == -EIO);
++    finish(&f);
++}
++static void hidden_error_tests(void)
++{
++    for (unsigned complete = 0; complete <= 1; complete++) {
++        struct fixture f;
++        init(&f); assert(!amdgpu_vm_batch_prepare(&f.vm));
++        struct dma_fence child = {.refs = 1, .signaled = true, .error = -EIO};
++        struct dma_fence array = {.refs = 1, .signaled = complete, .children = {&child}, .count = 1};
++        track(&f.vm, &array);
++        assert(amdgpu_vm_batch_status(&f.vm) == -EIO && array.refs == 1);
++        finish(&f);
++    }
++    struct fixture a, b;
++    init(&a); init(&b);
++    assert(!amdgpu_vm_batch_prepare(&a.vm) && !amdgpu_vm_batch_prepare(&b.vm));
++    amdgpu_vm_batch_error(&a.vm);
++    assert(amdgpu_vm_batch_status(&a.vm) == -EIO && !amdgpu_vm_batch_status(&b.vm));
++    finish(&a); finish(&b);
++}
++struct concurrent { struct amdgpu_vm *vm; struct dma_fence fences[1000]; };
++static void *producer(void *data)
++{
++    struct concurrent *c = data;
++    for (unsigned i = 0; i < 1000; i++) track(c->vm, &c->fences[i]);
++    return NULL;
++}
++static void *consumer(void *data)
++{
++    struct concurrent *c = data;
++    for (unsigned i = 0; i < 1000; i++) assert(!amdgpu_vm_batch_status(c->vm));
++    return NULL;
++}
++static void concurrent_test(void)
++{
++    struct fixture f;
++    init(&f); assert(!amdgpu_vm_batch_prepare(&f.vm));
++    struct concurrent c = {.vm = &f.vm};
++    for (unsigned i = 0; i < 1000; i++) { c.fences[i].refs = 1; c.fences[i].signaled = true; }
++    pthread_t a, b;
++    assert(!pthread_create(&a, NULL, producer, &c) && !pthread_create(&b, NULL, consumer, &c));
++    assert(!pthread_join(a, NULL) && !pthread_join(b, NULL));
++    assert(!amdgpu_vm_batch_status(&f.vm) && !pending(&f.vm));
++    for (unsigned i = 0; i < 1000; i++) assert(c.fences[i].refs == 1);
++    finish(&f);
++}
++int main(void)
++{
++    basic_tests();
++    timeline_recycling_test();
++    hidden_error_tests();
++    concurrent_test();
++    assert(allocations == frees);
++    printf("VM batch status: %u cases passed\n", cases);
++    return 0;
++}
++'''
++
++if __name__ == '__main__':
++    unittest.main()
