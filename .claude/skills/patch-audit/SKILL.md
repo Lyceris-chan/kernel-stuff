@@ -110,6 +110,7 @@ Run these in order. Copy the commands exactly — do not improvise.
    | `30xx` | Platform, USB and hwmon (PROM21 chipset temperature) |
    | `90xx` | agd5f staging + userq lifecycle backports |
    | `91xx` | Retry-fault handling v4 (agd5f staging, 9100–9110) |
+   | `92xx` | salkim userq experimental series — `sleepy-next/` preview only |
 
    A new category gets a new range; add it to this table when you create one.
    ```bash

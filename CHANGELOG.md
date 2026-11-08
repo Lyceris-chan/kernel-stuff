@@ -18,6 +18,43 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.11.05-5-sleepy-next (linux-next `next-20261105`)]: 2026-11-08
+
+Experimental user-queue carry for Proton. Adds nanomatters/kernel-salkim's
+local userq series on top of `2026.11.05-4`. The series is not upstream and
+carries no `Signed-off-by`; it is preview-only and the rc does not carry it.
+
+### Added
+
+- **`9200`–`9217`** — 18 commits from salkim's `salkim-7.4` branch
+  (`0940b82e7d10`), ported on top of the 159-patch series. They cover the
+  userq watchdog and cancellation path, explicit and implicit wait failure
+  reporting, eviction-fence lifetime, slot availability, MES gang priority,
+  TLB completion reporting, write-pointer offsets and fence-reference
+  ordering. Per-patch provenance and port notes are in
+  `sleepy-next/PATCH_SOURCES.md`.
+
+### Not carried
+
+- The VM/VA-batch subset (`937c6da57`, `510830536`, `5d64c2646`,
+  `fb21eba1b`). It needs the full 17-commit VM batch rework and the
+  `DRM_AMDGPU_GEM_VA_BATCH` UAPI; without that base it does not compile.
+
+### Verified
+
+- Cumulative audit: **177/177** on `next-20261105`; rc **338/338** on `v7.3`.
+- Built and installed `linux-sleepy-next-2026.11.05-5` and its headers.
+  `vmlinux` and `amdgpu.ko` carry `.BTF`/`.BTF_ids`; the configs are
+  unchanged (`CONFIG_LRU_CAST=y`, `CONFIG_CPU_IDLE_GOV_NAP=y`,
+  `CONFIG_SCHED_CLASS_EXT=y`, `CONFIG_TCP_CONG_BBR3=y`,
+  `CONFIG_TCP_CONG_BBR` unset). The built-in cmdline is unchanged, including
+  `amdgpu.user_queue=1`.
+- Coverage check: all 52 salkim-authored commits are accounted for — 18
+  carried, 4 dropped with the VM batch rework, 17 batch prerequisites dropped
+  with them, 3 display, 9 test-only, 1 already carried as `1321`. Every
+  upstream userq fix in salkim's 7.3 branch is already in `next-20261105`.
+- No reboot after the install; the machine still runs `2026.11.05-3`.
+
 ## [2026.11.05-4-sleepy-next (linux-next `next-20261105`)]: 2026-11-08
 
 The 2026-11-08 sweep. **No `next-20261106`, `-1107` or `-1108` snapshot was

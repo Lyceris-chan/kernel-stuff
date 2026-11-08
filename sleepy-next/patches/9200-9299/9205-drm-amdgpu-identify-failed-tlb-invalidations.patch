@@ -1,0 +1,30 @@
+From c7f50bf54735a21c33a728bdca38ece776a63d85 Mon Sep 17 00:00:00 2001
+From: Erhan Bilgili <erhan.bilgili@gmail.com>
+Date: Thu, 29 Oct 2026 23:21:18 +0100
+Subject: [PATCH] drm/amdgpu: Identify failed TLB invalidations.
+
+(cherry picked from commit 3f46f5a2898ac32b7abc8fc35e23c8abbef3b402)
+---
+ drivers/gpu/drm/amd/amdgpu/mes_v12_0.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/mes_v12_0.c b/drivers/gpu/drm/amd/amdgpu/mes_v12_0.c
+index 070c580cb984..0b64cf2a070d 100644
+--- a/drivers/gpu/drm/amd/amdgpu/mes_v12_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/mes_v12_0.c
+@@ -1310,9 +1310,14 @@ static int mes_v12_0_inv_tlbs_pasid(struct amdgpu_mes *mes,
+ 	if (ret < 0)
+ 		return -EINVAL;
+ 	mes_inv_tlbs.invalidate_tlbs.hub_id = ret;
+-	return mes_v12_0_submit_pkt_and_poll_completion(mes, AMDGPU_MES_KIQ_PIPE,
++	ret = mes_v12_0_submit_pkt_and_poll_completion(mes, AMDGPU_MES_KIQ_PIPE,
+ 			&mes_inv_tlbs, sizeof(mes_inv_tlbs),
+ 			offsetof(union MESAPI__INV_TLBS, api_status));
++	if (ret)
++		dev_err(mes->adev->dev,
++			"MES TLB invalidation failed for PASID %u hub %u flush type %u: %d\n",
++			input->pasid, input->hub_id, input->flush_type, ret);
++	return ret;
+ 
+ }
+ 

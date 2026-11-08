@@ -1,0 +1,77 @@
+From fd80653a538e0e1d609a4c7735f35e422822b593 Mon Sep 17 00:00:00 2001
+From: Erhan Bilgili <erhan.bilgili@gmail.com>
+Date: Mon, 2 Nov 2026 15:59:49 +0100
+Subject: [PATCH] drm/amdgpu: Add MES gang priority updates.
+
+(cherry picked from commit 0c65a779b90f93cf2ea2ffd6975868c43baee98e)
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_mes.h | 10 ++++++++++
+ drivers/gpu/drm/amd/amdgpu/mes_v12_0.c  | 20 ++++++++++++++++++++
+ 2 files changed, 30 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_mes.h b/drivers/gpu/drm/amd/amdgpu/amdgpu_mes.h
+index 0f368fbd2c80..ec6204302f42 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_mes.h
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_mes.h
+@@ -463,6 +463,13 @@ struct mes_misc_op_input {
+ 	};
+ };
+ 
++struct mes_change_gang_priority_input {
++	u64 gang_context_addr;
++	u64 gang_quantum;
++	u32 gang_context_array_index;
++	u32 gang_global_priority_level;
++};
++
+ struct amdgpu_mes_funcs {
+ 	int (*add_hw_queue)(struct amdgpu_mes *mes,
+ 			    struct mes_add_queue_input *input);
+@@ -482,6 +489,9 @@ struct amdgpu_mes_funcs {
+ 	int (*resume_gang)(struct amdgpu_mes *mes,
+ 			   struct mes_resume_gang_input *input);
+ 
++	int (*change_gang_priority)(struct amdgpu_mes *mes,
++				    struct mes_change_gang_priority_input *input);
++
+ 	int (*misc_op)(struct amdgpu_mes *mes,
+ 		       struct mes_misc_op_input *input);
+ 
+diff --git a/drivers/gpu/drm/amd/amdgpu/mes_v12_0.c b/drivers/gpu/drm/amd/amdgpu/mes_v12_0.c
+index 0b64cf2a070d..e4efd5f7b37b 100644
+--- a/drivers/gpu/drm/amd/amdgpu/mes_v12_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/mes_v12_0.c
+@@ -912,6 +912,25 @@ static int mes_v12_0_resume_gang(struct amdgpu_mes *mes,
+ 			offsetof(union MESAPI__RESUME, api_status));
+ }
+ 
++static int mes_v12_0_change_gang_priority(struct amdgpu_mes *mes,
++					  struct mes_change_gang_priority_input *input)
++{
++	union MESAPI__CHANGE_GANG_PRIORITY_LEVEL packet = {};
++
++	packet.header.type = MES_API_TYPE_SCHEDULER;
++	packet.header.opcode = MES_SCH_API_CHANGE_GANG_PRORITY;
++	packet.header.dwsize = API_FRAME_SIZE_IN_DWORDS;
++	packet.inprocess_gang_priority = AMDGPU_MES_PRIORITY_LEVEL_NORMAL;
++	packet.gang_global_priority_level = input->gang_global_priority_level;
++	packet.gang_quantum = input->gang_quantum;
++	packet.gang_context_addr = input->gang_context_addr;
++	packet.gang_context_array_index = input->gang_context_array_index;
++
++	return mes_v12_0_submit_pkt_and_poll_completion(mes, AMDGPU_MES_SCHED_PIPE,
++			&packet, sizeof(packet),
++			offsetof(union MESAPI__CHANGE_GANG_PRIORITY_LEVEL, api_status));
++}
++
+ static int mes_v12_0_query_sched_status(struct amdgpu_mes *mes, int pipe)
+ {
+ 	union MESAPI__QUERY_MES_STATUS mes_status_pkt;
+@@ -1367,6 +1386,7 @@ static const struct amdgpu_mes_funcs mes_v12_0_funcs = {
+ 	.unmap_legacy_queue = mes_v12_0_unmap_legacy_queue,
+ 	.suspend_gang = mes_v12_0_suspend_gang,
+ 	.resume_gang = mes_v12_0_resume_gang,
++	.change_gang_priority = mes_v12_0_change_gang_priority,
+ 	.misc_op = mes_v12_0_misc_op,
+ 	.reset_hw_queue = mes_v12_0_reset_hw_queue,
+ 	.invalidate_tlbs_pasid = mes_v12_0_inv_tlbs_pasid,

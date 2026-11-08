@@ -18,8 +18,8 @@ moved, so the full ledger is not duplicated here.
 | Snapshot | `next-20261105`, tag `ddfe51b0a0f5` (tag object `cae1456a7b59`) |
 | Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261105.tar.gz` |
 | Snapshot tree `Makefile` | `7.4.0-rc1` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.11.05-4-sleepy-next` |
-| Package | `linux-sleepy-next-2026.11.05-4` |
+| Kernel release | `2026.11.05-5-sleepy-next` |
+| Package | `linux-sleepy-next-2026.11.05-5` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -1582,3 +1582,60 @@ UAF) is already in this snapshot.
 
 **159 patches** (153 + 6). `audit_series.py`: **159/159** on
 `next-20261105`. The rc series is **338/338** on `v7.3`.
+
+## 2026-11-08 — experimental salkim userq series (`9200`–`9217`, preview only)
+
+At the user's request the preview now carries nanomatters/kernel-salkim's local
+user-queue series, which targets Proton/`AMD_USERQ` workloads and is **not
+upstream**. Source: `https://github.com/nanomatters/kernel-salkim`, branch
+`salkim-7.4`, tip `0940b82e7d10` (2026-11-08). The commits are authored by
+Erhan Bilgili <erhan.bilgili@gmail.com> (the two test-only commits aside).
+**None carries a `Signed-off-by` trailer**, so provenance rests on the public
+commit hashes below; this is a deliberate deviation from the sweep's usual
+Check 4, accepted because the carry is preview-only and experimental. The rc
+does not carry any `92xx` patch.
+
+The commits were cherry-picked in order onto the exact 159-patch series state
+(`next-20261105` + the 2026-11-08 series) and exported as `9200`–`9217`; each
+file keeps its original author, date, subject and a
+`(cherry picked from commit …)` trailer.
+
+| Patch | Original commit | Subject | Port note |
+|---|---|---|---|
+| `9200` | `62a6b0edc972` | drm/amdgpu: Enable UserQ by default | Flips the module-param default from `-1` to `1`; the preview CMDLINE already sets `amdgpu.user_queue=1`. |
+| `9201` | `bc6f5f3ccb6f` | drm/amdgpu/userq: reject imported dma-bufs as WPTR BO | Selftest conflict only. |
+| `9202` | `51f92810b1c9` | drm/amdgpu: Preserve UserQ mappings during restore | |
+| `9203` | `27f2e9658f05` | drm/amdgpu: Validate pending UserQ mappings | Kept both lists: the loop walks `individual.evicted` and `individual.needs_update`. Supersedes the `needs_update`-only loop from `9093`. |
+| `9204` | `e28465e97b3b` | drm/amdgpu: Avoid skipping BOs during VM locking | |
+| `9205` | `3f46f5a28d47` | drm/amdgpu: Identify failed TLB invalidations | |
+| `9206` | `9acc5e726b86` | drm/amdgpu: Skip implicit UserQ waits within a client | |
+| `9207` | `200120508a3c` | drm/amdgpu: Report explicit UserQ wait failures | |
+| `9208` | `19c0697b1e2a` | drm/amdgpu: Drop UserQ eviction fences on BO release | |
+| `9209` | `943593f1d1d7` | drm/amdgpu: Revalidate UserQ watchdog timeouts | Kept our `destroy_work` next to the new watchdog state; both the reset-semaphore and `state_mutex` guards are held in map/unmap; the suspend loop keeps the carried kref `put` and iteration and calls `amdgpu_userq_request_reset()` before dropping the reference. |
+| `9210` | `cdcd08459b1a` | drm/amdgpu: Trace UserQ restore and mapping clears | |
+| `9211` | `d7f2ef62a1d4` | drm/amdgpu: Reject UserQ signals after cancelled work | |
+| `9212` | `6918d668e4cc` | drm/amdgpu: Correct UserQ slot availability checks | Selftest conflict only. |
+| `9213` | `0c65a779b7f4` | drm/amdgpu: Add MES gang priority updates | |
+| `9214` | `41cef94209e7` | drm/amdgpu: Report TLB completion failures | Ported to this tree's 3-argument `amdgpu_vm_tlb_fence_create(adev, vm, fence)`: `*fence` is the dependency, so `dep` is dropped and the function returns `int`. Adds `amdgpu_tlb_fence_flush()` and keeps our caller's fence handling. |
+| `9215` | `01665009ae32` | drm/amdgpu: Cancel suspended compute queues safely | Keeps our doorbell lookup and its kref `put` on every path, and adopts the watchdog stop plus the `CANCELED` state check in `mes_userq_reset_queue()`. |
+| `9216` | `f0de1dafe3a1` | drm/amdgpu: Preserve UserQ write-pointer offsets | |
+| `9217` | `e63069042b7c` | drm/amdgpu: Take UserQ fence references before unlocking | |
+
+### Not carried: the VM/VA-batch subset
+
+Four commits from the same series are **not** in this carry: `937c6da57`
+(Preserve mappings after partial VA replacement), `510830536` (Retain VM batch
+failures), `5d64c2646` (Add UserQ VA batch completion) and `fb21eba1b` (Resume
+the device before sparse VA batches). They build on the 17-commit VM batch
+rework (`4eab3be7b`…`93e0b4b20`) and on the `DRM_AMDGPU_GEM_VA_BATCH` UAPI
+introduced by `47b10740a`. That rework refactors
+`amdgpu_vm_bo_clear_mappings()` into a prealloc variant, replaces
+`amdgpu_vm_update_range()` with batched page updates and changes the
+`amdgpu_vm_tlb_fence_create()` caller contract; it does not merge cleanly with
+the carried VM patches. Porting it is a separate project, and without it
+`5d64c2646` does not compile (the ioctl command number and struct are absent).
+
+### Series state
+
+**177 patches** (159 + 18). `audit_series.py`: **177/177** on
+`next-20261105`. The rc series remains **338/338** on `v7.3`.
