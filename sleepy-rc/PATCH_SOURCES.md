@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
 - **Base:** Linux `v7.3`
-- **Series:** 327 patches
+- **Series:** 338 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -22,20 +22,20 @@ are supplied by the generator instead, so every row below has a source.
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 30 |
-| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 23 |
-| `1100–1199` | AMD display (DCN4, colorops) | 31 |
+| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 27 |
+| `1100–1199` | AMD display (DCN4, colorops) | 32 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 32 |
-| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 50 |
+| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 51 |
 | `2100–2199` | Memory management and swap (zstd, LRU-MARIE, gup, zswap) | 50 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 21 |
-| `2400–2499` | Core scheduler and sched-ext | 6 |
+| `2400–2499` | Core scheduler and sched-ext | 7 |
 | `2500–2599` | x86 and arch core | 2 |
 | `2600–2699` | Time and timers | 0 |
-| `2800–2899` | Memory management, second series (mm/swap follow-ups) | 8 |
+| `2800–2899` | Memory management, second series (mm/swap follow-ups) | 11 |
 | `2900–2999` | VFS / core filesystem | 0 |
 | `3000–3099` | Platform, USB and hwmon (PROM21 chipset temperature) | 2 |
-| `9000–9099` | agd5f staging + userq lifecycle backports | 37 |
+| `9000–9099` | agd5f staging + userq lifecycle backports | 38 |
 | `9100–9199` | Retry-fault handling v4 (agd5f staging) | 11 |
 
 **Total: 327** patch files, all listed in `PKGBUILD`'s `source=()`.
@@ -12219,3 +12219,138 @@ the carried up-front reservations stay.
 **331 patches** (327 + 4). `audit_series.py`: **331/331** on `v7.3`; the
 preview is **153/153** on `next-20261105` (see its own ledger for the CAST
 port).
+
+## Sweep 2026-11-08 — `drm-fixes-2026-11-07`; seven carries, no new snapshot
+
+Sources refreshed on 2026-11-08: torvalds `origin/master` `fa4ad798f6f6` (the
+2026-11-06 sweep saw `a91337fb5e8e`), linux-next tags still end at
+`next-20261105` `ddfe51b0a0f5` — **no `next-20261106`, `-1107` or `-1108` tag
+was published**, so the preview base cannot move and this sweep only adds
+patches — drm-next `6628e7d4c6b2` (Linux 7.4-rc1, unchanged since 2026-11-01),
+agd5f and amd-staging `178d00b16ddb` (unchanged), drm-misc `de30740dccd8`,
+linux-pm `6628e7d4c6b2`, akpm-mm `mm-everything`, tip. sirlucjan
+`origin/master` `7275a4ad` adds only the Apple T2 line, CachyOS
+`kernel-patches` `706b5652` only the out-of-tree r8125 rtltool removal, NVIDIA
+and PRJC — all out of scope. `lru_cast` `origin/main` is still `ce117bb`
+(v0.2.10 for 7.4) and firelzrd NAP is still `0.6.6`: **no CAST or NAP update**.
+BORE 7.0.1 exists and is not carried. The sixteen lore git mirrors were
+refreshed; the drm/amd tracker returned 70 issues updated since 2026-11-04
+(59 open, 11 closed) with public comments through GraphQL, and Phoronix was
+read through its RSS and the 2026-11-04..07 index.
+
+### Adopted — both packages
+
+| Patch | Change | Why |
+|---|---|---|
+| `1185` | **`drm/amd/display: Reset DET of HUBPs without a plane before outstanding updates`** (2026-10-27, merged as `f3afbf7d832a` in `drm-fixes-2026-11-07`) | `dcn401_program_compbuf_segments()` asserts when the DET left on a plane-less HUBP (for example by the VBIOS) is larger than the DET the new state planned, because DET + compbuf then exceeds the CRB size and sets CONFIG_ERROR. This is the machine's exact display IP (DCN 4.0.1 / `dcn401_hubbub.c`). The fix adds `hwss_reset_unused_det()` and calls it before `hwss_process_outstanding_hw_updates()`. No carried patch touches `program_det_segments`. |
+| `1328` | **`drm/amdgpu: finish GPU recovery callbacks before restarting schedulers`** (2026-08-20, merged as `733389cb31e2`) | Runs the post-reset callbacks, including KFD and display-audio resume, before `amdgpu_device_sched_resume()` restarts the DRM workqueues, so new submissions cannot race the resume. Applies cleanly to `v7.3`; no carried patch touches `amdgpu_device_gpu_recover()`. |
+| `1329` | **`drm/amdgpu: stop the schedulers before preparing the GPU reset`** (2026-10-16, merged as `5b40c07c7ae9`; `Fixes: 290f46cf5726`, in `v7.3`) | `amdgpu_device_halt_activities()` stopped the rings only after `amdgpu_userq_pre_reset()`; with a hung MES every REMOVE_QUEUE waits out its timeout while the schedulers keep submitting, producing the `amdgpu_device_skip_hw_access` WARNING. The preview enables user queues with `amdgpu.user_queue=1` in its built-in CMDLINE, so the path is live there; the rc leaves the driver's `-1` auto default, which resolves to user queues disabled on GFX12/SDMA7, so the fix protects a runtime opt-in. Applied after `1328`, the order the branch merged them in. |
+| `1330` | **`drm/sched: Adjust run-queue when changing priority at runtime`** (Tvrtko Ursulin, 2026-10-21, merged as `75709a35da45`; `Fixes: 2fa4d8e2c109`, `Cc: stable # v7.2+`) | The revert of the single-run-queue change restored `entity->rq_priority`, but `drm_sched_entity_set_priority()` no longer updated it, so a runtime priority change left the entity on the old run queue. Two lines; `rq_priority` exists in `v7.3`. Only amdgpu drives this, and only on multi-instance rings such as SDMA. |
+| `9091` | **`drm/amdgpu/userq: wait for GPU reset before mapping or unmapping queues`** (2026-10-16, merged as `623507b8f4fe`) | Moves the `reset_domain->sem` read lock from the create path into the map and unmap helpers, so eviction, restore, destroy and suspend also wait for a running reset instead of submitting to an unresponsive MES. The `v7.3` helpers are textually identical to the pre-patch form; `rwsem_read` guards exist there. The preview, which enables user queues, exercises the path directly. |
+
+### Adopted — rc only
+
+| Patch | Change | Why |
+|---|---|---|
+| `1331` | **`drm/amdgpu/gfx12: disallow GFXOFF while updating the SPM VMID`** (2026-10-26, merged as `d1551515a325`; `Fixes: 52cb80c12e8a`, in `v7.3`) | `gfx_v12_0_update_spm_vmid()` does a read-modify-write of `RLC_SPM_MC_CNTL` without keeping GFX powered, so with GFX in GFXOFF the reserved VMID does not stick and the SPM keeps writing through VMID 0. The report is on navi48 — this machine. `next-20261105` has the 7.4 SPM series form of the function and the fix does not apply there (classified neither direction); it arrives with a later snapshot. |
+| `2422` | **`sched_ext: Fix use-after-free of a local reenq node left on an inactive cpu`** (2026-10-15, merged as `43e1ef14a472`, in `next-20261105`) | A reenq of an inactive CPU's local DSQ could be dropped by `queue_balance_callback()` or `irq_work_queue_on()`, leaving its node linked when the scheduler's pcpu is freed; the hotplug test is lockless and the ignored reenq is pointless because that DSQ holds only bound or migrating tasks. Since 2026-11-04 `kernel/sched/ext/` is the live scheduler here (`scx_cake`). The preview already carries it; the rc gets it as a backport. |
+
+### Adopted — preview only
+
+| Patch | Change | Why |
+|---|---|---|
+| `9093` | **`drm/amdgpu/userq: validate the moved individual BOs on restore`** (2026-10-26, merged as `ce5f2a25bdf6`; `Fixes: 4cdbba5a16aa`, `18decfc9e8cc`) | The user-queue restore validated `vm->individual.invalidated`, which the VM state-machine rework replaced with the always-valid evicted list and `18decfc9e8cc` with the individual evicted one; that list holds only imported DMA-bufs of compute VMs, so user-queue BOs were never validated, never locked and never given the new eviction fence. `18decfc9e8cc` is in `next-20261105` but not in `v7.3`, so the regression exists only in the preview; it is not carried in the rc, where `9090` already covers the idle list. |
+
+### Rejected and watch items
+
+- **`drm/amdgpu: wait for tlb flush before freeing BO` v2** (Benjamin Cheng,
+  `<20261106152031.4040973-2-benjamin.cheng@amd.com>`) — a real user-queue
+  use-after-free on GEM close, and it applies textually to both trees, but it
+  rebases on the uncarried "TLB invalidation fence handling v4" series and
+  needs `vm->last_tlb_inv`, which exists in neither base nor in any carried
+  patch. Symbol check fails, so it is not carried; re-check when that series
+  merges.
+- **`drm/amdkfd: preserve the byte address when removing retry faults`**
+  (Aveline Noir, `<20261108-kfd-fault-filter-address-20261108-v1-1-...>`) — a
+  real bug: `svm_range_restore_pages()` receives a page number but hands it to
+  `amdgpu_gmc_filter_faults_remove()`, which keys on a byte address, so a
+  deferred or `-EAGAIN` fault can stay filtered until its entry ages out.
+  Applies to both trees, `Fixes: b3dc91f97317` (in `v7.3`), has a Sashiko
+  report and a `Signed-off-by`, but it is an unreviewed v1 posted on the day
+  of this sweep and it changes a fault-path signature. Defer one sweep for
+  review.
+- **The SVM notifier/HMM v1 pair** (same author, same day) — error-path
+  robustness in `kfd_svm.c`; applies to both, no review yet. Defer with the
+  byte-address patch.
+- **SPM re-enable/reemit series** (`re-enable SPM updates in the IB path`,
+  `reemit RLC SPM register in ring reemit`, `[PATCH 1/2]`, 2026-11-06) — still
+  unreviewed v1 and written against the 7.4 SPM path; the rc keeps the old
+  runtime call. Watch for the merged form.
+- **`drm/amdgpu: Ensure that harvest information gets set`** (`4c5ec969b9b0`) —
+  populates `ip_inst->harvest` in the early-init sysfs path; the value is
+  exposed in sysfs only, so it is not a functional fix here.
+- **`drm/amdgpu: Check cs flags.`** (`f5ea64f9fcd9`) — rejects a non-zero
+  `cs->in.flags`, which no UAPI defines; hardening without a bug in this base.
+- **`drm/amd/display: Accept HDMI 2.2 FRL rates from the sink EDID`**
+  (`a9997269dd8f`) — the rc keeps FRL off by design (`dcfeaturemask=2`); the
+  preview takes the pull with a later snapshot.
+- **Wrong chip or wrong path**, checked and dismissed: `d13f36e4e055`
+  (dcn20 optc; dcn401 registers `optc1_program_timing`), `bba4dc330648`
+  (DCN32 clocks), `a26ec1909257` (SMU v11), `079f9103d9cd` (SMU 13.0.7),
+  `e23621a91bb5`/`f5a0b3130f43` (VCE/UVD), `0de95c96655c` (legacy DCE HDMI
+  audio), `146b96974b33` (`navi10_ih`; this GPU reports `ih_v7_0_0`),
+  `e7ba638b8116` (DP AUX/DDC; the displays are HDMI).
+- **`drm/amdgpu: publish IH enabled before PSP programs IH_RB_CNTL`**
+  (`9d550dd1a3b4`) — SR-IOV indirect-IH path only; bare metal is unaffected.
+- **salkim's local user-queue work** (`138bad563`, `ffca1f92`, `d6091349c`,
+  and the October series behind them) — one-line messages, no mainline
+  posting, and `ffca1f92` overlaps the carried `1065`, `1066` and `9081`.
+  Needs a real audit before any carry, not a dry-run.
+- **`iommu/amd: Fix NULL pointer dereference for GPUs without an upstream
+  bridge`** (`2cf4be57b301`) — the impacted systems are APUs and Navi 2x
+  cards in legacy/CSM mode; this GPU has an upstream bridge. Inert.
+- **`tip` 2026-11-08** (`origin/master` `b6b0151a9f96`, merged after the
+  2026-11-06 sweep) — the only new on-target-looking commits are
+  `x86/mm: Fix global ASID handed out to two processes` (`5cdc3746fa16`,
+  `Fixes: d504d1247e36`) and `x86/boot: Fix off-by-one error in
+  sme_clear_pgd()` (`cb319926808b`, `Cc: stable`). The first corrupts memory
+  only on CPUs with INVLPGB, which gates the whole global-ASID allocator; this
+  Ryzen 7 7700 does not enumerate `invlpgb`. The second runs only with AMD SME,
+  which this CPU does not enumerate either. Both are inert here; the rest of
+  the tip merges are the iommu, xen and arm64 commits above.
+
+### Already carried
+
+Reverse-applies cleanly, so no action: `6d1f901a8360`, `ade92d50aad6`,
+`71388e1ed836`, `e0a1404b34e0`, `fb900f8bfd8a`, `122e86486114`,
+`ea47f8419924`, `ab18dd3061eb`, `f2853a06e4b9`, `7fac15d009cf`,
+`920ca822f527`, `da2897ee8b81`, `37cfaaa6b5e9`. Three more reverse-failed
+from context drift but are carried under different subjects: `a56c2536c399`
+(`1304`), `81f923b06580` (`1177`) and `7a56d929dc23` (`1098`).
+
+### Reverts, versions and tracker
+
+- **No upstream revert targets carried work.** The only on-target revert in
+  the window is the DCN32/1 DMUB revert (`5b3717a14ef6`), which is off-target
+  and absent from both bases; the `lib/sort.c` and PCI-layerscape reverts are
+  unrelated. salkim's "Drop UserQ recovery experiments" is a change in its own
+  fork, not a revert of anything carried here.
+- **Version sweep:** `1183` v2 differs from the carried v1 only in KUnit
+  `EXPECT_EQ` counts (the tests are not built); `2806` v2, `3000` v3 and
+  `1175` v5 are content-identical resends; the kbuild v5 rework is still
+  unmerged and no part applies. No carried patch was displaced.
+- **Tracker:** the only recurring fix commit, `63e19ef3ddab`, is already in
+  both bases. New untriaged issues: #6103 (VRR range 0/0 on 7.3.3), #6104
+  (D3cold load failure; `runpm=0` here), #6105 (HDMI+DP flicker) and #6100
+  (gfx1201 SMU stall, correlated with firmware). #5380's claimed ODM fix has
+  no sha. Firmware watch: `psp_14_0_*_ta` from linux-firmware 20260916
+  (issue #6088) and SMU 104.80 on gfx1201.
+- **Phoronix 2026-11-04..08:** 7.3 is the planned LTS, which supports the
+  pinned base; the HDMI 2.2 FRL pair is covered above; the 7.4 Core MM pull is
+  already in `next-20261104`; `RT_GROUP_SCHED` is already unset in both
+  configs. No on-target article and no revert news.
+
+### Series state
+
+**338 patches** (331 + 7). `audit_series.py`: **338/338** on `v7.3`; the
+preview is **159/159** on `next-20261105` (153 + 6, `9093` preview-only).

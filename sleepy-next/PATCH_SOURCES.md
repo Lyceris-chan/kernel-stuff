@@ -18,8 +18,8 @@ moved, so the full ledger is not duplicated here.
 | Snapshot | `next-20261105`, tag `ddfe51b0a0f5` (tag object `cae1456a7b59`) |
 | Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261105.tar.gz` |
 | Snapshot tree `Makefile` | `7.4.0-rc1` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.11.05-1-sleepy-next` |
-| Package | `linux-sleepy-next-2026.11.05-1` |
+| Kernel release | `2026.11.05-4-sleepy-next` |
+| Package | `linux-sleepy-next-2026.11.05-4` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -1557,3 +1557,28 @@ The rc ledger carries the full rejection list. Preview-specific notes:
 
 **153 patches** (150 + 3). `audit_series.py`: **153/153** on `next-20261105`.
 The rc series is **331/331** on `v7.3`.
+
+## Sweep 2026-11-08 — `drm-fixes-2026-11-07`; six shared carries, `9093` preview only
+
+No `next-20261106`, `-1107` or `-1108` tag was published, so the snapshot
+stays at `next-20261105` and this pass only adds patches on top of it.
+
+Shared with the rc series (same provenance and reasons in its ledger):
+`1185` (`f3afbf7d832a`, DCN401 DET), `1328` (`733389cb31e2`, recovery
+callbacks before sched resume), `1329` (`5b40c07c7ae9`, stop schedulers
+before the reset), `1330` (`75709a35da45`, `rq_priority` on runtime priority
+change) and `9091` (`623507b8f4fe`, userq map/unmap waits for a reset).
+
+Preview only:
+
+| Patch | Change | Why |
+|---|---|---|
+| `9093` | `drm/amdgpu/userq: validate the moved individual BOs on restore` (`ce5f2a25bdf6`) | The regression it fixes comes from `18decfc9e8cc`, which is in this snapshot but not in `v7.3`: the individual evicted list was narrowed to imported DMA-bufs of compute VMs, so user-queue BOs were no longer validated, locked or fenced on restore. The rc keeps `9090` instead, which covers its idle list. |
+
+The rc-only `1331` (gfx12 SPM VMID/GFXOFF) does not apply here: this
+snapshot has the 7.4 SPM-series form of `gfx_v12_0_update_spm_vmid()` and
+the patch classifies neither direction. The rc-only `2422` (sched_ext reenq
+UAF) is already in this snapshot.
+
+**159 patches** (153 + 6). `audit_series.py`: **159/159** on
+`next-20261105`. The rc series is **338/338** on `v7.3`.

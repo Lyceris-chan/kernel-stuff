@@ -18,6 +18,86 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.11.05-4-sleepy-next (linux-next `next-20261105`)]: 2026-11-08
+
+The 2026-11-08 sweep. **No `next-20261106`, `-1107` or `-1108` snapshot was
+published** — the linux-next tags still end at `next-20261105` — so the base
+stays and the release carries the merged 2026-11-07 DRM fixes on top of it.
+
+### Added
+
+- **`1185`** — `drm/amd/display: Reset DET of HUBPs without a plane before
+  outstanding updates` (Roman Li, `f3afbf7d832a`). Resets a plane-less HUBP's
+  DET before outstanding updates, so a DET left by the VBIOS cannot make DET +
+  compbuf exceed the CRB and trip the DCN 4.0.1 assert.
+- **`1328`**, **`1329`** — the two GPU reset-ordering fixes (Prike Liang,
+  `733389cb31e2`, `5b40c07c7ae9`). Recovery callbacks, including KFD and
+  display-audio resume, now finish before the schedulers restart; and the
+  schedulers stop before the reset preparation that can block on an
+  unresponsive MES. The preview enables user queues, so the second path is
+  live here.
+- **`1330`** — `drm/sched: Adjust run-queue when changing priority at runtime`
+  (Tvrtko Ursulin, `75709a35da45`); updates `entity->rq_priority` when a
+  runtime priority change is requested.
+- **`9091`** — `drm/amdgpu/userq: wait for GPU reset before mapping or
+  unmapping queues` (Prike Liang, `623507b8f4fe`). The eviction, restore,
+  destroy and suspend paths now take the reset semaphore around the MES call.
+- **`9093`** — preview only: `drm/amdgpu/userq: validate the moved individual
+  BOs on restore` (Jesse Zhang, `ce5f2a25bdf6`). This snapshot carries the
+  `18decfc9e8cc` change that narrowed the individual evicted list to imported
+  DMA-bufs, so user-queue BOs were not validated on restore. The rc keeps
+  `9090` instead.
+
+`1331` (gfx12 SPM VMID/GFXOFF) and `2422` (sched_ext local-reenq UAF) are rc
+only: the first does not apply to this snapshot's 7.4 SPM path, and the second
+is already in it.
+
+### Verified
+
+- Cumulative audit: **159/159** on `next-20261105`; rc **338/338** on `v7.3`.
+- CAST v0.2.10 (firelzrd `ce117bb`) and NAP 0.6.6 are still the authors'
+  current releases, so there is no CAST or NAP update.
+- Built and installed `linux-sleepy-next-2026.11.05-4` and its headers.
+  `vmlinux` and `amdgpu.ko` carry `.BTF`/`.BTF_ids`; the build has
+  `CONFIG_LRU_CAST=y`, `CONFIG_CPU_IDLE_GOV_NAP=y`, `CONFIG_SCHED_CLASS_EXT=y`,
+  `CONFIG_EXT_SUB_SCHED=y` and `CONFIG_TCP_CONG_BBR3=y` with
+  `CONFIG_TCP_CONG_BBR` unset. The built-in cmdline is unchanged, including
+  `amdgpu.user_queue=1`.
+- No reboot after the install; the machine still runs `2026.11.05-3`.
+
+## [7.3.0-22-sleepy-rc]: 2026-11-08
+
+The 2026-11-08 sweep: the merged `drm-fixes-2026-11-07` pull, the sched_ext
+local-reenq fix, and one scheduler correction. No new linux-next tag exists,
+so this release is patch content only.
+
+### Added
+
+- **`1185`**, **`1328`**, **`1329`**, **`1330`** and **`9091`** — the five
+  shared carries; provenance and reasons are the same as
+  `2026.11.05-4-sleepy-next`.
+- **`1331`** — `drm/amdgpu/gfx12: disallow GFXOFF while updating the SPM VMID`
+  (Jesse Zhang, `d1551515a325`). Without it, the SPM VMID read-modify-write
+  does not stick while GFX is in GFXOFF, so a process with a reserved VMID can
+  still have the SPM write through VMID 0. The report is on navi48.
+- **`2422`** — `sched_ext: Fix use-after-free of a local reenq node left on an
+  inactive cpu` (Tejun Heo, `43e1ef14a472`). Since 2026-11-04
+  `kernel/sched/ext/` is the live scheduler here (`scx_cake`), so the hotplug
+  UAF is on the active path.
+
+### Verified
+
+- Cumulative audit: **338/338** on `v7.3`; preview **159/159** on
+  `next-20261105`.
+- Built and installed `linux-sleepy-rc-7.3.0-22` and its headers. `vmlinux`
+  and `amdgpu.ko` carry `.BTF`/`.BTF_ids`; the build has
+  `CONFIG_LRU_CAST=y`, `CONFIG_CPU_IDLE_GOV_NAP=y`, `CONFIG_SCHED_CLASS_EXT=y`,
+  `CONFIG_EXT_SUB_SCHED=y` and `CONFIG_TCP_CONG_BBR3=y` with
+  `CONFIG_TCP_CONG_BBR` unset. The built-in cmdline is unchanged.
+- The user-queue patches protect a runtime opt-in on this package: the rc does
+  not set `amdgpu.user_queue=1`, so the driver keeps its `-1` auto default.
+- No reboot after the install.
+
 ## [2026.11.05-3-sleepy-next (linux-next `next-20261105`)]: 2026-11-06
 
 The 2026-11-06 sweep on top of `next-20261105`. **`next-20261106` had not been

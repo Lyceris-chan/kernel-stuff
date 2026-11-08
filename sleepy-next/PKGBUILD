@@ -203,7 +203,7 @@ _snapdate=${_srctag#next-}                                            # 20261105
 _snapver="${_snapdate:0:4}.${_snapdate:4:2}.${_snapdate:6:2}"
 pkgver=${_snapver}
 _tagrel=1
-pkgrel=3
+pkgrel=4
 # Build parallelism. Previously capped at 8 on a diagnosis that did not hold up.
 #
 # The cap was added after an rc4-7 build thrashed badly — 6 watchdog firings and
@@ -327,6 +327,7 @@ source=(
   "patches/1100-1199/1180-drm-amd-display-keep-the-nominal-vtotal-while-VRR-is-inactive.patch"
   "patches/1100-1199/1183-drm-amd-display-drop-RGBA8888-from-plane-format-lists.patch"
   "patches/1100-1199/1184-drm-amd-display-remove-DCN401-RDPCS-PHY-state-reads.patch"
+  "patches/1100-1199/1185-drm-amd-display-reset-DET-of-HUBPs-without-a-plane.patch"
   "patches/1200-1299/1201-cpufreq-amd-pstate-Update-cppc_req_cached-before-w.patch"
   "patches/1200-1299/1202-cpufreq-amd-pstate-Add-per-core-EPP-boost-for-rec.patch"
   "patches/1200-1299/1203-Documentation-amd-pstate-Document-the-epp_boost-pa.patch"
@@ -361,6 +362,9 @@ source=(
   "patches/1300-1399/1325-drm-amdgpu-amdgpu_fence-remove-ops-release.patch"
   "patches/1300-1399/1326-drm-amdgpu-gfx12-program-the-SPM-VMID-once-the-RLC-runs.patch"
   "patches/1300-1399/1327-drm-amdgpu-release-the-IMU-firmware-with-the-other-GFX-microcode.patch"
+  "patches/1300-1399/1328-drm-amdgpu-finish-GPU-recovery-callbacks-before-sched-resume.patch"
+  "patches/1300-1399/1329-drm-amdgpu-stop-the-schedulers-before-preparing-the-GPU-reset.patch"
+  "patches/1300-1399/1330-drm-sched-adjust-run-queue-when-changing-priority-at-runtime.patch"
   "patches/2000-2099/2000-block-mq-deadline-pass-in-queue-directly-to-dd_inser.patch"
   "patches/2000-2099/2001-block-mq-deadline-skip-expensive-merge-lookups-if-co.patch"
   "patches/2000-2099/2002-block-bfq-pass-in-queue-directly-to-bfq_insert_reque.patch"
@@ -444,6 +448,8 @@ source=(
   "patches/9000-9099/9083-drm-amdkfd-disable-SVM-when-the-GPUVM-cannot-cover-CPU-addresses.patch"
   "patches/9000-9099/9084-drm-amdkfd-validate-SVM-ranges-against-GPU-address-limits.patch"
   "patches/9000-9099/9090-drm-amdgpu-userq-validate-evicted-BOs-on-the-individual-idle-list-on-restore.patch"
+  "patches/9000-9099/9091-drm-amdgpu-userq-wait-for-GPU-reset-before-mapping-or-unmapping.patch"
+  "patches/9000-9099/9093-drm-amdgpu-userq-validate-the-moved-individual-BOs-on-restore.patch"
   # 1008/1012/1013/1014/1017 (amdgpu TLB-invalidation rework) are excluded from the
   # preview package only: 1008 no longer applies to this snapshot while 1012/1013 do,
   # and 1012/1013 consume the tlb_inv_num_dw member and amdgpu_emit_tlb_inv() helper
@@ -1192,6 +1198,7 @@ b2sums=('eb66338d1cba00ad3025461dbaa209b349fffcc4e74bb8d9b3355e8f8ae7ddd7af8a303
         '05133707e85dd1c3792fe08a9a6eb4c92e4db31538af57a96656749640b0b86f12116aefc3d73387c4ccedbdf49bf7504ba45671cea452e83d9e379055f6db17'
         '2061a89f3ac034b6250f105114c115f051be07ac5006cf89f02548de59f39640de55bc699f141a9d613174f68235d178d2197b1171cdacf83e1c47b17f30759b'
         '1c44cbcbda511a379e3c14e68c1988a20f4a6442e3b250257676bef56e08a8cfaace0f1220dca5a9808db82b896929165d5a840db2cadcf3811682779274b5a6'
+        '230c3aa684c82da799003192057f95b0e5e7999f5b927290d59a329a935fa5b9c7a6f840085476b00d06e71a7dd0d12b59b61880140deb425660ab88c3b536b7'
         'e9d464ebf525cd8d93d48f1cbedea0197bd9d0142085da7d83ec3dfda0174483a0fea4077055fd7d1ad9180563dc6dfb77e4f52f9bcb023b7c7d7c9fb5c39ece'
         '85a469292c954e5c34d0e0a8b8be874356b5a60d9010ec9a42de1c6135c56e9096674389a8145d73772a8fe3438c4a9c14f1a3c667e91d8166da5f4d2f1fe73a'
         '52fe01328f544e023666eab1fd378ae0a0eb47385d495403a55a933f71beedcf295300767c1e43feb46366915fae8bea3b9137f11d16ed194a1fcf71d95aec0d'
@@ -1226,6 +1233,9 @@ b2sums=('eb66338d1cba00ad3025461dbaa209b349fffcc4e74bb8d9b3355e8f8ae7ddd7af8a303
         '6bbf8da44bd7c427039ee0334d8197e0d58b50a56dd661fd139551a6d51920e37ed53d2876f302a2ec4d433f9aefb69b639343e02665042ee636b808b7d913fc'
         'c20acecad228d85095d23f1f7835090652ca1a9ecf9f3f1ca4a092af8e6afd1c3e8154298cdccc62a6a2ee29c99c4832ee8eb94566d5f87350030320ac225f5a'
         'c244aa5b407700474cc0d386ad3321cc4aa67b8900e813491a3067e5ee62acf73dbcd97fff4d55849d3712645c8801d059329c5686c1c4145928a23bc521618a'
+        'a4cba5f41114131ab836b286b119bdb34fa4ee19407d89b17fa4bc49ea083c0d81e8a014dacb3e33dae9c565bace82af242c0fa13419d12c3ac358b35fb56551'
+        '18a0c8261553aa37694aa904959144d4f16a57e0287957a76e21997f6bfeb1cff301fb1d9cdb2513a7ca16affd15d88003433dfef6d2564b2a81862d29a58f5e'
+        '30bdb04c9092613d28bb9bf2315b81389ecf6da661db24c84340d2db3adeec657b22dcc790b3828db578c4df5777f2722ae1e9217ec06dfcb26032c7a92717cd'
         'c20b3b791715d02756742bfa34f4921bcaebeee62edf079fe15c89afdc11451a2656122f4f21335cd116676ff69c3b7eee80c6adfdcbfe838c0f1e9012ce0428'
         'df68cfd344b37cae25fa446c82c5897510de23c55761570969dc5a6f2a5bf4c11b31e50c1670a18bef1065af6597e72e0ed839e8fdbc0328cf2dcf34484e5758'
         '8bff27696075ec53ca042b0c9e0deae345712e652b3b66bab1da82c4deefdf35533d04c00d59de70cbf968380236131bc819e0eeaa8aa40edfd84df3bd0972ef'
@@ -1300,6 +1310,8 @@ b2sums=('eb66338d1cba00ad3025461dbaa209b349fffcc4e74bb8d9b3355e8f8ae7ddd7af8a303
         'b7c3fbefcfbd803fbd820d328b8983e9877c487cf7d1e2e9ca446f6ce85c50b00b5dc8e4e4e04425ac6b7fda62f97a2e81202d0b5f6b5fd5a34be66a25aa32c0'
         '9941983df5ddd7f1b0f4be6d080e3df63c089841d3601426d7d433539a13ab58fe6ccbcf9da43ee14d65dab73341c307552835e022d69bbdde71f938fb4e6bfc'
         '775ee6714cc0961fd12aba8dbe218548ead09cb8d45fd457a6fa5348453bb4b39737ee322ee8802e7b52fa4f5b91aef52cf4b14c154400e71e295ae0984333cc'
+        'a0175809dcecbeeab4166c9897b99afd1094138602aa83b503aeb862c6505f8141cabcbc8821270c5da94126a5de6fe70221cdc77a7a2328e464b769f8f713fc'
+        '555f73dcbc343f566f3e16dd33db4af01e81f189e41a8afa3acc1bc6d34065012916e52819c11f46fbe82b4fedd14d4211218bc8e0caec02427629c14fda677e'
         'f8948396584fc2c3e82bf857c6f3ad7fd77e887b5d30fdbf288ed01f939b101e28e0f7b67d7e52c28d8479918da3cad72d6650daa6200739139426d5d491ef75')
 
 if [ "$_use_kernel_org_llvm" = "yes" ]; then
