@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
 - **Base:** Linux `v7.3`
-- **Series:** 338 patches
+- **Series:** 343 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -22,8 +22,8 @@ are supplied by the generator instead, so every row below has a source.
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 30 |
-| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 27 |
-| `1100–1199` | AMD display (DCN4, colorops) | 32 |
+| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 31 |
+| `1100–1199` | AMD display (DCN4, colorops) | 33 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 32 |
 | `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 51 |
 | `2100–2199` | Memory management and swap (zstd, LRU-MARIE, gup, zswap) | 50 |
@@ -38,7 +38,7 @@ are supplied by the generator instead, so every row below has a source.
 | `9000–9099` | agd5f staging + userq lifecycle backports | 38 |
 | `9100–9199` | Retry-fault handling v4 (agd5f staging) | 11 |
 
-**Total: 327** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 343** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-19). The counts are now generated from the patch tree
@@ -12354,3 +12354,69 @@ from context drift but are carried under different subjects: `a56c2536c399`
 
 **338 patches** (331 + 7). `audit_series.py`: **338/338** on `v7.3`; the
 preview is **159/159** on `next-20261105` (153 + 6, `9093` preview-only).
+
+## Sweep 2026-11-10 — `next-20261109`; five carries, `2044` v7
+
+Sources refreshed on 2026-11-10: torvalds `origin/master` `067c5c24cef2`
+(2026-11-10; `ls-remote` matched), linux-next `next-20261109` `630059a5a632`
+(no `next-20261110` tag was published by 18:30 UTC), drm-next `e7a265b7533b`
+(2026-11-10), agd5f/amd-staging `47df73aa49d1` (2026-11-09), drm-misc
+`41b5458595c6`, linux-pm `7475ea8b5861` (Linux 7.4-rc2), akpm-mm
+`mm-everything` `30899c485b1b`, tip `067b20446fa9`. The sixteen lore git
+mirrors were refreshed through 2026-11-10; the amd-gfx and dri-devel
+freedesktop archives were re-read. The drm/amd tracker returned 43 open issues
+updated since 2026-11-07 (one page), with comments through GraphQL. Phoronix
+was read through its RSS index on 2026-11-10.
+
+### Adopted — both packages
+
+| Patch | Change | Why |
+|---|---|---|
+| `1186` | `drm/amd/display: Add support for more PSP footer sizes` (Ovidiu Bunea; `Reviewed-by: Mario Limonciello (AMD)`, `Tested-by`) | The PSP footer can be 1932 bytes; the DMUB boot parser only accepted the smaller sizes, so the DMUB FW metadata was located at the wrong offset. DCN 4.0.1 runs DMUB. Commit `1ffbf3540888`; applies to both bases and both series. |
+| `1333` | `drm/amdgpu: fix the error handling of amdgpu_vm_init_entities()` (Jesse Zhang; `Reviewed-by: Christian König`) | On navi48 a `failslab` allocation failure opening the render node destroys the immediate entity before it is created, and leaks it when the delayed entity fails; the observed crash is a KASAN null-ptr-deref in `drm_sched_rq_remove_entity()`. `Fixes: 55bf196f60df`, in `v7.3`. Commit `0465cbbd6647`; both packages. |
+| `1334` | `drm/amdkfd: fix double lock acquisition in set_perfcount` (Benjamin Welton; `Acked-by: Kent Russell`) | `set_perfcount()` takes the DQM lock and then calls `pqm_update_mqd()`, which re-takes it and hangs. The fix was in the original mailing-list commit but not the gerrit merge. `Fixes: a789761de305`. Commit `d327838bf804`; both packages. |
+| `1335` | `drm/amdkfd: preempt the HWS runlist once in set_perfcount` (Perry Yuan; `Reviewed-by: Yifan Zhang`) | The non-MES HWS path unmaps and remaps every dynamic queue on each `update_queue_locked()`, so one perfcount toggle preempts the runlist once per user queue. Batch the unmap, MQD update and remap; depends on `1334`. Commit `518a2617dec9`; both packages. |
+
+### Adopted — rc only
+
+| Patch | Change | Why |
+|---|---|---|
+| `1332` | `drm/amdgpu: fix TLB invalidation fence handling v4` (Christian König; `Reviewed-by: Felix Kuehling`) | The TLB invalidation was tracked through `vm->last_update`, which a PDE update can overwrite during a combined unmap/map, so userspace could return before the invalidation finished — `sq_int` and page faults. v4 fixes the ref leak, error handling, an inverted test and a `||`/`&&` mix found in review. `v7.3` still has the pre-fix helpers. **Rc only**: the preview's salkim userq/VM batch rework rewrites the same fence path (`9214`, `9219`, `9239`) and the patch does not apply there. Commit `27911d89ae30`. |
+
+### Updated — both packages
+
+| Patch | Change | Why |
+|---|---|---|
+| `2044` | **v6 → v7** — `lib/group_cpus: Snapshot cluster masks to keep grouping hotplug invariant` (Vishal Badole) | v7 returns the cluster count from `__try_group_cluster_cpus()` and propagates `-ENOMEM` instead of silently switching grouping algorithms, so a failed snapshot cannot break the stable partition that fixes the s2idle/NVMe affinity drift. Same pristine base; Message-ID `<20261110174513.461743-1-Vishal.Badole@amd.com>`; applies to both series. |
+
+### Rejected and watch items
+
+- **CWSR infrastructure reverts** (ASDN `e0b6ffa41d03`, `06ce8eac0146`, `e07a7108114d`, `47df73aa49d1`, 2026-11-09) — Alex Deucher reverts the four-commit CWSR user-queue series. None of it is in either base: `amdgpu_cwsr_alloc()` is absent from `v7.3`, `next-20261109` and both carried series. No carried patch depends on it; the CWSR fixes remain rejected for the same reason.
+- **SPM re-enable/reemit pair** (`a71a8004ce6d`, `813ac3c86b52`) — Alex Deucher; `Acked-by`/`Tested-by` Vitaly Prosyak. They fix `2fb5a4572c76` ("remove the now-redundant runtime SPM VMID update"), which is absent from both bases; `next-20261109` still has the runtime `update_spm_vmid()` call in `amdgpu_ib.c`. The bug does not exist yet; defer until a snapshot merges the removal. `1326` is dropped from the preview for the same reason.
+- **JPEG/VCN idle-work v3** (`b31014971d84`, Prike Liang) — the preview base already has the newer `amdgpu_jpeg_early_fini()`/`amdgpu_{jpeg,vcn}_cancel_idle_work()` form, so `1304`/`1318` are absorbed there and the v3 does not fit `v7.3`; the rc keeps `1304`.
+- **MES queue-reset trio** (`ee2f7d789d0b`, `0a124cd60e67`, `37a5808e052e`, Amber Lin) — `xcp` is always 0 on a single-XCC Navi 48; the rest is debug output and cleanup. Inert.
+- **Perfmon clock force** (`6efa5247542a`, Apurv Mishra) — new refcounted clock API and a profiler ioctl version bump for the KFD PMC path only. Defer.
+- **`drm/amd/display: Only allow idle optimizations when all CRTCs are idle`** (v1, 2026-11-09) — targets work items #6115/#4906 (a static second CRTC enables idle optimizations globally, then every cursor update does a synchronous DMUB idle exit). The author reports Sashiko found three real problems, including a use-after-free reading another CRTC's `state` under only `dc_lock`, and confirmed them. Watch for v2.
+- **MES process/gang context slot series (6 patches, 2026-11-10)** — first posting, no review; touches `mes_v12_0` context loading, the area the CWSR revert just churned. Defer one sweep.
+- **`drm/amdgpu: fix page fault by not skipping VM flush before tlb_seq update`** (2026-11-10) — single patch under active review (König replied the same day); overlaps `1332`'s fence path. Defer for the next revision.
+- **`x86/bugs: Select the BHI mitigation based on the attack vector properly`** (`3457b3bcd344`) — restores the Intel `BHI_DIS_S`/BHB clearing path when KVM is disabled. `spec_ctrl_bhi_dis()` is gated on `X86_FEATURE_BHI_CTRL`, which this Zen 4 CPU does not enumerate. Inert.
+- **`x86/bugs: Mitigate TSA on AMD Zen5`** (`cf27412f19c9`) — sets the TSA flags off for every non-Zen5 family. Zen 4 is unaffected by the new variant. Inert.
+- **`iommu/amd: Force device table to maximum size`** (`6e2213dae78b`, 2026-11-10) — enlarges the device table; no behaviour change on a single-GPU desktop whose AMD-Vi table is already sized at probe. Not adopted.
+- **`gpu/buddy` v4** — `amdgpu_dm_update_memclk_states()` still returns early unless DCN 3.2/3.21; DCN 4.0.1 never runs it. Inert.
+- **HDMI FRL training fixes (3 patches, 2026-11-10)** and the HDMI 2.2 FRL pair — the rc keeps FRL off (`dcfeaturemask=2`); the preview takes the base's FRL support. Inert here.
+- **`blk-mq: fix out-of-bounds read in blk_mq_free_rqs`** (`894e4e608492`) — requires a root elevator change to fail mid-way under memory pressure; the local NVMe is a single device. Not adopted.
+- **`drm/sched: Fix out of bounds entity priority check`** (`cda6f72545f2`) — the commit says no driver hits the clamped-priority path. Not adopted.
+- **`nvme: wait for SRCU readers before splicing the namespace list`** (+ `srcu` helper) — rescan path on a single local namespace; not adopted.
+- **Wrong-chip and wrong-path rejects re-checked:** DCN 3.2/6.x resource work, SMU 15.0.0 clock messages, GC 11.0.2 power gating, VCE/UVD legacy tests, XCP/partitioning, SR-IOV VF paths, MI300/A+A and laptop panels. None targets GC 12.0 / DCN 4.0.1 / SMU 14.0.0.
+
+### Reverts, versions and tracker
+
+- **No upstream revert targets carried work.** ASDN's four CWSR reverts remove a series neither base ever had. The DCN32/1 DMUB and `lib/sort.c` reverts remain off-target. The AMD-Vi identity revert (`2507`) is still needed in the preview and was re-ported to `next-20261109` (the base now carries `2cf4be57b301`'s `pci_upstream_bridge()` NULL check).
+- **Version sweep:** 73 postings at v2 or higher matched carried subjects. `2044` v7 is the only real update; `2809` v2 and `2811` v2 (2026-11-10) are content-identical and a comment-wording change respectively; `1183` v2 differs only in KUnit `EXPECT_EQ` counts; `2806`/`2807`/`3001` v2 are resends already absorbed by the base; the kbuild v5 rework is still unmerged and does not apply. ACPI CPPC v7, GUP v7, zswap v3, r8169 LTR v4 and the CAKE v4/v5 postings predate or are already covered by the carried revisions.
+- **Tracker:** 43 open issues updated since 2026-11-07. #6115/#4906 (DCN401 cursor stutter from a static second CRTC's idle optimizations) has a v1 patch with confirmed Sashiko findings — watch for v2. #5511/#6103/#6116 have no new fix; #6088's fan-control regression bisects to `psp_14_0_2_ta.bin` from linux-firmware 20260916, a 14.0.2 TA this GPU (PSP 14.0.0) does not load. #6081 (Navi 23 broken in 7.4-rc1) is the AMD-Vi regression `2507` addresses. Firmware watch unchanged: `psp_14_0_*_ta` and SMU 104.80 on gfx1201.
+- **Phoronix 2026-11-08..10:** Linux 7.4-rc2 (FAT32, AMDGPU HDMI 2.2), PerfOpt for integrated GPUs (APU-only; inert), the BHI mitigation-selection fix (Intel path; inert), and GFX13/RDNA5 bring-up (future hardware). No on-target RDNA4 article and no revert news.
+- **Other sources:** sirlucjan `origin/master` unchanged at `7275a4ad` (only the Apple T2 line); CachyOS `kernel-patches` `706b5652` unchanged; `lru_cast` `origin/main` still `ce117bb` (v0.2.10); firelzrd NAP still `v0.6.6` (`5092cfd`); salkim's `salkim-7.4` advanced to `e179ea7f` but the new commits are display/KUnit/debugfs fixes already in ASDN or off-target. No CAST or NAP update.
+
+### Series state
+
+**343 patches** (338 + 5). `audit_series.py`: **343/343** on `v7.3`; the preview is **172/172** on `next-20261109`.

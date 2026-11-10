@@ -18,6 +18,47 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.11.09-1-sleepy-next (linux-next `next-20261109`)]: 2026-11-10
+
+The preview moves to the newest snapshot that exists; no `next-20261110` tag
+was published.
+
+### Added
+
+- **`1186`** — display PSP footer sizes up to 1932 bytes.
+- **`1333`** — `amdgpu_vm_init_entities()` error-path fixes.
+- **`1334`**, **`1335`** — KFD `set_perfcount()` double-lock fix and single
+  runlist preempt.
+- **`2044` v7** — fail the cluster snapshot instead of switching grouping
+  algorithms.
+
+### Changed
+
+- Base `next-20261105` → `next-20261109`; release `2026.11.09-1`.
+- **`2102`** lru_cast v0.2.10 ported to the 7.4-rc2 mm internals.
+- **`2507`** AMD-Vi revert rebuilt over the new `pci_upstream_bridge()` NULL
+  check.
+
+### Removed
+
+- 31 patches the new base absorbed or superseded, including the DCN401 RDPCS
+  removal, the GPU recovery ordering fixes and the swap/zswap fixes. `1326`
+  is deferred until the 7.4 SPM series lands. The seven orphan patch files
+  from earlier bumps were removed too.
+
+## [7.3.0-23-sleepy-rc]: 2026-11-10
+
+### Added
+
+- **`1186`** display PSP footer sizes, **`1333`** VM entity error handling,
+  **`1334`**/**`1335`** KFD `set_perfcount`, and **`1332`** TLB invalidation
+  fence handling v4 (rc only; the preview's userq VM batch owns that path).
+- **`2044` v7**.
+
+### Changed
+
+- Series 338 → 343 patches.
+
 ## [2026.11.05-6-sleepy-next (linux-next `next-20261105`)]: 2026-11-08
 
 The salkim userq carry is now complete: the preview matches the branch's

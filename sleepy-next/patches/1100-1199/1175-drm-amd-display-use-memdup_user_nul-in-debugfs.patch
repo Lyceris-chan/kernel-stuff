@@ -417,6 +417,33 @@ index 6622a686e5e0..b77f25cc849a 100644
  		kfree(wr_buf);
  		return -EINVAL;
  	}
+@@ -3011,21 +3011,19 @@ static ssize_t hdmi_automation_enable(struct file *f, const char __user *buf,
+-	char *wr_buf = NULL;
++	char *wr_buf;
+ 	const uint32_t wr_buf_size = 40;
+ 	int max_param_num = 1;
+ 	uint8_t param_nums = 0;
+ 	long param[2];
+ 	bool hdmi_comp_auto;
+ 
+ 	if (size == 0)
+ 		return -EINVAL;
+ 
+-	wr_buf = kcalloc(wr_buf_size, sizeof(char), GFP_KERNEL);
+-	if (!wr_buf)
+-		return -ENOSPC;
++	wr_buf = memdup_user_nul(buf, wr_buf_size);
++	if (IS_ERR(wr_buf))
++		return PTR_ERR(wr_buf);
+ 
+ 	if (parse_write_buffer_into_params(wr_buf, wr_buf_size,
+-					   (long *)param, buf,
+-					   max_param_num,
+-					   &param_nums)) {
++					   param, max_param_num, &param_nums)) {
+ 		kfree(wr_buf);
+ 		return -EINVAL;
+ 	}
 @@ -3758,7 +3709,6 @@ static ssize_t edp_ilr_write(struct file *f, const char __user *buf,
  	struct amdgpu_device *adev = drm_to_adev(connector->base.dev);
  	struct dc *dc = (struct dc *)link->dc;

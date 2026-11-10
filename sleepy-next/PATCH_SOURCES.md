@@ -15,11 +15,11 @@ moved, so the full ledger is not duplicated here.
 
 | | |
 |---|---|
-| Snapshot | `next-20261105`, tag `ddfe51b0a0f5` (tag object `cae1456a7b59`) |
-| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261105.tar.gz` |
-| Snapshot tree `Makefile` | `7.4.0-rc1` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.11.05-6-sleepy-next` |
-| Package | `linux-sleepy-next-2026.11.05-6` |
+| Snapshot | `next-20261109`, tag `630059a5a632` (tag object `0941356091e3`) |
+| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261109.tar.gz` |
+| Snapshot tree `Makefile` | `7.4.0-rc2` — the base release, **deliberately not used in the release name** |
+| Kernel release | `2026.11.09-1-sleepy-next` |
+| Package | `linux-sleepy-next-2026.11.09-1` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -1661,3 +1661,98 @@ preview-only.
 
 **199 patches** (159 + 40). `audit_series.py`: **199/199** on
 `next-20261105`. The rc series remains **338/338** on `v7.3`.
+
+## 2026-11-10 — bump to `next-20261109`; 31 absorbed drops, two ports, four carries
+
+No `next-20261110` tag existed by 18:30 UTC; `next-20261109` (tag object
+`0941356091e3`, commit `630059a5a632`) is the newest snapshot. The base moves
+from 7.4.0-rc1 to 7.4.0-rc2 plus the 2026-11-09 `-next` merges, and the package
+becomes `2026.11.09-1`.
+
+### Dropped — absorbed or superseded by the new base (31)
+
+The base now contains all of these; reverse-applying them to the clean base
+succeeds or the identifiers they introduce are already present. Their files
+were deleted and the pre-existing seven orphans (`1008`, `1012`–`1014`,
+`1017`, `9040`, `9060`) were removed with them.
+
+- **Display:** `1177` (FreeSync PQ for DP HDR), `1178` (DCN401 clock DTO NULL
+  deref), `1179` (`allow_freesync`), `1180` (nominal VTOTAL while VRR is
+  inactive), `1184` (DCN401 RDPCS PHY reads), `1185` (DCN401 DET reset).
+- **GPU and KFD:** `1064` (gang fence), `1098` (CS user-fence BO in GTT),
+  `1310` (sign-extended GEM_OP addresses), `1312` (`amdgpu_vm_ready()` in
+  dma-buf move notify), `1313` (WPTR BO process info), `1314` (rewrite PTEs
+  after VM reset), `1315` (CS chunk walk), `1318` (JPEG/VCN idle work; the
+  base has the newer `early_fini`/`cancel_idle_work` form), `1321` (MES ring
+  wait timeouts), `1322` (KFD dma-buf ref), `1323` (KFD BO attach unlock),
+  `1328` (GPU recovery callbacks), `1329` (stop schedulers before reset),
+  `1330` (drm/sched run-queue priority).
+- **Scheduler and mm:** `2421` (sched_ext `exit_kind`), `2700` (zswap
+  readahead bypass), `2806` (stale zswap entry), `2807` (large swap-in across
+  extents), `2808` (`unuse_pte()` large folio).
+- **USB and userq:** `3001` (xHCI OS ownership), `9035` (BO VA mapping offset;
+  the base has the `m->offset` term), `9091` (userq reset semaphore), `9093`
+  (userq restore BO validation).
+- **`1304`** (cancel idle work in hw_init failure paths) and **`1326`** (SPM
+  VMID once the RLC runs) are also dropped. `1304` is absorbed by the base's
+  newer idle-work rework. `1326` is *not* absorbed: `next-20261109` still has
+  the runtime `update_spm_vmid()` call in `amdgpu_ib.c`, so `2fb5a4572c76` has
+  not landed and the bug does not exist there; re-add it when the 7.4 SPM
+  series merges.
+
+### Ported (2)
+
+- **`2102` lru_cast v0.2.10.** Four hunks needed rebasing to the new mm
+  internals: the `defer_sync_submit` field moved inside `struct swap_io_ctx`
+  after the new pressure-window fields; the `lru_cast_wait_swapin()` call in
+  `do_swap_page()` now sits after the zswap readahead bypass; `struct
+  scan_control` (and its new `clean_below_min` bit) moved from `mm/vmscan.c` to
+  `mm/vmscan.h`; and the zero-folio `lru_cast_evict_cpu()` call moved past the
+  new `swp_entry_t entry` / `zswap_invalidate()` block in `swap_writeout()`.
+  The `trace_mm_vmscan_lru_isolate()` call in the CAST isolate path was also
+  adapted: the 7.4 tracepoint now takes `(sc, nr_requested, nr_scanned,
+  nr_skipped, nr_taken, lru)` instead of `(highest_zoneidx, order, …)`, so the
+  call passes `sc` and `nr_to_scan` where the old form passed `sc->reclaim_idx`
+  and `sc->order`. The regenerated patch keeps the author, date, subject and
+  Message-ID; it applies to both `git apply --check` and GNU `patch -F2`.
+- **`2507` AMD-Vi identity revert.** Rebuilt over `2cf4be57b301`'s
+  `pci_upstream_bridge()` NULL check: the base's `quirks_force_identity_mapping()`
+  now carries `struct pci_dev *bridge` and checks it before `->vendor`. The
+  revert semantics are unchanged (discrete GPUs behind an ATI bridge lose
+  identity mode and fail PSP firmware loading otherwise). Its header diffstat
+  was corrected to 11 insertions / 39 deletions.
+
+### Adapted (1)
+
+- **`1175` `drm/amd/display: Use memdup_user_nul in debugfs code`.** The new
+  7.4 base adds `hdmi_automation_enable()`, which still calls
+  `parse_write_buffer_into_params()` with the old six-argument form. The first
+  build failed there: `too many arguments to function call, expected 5, have
+  6`. One hunk was added, converting the new function to `memdup_user_nul()`
+  and the five-argument helper. The rc base does not have the function and
+  keeps the original patch.
+
+### New carries (4)
+
+`1186` (PSP footer sizes), `1333` (`amdgpu_vm_init_entities()` error handling),
+`1334`/`1335` (set_perfcount double-lock fix and single runlist preempt) — the
+same numbers, provenance and reasons as the rc ledger. `1332` (TLB fence v4)
+is **rc-only**: the salkim userq/VM batch rework already owns that path here.
+
+### Updated (1)
+
+`2044` v6 → v7, the same replacement as the rc: v7 propagates `-ENOMEM` from
+the cluster snapshot instead of falling back to a different grouping algorithm.
+
+### Rejected in the preview
+
+The SPM re-enable/reemit pair, the CWSR reverts, the MES context-slot series,
+the idle-optimization v1, the MES queue-reset trio and the perfmon clock API
+are deferred for the reasons in the rc ledger. No preview-only candidate
+survived triage; the display idle-optimization v1 has confirmed Sashiko
+findings and waits for v2.
+
+### Series state
+
+**172 patches** (199 - 31 + 4). `audit_series.py`: **172/172** on
+`next-20261109`. The rc series is **343/343** on `v7.3`.

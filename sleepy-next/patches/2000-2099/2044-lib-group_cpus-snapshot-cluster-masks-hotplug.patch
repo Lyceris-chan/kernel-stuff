@@ -1,8 +1,8 @@
-From nobody Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Vishal Badole <Vishal.Badole@amd.com>
-Date: Mon, 2 Nov 2026 12:39:30 +0530
-Subject: [PATCH v6] lib/group_cpus: Snapshot cluster masks to keep grouping hotplug invariant
-Message-ID: <20261102070930.1803698-1-Vishal.Badole@amd.com>
+Date: Tue, 10 Nov 2026 23:15:13 +0530
+Subject: [PATCH v7] lib/group_cpus: Snapshot cluster masks to keep grouping hotplug invariant
+Message-ID: <20261110174513.461743-1-Vishal.Badole@amd.com>
 
 group_cpus_evenly() builds the managed-IRQ affinity spread used by
 multi-queue devices such as NVMe. That spread is meant to be a property
@@ -51,6 +51,11 @@ Fixes: 89802ca36c96 ("lib/group_cpus: make group CPU cluster aware")
 Cc: stable@vger.kernel.org
 Signed-off-by: Vishal Badole <Vishal.Badole@amd.com>
 ---
+Changes in v7:
+- Return ncluster directly from __try_group_cluster_cpus().
+- Remove the duplicate done update in __group_cpus_evenly().
+- Link to v6: https://lore.kernel.org/all/20261102070930.1803698-1-Vishal.Badole@amd.com/
+
 Changes in v6:
 - Clarify CPUs 3-11 stay offline from before suspend through IRQ remapping.
 - Describe the lock as excluding CPU hotplug, not pinning topology masks.
@@ -75,11 +80,11 @@ Changes in v2:
 - Reword the changelog and the code comments. No other change.
 - Link to v1: https://lore.kernel.org/all/20260807073612.3711269-1-Vishal.Badole@amd.com/
 
- lib/group_cpus.c | 120 +++++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 106 insertions(+), 14 deletions(-)
+ lib/group_cpus.c | 125 ++++++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 106 insertions(+), 19 deletions(-)
 
 diff --git a/lib/group_cpus.c b/lib/group_cpus.c
-index e6e18d7a49bba..66628bae79909 100644
+index e6e18d7a49bba..7d878c94898d0 100644
 --- a/lib/group_cpus.c
 +++ b/lib/group_cpus.c
 @@ -6,11 +6,14 @@
@@ -241,20 +246,20 @@ index e6e18d7a49bba..66628bae79909 100644
   * Try group CPUs evenly for cluster locality within a NUMA node.
   *
 - * Return: true if success, false otherwise.
-+ * Return: 1 if successful, 0 if inapplicable, or -ENOMEM on allocation failure.
++ * Return: cluster count on success, 0 if inapplicable, or -ENOMEM on failure.
   */
 -static bool __try_group_cluster_cpus(unsigned int ncpus,
 +static int __try_group_cluster_cpus(unsigned int ncpus,
  				     unsigned int ngroups,
  				     struct cpumask *node_cpumask,
  				     struct cpumask *masks,
-@@ -365,18 +450,18 @@ static bool __try_group_cluster_cpus(unsigned int ncpus,
+@@ -365,18 +450,17 @@ static bool __try_group_cluster_cpus(unsigned int ncpus,
  {
  	struct node_groups *cluster_groups;
  	const struct cpumask **clusters;
 -	unsigned int ncluster;
 -	bool ret = false;
-+	int ncluster, ret;
++	int ncluster;
  	cpumask_var_t nmsk;
  	unsigned int i, nc;
  
@@ -266,26 +271,26 @@ index e6e18d7a49bba..66628bae79909 100644
  					&clusters, &cluster_groups);
  
 -	if (ncluster == 0)
-+	ret = ncluster;
 +	if (ncluster <= 0)
  		goto fail_no_clusters;
  
  	for (i = 0; i < ncluster; i++) {
-@@ -392,12 +477,11 @@ static bool __try_group_cluster_cpus(unsigned int ncpus,
+@@ -392,13 +476,11 @@ static bool __try_group_cluster_cpus(unsigned int ncpus,
  		assign_cpus_to_groups(nc, nmsk, nv, masks, curgrp, last_grp);
  	}
  
 -	ret = true;
-+	ret = 1;
  	kfree(cluster_groups);
  	kfree(clusters);
   fail_no_clusters:
  	free_cpumask_var(nmsk);
 - fail_nmsk_alloc:
- 	return ret;
+-	return ret;
++	return ncluster;
  }
  
-@@ -442,6 +526,7 @@ static int __group_cpus_evenly(unsigned int startgrp, unsigned int numgrps,
+ static int __group_cpus_evenly(unsigned int startgrp, unsigned int numgrps,
+@@ -442,6 +524,7 @@ static int __group_cpus_evenly(unsigned int startgrp, unsigned int numgrps,
  	for (i = 0; i < nr_node_ids; i++) {
  		unsigned int ncpus;
  		struct node_groups *nv = &node_groups[i];
@@ -293,23 +298,30 @@ index e6e18d7a49bba..66628bae79909 100644
  
  		if (nv->ngroups == UINT_MAX)
  			continue;
-@@ -454,8 +539,13 @@ static int __group_cpus_evenly(unsigned int startgrp, unsigned int numgrps,
+@@ -454,14 +537,16 @@ static int __group_cpus_evenly(unsigned int startgrp, unsigned int numgrps,
  
  		WARN_ON_ONCE(nv->ngroups > ncpus);
  
 -		if (__try_group_cluster_cpus(ncpus, nv->ngroups, nmsk,
 -					     masks, &curgrp, last_grp)) {
+-			done += nv->ngroups;
+-			continue;
 +		ret = __try_group_cluster_cpus(ncpus, nv->ngroups, nmsk,
 +					       masks, &curgrp, last_grp);
 +		if (ret < 0) {
 +			kfree(node_groups);
 +			return ret;
-+		}
-+		if (ret) {
- 			done += nv->ngroups;
- 			continue;
  		}
-@@ -496,6 +586,8 @@ struct cpumask *group_cpus_evenly(unsigned int numgrps, unsigned int *nummasks)
+ 
+-		assign_cpus_to_groups(ncpus, nmsk, nv, masks, &curgrp,
+-				      last_grp);
++		if (!ret)
++			assign_cpus_to_groups(ncpus, nmsk, nv, masks, &curgrp,
++					      last_grp);
+ 		done += nv->ngroups;
+ 	}
+ 	kfree(node_groups);
+@@ -496,6 +581,8 @@ struct cpumask *group_cpus_evenly(unsigned int numgrps, unsigned int *nummasks)
  	if (numgrps == 0)
  		return NULL;
  
