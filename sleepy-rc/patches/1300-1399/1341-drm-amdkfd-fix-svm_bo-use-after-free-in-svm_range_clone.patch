@@ -1,0 +1,68 @@
+From 0f862d8774161af543fdf6bbc279ba9182c3f8de Mon Sep 17 00:00:00 2001
+From: Philip Yang <Philip.Yang@amd.com>
+Date: Mon, 5 Oct 2026 14:44:36 -0400
+Subject: [PATCH] drm/amdkfd: Fix svm_bo use after free in svm_range_clone
+
+prange->svm_bo stays set after the range drops its reference in
+svm_range_vram_node_free(), it is only cleared later by
+svm_range_bo_release(). Taking a new reference based on old->svm_bo can
+therefore hit a svm_bo with refcount 0 and svm_range_bo_release_async()
+pending, leaving the clone with a freed svm_bo.
+
+Use svm_bo_ref_unless_zero() under old->lock to only share the svm_bo if
+it is still alive, same as svm_range_validate_svm_bo() does.
+
+A range only holds a svm_bo reference while ttm_res is set, so drop the
+reference again if old had already dropped its own. The clone keeps the
+svm_bo pointer and stays on svm_bo->range_list, so svm_range_bo_release()
+clears the pointer when the svm_bo goes away. The unref must be done
+outside old->lock because svm_range_bo_release() takes the lock of every
+range on the list, including old.
+
+v3: drop the reference if ttm_res is not set, don't leak it.
+v2: use svm_bo_ref_unless_zero instead of checking old->ttm_res, to keep
+    sharing the svm_bo when the range dropped its own reference (Felix).
+
+Signed-off-by: Philip Yang <Philip.Yang@amd.com>
+Signed-off-by: Mukul Joshi <mukul.joshi@amd.com>
+Reviewed-by: Felix Kuehling <felix.kuehling@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdkfd/kfd_svm.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c b/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
+index cfb428c72686..1f5d73f0ebce 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
+@@ -2158,14 +2158,25 @@ static struct svm_range *svm_range_clone(struct svm_range *old)
+ 		svm_range_free(new, false);
+ 		return NULL;
+ 	}
+-	if (old->svm_bo) {
++
++	/* old->lock keeps old->svm_bo alive while taking the reference */
++	mutex_lock(&old->lock);
++	if (svm_bo_ref_unless_zero(old->svm_bo)) {
+ 		new->ttm_res = old->ttm_res;
+ 		new->offset = old->offset;
+-		new->svm_bo = svm_range_bo_ref(old->svm_bo);
++		new->svm_bo = old->svm_bo;
+ 		spin_lock(&new->svm_bo->list_lock);
+ 		list_add(&new->svm_bo_list, &new->svm_bo->range_list);
+ 		spin_unlock(&new->svm_bo->list_lock);
+ 	}
++	mutex_unlock(&old->lock);
++
++	/* prange only holds an svm_bo reference while ttm_res is set, unref
++	 * outside old->lock, svm_range_bo_release takes it and would deadlock.
++	 */
++	if (new->svm_bo && !new->ttm_res)
++		svm_range_bo_unref(new->svm_bo);
++
+ 	new->flags = old->flags;
+ 	new->preferred_loc = old->preferred_loc;
+ 	new->prefetch_loc = old->prefetch_loc;
+-- 
+2.56.1
+

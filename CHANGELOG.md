@@ -18,6 +18,48 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.11.10-1-sleepy-next (linux-next `next-20261110`)]: 2026-11-11
+
+The 2026-11-11 sweep moved the preview to `next-20261110`, which was tagged at
+01:36 UTC that day. No `next-20261111` tag exists.
+
+### Added
+
+- Nothing preview-only: the thirteen rc carries below are already in this
+  snapshot's `amd-drm-next-7.5-2026-10-28` pull.
+
+### Changed
+
+- Base `next-20261109` → `next-20261110`; release `2026.11.10-1`.
+- **`0101`** bbr3 regenerated against the 7.4 series state from CachyOS
+  `origin/7.4/bbr3`.
+- **`1175`** hunk 17 dropped (the base replaced that debugfs writer with
+  `debugfs_create_bool()`); **`9207`** hunk 4 context rebased.
+- **`2052`–`2055`** CAKE v8 → v9: snapshot-based backlog re-derivation in
+  `2054`, explicit `flow_mode` and `qdisc_drop_reason()` in `2055`.
+
+### Removed
+
+- Six patches the new base absorbed: `1236`, `1307`, `1309`, `1324`, `1325`,
+  `2810`. The rc keeps all six.
+
+## [7.3.0-24-sleepy-rc]: 2026-11-11
+
+### Added
+
+- Thirteen fixes from the `amd-drm-next-7.5-2026-10-28` pull, all rc-only
+  because the preview base already has them: display and PSP debugfs NULL
+  dereferences (`1187`, `1344`), unowned DDC-pin closes (`1188`), VM
+  generation-mismatch PTE clears (`1336`), CRIU queue eviction and restored
+  queue validation (`1337`, `1338`), BO free during GPU reset (`1339`),
+  doorbell allocation race (`1340`), `svm_bo` use-after-free and CWSR
+  reference (`1341`, `1342`), `GEM_METADATA` unknown-op rejection (`1343`),
+  KFD VRAM double accounting (`1345`) and the seq64 VM update move (`1346`).
+
+### Changed
+
+- Series 343 → 356 patches; pkgrel 23 → 24.
+
 ## [2026.11.09-1-sleepy-next (linux-next `next-20261109`)]: 2026-11-10
 
 The preview moves to the newest snapshot that exists; no `next-20261110` tag

@@ -1,9 +1,7 @@
-From Jamal Hadi Salim <jhs@mojatatu.com> Mon Sep 17 00:00:00 2001
+From 130c193e0 Mon Sep 17 00:00:00 2001
 From: Jamal Hadi Salim <jhs@mojatatu.com>
-Date: Tue, 20 Oct 2026 12:57:30 -0400
-Subject: [PATCH net-next v8 4/4] net/sched: cake: hash before segmenting and reject an overlong split
-Message-ID: <QDISC-BA27.v8.r0.20261020063241-4@mojatatu.com>
-
+Date: Tue, 10 Nov 2026 09:40:55 -0500
+Subject: [PATCH net-next v9 4/4] net/sched: cake: hash before segmenting and reject an overlong split
 The Fix:
 with CAKE_FLAG_SPLIT_GSO, cake computes the flow/host hash keys, then
 splits a GSO skb into segments it accounts individually. Key extraction
@@ -27,37 +25,51 @@ keeps SKB_GSO_CB at cb offset 32, aliasing tc_skb_cb.drop_reason, and
 __copy_skb_header() copies it into every segment, so tagging only the
 head left the rest with GSO scratch (a headroom-sized value) as their
 drop reason, which __tcf_kfree_skb_list() would report as an unrelated
-core reason.
+core reason. The segmentation-failure return has the same aliasing and
+uses qdisc_drop_reason(..., QDISC_DROP_GENERIC) so its drop is still
+reported as a qdisc drop.
 
 Read q->config->flow_mode once with READ_ONCE() in cake_enqueue() and
-pass that value to both cake_hash_keys() and cake_hash_resolve().
-cake_config_change() writes the mode before cake_change() takes
-sch_tree_lock(), and the split introduced two separate loads with the
-segmentation work between them; a concurrent reconfiguration could
-extract keys in one mode and resolve them in another.
+pass that value to both cake_hash_keys() and cake_hash_resolve(), and to
+the later flowchain calls (cake_get_flow_quantum(),
+cake_inc_srchost_bulk_flow_count(), cake_inc_dsthost_bulk_flow_count()).
+cake_mq_change() updates the shared cake_config outside the qdisc lock, so
+a reconfiguration could extract and resolve keys in different modes.
+
+Conditions to recreate the bug:
+  ip tuntap add tun0 mode tun
+  ip link set tun0 txqueuelen 32 up
+  ip addr add 10.99.0.1/24 dev tun0
+  # hold the tun fd open without reading so the backlog persists; a stab
+  # overhead of 1048468 accounts each 92-byte packet at 1048560 bytes, so
+  # 4095 queued packets leave 65519 bytes below QDISC_MAX_BACKLOG.  A
+  # 65000-byte UDP_SEGMENT payload with a 1400-byte segment size then has
+  # a segment sum past the remaining headroom, and cake rejects the whole
+  # split.  Setup needs CAP_NET_ADMIN; the payload itself does not.
+  tc qdisc add dev tun0 root handle 1: stab overhead 1048468 \
+      cake split-gso memlimit 512Mb
 
 Link: https://lore.kernel.org/netdev/179231933068.3135.80340792633077986@kernel.org/
+Link: https://lore.kernel.org/netdev/179269577270.3135.16072065138845192450@kernel.org/
 Reviewed-by: Victor Nogueira <victor@mojatatu.com>
+Acked-by: Toke Høiland-Jørgensen <toke@toke.dk>
 Signed-off-by: Jamal Hadi Salim <jhs@mojatatu.com>
 
 ---
 
-v7 -> v8: the original skb is consumed unconditionally right after a
-successful split -- the caller's reference; a fraglist GSO takes the
-list's own reference on the same skb in skb_segment_list() -- so the
-reject branch tags every deferred segment and drops the whole list with
-qdisc_drop_all(), the admitted path no longer consumes the skb after the
-walk, and both special-case comments are gone.  (Toke
-Høiland-Jørgensen, v7 review)
+v8 -> v9: use qdisc_drop_reason(QDISC_DROP_GENERIC) when segmentation
+fails (__skb_gso_segment() has already clobbered the drop-reason slot),
+and pass the flow_mode snapshot to the later flowchain calls.  (Sashiko
+nipa review of v7)
 ---
- net/sched/sch_cake.c | 123 +++++++++++++++++++++++++++++++------------
- 1 file changed, 90 insertions(+), 33 deletions(-)
+ net/sched/sch_cake.c | 130 +++++++++++++++++++++++++++++++------------
+ 1 file changed, 94 insertions(+), 36 deletions(-)
 
 diff --git a/net/sched/sch_cake.c b/net/sched/sch_cake.c
-index 91c33295b30b..79d6f6f76dbc 100644
+index 3fd13bf6f3ce..74e2b09971ee 100644
 --- a/net/sched/sch_cake.c
 +++ b/net/sched/sch_cake.c
-@@ -706,19 +706,28 @@ static u16 cake_get_flow_quantum(struct cake_tin_data *q,
+@@ -709,19 +709,28 @@ static u16 cake_get_flow_quantum(struct cake_tin_data *q,
  		get_random_u16()) >> 16;
  }
  
@@ -91,7 +103,7 @@ index 91c33295b30b..79d6f6f76dbc 100644
  
  	/* If both overrides are set, or we can use the SKB hash and nat mode is
  	 * disabled, we can skip packet dissection entirely. If nat mode is
-@@ -753,50 +762,64 @@ static u32 cake_hash(struct cake_tin_data *q, const struct sk_buff *skb,
+@@ -756,50 +765,64 @@ static u32 cake_hash(struct cake_tin_data *q, const struct sk_buff *skb,
  	switch (host_keys.control.addr_type) {
  	case FLOW_DISSECTOR_KEY_IPV4_ADDRS:
  		host_keys.addrs.v4addrs.src = 0;
@@ -169,7 +181,7 @@ index 91c33295b30b..79d6f6f76dbc 100644
  
  	reduced_hash = flow_hash % CAKE_QUEUES;
  
-@@ -1761,13 +1784,17 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
+@@ -1765,13 +1788,17 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
  {
  	u32 idx, tin, prev_qlen, prev_backlog, drop_id;
  	struct cake_sched_data *q = qdisc_priv(sch);
@@ -185,9 +197,9 @@ index 91c33295b30b..79d6f6f76dbc 100644
  	bool same_flow = false;
 +	u64 slen = 0;
  
- 	/* Classify first: a terminal TC action consumes the packet. */
+ 	/* Classify first: a terminal verdict means do not enqueue. */
  	if (cake_tcf_classify(sch, skb, &flow_override, &host_override, &ret)) {
-@@ -1784,12 +1811,49 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
+@@ -1788,12 +1815,50 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
  					 QDISC_DROP_OVERLIMIT);
  	}
  
@@ -207,7 +219,8 @@ index 91c33295b30b..79d6f6f76dbc 100644
 +
 +		segs = skb_gso_segment(skb, features & ~NETIF_F_GSO_MASK);
 +		if (IS_ERR_OR_NULL(segs))
-+			return qdisc_drop(skb, sch, to_free);
++			return qdisc_drop_reason(skb, sch, to_free,
++						 QDISC_DROP_GENERIC);
 +
 +		/* we never use the original skb after splitting */
 +		consume_skb(skb);
@@ -241,7 +254,7 @@ index 91c33295b30b..79d6f6f76dbc 100644
  	flow = &b->flows[idx];
  
  	/* ensure shaper state isn't stale */
-@@ -1816,14 +1880,9 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
+@@ -1820,14 +1885,9 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
  	if (unlikely(len > b->max_skblen))
  		WRITE_ONCE(b->max_skblen, len);
  
@@ -259,7 +272,7 @@ index 91c33295b30b..79d6f6f76dbc 100644
  
  		skb_list_walk_safe(segs, seg, nskb) {
  			skb_mark_not_on_list(seg);
-@@ -1837,7 +1896,6 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
+@@ -1841,7 +1901,6 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
  			qdisc_qlen_inc(sch);
  			numsegs++;
  			q->buffer_used += seg->truesize;
@@ -267,7 +280,7 @@ index 91c33295b30b..79d6f6f76dbc 100644
  			WRITE_ONCE(b->packets, b->packets + 1);
  		}
  
-@@ -1849,9 +1907,8 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
+@@ -1853,9 +1912,8 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
  		WRITE_ONCE(b->backlogs[idx], b->backlogs[idx] + slen);
  
  		qdisc_tree_reduce_backlog(sch, 1-numsegs, len-slen);
@@ -278,3 +291,24 @@ index 91c33295b30b..79d6f6f76dbc 100644
  		int ack_pkt_len = 0;
  
  		cobalt_set_enqueue_time(skb, now);
+@@ -1949,7 +2007,7 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
+ 		flow->set = CAKE_SET_SPARSE;
+ 		WRITE_ONCE(b->sparse_flow_count, b->sparse_flow_count + 1);
+ 
+-		WRITE_ONCE(flow->deficit, cake_get_flow_quantum(b, flow, q->config->flow_mode));
++		WRITE_ONCE(flow->deficit, cake_get_flow_quantum(b, flow, flow_mode));
+ 	} else if (flow->set == CAKE_SET_SPARSE_WAIT) {
+ 		/* this flow was empty, accounted as a sparse flow, but actually
+ 		 * in the bulk rotation.
+@@ -1958,8 +2016,8 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
+ 		WRITE_ONCE(b->sparse_flow_count, b->sparse_flow_count - 1);
+ 		WRITE_ONCE(b->bulk_flow_count, b->bulk_flow_count + 1);
+ 
+-		cake_inc_srchost_bulk_flow_count(b, flow, q->config->flow_mode);
+-		cake_inc_dsthost_bulk_flow_count(b, flow, q->config->flow_mode);
++		cake_inc_srchost_bulk_flow_count(b, flow, flow_mode);
++		cake_inc_dsthost_bulk_flow_count(b, flow, flow_mode);
+ 	}
+ 
+ 	if (q->buffer_used > u64_stats_read(&q->buffer_max_used)) {
+

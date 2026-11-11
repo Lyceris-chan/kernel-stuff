@@ -182,7 +182,7 @@ _rcver=
 
 pkgver=7.3.0
 _tagrel=1
-pkgrel=23
+pkgrel=24
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -347,6 +347,8 @@ source=(
   "patches/1100-1199/1183-drm-amd-display-drop-RGBA8888-from-plane-format-lists.patch"
   "patches/1100-1199/1185-drm-amd-display-reset-DET-of-HUBPs-without-a-plane.patch"
   "patches/1100-1199/1186-drm-amd-display-add-support-for-more-PSP-footer-sizes.patch"
+  "patches/1100-1199/1187-drm-amd-display-prevent-debugfs-nullptr-dereference.patch"
+  "patches/1100-1199/1188-drm-amd-display-avoid-closing-unowned-ddc-pins.patch"
   "patches/1200-1299/1201-cpufreq-amd-pstate-Update-cppc_req_cached-before-w.patch"
   "patches/1200-1299/1202-cpufreq-amd-pstate-Add-per-core-EPP-boost-for-rec.patch"
   "patches/1200-1299/1203-Documentation-amd-pstate-Document-the-epp_boost-pa.patch"
@@ -410,6 +412,17 @@ source=(
   "patches/1300-1399/1333-drm-amdgpu-fix-the-error-handling-of-amdgpu_vm_init_entities.patch"
   "patches/1300-1399/1334-drm-amdkfd-fix-double-lock-acquisition-in-set_perfcount.patch"
   "patches/1300-1399/1335-drm-amdkfd-preempt-the-HWS-runlist-once-in-set_perfcount.patch"
+  "patches/1300-1399/1336-drm-amdgpu-clear-vm-pts-upon-a-vm-generation-mismatch.patch"
+  "patches/1300-1399/1337-drm-amdkfd-evict-the-queues-only-once-for-criu-process-info.patch"
+  "patches/1300-1399/1338-drm-amdkfd-validate-the-control-stack-of-a-restored-queue.patch"
+  "patches/1300-1399/1339-drm-amdkfd-wait-for-a-gpu-reset-before-freeing-a-bo.patch"
+  "patches/1300-1399/1340-drm-amdkfd-fix-doorbell-allocation-race-creating-duplicates.patch"
+  "patches/1300-1399/1341-drm-amdkfd-fix-svm_bo-use-after-free-in-svm_range_clone.patch"
+  "patches/1300-1399/1342-drm-amdkfd-dont-drop-an-svm-cwsr-reference-never-taken.patch"
+  "patches/1300-1399/1343-drm-amdgpu-reject-unknown-gem_metadata-ops.patch"
+  "patches/1300-1399/1344-drm-amdgpu-prevent-debugfs-nullptr-dereference.patch"
+  "patches/1300-1399/1345-amdkfd-fix-memory-availability-double-accounting.patch"
+  "patches/1300-1399/1346-drm-amdgpu-move-amdgpu_vm_bo_update-call-into-correct-location.patch"
 
   "patches/2000-2099/2000-block-mq-deadline-pass-in-queue-directly-to-dd_inser.patch"
   "patches/2000-2099/2001-block-mq-deadline-skip-expensive-merge-lookups-if-co.patch"
@@ -1327,6 +1340,8 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         '2061a89f3ac034b6250f105114c115f051be07ac5006cf89f02548de59f39640de55bc699f141a9d613174f68235d178d2197b1171cdacf83e1c47b17f30759b'
         '230c3aa684c82da799003192057f95b0e5e7999f5b927290d59a329a935fa5b9c7a6f840085476b00d06e71a7dd0d12b59b61880140deb425660ab88c3b536b7'
         '58eef7376f156b1db90a8166be3897ad1a75a42defc2d8bcc3c58332b636ba94e10b232609e765e1b41ea4b908f98942086d5dbbff2cfe07d56b2ee9ea8cead4'
+        '8fdcf113e54d149004c5d9d9f7d97ef224f612747bd506e843a5e835cf251867ae4b60c07603d0edf7d4349ef6efea42ac055c4746434ecb3a07294925b03448'
+        '5c917f2cf653ba48d29049f964fa01a4d7d6ae74b254499fa839a0797913b0c3e30993a70f63744a78f5543e27b0b78cb5e10c025d0bc2adf1ab407ef9d8d89f'
         'e9d464ebf525cd8d93d48f1cbedea0197bd9d0142085da7d83ec3dfda0174483a0fea4077055fd7d1ad9180563dc6dfb77e4f52f9bcb023b7c7d7c9fb5c39ece'
         '9d3e36dbc5c9c5342d2991c4665278ed075073196251e59280bd12f1d6812a37d31db58f5cb978b926e2dcd0a32365960a414b69d10f463bd8f68cedbb4bb6ae'
         '52fe01328f544e023666eab1fd378ae0a0eb47385d495403a55a933f71beedcf295300767c1e43feb46366915fae8bea3b9137f11d16ed194a1fcf71d95aec0d'
@@ -1390,6 +1405,17 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         'eb745e1f0d5641c497798716f16f71336241c8c8a00996af22916cec0899e0c33bde804b308d53d1c3472c35aa107beb286ee463aa20519ba3e9b2eb5602aa46'
         '5c0e92145c018039587087ed5b83963e2a2b6af7b86f3cfc1b66cd9480908a2f1defd204e8ea4d2f79af20c382699eedcf80e019d3e236a0d25de1dba6abb764'
         '46887144b3894d32d7697744eebafc35d93ece4ab78bba4b1f1b18ba3ad1d70025a408cbf5972cb68d1cd2e374f2dc0488f60216b8ddf524fb92f5584966d1fa'
+        '190c87dec846e3f09db744bb7bd92336b2cdacf75889c35d831fa70b977d428881a5ba6233ed98b25ac2edaf0127fb860b48112a7d2587782fe9a8b323cd1d11'
+        'c19d033e5438d534cc41041911f38e9c214df70c4dd616ddf5e9af8b154b24e69bf0dae51489cee0cdc22e5d8bfb6a54c7a8e8ff01aee6522069823804e65daa'
+        '4952814811daee1170fbbfd9735b9ebd91e899a1472d2e454ef00c93712ee82d2c34bcda9521dbbf1584ccb2d84c98a4b6dca4de1b749e3612e9734d44768a34'
+        'cf8f862718f286b2f9165b331648433d3bcf7dd77fa5155f2ddfd83eabdb82e3caf39310cc7961d0abe0760c74c23c758134aab3ab1ebb8eac1446c6d8cd0b2a'
+        '5513df82b5d8be69adf2e34a5a1de6d8e1723947e7ea4c7a0e58a8765d93c2ccee05d90e6adfe8def0e679ab6a5933cc529743f6d42b1d77decda4b3944f1c1e'
+        '4e2ae6248c3ad752d2291dc28cc25c782fe7a959c558448d3d50ae1c317bf1403eff0020fec6b13f1465cab9c8c3052de30476f984c6d8c3d32045482fcf3583'
+        '2e15bfdb0583e8a956d8b608d3a59a57749328cb471c72ad9a2a10bd68839f62a6e9b535e9b95ecd99c7b800fd6429d0b9f13a95bcf3fd6aa0503f3684013405'
+        '5cc57490e1be5e7fccd15ebd182683ece74cf08f3b8d74694016e731083a52310dc4cc162a02b409e934e1756f3771811d6b660c3cb7e0e94d5d60011a0a3f7e'
+        'a94a5e8962d109a57e47219aa1ca94c6b162dc3becab04f7e24ebbc748b94568ce356dc2b4ae8a8fd78f78edc958c7114eb9581c88febf70a13cc62938cf4b1e'
+        'b1091dc02b1cb87607b6e934551b0fe8c69e4e847d4b2244c36815cdc6becfa908dd9ce903afa38f65f20d51c4a0e27c5313c9e5225b92806ff0b6343e6e4142'
+        'a47aa2ac013606974b7a62bbc460e8912e5085f0ce7c14ddd863c50dbaf3753303fb356f255db9c275c97e37f0f9b92f85c4e1539497111e181ab306180d60ae'
         'c20b3b791715d02756742bfa34f4921bcaebeee62edf079fe15c89afdc11451a2656122f4f21335cd116676ff69c3b7eee80c6adfdcbfe838c0f1e9012ce0428'
         'df68cfd344b37cae25fa446c82c5897510de23c55761570969dc5a6f2a5bf4c11b31e50c1670a18bef1065af6597e72e0ed839e8fdbc0328cf2dcf34484e5758'
         '8bff27696075ec53ca042b0c9e0deae345712e652b3b66bab1da82c4deefdf35533d04c00d59de70cbf968380236131bc819e0eeaa8aa40edfd84df3bd0972ef'

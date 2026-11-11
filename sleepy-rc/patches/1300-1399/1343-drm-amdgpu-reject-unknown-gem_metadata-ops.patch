@@ -1,0 +1,65 @@
+From 4e4509d0b0113d1b0c5d023dce12baa346e7c65b Mon Sep 17 00:00:00 2001
+From: Jesse Zhang <Jesse.Zhang@amd.com>
+Date: Mon, 12 Oct 2026 09:28:33 +0800
+Subject: [PATCH] drm/amdgpu: reject unknown GEM_METADATA ops
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+amdgpu_gem_metadata_ioctl() handles AMDGPU_GEM_METADATA_OP_GET_METADATA
+and AMDGPU_GEM_METADATA_OP_SET_METADATA and returns r otherwise, which
+is 0 from the successful amdgpu_bo_reserve(). Any other op therefore
+succeeds without doing anything.
+
+Convert the if/else chain into a switch and return -EINVAL for unknown
+ops.
+
+v2: use a switch statement instead of if/else if/else (Christian)
+
+Fixes: d38ceaf99ed0 ("drm/amdgpu: add core driver (v4)")
+Signed-off-by: Jesse Zhang <Jesse.Zhang@amd.com>
+Reviewed-by: Christian König <christian.koenig@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
+index 3962b9f08dd6..4ed1706d8d5f 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
+@@ -752,22 +752,28 @@ int amdgpu_gem_metadata_ioctl(struct drm_device *dev, void *data,
+ 		goto unreserve;
+ 	}
+ 
+-	if (args->op == AMDGPU_GEM_METADATA_OP_GET_METADATA) {
++	switch (args->op) {
++	case AMDGPU_GEM_METADATA_OP_GET_METADATA:
+ 		amdgpu_bo_get_tiling_flags(robj, &args->data.tiling_info);
+ 		r = amdgpu_bo_get_metadata(robj, args->data.data,
+ 					   sizeof(args->data.data),
+ 					   &args->data.data_size_bytes,
+ 					   &args->data.flags);
+-	} else if (args->op == AMDGPU_GEM_METADATA_OP_SET_METADATA) {
++		break;
++	case AMDGPU_GEM_METADATA_OP_SET_METADATA:
+ 		if (args->data.data_size_bytes > sizeof(args->data.data)) {
+ 			r = -EINVAL;
+-			goto unreserve;
++			break;
+ 		}
+ 		r = amdgpu_bo_set_tiling_flags(robj, args->data.tiling_info);
+ 		if (!r)
+ 			r = amdgpu_bo_set_metadata(robj, args->data.data,
+ 						   args->data.data_size_bytes,
+ 						   args->data.flags);
++		break;
++	default:
++		r = -EINVAL;
++		break;
+ 	}
+ 
+ unreserve:
+-- 
+2.56.1
+

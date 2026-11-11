@@ -1,10 +1,8 @@
-From Jamal Hadi Salim <jhs@mojatatu.com> Mon Sep 17 00:00:00 2001
+From f91cc4ac0 Mon Sep 17 00:00:00 2001
 From: Jamal Hadi Salim <jhs@mojatatu.com>
-Date: Tue, 20 Oct 2026 12:57:27 -0400
-Subject: [PATCH net-next v8 1/4] net/sched: cake: return the classifier result to the caller
-Message-ID: <QDISC-BA27.v8.r0.20261020063241-1@mojatatu.com>
-
-The Fix:
+Date: Tue, 10 Nov 2026 09:40:52 -0500
+Subject: [PATCH net-next v9 1/4] net/sched: cake: return the classifier result to the caller
+Preparation:
 cake runs an optional external classifier from its enqueue path and then
 computes the flow hash inside the helper. Have the helper return the
 filter's overrides instead, so the caller owns the flow selection.
@@ -12,33 +10,35 @@ filter's overrides instead, so the caller owns the flow selection.
 This is preparation for the accounting changes that follow. Packet
 classification and flow selection are unchanged.
 
+Link: https://lore.kernel.org/netdev/179269577009.3135.5221412623031392098@kernel.org/
 Reviewed-by: Victor Nogueira <victor@mojatatu.com>
+Acked-by: Toke Høiland-Jørgensen <toke@toke.dk>
 Signed-off-by: Jamal Hadi Salim <jhs@mojatatu.com>
 
 ---
 
-v7 -> v8: cake-only.  fq_codel_classify() is line-for-line the same as
-fq_pie_classify() and fq_pie is not changed by this series, so fq_codel
-keeps its original classify shape; the fq_codel backlog guard is placed
-inline in sch_fq_codel.c in 0003 instead.  (Toke Høiland-Jørgensen, v7
-review)
+v8 -> v9: reword the opening heading: this patch is preparation, not a
+fix; and the classifier helper's comments now say the caller must drop
+the skb, since a terminal action does not take ownership of it.
+(Sashiko nipa reviews of v7 and v8)
 ---
- net/sched/sch_cake.c | 35 ++++++++++++++++++++++-------------
- 1 file changed, 22 insertions(+), 13 deletions(-)
+ net/sched/sch_cake.c | 36 +++++++++++++++++++++++-------------
+ 1 file changed, 23 insertions(+), 13 deletions(-)
 
 diff --git a/net/sched/sch_cake.c b/net/sched/sch_cake.c
-index dc93267029e7..6432d10c992e 100644
+index aa4043d662c1..67cb4cbda1c7 100644
 --- a/net/sched/sch_cake.c
 +++ b/net/sched/sch_cake.c
-@@ -1712,18 +1712,24 @@ static struct cake_tin_data *cake_select_tin(struct Qdisc *sch,
+@@ -1715,18 +1715,25 @@ static struct cake_tin_data *cake_select_tin(struct Qdisc *sch,
  	return &qd->tins[tin];
  }
  
 -static u32 cake_classify(struct Qdisc *sch, struct cake_tin_data **t,
 -			 struct sk_buff *skb, int flow_mode, int *qerr)
 +/* Run the qdisc's optional external classifier. Returns true when a
-+ * terminal TC action consumed the packet, with the reason in *qerr;
-+ * otherwise *flow and *host hold the filter's overrides (0 if none).
++ * terminal TC action wants the packet dropped, with the reason in *qerr;
++ * the caller must drop the skb. Otherwise *flow and *host hold the
++ * filter's overrides (0 if none).
 + */
 +static bool cake_tcf_classify(struct Qdisc *sch, struct sk_buff *skb,
 +			      u16 *flow, u16 *host, int *qerr)
@@ -59,7 +59,7 @@ index dc93267029e7..6432d10c992e 100644
  
  	*qerr = NET_XMIT_SUCCESS | __NET_XMIT_BYPASS;
  	result = tcf_classify_qdisc(skb, filter, &res, false);
-@@ -1737,17 +1743,15 @@ static u32 cake_classify(struct Qdisc *sch, struct cake_tin_data **t,
+@@ -1740,17 +1747,15 @@ static u32 cake_classify(struct Qdisc *sch, struct cake_tin_data **t,
  			*qerr = NET_XMIT_SUCCESS | __NET_XMIT_STOLEN;
  			fallthrough;
  		case TC_ACT_SHOT:
@@ -81,7 +81,7 @@ index dc93267029e7..6432d10c992e 100644
  }
  
  static void cake_reconfigure(struct Qdisc *sch);
-@@ -1758,20 +1762,25 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
+@@ -1761,20 +1766,25 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
  	u32 idx, tin, prev_qlen, prev_backlog, drop_id;
  	struct cake_sched_data *q = qdisc_priv(sch);
  	int len = qdisc_pkt_len(skb), ret;
@@ -95,7 +95,7 @@ index dc93267029e7..6432d10c992e 100644
 -	/* choose flow to insert into */
 -	idx = cake_classify(sch, &b, skb, q->config->flow_mode, &ret);
 -	if (idx == 0) {
-+	/* Classify first: a terminal TC action consumes the packet. */
++	/* Classify first: a terminal verdict means do not enqueue. */
 +	if (cake_tcf_classify(sch, skb, &flow_override, &host_override, &ret)) {
  		if (ret & __NET_XMIT_BYPASS)
  			qdisc_qstats_drop(sch);
@@ -110,3 +110,4 @@ index dc93267029e7..6432d10c992e 100644
  	tin = (u32)(b - q->tins);
  	idx--;
  	flow = &b->flows[idx];
+

@@ -71,7 +71,7 @@ index 54bc888f97d6..42c5f42a428d 100644
  	}
  
  	/* Retrieve boolean fences */
-@@ -846,13 +857,16 @@ amdgpu_userq_wait_return_fence_info(struct drm_device *dev, struct drm_file *fil
+@@ -846,12 +857,15 @@ amdgpu_userq_wait_return_fence_info(struct drm_device *dev, struct drm_file *fil
  			goto free_fences;
  
  		r = amdgpu_userq_wait_add_fence(wait_info, fences,
@@ -80,7 +80,6 @@ index 54bc888f97d6..42c5f42a428d 100644
  		dma_fence_put(fence);
  		if (r)
  			goto free_fences;
- 
  	}
  
 +	/* Keep explicit dependencies separate from implicit reservation fences. */

@@ -12420,3 +12420,171 @@ was read through its RSS index on 2026-11-10.
 ### Series state
 
 **343 patches** (338 + 5). `audit_series.py`: **343/343** on `v7.3`; the preview is **172/172** on `next-20261109`.
+
+## Sweep 2026-11-11 — `next-20261110`; thirteen rc carries
+
+Sources refreshed on 2026-11-11: torvalds `origin/master` `067c5c24cef2`
+(2026-11-10; `ls-remote` matched, no new commits since the last sweep),
+linux-next `next-20261110` (`793807ca13bf`, tag pushed at 01:36 UTC on
+2026-11-11 — the newest snapshot; no `next-20261111` tag exists), drm-next
+`a5b29fce2659` (merged `amd-drm-next-7.5-2026-10-28` and
+`drm-xe-next-2026-11-05`), agd5f/amd-staging `47df73aa49d1` (unchanged),
+drm-misc `45a0af0666f5`, linux-pm `7475ea8b5861` (unchanged), akpm
+`mm-everything` `583db9c55831`, tip `c6279551a44c`. The sixteen lore git
+mirrors were refreshed through 2026-11-11; the amd-gfx and dri-devel
+freedesktop archives were re-read. The drm/amd tracker returned 37 open issues
+updated since 2026-11-09, with comments through GraphQL. Phoronix was read
+through its RSS index on 2026-11-11.
+
+### Adopted — rc only (13)
+
+The new drm-next pull (`amd-drm-next-7.5-2026-10-28`, landed in
+`next-20261110`) carries the fixes below. `v7.3` lacks them; the preview base
+already has them, so they are rc-only. Each has an AMD `Signed-off-by` and
+review, applies on the series tree with both `git apply --check` and
+`patch -F2`, and targets GC 12.0 / KFD / generic VM or display code.
+
+| Patch | Change | Why |
+|---|---|---|
+| `1187` | `drm/amd/display: Prevent debugfs nullptr dereference` (Amadeusz Sławiński; `Reviewed-by: Alex Deucher`) | Reading `amdgpu_dm_dmub_trace_mask` on a display block that does not implement it dereferences NULL. Commit `90c87f252eb6`. |
+| `1188` | `drm/amd/display: Avoid closing unowned DDC pins` (Alex Hung; `Tested-by: Dan Wheeler`, `Reviewed-by: Leo Li`) | The failed `dal_ddc_open()` path closes pins it never acquired; with `GPIO_RESULT_ALREADY_OPENED` the handles can belong to AUX, so closing them disrupts AUX. Commit `175ae7772b68`. |
+| `1336` | `drm/amdgpu: clear vm pts upon a vm->generation mismatch` (Shahyan Soltani; `Suggested-by`/`Reviewed-by: Christian König`) | On a generation mismatch the evicted page tables were moved and re-initialised but never cleared, leaving garbage PTEs. Commit `d6048b741ad1`. |
+| `1337` | `drm/amdkfd: evict the queues only once for CRIU PROCESS_INFO` (Jesse Zhang) | Every `criu_process_info()` incremented `qpd->evicted` while UNPAUSE restores once; after two PROCESS_INFO calls the queues stayed evicted. `Fixes: cd9f79103003`. Commit `4d79c9e3c32c`. |
+| `1338` | `drm/amdkfd: Validate the control stack of a restored queue` (William Palacek; `Reviewed-by: Alex Deucher`) | `kfd_criu_restore_queue()` took the control-stack size from the image without the create-path topology check, so `0xFFFFFFFF` reached `kmalloc()` and offsets could wrap `get_wave_state()`. `Fixes: 626f7b3190b4`, `42c6c48214b7`. Commit `92249023caee`. |
+| `1339` | `drm/amdkfd: wait for a GPU reset before freeing a BO` (William Palacek; `Reviewed-by: Felix Kuehling`) | While a reset holds the reset domain, KFD eviction cannot unmap user queues and the TLB flush is skipped; a concurrent BO free left stale translations and crashed `free_swap_cache()`. `Fixes: 9c33e5fd4fb6`. Commit `06ff8ce77726`. |
+| `1340` | `drm/amdkfd: fix doorbell allocation race creating duplicate allocations` (Henry Martin; `Reviewed-by: Felix Kuehling`) | Three call sites checked `pdd->qpd.proc_doorbells` under different locking, so racing threads could each allocate a doorbell BO and bitmap. `Fixes: 16f0013157bf`. Commit `4e27ba5ad5f7`. |
+| `1341` | `drm/amdkfd: Fix svm_bo use after free in svm_range_clone` (Philip Yang; `Reviewed-by: Felix Kuehling`) | `prange->svm_bo` stays set after the range drops its reference, so a clone could take a reference on a refcount-0 svm_bo. Commit `0f862d877416`. |
+| `1342` | `drm/amdkfd: don't drop an SVM CWSR reference that was never taken` (Jesse Zhang; `Reviewed-by: Felix Kuehling`) | The `kfd_queue_acquire_buffers()` error path released a CWSR SVM reference it never acquired, dropping another queue's reference instead. `Fixes: b049504e211e`. Commit `9a08122e6361`. |
+| `1343` | `drm/amdgpu: reject unknown GEM_METADATA ops` (Jesse Zhang; `Reviewed-by: Christian König`) | Unknown `AMDGPU_GEM_METADATA_OP_*` returned the successful `amdgpu_bo_reserve()` value, so they succeeded without doing anything. `Fixes: d38ceaf99ed0`. Commit `4e4509d0b011`. |
+| `1344` | `drm/amdgpu: Prevent debugfs nullptr dereference` (Amadeusz Sławiński; `Reviewed-by: Alex Deucher`) | Reading `psp_spirom_dump` on a card that does not support it dereferences NULL. Commit `b48f3f3ea619`. |
+| `1345` | `amdkfd: Fix memory availability double accounting of kfd pinned objects` (Daniel Phillips; `Reviewed-by: Felix Kuehling`) | Objects pinned by KFD are counted both as used and as pinned, reducing the VRAM reported to KFD by their size. Commit `b8257bdb26ca`. |
+| `1346` | `drm/amdgpu: move amdgpu_vm_bo_update() call into correct location` (Shahyan Soltani; `Reviewed-by: Christian König`) | The seq64 VM update ran in `amdgpu_seq64_map()`; moving it to `amdgpu_cs_vm_handling()` is required for the VM to initialise without waking sleep. Commit `8e16e9176d6b`. |
+
+### Preview bump to `next-20261110`
+
+`next-20261110` (`793807ca13bf`) was pushed at 01:36 UTC on 2026-11-11, after
+the previous sweep's 18:30 UTC check. `_srctag` moves from `next-20261109`; the
+package becomes `2026.11.10-1`. The snapshot adds 3324 non-merge commits, 357
+of them under `drivers/gpu/drm/amd`.
+
+Six preview patches are absorbed by the new base and were removed from
+`sleepy-next/source=()` with the user's explicit approval: `1236`
+(`d2e028160b1c`), `1307` (`fb26cf4f1df4`), `1309` (`ea449fd526d2`), `1324`
+(`974b87766921`), `1325` (`769496d3bcc8`) and `2810` (`fefaa69d498b`). The
+preview ledger carries the per-patch evidence.
+
+Three preview patches were ported:
+
+- **`0101` bbr3** — regenerated against the series state from the CachyOS
+  `origin/7.4/bbr3` content (`5e201ec1d3c9` + `f5b7232063fb`), with one
+  context adaptation in `tcp_disconnect()` for the new
+  `tp->rcv_collapse_credit = 0;` line. The rc keeps its 7.3 squash.
+- **`1175`** — hunk #17 (`hdmi_automation_enable()`) dropped: the new base
+  replaced that debugfs writer with `debugfs_create_bool()` in
+  `e3b643d7864d`. The remaining 18 hunks apply.
+- **`9207`** — hunk #4 context rebased for the series tree: the series
+  adaptation has no blank line before the loop's closing brace.
+
+**CAKE `2052`–`2055` v8 → v9** (preview only). v9 (cover
+`<QDISC-BA27.v9.r0.20261108195325@mojatatu.com>`, 2026-11-10) rewords the
+classifier comment and reworks the backlog accounting in `2054`: the v8
+`qstats_backlog_sub()` undo is replaced by re-deriving the aggregate from
+parent/child snapshots and passing the child's actual growth up the RED
+chain; `2055` passes `flow_mode` explicitly and uses `qdisc_drop_reason()`.
+Verified as a cumulative four-patch swap on a CAKE-less preview tree, and the
+full preview audit is clean afterwards.
+
+### Reverts — none target carried work
+
+The new pulls contain no revert of a carried patch. `899489d2e2aa` reverts
+"Allocate DCN32/1 dmub memory to GTT" — DCN 3.2.1 is not carried and the
+target is a Strix-family path. The `lib/sort.c` `_nonatomic()` revert
+(`4d26dd5feadf`), the `khugepaged_mm_slot` revert and the DCN60 DSC reverts
+match nothing in either series. ASDN's four CWSR user-queue reverts
+(`47df73aa49d1` tip) remain irrelevant: neither base ever had the CWSR
+user-queue infrastructure.
+
+### Rejected and watch items
+
+- **Vblank/flip series (5 patches, Prike Liang, 2026-11-11)** — first posting,
+  no review. It stops `drm_crtc_wait_one_vblank()` when vblank is off and
+  turns vblank off across GPU reset; relevant to the `#5511` pageflip
+  timeouts, but defer until it has review.
+- **GFX pipe reset enablement** (`ce652d42` gfx12, `9726dcdb` gfx11,
+  2026-11-11) — enables `AMDGPU_RESET_TYPE_PER_PIPE` when CP firmware meets
+  version gates. New feature, not a fix; our CP firmware versions have not
+  been checked against those gates. Defer.
+- **CPU page-table update RFC v2 (6 patches, 2026-11-11)** — RFC, under
+  review; overlaps the preview's `9219`–`9239` batch rework.
+- **SPM re-enable/reemit pair** — still gated on `2fb5a4572c76`, which `v7.3`
+  does not have. The new preview base programs the SPM VMID once the RLC runs
+  (`184c9b0c4bd1`), but the rc has the old runtime update; the bug does not
+  exist in `v7.3`.
+- **`drm/amd/display: Do not allow vbios version of dmubfw`**
+  (`2a2406f552c7`) — touches `dmub_dcn42.c` only. DCN 4.2 runs under GC 11.5,
+  not GC 12.0; inert here.
+- **`c775493b6dc0` (DCN401 PHY reset/lane state)** — adds read-only
+  bookkeeping fields and maps registers; "nothing programs them". No
+  behaviour change; defer.
+- **`drm/amdgpu/psp: Fail on VCN firmware load error`** (`c57b810a7fbd`) —
+  turns a VCN firmware failure into a probe failure. Behaviour change with a
+  display-availability risk; not adopted.
+- **`1ad7473e82b9` (zero V_TOTAL_MIN/MAX on seamless boot)** — tested only on
+  Renoir eDP; no evidence for DCN 4.0.1. Defer.
+- **`945ef007af8c` (stop GPU recovery wait for JPEG/VCN idle work)** — needs
+  the 7.5 idle-work rework; neither direction applies to the rc tree.
+- **MES context-slot series, idle-optimization v1, MES queue-reset trio,
+  perfmon clock API, CWSR fixes** — unchanged reasons from the 2026-11-10
+  ledger.
+- **New salkim userq follow-ups** (`84ae1378e`, `894a6376e`, `9561ec6b9`,
+  `ebb97d359`, `8fd65e1ca`, 2026-11-08/09) — three apply standalone to the
+  preview tree, but `9561ec6b9` and `8fd65e1ca` do not, so the five cannot be
+  carried as a unit. Defer until the next complete posting.
+
+### Version sweep
+
+A full re-run over 343 rc subjects against all sixteen lore mirrors matched 91
+higher-version or post-2026-11-09 postings across 67 rc patch numbers. The
+content-delta filter removed all but one:
+
+- `2052`–`2055` v8 → v9 (2026-11-10): adopted for the preview (above).
+- `1179` v2 (2026-10-26), `1231`/`1232` v2 (2026-10-01), `1330` v2
+  (2026-10-21) and `2028` v2 (2026-11-04) are content-identical to the
+  carried revisions — only comment punctuation or a blank line differs.
+- `2044` v7 is what we carry. `2809`/`2811` v2 were assessed on 2026-11-10 as
+  identical/comment-only. `2310`–`2320` v5 is the unmerged kbuild rework and
+  still does not apply. `1317` v5/v6 remains inert under DCN 4.0.1
+  (`amdgpu_dm_update_memclk_states()` returns early unless DCN 3.2/3.21).
+
+### Tracker and Phoronix
+
+37 open issues updated since 2026-11-09. New on-target threads: `#6105` (RX
+9070 boot/login flicker with two DP plus one HDMI — no fix referenced),
+`#6104` (RX 9070 XT D3cold-to-D0 load failure — no fix), `#6114` (DMCUB error
+loop on an X870E/9950X3D desktop — no fix), `#6045` (MST blinking after wake,
+`link_dpms.c` assertion — debug-only patch, no root cause). `#6115`/`#4906`
+still wait for v2 after the confirmed Sashiko findings. `#5511` (9070 XT
+pageflip timeout) has no new fix; the new vblank series is the first plausible
+candidate. `#6088` remains a `psp_14_0_2_ta.bin`/SMU-firmware issue for a
+14.0.2 part, not this PSP 14.0.0 GPU. Firmware watch unchanged: `psp_14_0_*_ta`
+and SMU 104.80 on gfx1201. Phoronix 2026-11-10..11: GFX13/RDNA5 Mesa
+bring-up (future hardware), R300/R500 driver work (legacy), EPYC Zen 6/7
+server parts, AOCC 6.0 and Intel microcode — no on-target RDNA4 or kernel
+article.
+
+### Other sources
+
+`lru_cast` `origin/main` remains `ce117bb` (v0.2.10) and firelzrd NAP remains
+`v0.6.6` (`5092cfd`) — no CAST or NAP update. sirlucjan `origin/master` is
+unchanged at `7275a4ad` and `cachyos-kernel-patches` at `706b5652`; CachyOS
+`cachyos-linux` has a new `origin/7.4/bbr3` branch (2026-11-04) whose two
+commits are the BBR3 content used for the preview's regenerated `0101`.
+salkim `kernel-salkim` advanced to `8fd65e1ca` (2026-11-09) with the five
+userq follow-ups above; `kernel-salkim-74` remains at `e179ea7f`. linux-tkg
+and `xanmod` had no on-target change.
+
+### Series state
+
+**356 patches** (343 + 13). `audit_series.py`: **356/356** on `v7.3`. The
+preview is **166 patches** (172 - 6 absorbed) and **166/166** on
+`next-20261110`.

@@ -1,9 +1,7 @@
-From Jamal Hadi Salim <jhs@mojatatu.com> Mon Sep 17 00:00:00 2001
+From 1c5de6689 Mon Sep 17 00:00:00 2001
 From: Jamal Hadi Salim <jhs@mojatatu.com>
-Date: Tue, 20 Oct 2026 12:57:29 -0400
-Subject: [PATCH net-next v8 3/4] net/sched: cap the accounted backlog before it can wrap
-Message-ID: <QDISC-BA27.v8.r0.20261020063241-3@mojatatu.com>
-
+Date: Tue, 10 Nov 2026 09:40:54 -0500
+Subject: [PATCH net-next v9 3/4] net/sched: cap the accounted backlog before it can wrap
 This is a followup of commit 709f34f7c28d ("net/sched: fq: add overflow
 bounds to quantum and initial quantum") as reported by Sashiko.
 
@@ -44,20 +42,17 @@ length, and sch_handle_ingress() -- which ignores the initializer's
 return value and reads pkt_segs for packet statistics -- keeps
 complete metadata.
 
-Cover sch_plug and non-WRED sch_gred too: plug admits on skb->len
-while qdisc_enqueue_tail() adds qdisc_pkt_len(), and gred bounds each
-virtual queue but adds every VQ into the one aggregate. pfifo is
-included because RED reads a grafted child's backlog into
-red_calc_qavg(); it can be reached standalone or as the default child
-of SFB. In RED, account the packet to the aggregate before handing it
-to the child, because a duplicating netem child re-enqueues its clone
-at the root while the stored backlog is still un-updated -- one guard
-check must not authorize two additions.
+Cover sch_plug, pfifo and non-WRED sch_gred as well. In RED, account the
+packet before handing it to the child, bound the child backlog too, and
+re-derive the aggregate from pre-reservation snapshots on failure.
 
 The guard bounds each qdisc's own enqueue path: a child that segments a
 GSO skb (tbf, netem) can still grow a parent's aggregate through
 qdisc_tree_reduce_backlog()'s unclamped byte delta, which is left to a
 separate change.
+
+CAKE's split-GSO branch is the other exception; 4/4 sums and checks those
+segments before linking any of them.
 
 Conditions to recreate the bug:
   ip tuntap add tun0 mode tun
@@ -77,30 +72,31 @@ Link: https://lore.kernel.org/netdev/CANn89i+GOFH_8g+vSV0jUj0aBqLYVWuFOrHuDggZu9
 Link: https://lore.kernel.org/netdev/87a4oottcj.fsf@toke.dk/
 Link: https://lore.kernel.org/netdev/87pkxks68f.fsf@toke.dk/
 Link: https://lore.kernel.org/netdev/179231932946.3135.7497478990186385688@kernel.org/
+Link: https://lore.kernel.org/netdev/179269577131.3135.3967915390403138015@kernel.org/
 Reviewed-by: Victor Nogueira <victor@mojatatu.com>
-Reviewed-by: Toke Høiland-Jørgensen <toke@toke.dk>
 Signed-off-by: Jamal Hadi Salim <jhs@mojatatu.com>
 
 ---
 
-v7 -> v8: fq_codel keeps its original classify shape (0001 no longer
-refactors it); the guard is placed between idx-- and
-codel_set_enqueue_time() so a dropped packet cannot touch flow state.
-(Toke Høiland-Jørgensen, v7 review)
+v8 -> v9: bound the child backlog as well as RED's aggregate, and
+re-derive the aggregate from the pre-reservation snapshots so both
+child conventions stay in step: leaves that reduce their ancestors on
+NET_XMIT_CN (pfifo_head_drop, sfq, fq_codel) and leaves that do not
+(hhf, skbprio).  (Sashiko nipa review of v7)
 ---
  include/net/pkt_sched.h   |  1 -
- include/net/sch_generic.h | 20 ++++++++++++++++++++
- net/sched/sch_cake.c      |  7 +++++++
- net/sched/sch_codel.c     | 16 +++++++++-------
+ include/net/sch_generic.h | 20 +++++++++++++++++
+ net/sched/sch_cake.c      |  7 ++++++
+ net/sched/sch_codel.c     | 16 ++++++++------
  net/sched/sch_dualpi2.c   |  1 +
- net/sched/sch_fifo.c      |  6 ++++++
- net/sched/sch_fq_codel.c  |  9 +++++++++
+ net/sched/sch_fifo.c      |  6 +++++
+ net/sched/sch_fq_codel.c  |  9 ++++++++
  net/sched/sch_fq_pie.c    |  3 ++-
- net/sched/sch_gred.c      |  9 +++++++++
+ net/sched/sch_gred.c      |  9 ++++++++
  net/sched/sch_pie.c       |  3 ++-
- net/sched/sch_plug.c      |  9 ++++++++-
- net/sched/sch_red.c       | 23 ++++++++++++++++++-----
- 12 files changed, 91 insertions(+), 16 deletions(-)
+ net/sched/sch_plug.c      |  9 +++++++-
+ net/sched/sch_red.c       | 46 ++++++++++++++++++++++++++++++++++-----
+ 12 files changed, 114 insertions(+), 16 deletions(-)
 
 diff --git a/include/net/pkt_sched.h b/include/net/pkt_sched.h
 index 90d3e7943b19..18a419cd9d94 100644
@@ -146,10 +142,10 @@ index 1acaadb3e2cf..a5a6bdf55e0a 100644
  {
  	u32 pkt_segs = qdisc_skb_cb(skb)->pkt_segs;
 diff --git a/net/sched/sch_cake.c b/net/sched/sch_cake.c
-index 0d13c4b0bfe3..91c33295b30b 100644
+index dfc187f48a2f..3fd13bf6f3ce 100644
 --- a/net/sched/sch_cake.c
 +++ b/net/sched/sch_cake.c
-@@ -1777,6 +1777,13 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
+@@ -1781,6 +1781,13 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
  		return ret;
  	}
  
@@ -263,7 +259,7 @@ index 5982847df8f8..9f927a08b7bc 100644
  		goto out;
  	} else if (unlikely(memory_limited)) {
 diff --git a/net/sched/sch_gred.c b/net/sched/sch_gred.c
-index f04f425c6c44..bedb945d3b67 100644
+index f3d9a7252949..de96badff654 100644
 --- a/net/sched/sch_gred.c
 +++ b/net/sched/sch_gred.c
 @@ -170,6 +170,15 @@ static int gred_enqueue(struct sk_buff *skb, struct Qdisc *sch,
@@ -317,14 +313,24 @@ index b60ddfee6a68..c90b5ca60bc0 100644
  			q->pkts_current_epoch++;
  		return qdisc_enqueue_tail(skb, sch);
 diff --git a/net/sched/sch_red.c b/net/sched/sch_red.c
-index d7598214270b..72990d0db4fd 100644
+index d7598214270b..b5233d9fbf57 100644
 --- a/net/sched/sch_red.c
 +++ b/net/sched/sch_red.c
-@@ -76,6 +76,12 @@ static int red_enqueue(struct sk_buff *skb, struct Qdisc *sch,
+@@ -73,9 +73,22 @@ static int red_enqueue(struct sk_buff *skb, struct Qdisc *sch,
+ 	enum qdisc_drop_reason reason = QDISC_DROP_CONGESTED;
+ 	struct red_sched_data *q = qdisc_priv(sch);
+ 	struct Qdisc *child = q->qdisc;
++	u32 child_backlog;
++	u32 red_backlog;
  	unsigned int len;
  	int ret;
  
-+	if (unlikely(qdisc_backlog_overflow(sch, skb))) {
++	/* RED reads the child backlog into red_calc_qavg(), so bound both
++	 * counters: a child that evicts on NET_XMIT_CN can otherwise grow
++	 * its own backlog while RED's stays put.
++	 */
++	if (unlikely(qdisc_backlog_overflow(sch, skb) ||
++		     qdisc_backlog_overflow(child, skb))) {
 +		qdisc_qstats_overlimit(sch);
 +		return qdisc_drop_reason(skb, sch, to_free,
 +					 QDISC_DROP_OVERLIMIT);
@@ -333,14 +339,15 @@ index d7598214270b..72990d0db4fd 100644
  	q->vars.qavg = red_calc_qavg(&q->parms,
  				     &q->vars,
  				     child->qstats.backlog);
-@@ -136,14 +142,21 @@ static int red_enqueue(struct sk_buff *skb, struct Qdisc *sch,
+@@ -136,14 +149,37 @@ static int red_enqueue(struct sk_buff *skb, struct Qdisc *sch,
  	}
  
  	len = qdisc_pkt_len(skb);
 +	/* Reserve the length before the child sees the packet: netem
 +	 * can re-enqueue a clone here before the backlog is updated.
-+	 * Undo it if the child drops the packet.
 +	 */
++	red_backlog = READ_ONCE(sch->qstats.backlog);
++	child_backlog = READ_ONCE(child->qstats.backlog);
 +	qstats_backlog_add(sch, len);
  	ret = qdisc_enqueue(skb, child, to_free);
  	if (likely(ret == NET_XMIT_SUCCESS)) {
@@ -351,7 +358,22 @@ index d7598214270b..72990d0db4fd 100644
 -			   q->stats.pdrop + 1);
 -		qdisc_qstats_drop(sch);
 +	} else {
-+		qstats_backlog_sub(sch, len);
++		u32 propagated, grew;
++
++		/* Re-derive the aggregate from the snapshots: the child may
++		 * have dropped the packet or evicted another one, and may or
++		 * may not have reduced the ancestors' backlog itself
++		 * (pfifo_head_drop, sfq and fq_codel do; hhf and skbprio
++		 * return NET_XMIT_CN without qdisc_tree_reduce_backlog()).
++		 * Keep what the child actually accounted for, and pass the
++		 * difference on to the ancestors above RED.
++		 */
++		propagated = READ_ONCE(sch->qstats.backlog) -
++			     red_backlog - len;
++		grew = READ_ONCE(child->qstats.backlog) - child_backlog;
++		WRITE_ONCE(sch->qstats.backlog, red_backlog + grew);
++		if (propagated != grew)
++			qdisc_tree_reduce_backlog(sch, 0, propagated - grew);
 +		if (net_xmit_drop_count(ret)) {
 +			WRITE_ONCE(q->stats.pdrop,
 +				   q->stats.pdrop + 1);
@@ -360,3 +382,4 @@ index d7598214270b..72990d0db4fd 100644
  	}
  	return ret;
  
+

@@ -1,0 +1,59 @@
+From d6048b741ad18e13f3504632c8f8c74accf5c1e4 Mon Sep 17 00:00:00 2001
+From: Shahyan Soltani <shahyan.soltani@amd.com>
+Date: Wed, 21 Oct 2026 12:23:50 -0400
+Subject: [PATCH] drm/amdgpu: clear vm pts upon a vm->generation mismatch
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Upon a vm->generation mismatch, the evicted pagetables are iterated
+through, resetting their state, and moved to their preferred domain.
+However validation doesn't process the necessary step of clearing the
+pagetables' garbage data.
+
+Clear the vm page tables through the kernel.evicted loop upon a
+vm->generation mismatch. This ensures any garbage data is wiped. The new
+vm->generation value is assigned after the loop.
+
+Suggested-by: Christian König <christian.koenig@amd.com>
+Signed-off-by: Shahyan Soltani <shahyan.soltani@amd.com>
+Reviewed-by: Christian König <christian.koenig@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+index 9ce4bb3ed0b1..65974c0e7a16 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+@@ -630,7 +630,6 @@ int amdgpu_vm_validate(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+ 
+ 	dma_resv_assert_held(vm->root.bo->tbo.base.resv);
+ 	if (vm->generation != new_vm_generation) {
+-		vm->generation = new_vm_generation;
+ 		amdgpu_vm_bo_reset_state_machine(vm);
+ 		amdgpu_vm_fini_entities(vm);
+ 		r = amdgpu_vm_init_entities(adev, vm);
+@@ -645,9 +644,18 @@ int amdgpu_vm_validate(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+ 
+ 		vm->update_funcs->map_table(to_amdgpu_bo_vm(bo_base->bo));
+ 		bo_base->moved = true;
++
++		if (vm->generation != new_vm_generation) {
++			r = amdgpu_vm_pt_clear(adev, vm, to_amdgpu_bo_vm(bo_base->bo), false);
++			if (r)
++				return r;
++		}
++
+ 		amdgpu_vm_bo_needs_update(bo_base);
+ 	}
+ 
++	vm->generation = new_vm_generation;
++
+ 	/*
+ 	 * As soon as all page tables are in place we can start updating them
+ 	 * again.
+-- 
+2.56.1
+

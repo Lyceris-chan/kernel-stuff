@@ -1,0 +1,67 @@
+From 8e16e9176d6b2c7b59b486e78941ff488d645245 Mon Sep 17 00:00:00 2001
+From: Shahyan Soltani <shahyan.soltani@amd.com>
+Date: Tue, 6 Oct 2026 15:49:25 -0400
+Subject: [PATCH] drm/amdgpu: move amdgpu_vm_bo_update() call into correct
+ location
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Calling amdgpu_vm_bo_update() this early is unnecessary. moving it to
+amdgpu_cs_vm_handling is the correct location for this function and is
+required to allow the VM to initialize without waking up sleep.
+
+Signed-off-by: Shahyan Soltani <shahyan.soltani@amd.com>
+Reviewed-by: Christian König <christian.koenig@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c    | 14 ++++++++++++++
+ drivers/gpu/drm/amd/amdgpu/amdgpu_seq64.c |  7 -------
+ 2 files changed, 14 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c
+index 5558e7330cf4..1d3c3ad9813e 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c
+@@ -1157,6 +1157,20 @@ static int amdgpu_cs_vm_handling(struct amdgpu_cs_parser *p)
+ 			return r;
+ 	}
+ 
++	if (fpriv->seq64_va) {
++		bo_va = fpriv->seq64_va;
++		r = amdgpu_vm_bo_update(adev, bo_va, false);
++		if (r) {
++			DRM_ERROR("failed to do vm_bo_update on userq sem\n");
++			return r;
++		}
++
++		r = amdgpu_sync_fence(&p->sync, bo_va->last_pt_update,
++				      GFP_KERNEL);
++		if (r)
++			return r;
++	}
++
+ 	/* FIXME: In theory this loop shouldn't be needed any more when
+ 	 * amdgpu_vm_handle_moved handles all moved BOs that are reserved
+ 	 * with p->ticket. But removing it caused test regressions, so I'm
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_seq64.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_seq64.c
+index 21a225b0116a..fbf9ec7d467b 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_seq64.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_seq64.c
+@@ -103,13 +103,6 @@ int amdgpu_seq64_map(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+ 		goto error;
+ 	}
+ 
+-	r = amdgpu_vm_bo_update(adev, *bo_va, false);
+-	if (r) {
+-		DRM_ERROR("failed to do vm_bo_update on userq sem\n");
+-		amdgpu_vm_bo_del(adev, *bo_va);
+-		goto error;
+-	}
+-
+ error:
+ 	drm_exec_fini(&exec);
+ 	return r;
+-- 
+2.56.1
+

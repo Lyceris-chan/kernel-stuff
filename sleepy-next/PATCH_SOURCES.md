@@ -15,11 +15,11 @@ moved, so the full ledger is not duplicated here.
 
 | | |
 |---|---|
-| Snapshot | `next-20261109`, tag `630059a5a632` (tag object `0941356091e3`) |
-| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261109.tar.gz` |
+| Snapshot | `next-20261110`, tag `793807ca13bf` (tag object `827b0a511f32`) |
+| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261110.tar.gz` |
 | Snapshot tree `Makefile` | `7.4.0-rc2` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.11.09-1-sleepy-next` |
-| Package | `linux-sleepy-next-2026.11.09-1` |
+| Kernel release | `2026.11.10-1-sleepy-next` |
+| Package | `linux-sleepy-next-2026.11.10-1` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -1756,3 +1756,64 @@ findings and waits for v2.
 
 **172 patches** (199 - 31 + 4). `audit_series.py`: **172/172** on
 `next-20261109`. The rc series is **343/343** on `v7.3`.
+
+## 2026-11-11 — bump to `next-20261110`; six absorbed drops, three ports, CAKE v9
+
+`next-20261110` (`793807ca13bf`) was pushed at 01:36 UTC on 2026-11-11, after
+the 2026-11-10 sweep's 18:30 UTC check. The base moves from `next-20261109`;
+the package becomes `2026.11.10-1`. The snapshot adds 3324 non-merge commits,
+357 under `drivers/gpu/drm/amd` — the `amd-drm-next-7.5-2026-10-28` pull.
+Sources and the full triage are recorded in the rc ledger's 2026-11-11
+section; this entry covers only what differs here.
+
+### Dropped — absorbed by the new base (6)
+
+Removed from `source=()` and from disk with the user's explicit approval:
+
+- **`1236`** `Update stapm_power_limit values in gpu_metrics for SMU14` —
+  base commit `d2e028160b1c`.
+- **`1307`** `gpu/buddy: do not pass caller list to __alloc_contig_try_harder()` —
+  base commit `fb26cf4f1df4`.
+- **`1309`** `gfx12: flush the scratch register write in the ring test` —
+  base commit `ea449fd526d2` (same `RREG32(scratch)` flush, longer comment).
+- **`1324`** `amdkfd: Don't check for vm ready on svm unmap` — base commit
+  `974b87766921`.
+- **`1325`** `amdgpu_fence: remove ops->release()` — base commit
+  `769496d3bcc8`.
+- **`2810`** `mm, swap: only prefer nonfull clusters on synchronous devices` —
+  base commit `fefaa69d498b`.
+
+`sleepy-rc` keeps all six; `v7.3` lacks every one of them.
+
+### Ported (3)
+
+- **`0101` bbr3.** Regenerated against the series state from CachyOS
+  `origin/7.4/bbr3` (`5e201ec1d3c9` + `f5b7232063fb`). The
+  `tcp_disconnect()` hunk gained the new `tp->rcv_collapse_credit = 0;`
+  context line. The rc keeps its 7.3 squash.
+- **`1175`.** Hunk #17 (`hdmi_automation_enable()`) dropped — the new base
+  replaced that debugfs writer with `debugfs_create_bool()` in
+  `e3b643d7864d`. The remaining 18 hunks apply.
+- **`9207`.** Hunk #4 context rebased for the series tree: the salkim
+  adaptation has no blank line before the loop's closing brace.
+
+### Updated (4)
+
+**`2052`–`2055` CAKE v8 → v9** (cover
+`<QDISC-BA27.v9.r0.20261108195325@mojatatu.com>`, 2026-11-10). The classifier
+helper comment is reworded; `2054` replaces the v8 `qstats_backlog_sub()`
+undo with a snapshot-based re-derivation of the aggregate backlog and passes
+the child's actual growth up the RED chain; `2055` passes `flow_mode`
+explicitly and uses `qdisc_drop_reason()`. Verified as a cumulative
+four-patch swap on a CAKE-less preview tree.
+
+### Not carried here
+
+The thirteen rc carries (`1187`, `1188`, `1336`–`1346`) are already in the
+`next-20261110` base, so they are rc-only. The new salkim userq follow-ups and
+the vblank/flip series are deferred for the reasons in the rc ledger.
+
+### Series state
+
+**166 patches** (172 - 6). `audit_series.py`: **166/166** on
+`next-20261110`. The rc series is **356/356** on `v7.3`.

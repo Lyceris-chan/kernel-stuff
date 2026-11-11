@@ -1,0 +1,61 @@
+From b48f3f3ea61909c45ebc851ce6b52f6053173758 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Amadeusz=20S=C5=82awi=C5=84ski?= <amade@asmblr.net>
+Date: Tue, 27 Oct 2026 20:35:58 +0100
+Subject: [PATCH] drm/amdgpu: Prevent debugfs nullptr dereference
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Running
+cat /sys/kernel/debug/dri/0/psp_spirom_dump
+with amdgpu card that doesn't support it leads to nullptr dereference.
+Add checks to prevent that.
+
+Reviewed-by: Alex Deucher <alexander.deucher@amd.com>
+Signed-off-by: Amadeusz Sławiński <amade@asmblr.net>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_psp.c | 6 ++++++
+ drivers/gpu/drm/amd/amdgpu/amdgpu_psp.h | 2 +-
+ 2 files changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_psp.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_psp.c
+index 01dca6858833..c0ed3e24b684 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_psp.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_psp.c
+@@ -5376,6 +5376,9 @@ static int psp_read_spirom_debugfs_open(struct inode *inode, struct file *filp)
+ 	struct spirom_bo *bo_triplet;
+ 	int ret;
+ 
++	if (!adev->psp.funcs || !adev->psp.funcs->dump_spirom)
++		return -EOPNOTSUPP;
++
+ 	/* serialize the open() file calling */
+ 	if (!mutex_trylock(&adev->psp.mutex))
+ 		return -EBUSY;
+@@ -5468,6 +5471,9 @@ void amdgpu_psp_debugfs_init(struct amdgpu_device *adev)
+ #if defined(CONFIG_DEBUG_FS)
+ 	struct drm_minor *minor = adev_to_drm(adev)->primary;
+ 
++	if (!adev->psp.funcs || !adev->psp.funcs->dump_spirom)
++		return;
++
+ 	debugfs_create_file_size("psp_spirom_dump", 0444, minor->debugfs_root,
+ 				 adev, &psp_dump_spirom_debugfs_ops, AMD_VBIOS_FILE_MAX_SIZE_B * 2);
+ #endif
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_psp.h b/drivers/gpu/drm/amd/amdgpu/amdgpu_psp.h
+index a4ec60f6c317..975d12359358 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_psp.h
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_psp.h
+@@ -574,7 +574,7 @@ struct amdgpu_psp_funcs {
+ 	(psp)->funcs->update_spirom((psp), fw_pri_mc_addr) : -EINVAL)
+ 
+ #define psp_dump_spirom(psp, fw_pri_mc_addr) \
+-	((psp)->funcs->dump_spirom ? \
++	(((psp)->funcs && (psp)->funcs->dump_spirom) ? \
+ 	(psp)->funcs->dump_spirom((psp), fw_pri_mc_addr) : -EINVAL)
+ 
+ #define psp_vbflash_status(psp) \
+-- 
+2.56.1
+
