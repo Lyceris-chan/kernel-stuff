@@ -16,13 +16,18 @@ diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_gfx.c b/drivers/gpu/drm/amd/amdgp
 index 0ae6e990c310..04cd05c62515 100644
 --- a/drivers/gpu/drm/amd/amdgpu/amdgpu_gfx.c
 +++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_gfx.c
-@@ -2485,15 +2485,22 @@ int amdgpu_gfx_reset_mes_compute(struct amdgpu_device *adev,
+@@ -2577,7 +2577,8 @@
  	struct mes_remove_queue_input *queue_input = (struct mes_remove_queue_input *)faulty_queue_input;
  	struct amdgpu_gfx_deferred_entry deferred_end[AMDGPU_MAX_COMPUTE_RINGS + 1];
  	int n_deferred = 0;
 -	int ring_err;
 +	int ring_err, resume_err;
 +	bool suspended;
+ 	uint32_t xcc_mask, xcc_id = 0, xcp_id = 0;
+ 
+ 	if (xcp) {
+@@ -2588,12 +2589,18 @@
+ 	}
  
  	guard(mutex)(&adev->gfx.mec.reset_mutex);
 +	if (uq) {
@@ -35,27 +40,17 @@ index 0ae6e990c310..04cd05c62515 100644
  	/* suspend all will determine which queues are hung.
  	 * reset detect will return the array of bad queue doorbells
  	 */
- 	r = amdgpu_mes_suspend(adev, 0);
+ 	r = amdgpu_mes_suspend(adev, xcc_id);
 +	suspended = !r && amdgpu_mes_suspend_resume_all_supported(adev);
  	/* if suspend all success, it should no hang queue */
- 	if (!r)
- 		/* always reset the KCQ/userq since we need to signal the fence
-@@ -2519,7 +2526,8 @@ int amdgpu_gfx_reset_mes_compute(struct amdgpu_device *adev,
- 		n_deferred++;
- 	}
- 	if (uq) {
--		r = mes_userq_reset(uq);
-+		/* A suspended queue only needs removal before other gangs resume. */
-+		r = suspended ? mes_userq_cancel(uq) : mes_userq_reset(uq);
- 		if (r)
- 			goto out;
- 	}
-@@ -2574,7 +2582,9 @@ int amdgpu_gfx_reset_mes_compute(struct amdgpu_device *adev,
+ 	if (!r) {
+ 		dev_dbg(adev->dev, "Suspend all succeeds. xcc_id %d\n", xcc_id);
+@@ -2682,7 +2689,9 @@
  
  out:
  	/* resume all will enable the non-hung queues */
--	amdgpu_mes_resume(adev, 0);
-+	resume_err = amdgpu_mes_resume(adev, 0);
+-	amdgpu_mes_resume(adev, xcc_id);
++	resume_err = amdgpu_mes_resume(adev, xcc_id);
 +	if (resume_err)
 +		return r ? r : resume_err;
  

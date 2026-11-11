@@ -12588,3 +12588,158 @@ and `xanmod` had no on-target change.
 **356 patches** (343 + 13). `audit_series.py`: **356/356** on `v7.3`. The
 preview is **166 patches** (172 - 6 absorbed) and **166/166** on
 `next-20261110`.
+
+## Sweep 2026-11-11 (second pass) — `next-20261111`; `1189`, `2423`, `2424`; `2415` v3
+
+The preview base moved to `next-20261111` (tagged 17:42 UTC on 2026-11-11, after
+the `next-20261110` build). The base-bump detail — nine absorbed preview drops
+and five salkim userq ports — is in `sleepy-next/PATCH_SOURCES.md`. This entry
+covers the source sweep and the rc carries.
+
+### Adopted (3 new, 1 update)
+
+- **`1189`** — `drm/amd/display: Fix dm i2c adapter lifetime on teardown` v2
+  (Lu Yao, `<20261111021925.63610-1-yaolu@kylinos.cn>`, 2026-11-11).
+  `devm_i2c_add_adapter()` only calls `i2c_del_adapter()` on teardown, so the
+  `struct amdgpu_i2c_adapter` allocated in `amdgpu_dm_create_i2c()` is never
+  freed, and the connector-init error path cannot `kfree()` it while the
+  adapter is still registered. The patch allocates it with devres and releases
+  the `i2c_devres_group` in `amdgpu_dm_fini()` before `dc_destroy()`, which
+  also removes the `dc_destroy()`/`i2c->ddc_service` ordering hazard. `Fixes:
+  5b3eca05cfb0`, which is in `v7.3`. **Backport adaptation:** `v7.3` has no
+  `devm_kzalloc_obj()`, so the carried copy uses
+  `devm_kzalloc(adev->dev, sizeof(...), GFP_KERNEL)` — same devres lifetime.
+  Applies to both packages.
+- **`2423`** — `sched_ext: make DSQ iterator stay drained after NULL`
+  (`fcbff7b56a88`, Kang Chen, `Signed-off-by: Tejun Heo`). `nldsq_cursor_next_task()`
+  unlinks the cursor at the end of a DSQ, so a later `next()` restarts from the
+  head and returns a task pointer while the verifier believes the iterator is
+  DRAINED and `R0 == 0`. The fix records the drained state in the cursor flags.
+  **Backport adaptation:** `v7.3`'s `enum scx_dsq_iter_flags` has no
+  `__SCX_DSQ_ITER_HAS_REENQ`; bit 28 is free there, so the backport adds
+  `__SCX_DSQ_ITER_DRAINED = 1U << 28` and the same check in
+  `bpf_iter_scx_dsq_next()`. The `BUILD_BUG_ON()` against
+  `__SCX_DSQ_LNODE_PRIV_SHIFT` (16) still holds. Rc only — `next-20261111`
+  already has it.
+- **`2424`** — `sched_ext: Fix partial-SMT core counting in calc_shard_layout()`
+  (`3b1ce3e0ccba`, Zhang Qiao). Counts a core at its first sibling inside
+  `@llc_cpus`, matching the cores `scx_cid_init()` builds; applies to `v7.3`
+  unchanged. Rc only.
+- **`2415`** — updated to v3 (`<PATCH v3>`, 2026-09-02 17:36 +0800, with
+  `Acked-by: Andrea Righi`). v3 collapses the
+  `__scx_kf_allowed_ctx()` inline + wrapper macro into one statement-expression
+  macro that uses `__func__` directly; behaviour is unchanged. Swapped by
+  reverse-applying the carried revision and applying v3 to the series tree.
+
+### Measured: the GFX pipe-reset gates are not met
+
+The 2026-11-11 ledger deferred the gfx12 PER_PIPE enablement (`ce652d42`)
+because "our CP firmware versions have not been checked". They have now been
+read from `/sys/kernel/debug/dri/0000:03:00.0/amdgpu_firmware_info`:
+
+| Firmware | Installed | Patch gate | Meets? |
+|---|---|---|---|
+| PFP | `0x00000c94` (3220) | 3220 | yes |
+| ME | `0x00000c26` (3110) | 3120 | **no** |
+| MEC | `0x00000da2` (3490) | 3490 | yes |
+
+With the installed firmware the patch would leave `PER_PIPE` off, so it is
+inert on this machine until the ME firmware reaches 3120. Not carried.
+
+### Deferred and rejected
+
+- **HDMI FRL training fixes (3 patches, Andrzej Piątysek, dri-devel
+  2026-11-10, `<20261110130956.160024-1-andrzej.piatyszek@gmail.com>`)** — the
+  most on-target find of the sweep: an RX 9070 XT trainer, tested on 7.3, that
+  raises the LTS:3 wait to 1 s, programs the requested TxFFE immediately and
+  retries the same rate after a sink timeout. It is written against
+  `47df73aa49d1`; on `v7.3` the TxFFE hunk's removal block carries our
+  `flt_no_timeout` line and the timeout patch targets a `poll_timeout_ns`
+  loop where we have `max_polls`, so it needs a deliberate backport rather
+  than a drop-in. It also changes the FRL training path this machine's HDMI
+  output depends on, and has no maintainer review yet (posted one day ago).
+  Defer to a dedicated adoption.
+- **GUP-fast large-folio batching (6 patches, Yeoreum Yun, 2026-11-10,
+  merged into `next-20261111`)** — performance, not a fix: the users are
+  `iov_iter_extract_user_pages()`, io_uring buffer registration and RDMA. Not
+  carried into `v7.3`; revisit if an io_uring-heavy workload shows up.
+- **`mm/zswap: validate dlen and normalize comp_ret`** (`066259da0b54`) — the
+  zswap store path was rewritten after `v7.3`; neither direction applies.
+- **DDC over AUX for native DP sinks v3** (Mario Limonciello,
+  `<20261110-superm1-amdgpu-ddc-v3-1-9436b04d1e31@kernel.org>`) — correct fix
+  for DP/eDP DDC/CI, but inert on this machine's HDMI link. The connector
+  adapter is also teardown-relevant, so reconsider together with `1189` on a
+  DP topology.
+- **zram shared-stream series (7 patches, 2026-10-25)** — zram is not used
+  here (zswap + swapfile).
+- **DCN6 series (74 patches), DCN42B/DCN60 stutter changes** — wrong display
+  IP (`dcn60`/`dcn42` run under GC 11.5, not GC 12.0).
+- **Fault shader-cleaner series (3 patches, Kent Russell, 2026-11-10)** —
+  `gfx_v9_4_2.c` (MI300 / Aldebaran, CDNA3) only; wrong silicon.
+- **`gfx11` pipe-reset enablement** — GC 11.x is not this GPU.
+- **`drm/amd/pm: bring back od_uclk_changed`** (Sasha Levin, 2026-11-11) — a
+  linux-next merge fixup for `smu13.0.0` (RDNA3); not a kernel fix to carry.
+- **Vblank/flip series and the CPU page-table RFC v2** — unchanged reasons
+  from the 2026-11-11 ledger.
+
+### Version sweep
+
+The full subject index now spans sixteen lore mirrors (62 075 subjects; the
+`lore-rust-for-linux` mirror is stale at 2026-09-24 and `lore-stable` at
+2022-05-18 — both are reported unrefreshed, not clean). 41 higher-version
+postings matched carried subjects:
+
+- **Adopted:** `2415` v3 (above).
+- **Content-identical** (changed-line sets equal, or reverse-applying cleanly
+  to the series tree): `1179` v2, `1231`/`1232` v2, `1330` v2, `2032` v3,
+  `2037` v2, `2039` v3, `2056` v4, `2067` v4, `2144` v2, `2154` v3, `2173`
+  v2, `2174` v3, `2185` v6, `2191` v3, `2193` v3, `2197` v2, `2315` v5,
+  `2317` v5, `2322` v4, `2803` v2, `2809` v2.
+- **`1183` v2** — the driver hunks are identical; the only delta is the KUnit
+  `EXPECT_EQ` counts, where our test version differs and the test hunk does
+  not apply.
+- **`1317` v6** — gpu/buddy; still inert under DCN 4.0.1.
+- **`2302` v4, `2308` v4, `2313`/`2314` v5** — the unmerged kbuild rework;
+  still does not apply to `v7.3`.
+- **`2806` v2, `3000` v3** — written against a newer base; neither direction
+  applies, so the carried revisions stay.
+- **`2811` v2** — one comment line.
+
+### Reverts
+
+The `next-20261110..next-20261111` delta has two reverts — `lib/sort.c`
+`_nonatomic()` and the KVM EFER/CPUID check — and torvalds has the
+`perf/aux` and "Allocate DCN32/1 dmub memory to GTT" reverts. None targets
+carried work: we carry no sort, KVM, perf/aux or DCN 3.2 patch.
+
+### Tracker and Phoronix
+
+25 open issues were updated since 2026-11-10. On-target threads: `#6121`
+(RX 9070 XT HDMI VRR on 7.4 — no fix), `#6115` (DCN401 cursor stutter; the
+contributor patch is not ready — Sashiko found a `crtc->state` use-after-free
+in `dm_ism_all_crtcs_idle()`), `#6100` (gfx1201/R9700 SMU DisallowGfxOff
+stall; no fix), `#6116` (9070 XT reset after sleep; agd5f asked for a
+bisect), `#5511` unchanged. No patch to carry. Phoronix 2026-11-10..11: GFX13
+/ RDNA5 Mesa bring-up, R300/R500, EPYC server parts and Intel microcode — no
+on-target RDNA4 or kernel article.
+
+### Other sources
+
+- **salkim** — `kernel-salkim` `origin/salkim-7.3` and `kernel-salkim-74`
+  `origin/salkim-7.4` are both still at 2026-11-09 (`8fd65e1ca` /
+  `e179ea7f`); no new commits. The 7.4 tree's userq batch series is the source
+  for the five preview ports recorded in the preview ledger.
+- **CachyOS** — `cachyos-kernel-patches` advanced to `21d72141` ("7.3: Update
+  handheld patch", 2026-11-11); handheld/laptop only, not this desktop.
+  `cachyos-linux` is unchanged (`7.4/bbr3` at 2026-11-04), sirlucjan stays at
+  `7275a4ad`.
+- **CAST and NAP** — no update: `lru_cast` `origin/main` is `ce117bb` (v0.2.10)
+  and firelzrd NAP is `v0.6.6` (`5092cfd`). BORE 7.0.1r2 targets 6.12/7.2 and
+  remains unused while `scx_cake` is the scheduler.
+- **linux-tkg, xanmod** — no on-target change.
+
+### Series state
+
+**359 patches** (356 + `1189`, `2423`, `2424`). `audit_series.py`:
+**359/359** on `v7.3`. The preview is **158 patches** and **158/158** on
+`next-20261111`.

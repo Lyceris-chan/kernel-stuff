@@ -1817,3 +1817,77 @@ the vblank/flip series are deferred for the reasons in the rc ledger.
 
 **166 patches** (172 - 6). `audit_series.py`: **166/166** on
 `next-20261110`. The rc series is **356/356** on `v7.3`.
+
+## 2026-11-11 (second pass) — bump to `next-20261111`; nine absorbed drops, five ports
+
+`next-20261111` (`aaa2f954c21b`, tag object `6aa7dbf8ad5e`) was tagged at
+17:42 UTC on 2026-11-11, thirteen hours after `next-20261110`. The base moves
+one snapshot; the package becomes `2026.11.11-1`. The delta is 1424 commits
+(1061 non-merge), 43 under `drivers/gpu/drm/amd` (36 non-merge). The one material change for
+this series is `892f46c7ae70` ("drm/amdgpu: fix TLB invalidation fence
+handling v4"), which replaces `vm->last_tlb_flush` with `vm->last_seq_flush`
+plus `vm->last_tlb_inv` and gives `amdgpu_vm_tlb_fence_create()` a `dep`
+argument — the model the salkim userq rework was written against.
+
+### Dropped — absorbed by the new base (9)
+
+Removed from `source=()` and from disk:
+
+- **`1186`** `drm/amd/display: Add support for more PSP footer sizes` — base
+  commit `a6836fcbb5b2`.
+- **`1238`** `drm/amd/pm: time SMU metrics caches with ktime` — base commit
+  `5c6732aa3abb`.
+- **`1301`** `drm/amdkfd: Don't reuse a VRAM page that is still referenced` —
+  base commit `1f19aa7acacb`.
+- **`1327`** `drm/amdgpu: release the IMU firmware with the other GFX
+  microcode` — base commit `ae8aff53de90`.
+- **`1333`** `drm/amdgpu: fix the error handling of amdgpu_vm_init_entities()`
+  — base commit `2f538f57501a`.
+- **`1334`** `drm/amdkfd: fix double lock acquisition in set_perfcount` — base
+  commit `471ec8156aeb`.
+- **`1335`** `drm/amdkfd: preempt the HWS runlist once in set_perfcount` —
+  base commit `eb47f647cf66`.
+- **`2809`** `mm: vmscan: allow writeout of swapcache folios without anon
+  mappings` — base commit `9b4df0dbda5a`.
+- **`2811`** `mm/swap: publish cluster tables after reacquiring allocator
+  locks` — base commit `45d3f24c31f4`.
+
+Each was detected by the audit as `Skipping patch` against `next-20261111` and
+confirmed by subject in the snapshot history. `sleepy-rc` keeps all nine;
+`v7.3` lacks every one of them.
+
+### Ported (5)
+
+- **`9214`** — replaced with salkim's `9ba223fce66a`, which carries the
+  TLB-completion reporting forward onto the `dep` signature. The `int` return,
+  the `dma_fence_unwrap_for_each()` status walk and the selftest are unchanged
+  in intent.
+- **`9215`** — hunks #1 and #3 rebased over `d9b840682476` (the new `xcp`
+  argument in `amdgpu_gfx_reset_mes_compute()`) and `3e88b710bb68` (the
+  `dev_dbg()` block); the `mes_userqueue.c` hunks still applied. The added
+  cancel-before-reset gate is unchanged.
+- **`9219`** — the `amdgpu_vm_update_end()` helper now passes `*fence` to
+  `amdgpu_vm_tlb_flush()`; the v4 rework changed that function to take a plain
+  fence. One context line and one added line, no behaviour change.
+- **`9233`** — the tail of `amdgpu_gem_va_update_vm()` is the v4 merged-fence
+  block rather than the old `dma_fence_get(vm->last_update)`, so the hunk now
+  removes that block and returns
+  `amdgpu_gem_va_update_fence(vm, bo_va, operation, survivors)`. The added
+  survivors loop branches to the existing `error` label instead of a new
+  `out` label, and the now-unused `fence` local is dropped.
+- **`9239`** — reduced from the TLB-field mapping to its remaining tree
+  adaptation: the `adev`/`current_domain` locals in
+  `amdgpu_vm_bo_update_done()`. The v4 base now supplies `last_tlb_inv` and the
+  four-argument fence helper itself, so the mapping and the extra `out:` label
+  are gone.
+
+### Added (1)
+
+- **`1189`** — `drm/amd/display: Fix dm i2c adapter lifetime on teardown` v2
+  (Lu Yao, `<20261111021925.63610-1-yaolu@kylinos.cn>`, 2026-11-11). The same
+  patch is in the rc series; see the rc ledger for the triage.
+
+### Series state
+
+**158 patches** (166 - 9 absorbed + 1189). `audit_series.py`: **158/158** on
+`next-20261111`. The rc series is **359/359** on `v7.3`.

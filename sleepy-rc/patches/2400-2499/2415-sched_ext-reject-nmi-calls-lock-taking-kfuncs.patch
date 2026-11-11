@@ -1,7 +1,7 @@
-From c659e506f9a77d7a0e100d3555bccd5a44babf0e Mon Sep 17 00:00:00 2001
+From nobody Mon Sep 17 00:00:00 2001
 From: Wanwu Li <liwanwu@kylinos.cn>
 Date: Wed, 2 Sep 2026 17:36:11 +0800
-Subject: [PATCH] sched_ext: Reject NMI calls to lock-taking kfuncs
+Subject: [PATCH v3] sched_ext: Reject NMI calls to lock-taking kfuncs
 
 commit e06ece82d7b0 ("sched_ext: Report NMI kicks with scx_error()") made
 scx_bpf_kick_cpu() reject NMI calls, and its cover letter describes the
@@ -48,24 +48,33 @@ cpuperf_cur/cap, sub_caps, the idle cpumask helpers and the cid lookups)
 take no scheduler lock on the path a tracing program reaches them, and were
 audited to that effect; they are correctly left unguarded. The select_cpu
 kfuncs do take pi_lock, but scx_kfunc_context_filter() only exposes the
-any/idle/cid sets to BPF_PROG_TYPE_TRACING, and struct_ops programs never
-run in NMI, so no lock-taking path here is reachable from NMI.
+any/idle/cid sets to BPF_PROG_TYPE_TRACING, and struct_ops run in task
+context, so no lock-taking path here is reachable from NMI.
 
 Link: https://lore.kernel.org/r/20260901095652.1009104-1-liwanwu@kylinos.cn
-Signed-off-by: Wanwu Li <liwanwu@kylinos.cn>
 Acked-by: Andrea Righi <arighi@nvidia.com>
-Signed-off-by: Tejun Heo <tj@kernel.org>
+Signed-off-by: Wanwu Li <liwanwu@kylinos.cn>
 ---
+V2 -> V3:
+ - Collapse the __scx_kf_allowed_ctx() inline + scx_kf_allowed_ctx() macro
+   into a single macro that takes the function name implicitly (Tejun Heo).
+ - Guard DSQ iteration once in bpf_iter_scx_dsq_new(); drop the redundant
+   checks in bpf_iter_scx_dsq_next()/destroy() (Tejun Heo).
+ - Use unlikely(!sch) in scx_bpf_destroy_dsq() (Tejun Heo).
+
+v2: https://lore.kernel.org/r/20260902023124.1422942-1-liwanwu@kylinos.cn
+v1: https://lore.kernel.org/r/20260901095652.1009104-1-liwanwu@kylinos.cn
+
  kernel/sched/ext/ext.c      | 30 +++++++++++++++++++++---------
  kernel/sched/ext/internal.h | 16 ++++++++++++++++
  kernel/sched/ext/sub.c      |  3 +++
  3 files changed, 40 insertions(+), 9 deletions(-)
 
 diff --git a/kernel/sched/ext/ext.c b/kernel/sched/ext/ext.c
-index 6a5c83aea047..387953b92668 100644
+index 10af28a9f2c0..3f8bde1dbb4c 100644
 --- a/kernel/sched/ext/ext.c
 +++ b/kernel/sched/ext/ext.c
-@@ -9537,14 +9537,8 @@ void scx_kick_cpu(struct scx_sched *sch, s32 cpu, u64 flags)
+@@ -9518,14 +9518,8 @@ void scx_kick_cpu(struct scx_sched *sch, s32 cpu, u64 flags)
  	struct rq *this_rq;
  	unsigned long irq_flags;
  
@@ -81,7 +90,7 @@ index 6a5c83aea047..387953b92668 100644
  
  	local_irq_save(irq_flags);
  
-@@ -9712,8 +9706,13 @@ __bpf_kfunc void scx_bpf_destroy_dsq(u64 dsq_id, const struct bpf_prog_aux *aux)
+@@ -9693,8 +9687,13 @@ __bpf_kfunc void scx_bpf_destroy_dsq(u64 dsq_id, const struct bpf_prog_aux *aux)
  
  	guard(rcu)();
  	sch = scx_prog_sched(aux);
@@ -97,7 +106,7 @@ index 6a5c83aea047..387953b92668 100644
  }
  
  /**
-@@ -9750,6 +9749,9 @@ __bpf_kfunc int bpf_iter_scx_dsq_new(struct bpf_iter_scx_dsq *it, u64 dsq_id,
+@@ -9731,6 +9730,9 @@ __bpf_kfunc int bpf_iter_scx_dsq_new(struct bpf_iter_scx_dsq *it, u64 dsq_id,
  	if (unlikely(!sch))
  		return -ENODEV;
  
@@ -107,7 +116,7 @@ index 6a5c83aea047..387953b92668 100644
  	if (flags & ~__SCX_DSQ_ITER_USER_FLAGS)
  		return -EINVAL;
  
-@@ -9876,6 +9878,9 @@ __bpf_kfunc void scx_bpf_dsq_reenq(u64 dsq_id, u64 reenq_flags,
+@@ -9857,6 +9859,9 @@ __bpf_kfunc void scx_bpf_dsq_reenq(u64 dsq_id, u64 reenq_flags,
  		return;
  	}
  
@@ -117,7 +126,7 @@ index 6a5c83aea047..387953b92668 100644
  	/* not specifying any filter bits is the same as %SCX_REENQ_ANY */
  	if (!(reenq_flags & __SCX_REENQ_FILTER_MASK))
  		reenq_flags |= SCX_REENQ_ANY;
-@@ -10263,6 +10268,9 @@ __bpf_kfunc void scx_bpf_cpuperf_set(s32 cpu, u32 perf, const struct bpf_prog_au
+@@ -10244,6 +10249,9 @@ __bpf_kfunc void scx_bpf_cpuperf_set(s32 cpu, u32 perf, const struct bpf_prog_au
  	if (unlikely(!sch))
  		return;
  
@@ -127,7 +136,7 @@ index 6a5c83aea047..387953b92668 100644
  	scx_cpuperf_set(sch, cpu, perf);
  }
  
-@@ -10288,6 +10296,10 @@ __bpf_kfunc s32 scx_bpf_cidperf_set(s32 cid, u32 perf,
+@@ -10269,6 +10277,10 @@ __bpf_kfunc s32 scx_bpf_cidperf_set(s32 cid, u32 perf,
  	sch = scx_prog_sched(aux);
  	if (unlikely(!sch))
  		return -ENODEV;
@@ -139,10 +148,10 @@ index 6a5c83aea047..387953b92668 100644
  	if (cpu < 0)
  		return cpu;
 diff --git a/kernel/sched/ext/internal.h b/kernel/sched/ext/internal.h
-index 076a351bb3f2..4f876e8f0655 100644
+index 27bbf5e04d90..ca8ebb11f03c 100644
 --- a/kernel/sched/ext/internal.h
 +++ b/kernel/sched/ext/internal.h
-@@ -2115,6 +2115,22 @@ extern struct scx_sched *scx_enabling_sub_sched;
+@@ -2091,6 +2091,22 @@ extern struct scx_sched *scx_enabling_sub_sched;
  #define scx_error(sch, fmt, args...)						\
  	scx_exit((sch), SCX_EXIT_ERROR, 0, fmt, ##args)
  
@@ -151,25 +160,25 @@ index 076a351bb3f2..4f876e8f0655 100644
 + * touch the kick lists, which are only protected by irq masking, can't run
 + * there, so abort the scheduler instead. scx_error() is NMI-safe.
 + */
-+static __always_inline bool __scx_kf_allowed_ctx(struct scx_sched *sch, const char *who)
-+{
-+	if (unlikely(in_nmi())) {
-+		scx_error(sch, "%s called from NMI", who);
-+		return false;
-+	}
-+	return true;
-+}
-+
-+#define scx_kf_allowed_ctx(sch)	__scx_kf_allowed_ctx((sch), __func__)
++#define scx_kf_allowed_ctx(sch)						\
++({										\
++	bool __allowed = true;							\
++										\
++	if (unlikely(in_nmi())) {						\
++		scx_error((sch), "%s called from NMI", __func__);		\
++		__allowed = false;						\
++	}									\
++	__allowed;								\
++})
 +
  /**
   * scx_root_protected_live - Root sched for paths that only run while live
   *
 diff --git a/kernel/sched/ext/sub.c b/kernel/sched/ext/sub.c
-index a17d84db93bd..380a5653dc52 100644
+index 0554448835bd..78349acd0a67 100644
 --- a/kernel/sched/ext/sub.c
 +++ b/kernel/sched/ext/sub.c
-@@ -2267,6 +2267,9 @@ static s32 sub_cap_preamble(u64 cgroup_id, u64 caps, const struct bpf_prog_aux *
+@@ -2265,6 +2265,9 @@ static s32 sub_cap_preamble(u64 cgroup_id, u64 caps, const struct bpf_prog_aux *
  	if (unlikely(!parent))
  		return -ENODEV;
  
@@ -179,6 +188,3 @@ index a17d84db93bd..380a5653dc52 100644
  	if (!scx_is_cid_type()) {
  		scx_error(parent, "sub-cap kfuncs require a cid-form scheduler");
  		return -EOPNOTSUPP;
--- 
-2.55.0
-

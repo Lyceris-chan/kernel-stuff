@@ -1,36 +1,37 @@
-From a90456a39e3361e1344087079f1045d6c8d6275e Mon Sep 17 00:00:00 2001
+From 9ba223fce66a8d42edf412728be2a4d986250ec2 Mon Sep 17 00:00:00 2001
 From: Erhan Bilgili <erhan.bilgili@gmail.com>
 Date: Sat, 31 Oct 2026 00:27:05 +0100
 Subject: [PATCH] drm/amdgpu: Report TLB completion failures.
 
-(cherry picked from commit 41cef94209e7785866ddd62fd98c121669d26616)
+(cherry picked from commit 9ba223fce66a8d42edf412728be2a4d986250ec2)
 ---
- drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h        |   7 +-
- .../gpu/drm/amd/amdgpu/amdgpu_vm_tlb_fence.c  |  68 ++++--
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h        |   8 +-
+ .../gpu/drm/amd/amdgpu/amdgpu_vm_tlb_fence.c  |  75 ++++---
  .../drivers/amdgpu/test_vm_tlb_fence.py       | 195 ++++++++++++++++++
- 3 files changed, 244 insertions(+), 26 deletions(-)
+ 3 files changed, 250 insertions(+), 28 deletions(-)
  create mode 100644 tools/testing/selftests/drivers/amdgpu/test_vm_tlb_fence.py
 
 diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
-index f9203d801e9c..710bc076bd53 100644
+index 713a597027bb..3b7b548ccf48 100644
 --- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
 +++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
-@@ -583,10 +583,9 @@ void amdgpu_vm_update_fault_cache(struct amdgpu_device *adev,
+@@ -576,10 +576,10 @@ void amdgpu_vm_update_fault_cache(struct amdgpu_device *adev,
  				  uint64_t addr,
  				  uint32_t status,
  				  unsigned int vmhub);
 -void amdgpu_vm_tlb_fence_create(struct amdgpu_device *adev,
--				 struct amdgpu_vm *vm,
--				 struct dma_fence **fence);
--
+-				struct amdgpu_vm *vm,
+-				struct dma_fence *dep,
+-				struct dma_fence **fence);
 +int amdgpu_vm_tlb_fence_create(struct amdgpu_device *adev,
 +			       struct amdgpu_vm *vm,
++			       struct dma_fence *dep,
 +			       struct dma_fence **fence);
  void amdgpu_vm_print_task_info(struct amdgpu_device *adev,
  			       struct amdgpu_task_info *task_info);
  
 diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_tlb_fence.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_tlb_fence.c
-index b0002c898386..d58b90d77dc4 100644
+index 180e02de73e9..364291092617 100644
 --- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_tlb_fence.c
 +++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_tlb_fence.c
 @@ -22,6 +22,7 @@
@@ -99,13 +100,20 @@ index b0002c898386..d58b90d77dc4 100644
  
  	dma_fence_signal(&f->base);
  	dma_fence_put(&f->base);
-@@ -75,23 +99,22 @@ static const struct dma_fence_ops amdgpu_tlb_fence_ops = {
- 	.get_timeline_name = amdgpu_tlb_fence_get_timeline_name
- };
- 
--void amdgpu_vm_tlb_fence_create(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+@@ -84,25 +108,27 @@ static const struct dma_fence_ops amdgpu_tlb_fence_ops = {
+  *
+  * Creates a TLB invalidation fence which signals when all the VMIDs assigned to
+  * the PASID of the VM are invalidated.
++ * Returns an error if synchronous invalidation fails. Asynchronous failures
++ * are reported through the returned fence.
+  */
+-void amdgpu_vm_tlb_fence_create(struct amdgpu_device *adev,
+-				struct amdgpu_vm *vm,
+-				struct dma_fence *dep,
 -				struct dma_fence **fence)
-+int amdgpu_vm_tlb_fence_create(struct amdgpu_device *adev, struct amdgpu_vm *vm,
++int amdgpu_vm_tlb_fence_create(struct amdgpu_device *adev,
++			       struct amdgpu_vm *vm,
++			       struct dma_fence *dep,
 +			       struct dma_fence **fence)
  {
  	struct amdgpu_tlb_fence *f;
@@ -117,25 +125,25 @@ index b0002c898386..d58b90d77dc4 100644
 -		 * We can't fail since the PDEs and PTEs are already updated, so
 -		 * just block for the dependency and execute the TLB flush
 -		 */
--		if (*fence)
--			dma_fence_wait(*fence, false);
+-		if (dep)
+-			dma_fence_wait(dep, false);
 -
 -		amdgpu_gmc_flush_gpu_tlb_pasid(adev, vm->pasid, 2, true, 0);
+-		return;
 +		/* Preserve update ordering without an asynchronous fence. */
-+		r = amdgpu_tlb_fence_flush(adev, vm->pasid, *fence);
++		r = amdgpu_tlb_fence_flush(adev, vm->pasid, dep);
 +		if (r)
 +			return r;
 +
 +		dma_fence_put(*fence);
- 		*fence = dma_fence_get_stub();
--		return;
++		*fence = dma_fence_get_stub();
 +		return 0;
  	}
  
  	f->adev = adev;
-@@ -108,4 +131,5 @@ void amdgpu_vm_tlb_fence_create(struct amdgpu_device *adev, struct amdgpu_vm *vm
- 	schedule_work(&f->work);
+@@ -120,4 +146,5 @@ void amdgpu_vm_tlb_fence_create(struct amdgpu_device *adev,
  
+ 	dma_fence_put(*fence);
  	*fence = &f->base;
 +	return 0;
  }
@@ -340,3 +348,6 @@ index 000000000000..156c7a2132ff
 +
 +if __name__ == '__main__':
 +    unittest.main()
+-- 
+2.56.1
+

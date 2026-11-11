@@ -186,10 +186,10 @@ index 0b46b3b2866f..b7d6be83924e 100644
  		goto error_free;
  
 -	if (params.needs_flush) {
--		amdgpu_vm_tlb_flush(&params, fence, tlb_cb);
+-		amdgpu_vm_tlb_flush(&params, *fence, tlb_cb);
 -		tlb_cb = NULL;
 +	if (params->needs_flush) {
-+		amdgpu_vm_tlb_flush(params, fence, batch->tlb_cb);
++		amdgpu_vm_tlb_flush(params, *fence, batch->tlb_cb);
 +		batch->tlb_cb = NULL;
  	}
  

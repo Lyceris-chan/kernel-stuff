@@ -18,6 +18,50 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.11.11-1-sleepy-next (linux-next `next-20261111`)]: 2026-11-11
+
+`next-20261111` was tagged at 17:42 UTC on 2026-11-11, thirteen hours after
+`next-20261110`. The `next-20261110` entry below says no such tag existed —
+it did not at that build's time.
+
+### Changed
+
+- Base `next-20261110` → `next-20261111`; release `2026.11.11-1`.
+- `892f46c7ae70` ("drm/amdgpu: fix TLB invalidation fence handling v4") rewrote
+  the VM TLB-fence model: `vm->last_tlb_flush` became `vm->last_seq_flush`
+  plus `vm->last_tlb_inv`, and `amdgpu_vm_tlb_fence_create()` gained a `dep`
+  argument. Five salkim userq patches were ported: `9214` (new revision
+  `9ba223fce66a`), `9215` (hunks rebased over the new `xcp` argument),
+  `9219` (`*fence` at the flush call), `9233` (tail rebuilt on the merged
+  fence) and `9239` (reduced to the `amdgpu_vm_bo_update_done()` locals).
+- **`1189`** added: dm i2c adapter lifetime on teardown, allocated through
+  devres. The carried copy uses `devm_kzalloc()` so one patch serves both
+  bases — `v7.3` has no `devm_kzalloc_obj()`.
+
+### Removed
+
+- Nine patches the new base absorbed: `1186`, `1238`, `1301`, `1327`, `1333`,
+  `1334`, `1335`, `2809`, `2811`. The rc keeps all nine.
+
+## [7.3.0-25-sleepy-rc]: 2026-11-11
+
+### Added
+
+- **`1189`** — `drm/amd/display: Fix dm i2c adapter lifetime on teardown`
+  (Lu Yao, dri-devel 2026-11-11): the devres group is released before
+  `dc_destroy()`, fixing the adapter leak and the init-failure use-after-free.
+- **`2423`** — `sched_ext: make DSQ iterator stay drained after NULL`
+  (`fcbff7b56a88`): a restarted DSQ iteration could hand a BPF program a task
+  pointer while the verifier believed `R0 == 0`. Backported to `v7.3`'s flag
+  layout.
+- **`2424`** — `sched_ext: Fix partial-SMT core counting in calc_shard_layout()`
+  (`3b1ce3e0ccba`).
+
+### Changed
+
+- **`2415`** updated to v3: the `__scx_kf_allowed_ctx()` helper is now one
+  statement-expression macro; no behaviour change.
+
 ## [2026.11.10-1-sleepy-next (linux-next `next-20261110`)]: 2026-11-11
 
 The 2026-11-11 sweep moved the preview to `next-20261110`, which was tagged at

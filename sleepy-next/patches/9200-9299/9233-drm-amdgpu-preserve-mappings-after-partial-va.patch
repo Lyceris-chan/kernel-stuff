@@ -15,7 +15,7 @@ diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c b/drivers/gpu/drm/amd/amdgp
 index 48cdf0b0d6d0..68db16e773b0 100644
 --- a/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
 +++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
-@@ -781,6 +781,55 @@ int amdgpu_gem_metadata_ioctl(struct drm_device *dev, void *data,
+@@ -791,6 +791,55 @@
  	return r;
  }
  
@@ -71,7 +71,7 @@ index 48cdf0b0d6d0..68db16e773b0 100644
  /**
   * amdgpu_gem_va_update_vm -update the bo_va in its VM
   *
-@@ -788,6 +837,7 @@ int amdgpu_gem_metadata_ioctl(struct drm_device *dev, void *data,
+@@ -798,6 +847,7 @@
   * @vm: vm to update
   * @bo_va: bo_va to update
   * @operation: map, unmap or clear
@@ -79,19 +79,19 @@ index 48cdf0b0d6d0..68db16e773b0 100644
   *
   * Update the bo_va directly after setting its address. Errors are not
   * vital here, so they are not reported back to userspace.
-@@ -799,9 +849,10 @@ static struct dma_fence *
+@@ -809,9 +859,9 @@
  amdgpu_gem_va_update_vm(struct amdgpu_device *adev,
  			struct amdgpu_vm *vm,
  			struct amdgpu_bo_va *bo_va,
 -			uint32_t operation)
 +			u32 operation, struct amdgpu_bo_va **survivors)
  {
- 	struct dma_fence *fence;
+-	struct dma_fence *fence;
 +	unsigned int i;
  	int r = 0;
  
  	/* If the VM is not ready return only a stub. */
-@@ -828,6 +879,15 @@ amdgpu_gem_va_update_vm(struct amdgpu_device *adev,
+@@ -838,6 +888,15 @@
  			goto error;
  	}
  
@@ -101,22 +101,49 @@ index 48cdf0b0d6d0..68db16e773b0 100644
 +			continue;
 +		r = amdgpu_vm_bo_update(adev, survivors[i], false);
 +		if (r)
-+			goto out;
++			goto error;
 +	}
 +
  	/* Always update PDEs after we touched the mappings. */
  	r = amdgpu_vm_update_pdes(adev, vm, false);
- 	if (r)
-@@ -860,7 +920,7 @@ amdgpu_gem_va_update_vm(struct amdgpu_device *adev,
+ 
+@@ -845,34 +904,7 @@
  	if (r && r != -ERESTARTSYS)
  		DRM_ERROR("Couldn't update BO_VA (%d)\n", r);
  
--	return dma_fence_get(vm->last_update);
+-	if ((operation == AMDGPU_VA_OP_MAP ||
+-	     operation == AMDGPU_VA_OP_REPLACE) &&
+-	    !amdgpu_vm_is_bo_always_valid(vm, bo_va->base.bo)) {
+-
+-		/*
+-		 * For MAP/REPLACE of non per-VM BOs we need to sync to both the
+-		 * bo_va->last_pt_update and vm->last_update or otherwise we
+-		 * potentially miss the PDE updates or TLB invalidation.
+-		 */
+-		fence = dma_fence_unwrap_merge(vm->last_update,
+-					       vm->last_tlb_inv,
+-					       bo_va->last_pt_update);
+-		if (!fence)
+-			dma_fence_wait(bo_va->last_pt_update, false);
+-
+-	} else {
+-		fence = dma_fence_unwrap_merge(vm->last_update,
+-					       vm->last_tlb_inv);
+-	}
+-
+-	if (!fence) {
+-		/* As fallback in OOM situations */
+-		dma_fence_wait(vm->last_update, false);
+-		dma_fence_wait(vm->last_tlb_inv, false);
+-		fence = dma_fence_get_stub();
+-	}
+-
+-	return fence;
 +	return amdgpu_gem_va_update_fence(vm, bo_va, operation, survivors);
  }
  
  int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
-@@ -878,11 +938,16 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
+@@ -890,11 +922,16 @@
  	struct amdgpu_device *adev = drm_to_adev(dev);
  	struct amdgpu_fpriv *fpriv = filp->driver_priv;
  	struct amdgpu_bo *abo;
@@ -134,7 +161,7 @@ index 48cdf0b0d6d0..68db16e773b0 100644
  	int r = 0;
  
  	/* Validate virtual address range against reserved regions. */
-@@ -952,6 +1017,16 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
+@@ -964,6 +1001,16 @@
  	r = PM_RUNTIME_ACQUIRE_ERR(&lock);
  	if (r)
  		goto error_put_gobj;
@@ -151,7 +178,7 @@ index 48cdf0b0d6d0..68db16e773b0 100644
  
  	/* Add input syncobj fences (if any) for synchronization. */
  	r = amdgpu_gem_add_input_fence(filp,
-@@ -974,6 +1049,18 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
+@@ -986,6 +1033,18 @@
  		drm_exec_retry_on_contention(&exec);
  		if (unlikely(r))
  			goto error;
@@ -170,7 +197,7 @@ index 48cdf0b0d6d0..68db16e773b0 100644
  	}
  
  	/* Resolve the BO-VA mapping for this VM/BO combination. */
-@@ -1036,7 +1123,7 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
+@@ -1048,7 +1107,7 @@
  		struct dma_fence *fence;
  
  		fence = amdgpu_gem_va_update_vm(adev, &fpriv->vm, bo_va,

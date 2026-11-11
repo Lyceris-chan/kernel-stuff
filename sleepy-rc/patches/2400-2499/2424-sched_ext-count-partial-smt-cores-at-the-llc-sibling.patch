@@ -1,0 +1,49 @@
+From 3b1ce3e0ccba4aadbf6330a5ed8bda78f0c9353a Mon Sep 17 00:00:00 2001
+From: Zhang Qiao <zhangqiao22@huawei.com>
+Date: Tue, 10 Nov 2026 17:10:42 +0800
+Subject: [PATCH] sched_ext: Fix partial-SMT core counting in
+ calc_shard_layout()
+
+calc_shard_layout() counts the cores of an LLC to spread them evenly
+across shards. A core is counted when its cpu is the first cpu of
+topology_sibling_cpumask(), but the cores scx_cid_init() builds are
+the siblings intersected with @llc_cpus.
+
+The sibling mask may contain cpus outside @llc_cpus - siblings which
+landed in another node or LLC unit, or offlined siblings on archs
+that keep them in the mask (mips, sparc64). A core whose first
+sibling is such a cpu is never counted, so cores_per_shard and
+nr_large come out too small and the shards end up uneven.
+
+Count a core at its first sibling in @llc_cpus, matching the cores the
+build loop constructs.
+
+Fixes: e2c841b91bf9 ("sched_ext: Add CID sharding")
+Signed-off-by: Zhang Qiao <zhangqiao22@huawei.com>
+Signed-off-by: Tejun Heo <tj@kernel.org>
+---
+ kernel/sched/ext/cid.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/kernel/sched/ext/cid.c b/kernel/sched/ext/cid.c
+index 8e04a8494e11..0cc397055f57 100644
+--- a/kernel/sched/ext/cid.c
++++ b/kernel/sched/ext/cid.c
+@@ -64,7 +64,13 @@ static void calc_shard_layout(const struct cpumask *llc_cpus, u32 shard_size,
+ 
+ 	for_each_cpu(cpu, llc_cpus) {
+ 		nr_cpus++;
+-		if (cpumask_first(topology_sibling_cpumask(cpu)) == cpu)
++		/*
++		 * scx_cid_init() forms each core from the siblings in
++		 * @llc_cpus. The sibling mask may include cpus outside
++		 * @llc_cpus, so count a core at its first sibling in @llc_cpus.
++		 */
++		if (cpumask_first_and(topology_sibling_cpumask(cpu),
++				      llc_cpus) == cpu)
+ 			nr_cores++;
+ 	}
+ 
+-- 
+2.56.1
+

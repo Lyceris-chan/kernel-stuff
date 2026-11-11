@@ -1,0 +1,128 @@
+From nobody Mon Sep 17 00:00:00 2001
+From: Lu Yao <yaolu@kylinos.cn>
+Date: Wed, 11 Nov 2026 10:19:25 +0800
+Subject: [PATCH v2] drm/amd/display: Fix dm i2c adapter lifetime on teardown
+Message-ID: <20261111021925.63610-1-yaolu@kylinos.cn>
+
+devm_i2c_add_adapter() only calls i2c_del_adapter() on teardown, so
+struct amdgpu_i2c_adapter is never freed.  Since
+commit 5b3eca05cfb0 ("drm/amd/display: Use devm_i2c_add_adapter to simplify i2c cleanup logic")
+every dm i2c adapter leaks on unload.
+
+The connector_init error path cannot kfree() it either: the adapter is
+still registered, so devres release would causing UAF.
+
+On the init failure path dc_destroy() also frees i2c->ddc_service before
+dm_hw_init() releases the devres group, so there also may causing UAF.
+
+Allocate the adapter with devm_kzalloc_obj() and release the devres group
+in amdgpu_dm_fini() right before dc_destroy().
+
+Fixes: 5b3eca05cfb0 ("drm/amd/display: Use devm_i2c_add_adapter to simplify i2c cleanup logic")
+Signed-off-by: Lu Yao <yaolu@kylinos.cn>
+
+(backport: devm_kzalloc() instead of devm_kzalloc_obj(), which v7.3 does not have)
+---
+ drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c | 15 ++++++---------
+ .../amd/display/amdgpu_dm/amdgpu_dm_connector.c   | 13 ++++---------
+ 2 files changed, 10 insertions(+), 18 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
+index 0ea45ab12119..5dbc00e6ee63 100644
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
+@@ -961,6 +961,11 @@ static void amdgpu_dm_fini(struct amdgpu_device *adev)
+ 
+ 	amdgpu_dm_irq_fini(adev);
+ 
++	if (adev->dm.i2c_devres_group) {
++		devres_release_group(adev->dev, adev->dm.i2c_devres_group);
++		adev->dm.i2c_devres_group = NULL;
++	}
++
+ 	/* DC Destroy TODO: Replace destroy DAL */
+ 	if (adev->dm.dc)
+ 		dc_destroy(&adev->dm.dc);
+@@ -1364,7 +1369,6 @@ STATIC_IFN_KUNIT int dm_oem_i2c_hw_init(struct amdgpu_device *adev)
+ 		r = devm_i2c_add_adapter(adev->dev, &oem_i2c->base);
+ 		if (r) {
+ 			drm_info(adev_to_drm(adev), "Failed to register oem i2c\n");
+-			kfree(oem_i2c);
+ 			return r;
+ 		}
+ 		dm->oem_i2c = oem_i2c;
+@@ -1406,7 +1410,7 @@ static int dm_hw_init(struct amdgpu_ip_block *ip_block)
+ 	/* Create DAL display manager */
+ 	r = amdgpu_dm_init(adev);
+ 	if (r)
+-		goto err_release_i2c;
++		return r;
+ 	amdgpu_dm_hpd_init(adev);
+ 
+ 	r = dm_oem_i2c_hw_init(adev);
+@@ -1415,10 +1419,6 @@ static int dm_hw_init(struct amdgpu_ip_block *ip_block)
+ 
+ 	devres_close_group(adev->dev, adev->dm.i2c_devres_group);
+ 	return 0;
+-
+-err_release_i2c:
+-	devres_release_group(adev->dev, adev->dm.i2c_devres_group);
+-	return r;
+ }
+ 
+ /**
+@@ -1433,9 +1433,6 @@ static int dm_hw_fini(struct amdgpu_ip_block *ip_block)
+ {
+ 	struct amdgpu_device *adev = ip_block->adev;
+ 
+-	if (adev->dm.i2c_devres_group)
+-		devres_release_group(adev->dev, adev->dm.i2c_devres_group);
+-
+ 	amdgpu_dm_hpd_fini(adev);
+ 
+ 	amdgpu_dm_fini(adev);
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
+index b498fc5fbb14..2e262f8ffc5f 100644
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
+@@ -3427,7 +3427,8 @@ amdgpu_dm_create_i2c(struct ddc_service *ddc_service, bool oem)
+ 	struct amdgpu_device *adev = ddc_service->ctx->driver_context;
+ 	struct amdgpu_i2c_adapter *i2c;
+ 
+-	i2c = kzalloc_obj(struct amdgpu_i2c_adapter);
++	i2c = devm_kzalloc(adev->dev, sizeof(struct amdgpu_i2c_adapter),
++			   GFP_KERNEL);
+ 	if (!i2c)
+ 		return NULL;
+ 	i2c->base.owner = THIS_MODULE;
+@@ -3499,7 +3499,7 @@ int amdgpu_dm_connector_init(struct amdgpu_display_manager *dm,
+ 
+ 	if (res) {
+ 		drm_err(adev_to_drm(dm->adev), "Failed to register hw i2c %d\n", link->link_index);
+-		goto out_free;
++		return res;
+ 	}
+ 
+ 	connector_type = to_drm_connector_type(link->connector_signal, link->link_id.id);
+@@ -3514,7 +3514,7 @@ int amdgpu_dm_connector_init(struct amdgpu_display_manager *dm,
+ 	if (res) {
+ 		drm_err(adev_to_drm(dm->adev), "connector_init failed\n");
+ 		aconnector->connector_id = -1;
+-		goto out_free;
++		return res;
+ 	}
+ 
+ 	drm_connector_helper_add(
+@@ -3538,12 +3538,7 @@ int amdgpu_dm_connector_init(struct amdgpu_display_manager *dm,
+ 	if (dc_is_dp_signal(link->connector_signal))
+ 		amdgpu_dm_initialize_dp_connector(dm, aconnector, link->link_index);
+ 
+-out_free:
+-	if (res) {
+-		kfree(i2c);
+-		aconnector->i2c = NULL;
+-	}
+-	return res;
++	return 0;
+ }
+ EXPORT_IF_KUNIT(amdgpu_dm_connector_init);
