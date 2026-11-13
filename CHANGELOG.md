@@ -18,6 +18,22 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.11.13-2-sleepy-next (linux-next `next-20261113`)]: 2026-11-13
+
+### Changed
+
+- Rebuilt with **ClangBuiltLinux clang 23.1.5** (`llvm-23.1.5-x86_64.tar.xz`
+  from kernel.org; SHA-256 verified against the signed `sha256sums.asc`).
+  Release `2026.11.13-2`; no patch changes.
+
+## [7.3.0-28-sleepy-rc]: 2026-11-13
+
+### Changed
+
+- Rebuilt with **ClangBuiltLinux clang 23.1.5** (`llvm-23.1.5-x86_64.tar.xz`
+  from kernel.org; SHA-256 verified against the signed `sha256sums.asc`).
+  `pkgrel` 27 → 28; no patch changes.
+
 ## [2026.11.13-1-sleepy-next (linux-next `next-20261113`)]: 2026-11-13
 
 `next-20261113` was tagged at 17:44 UTC on 2026-11-13. It is still cut

@@ -8,7 +8,7 @@ is; `../../CLAUDE.md` for the maintenance rules.
 
 | Setting | Value |
 |---|---|
-| Compiler | Clang 23.1.4 (kernel.org ClangBuiltLinux `llvm-23.1.4-x86_64.tar.xz`, auto-downloaded) |
+| Compiler | Clang 23.1.5 (kernel.org ClangBuiltLinux `llvm-23.1.5-x86_64.tar.xz`, auto-downloaded) |
 | Linker | `ld.lld` |
 | LTO | ThinLTO (`CONFIG_LTO_CLANG_THIN=y`) |
 | Optimization | `-O3` + `-march=znver4` |

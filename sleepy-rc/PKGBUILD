@@ -182,7 +182,7 @@ _rcver=
 
 pkgver=7.3.0
 _tagrel=1
-pkgrel=27
+pkgrel=28
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -657,14 +657,14 @@ validpgpkeys=(
   E8B9AA39F054E30E8290D492C3C4820857F654FE  # Peter Jung <admin@ptr1337.dev>
 )
 # Pre-built LLVM toolchain: the kernel.org ClangBuiltLinux release
-# llvm-23.1.4-x86_64.tar.xz (added to source() below) is the toolchain
+# llvm-23.1.5-x86_64.tar.xz (added to source() below) is the toolchain
 # actually used. It is a multicall build — clang, ld.lld and the llvm-* tools
 # are symlinks to one `llvm` binary — and needs no bundled ICU libs (it links
-# only the system libz/libzstd/libstdc++). 23.1.4 is the latest on both
+# only the system libz/libzstd/libstdc++). 23.1.5 is the latest on both
 # mirrors.edge.kernel.org and the llvm-project GitHub releases as of
-# 2026-10-26.
+# 2026-11-13.
 : "${_use_kernel_org_llvm:=yes}"
-: "${_llvm_dir_name:=llvm-23.1.4-x86_64}"
+: "${_llvm_dir_name:=llvm-23.1.5-x86_64}"
 
 _set_build_flags() {
     if _is_lto_kernel; then
@@ -1630,8 +1630,8 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         '5a986874cf6e64a32b084a25147132d21d32dce0378f91f63e8a918e91bd0e18423e96ef3dc6fb319c3ae0663f6326edcebe8b9a1e08d7d318295ddda21ac4bb'
         '334fc42a82212dbfb0ff37865a7ccbf4df09164c252b9c7493ba0ee0d58aaa9a0aa89e012c50be8b4671e01dceab45175634617e15032182590989adad35a7ab'
         '3a5f75c872c8e4af63befa0c102884b2f1ca2181b546ee5f92aa69354deae5d43349986d440cd0cd85ee6a87f091ac6217e3270e1cb257ddffd2d475eaf0fc4a'
-        'f8948396584fc2c3e82bf857c6f3ad7fd77e887b5d30fdbf288ed01f939b101e28e0f7b67d7e52c28d8479918da3cad72d6650daa6200739139426d5d491ef75')
+        '9b95b584d6a85f5617bee5ce989018501ac631d3abe64e8380cfe9c37bc537ffb9e4ee87324a749179ca2ec5141fd3d2e18e9f76eb1c838697a79e2a76d46997')
 
 if [ "$_use_kernel_org_llvm" = "yes" ]; then
-    source+=("https://mirrors.edge.kernel.org/pub/tools/llvm/files/llvm-23.1.4-x86_64.tar.xz")
+    source+=("https://mirrors.edge.kernel.org/pub/tools/llvm/files/llvm-23.1.5-x86_64.tar.xz")
 fi

@@ -18,8 +18,8 @@ moved, so the full ledger is not duplicated here.
 | Snapshot | `next-20261113`, tag `84abb955b101` (tag object `1b7a128c0c0f`) |
 | Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261113.tar.gz` |
 | Snapshot tree `Makefile` | `7.4.0-rc2` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.11.13-1-sleepy-next` |
-| Package | `linux-sleepy-next-2026.11.13-1` |
+| Kernel release | `2026.11.13-2-sleepy-next` |
+| Package | `linux-sleepy-next-2026.11.13-2` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -1917,6 +1917,12 @@ Build: `linux-sleepy-next 2026.11.13-1`, 23 MB kernel and 34 MB headers. BTF
 verified: `CONFIG_DEBUG_INFO_BTF=y`, `CONFIG_DEBUG_INFO_BTF_MODULES=y`,
 `CONFIG_DEBUG_INFO_DWARF5=y`, module `.BTF` present; `CONFIG_TCP_CONG_BBR` is
 unset and `CONFIG_TCP_CONG_BBR3=y`; NAP and sched_ext remain enabled.
+
+A toolchain-only rebuild on 2026-11-13 moved both packages to
+ClangBuiltLinux **23.1.5** (`llvm-23.1.5-x86_64.tar.xz`, SHA-256
+`b69433120ad62420d789f601c58a5472873c724be088c99a70b72fd30ca4af3c`,
+matching the signed kernel.org `sha256sums.asc`). The preview becomes
+`2026.11.13-2`; no patch changes.
 
 ### Series state
 

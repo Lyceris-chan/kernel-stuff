@@ -12971,3 +12971,12 @@ HDMI link at boot), `#6100` (gfx1201 SMU stall), `#5954` (UCLK pinned),
 **366 patches** (359 + 5 + 2). `audit_series.py`: **366/366** on `v7.3`. The
 preview is **158 listed / 156 applied** on `next-20261113`; the two skips are
 `2044` (absorbed) and `1317` (context drift, inert).
+
+### Toolchain
+
+A toolchain-only rebuild on 2026-11-13 moved both packages to ClangBuiltLinux
+**23.1.5** (`llvm-23.1.5-x86_64.tar.xz`, SHA-256
+`b69433120ad62420d789f601c58a5472873c724be088c99a70b72fd30ca4af3c`,
+matching the signed kernel.org `sha256sums.asc`; the extracted compiler
+reports `ClangBuiltLinux clang version 23.1.5`). The rc becomes
+`7.3.0-28`; no patch changes.

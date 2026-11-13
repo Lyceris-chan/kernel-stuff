@@ -6,8 +6,8 @@ built from **mainline Linux 7.3** plus a sanitized
 [CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 366-patch
 series. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0-27` · **Artifact:**
-`linux-sleepy-rc-7.3.0-27-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0-28` · **Artifact:**
+`linux-sleepy-rc-7.3.0-28-x86_64.pkg.tar.zst`
 
 ## Target hardware
 
@@ -23,7 +23,7 @@ series. It is not a general-purpose kernel.
 ## Highlights
 
 - **Clang ThinLTO `-O3 -march=znver4`** via the kernel.org ClangBuiltLinux
-  pre-built LLVM 23.1.4.
+  pre-built LLVM 23.1.5.
 - **lru_cast 0.2.10 (CAST)** page eviction — Masahito Suzuki's successor to
   LRU-MARIE, carried as `2102`. It keeps Marie's per-PFN state array, SIMD PTE
   walker, rmap-fed bloom filter, look-around, kcompressd and clean-file floor,

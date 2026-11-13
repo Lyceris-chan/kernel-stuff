@@ -203,7 +203,7 @@ _snapdate=${_srctag#next-}                                            # 20261111
 _snapver="${_snapdate:0:4}.${_snapdate:4:2}.${_snapdate:6:2}"
 pkgver=${_snapver}
 _tagrel=1
-pkgrel=1
+pkgrel=2
 # Build parallelism. Previously capped at 8 on a diagnosis that did not hold up.
 #
 # The cap was added after an rc4-7 build thrashed badly — 6 watchdog firings and
@@ -507,14 +507,14 @@ validpgpkeys=(
   E8B9AA39F054E30E8290D492C3C4820857F654FE  # Peter Jung <admin@ptr1337.dev>
 )
 # Pre-built LLVM toolchain: the kernel.org ClangBuiltLinux release
-# llvm-23.1.4-x86_64.tar.xz (added to source() below) is the toolchain
+# llvm-23.1.5-x86_64.tar.xz (added to source() below) is the toolchain
 # actually used. It is a multicall build — clang, ld.lld and the llvm-* tools
 # are symlinks to one `llvm` binary — and needs no bundled ICU libs (it links
-# only the system libz/libzstd/libstdc++). 23.1.4 is the latest on both
+# only the system libz/libzstd/libstdc++). 23.1.5 is the latest on both
 # mirrors.edge.kernel.org and the llvm-project GitHub releases as of
-# 2026-10-26.
+# 2026-11-13.
 : "${_use_kernel_org_llvm:=yes}"
-: "${_llvm_dir_name:=llvm-23.1.4-x86_64}"
+: "${_llvm_dir_name:=llvm-23.1.5-x86_64}"
 
 _set_build_flags() {
     if _is_lto_kernel; then
@@ -1314,8 +1314,8 @@ b2sums=('c379ca6f5e5744ea6d134b073fea78716df248d4012adb66fe0982863a1f419a00a17ba
         'f5ff5fa2685678fe47adfd559403ce43b6ea4b943733d0a2a78a8cb30ca7f475decae2956ae75d3b77c6ce0138db7720dc8c4673fc63a61effe5aae180b4729f'
         '521b40436f23a66f5b542d1cd420fb7b995abd2b239c3480709a56f910ba095691ddd36100a6360f7c35cf8c7a1d0f6915ab18f57bbb041779cf071a41bcdac0'
         '0f30b4e33aa335a8d4648053108d2232fd759f24d5fd570057dafea26d4c988991a909e5a7f466a2498ab6ed64cb3cf55b283e5d21372bbc5cf5e49e29827da5'
-        'f8948396584fc2c3e82bf857c6f3ad7fd77e887b5d30fdbf288ed01f939b101e28e0f7b67d7e52c28d8479918da3cad72d6650daa6200739139426d5d491ef75')
+        '9b95b584d6a85f5617bee5ce989018501ac631d3abe64e8380cfe9c37bc537ffb9e4ee87324a749179ca2ec5141fd3d2e18e9f76eb1c838697a79e2a76d46997')
 
 if [ "$_use_kernel_org_llvm" = "yes" ]; then
-    source+=("https://mirrors.edge.kernel.org/pub/tools/llvm/files/llvm-23.1.4-x86_64.tar.xz")
+    source+=("https://mirrors.edge.kernel.org/pub/tools/llvm/files/llvm-23.1.5-x86_64.tar.xz")
 fi
