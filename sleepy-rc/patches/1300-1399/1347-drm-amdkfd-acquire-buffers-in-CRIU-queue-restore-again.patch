@@ -1,0 +1,152 @@
+From 37820a7c716636b6ea499cc73875617886f4377f Mon Sep 17 00:00:00 2001
+From: David Francis <David.Francis@amd.com>
+Date: Mon, 21 Sep 2026 10:25:51 -0400
+Subject: [PATCH] drm/amdkfd: Acquire buffers in CRIU queue restore (again)
+
+CRIU queue restore doesn't acquire the bo buffers in the same way
+normal queue creation does. In normal queue creation, the driver
+gets an additional reference on the queue's underlying buffers
+that lasts until the queue is destroyed; this prevents the
+queue's buffers from being removed from underneath it.
+
+Acquire them, but don't get the svm bo. SVM isn't yet fully
+restored by this point in CRIU and so there's no svm range to get.
+This will be addressed in the next patch.
+
+v2: Don't use checkpoint ctl_stack_size
+v5: Also avoid cwsr in criu failure path
+
+Signed-off-by: David Francis <David.Francis@amd.com>
+Reviewed-by: Felix Kuehling <felix.kuehling@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+(cherry picked from commit 56ca6fb5b148eb045aef34c4e05f1f56864611d5)
+Cc: stable@vger.kernel.org
+---
+ drivers/gpu/drm/amd/amdkfd/kfd_chardev.c            |  4 ++--
+ drivers/gpu/drm/amd/amdkfd/kfd_priv.h               |  4 ++--
+ .../gpu/drm/amd/amdkfd/kfd_process_queue_manager.c  | 12 ++++++++++--
+ drivers/gpu/drm/amd/amdkfd/kfd_queue.c              | 13 ++++++++++---
+ 4 files changed, 24 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c b/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c
+index d65ae53c81a5..ed5a6c3263bf 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c
+@@ -433,7 +433,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
+ 		goto err_bind_process;
+ 	}
+ 
+-	err = kfd_queue_acquire_buffers(pdd, &q_properties);
++	err = kfd_queue_acquire_buffers(pdd, &q_properties, false);
+ 	if (err) {
+ 		pr_debug("failed to acquire user queue buffers\n");
+ 		goto err_acquire_queue_buf;
+@@ -478,7 +478,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
+ 
+ err_create_queue:
+ 	kfd_queue_unref_bo_vas(pdd, &q_properties);
+-	kfd_queue_release_buffers(pdd, &q_properties);
++	kfd_queue_release_buffers(pdd, &q_properties, false);
+ err_acquire_queue_buf:
+ err_sdma_engine_id:
+ err_bind_process:
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_priv.h b/drivers/gpu/drm/amd/amdkfd/kfd_priv.h
+index 288731acc928..13852c2fd868 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_priv.h
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_priv.h
+@@ -1386,8 +1386,8 @@ void print_queue(struct queue *q);
+ int kfd_queue_buffer_get(struct amdgpu_vm *vm, void __user *addr, struct amdgpu_bo **pbo,
+ 			 u64 expected_size);
+ void kfd_queue_buffer_put(struct amdgpu_bo **bo);
+-int kfd_queue_acquire_buffers(struct kfd_process_device *pdd, struct queue_properties *properties);
+-int kfd_queue_release_buffers(struct kfd_process_device *pdd, struct queue_properties *properties);
++int kfd_queue_acquire_buffers(struct kfd_process_device *pdd, struct queue_properties *properties, bool is_criu);
++int kfd_queue_release_buffers(struct kfd_process_device *pdd, struct queue_properties *properties, bool is_criu);
+ void kfd_queue_unref_bo_va(struct amdgpu_vm *vm, struct amdgpu_bo **bo);
+ int kfd_queue_unref_bo_vas(struct kfd_process_device *pdd,
+ 			   struct queue_properties *properties);
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_process_queue_manager.c b/drivers/gpu/drm/amd/amdkfd/kfd_process_queue_manager.c
+index 4c4a3a8587f4..5741ed95c381 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_process_queue_manager.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_process_queue_manager.c
+@@ -227,7 +227,7 @@ void pqm_uninit(struct process_queue_manager *pqm)
+ 										     pqm->process);
+ 			if (pdd) {
+ 				kfd_queue_unref_bo_vas(pdd, &pqn->q->properties);
+-				kfd_queue_release_buffers(pdd, &pqn->q->properties);
++				kfd_queue_release_buffers(pdd, &pqn->q->properties, false);
+ 			} else {
+ 				WARN_ON(!pdd);
+ 			}
+@@ -572,7 +572,7 @@ int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid)
+ 				goto err_destroy_queue;
+ 		}
+ 		kfd_procfs_del_queue(pqn->q);
+-		kfd_queue_release_buffers(pdd, &pqn->q->properties);
++		kfd_queue_release_buffers(pdd, &pqn->q->properties, false);
+ 		pqm_clean_queue_resource(pqm, pqn);
+ 		uninit_queue(pqn->q);
+ 	}
+@@ -1095,9 +1095,17 @@ int kfd_criu_restore_queue(struct kfd_process *p,
+ 
+ 	print_queue_properties(&qp);
+ 
++	ret = kfd_queue_acquire_buffers(pdd, &qp, true);
++	if (ret) {
++		pr_err("Failed to acquire user queue buffers err:%d\n", ret);
++		goto exit;
++	}
++
+ 	ret = pqm_create_queue(&p->pqm, pdd->dev, &qp, &queue_id, q_data, mqd, ctl_stack, NULL);
+ 	if (ret) {
+ 		pr_err("Failed to create new queue err:%d\n", ret);
++		kfd_queue_unref_bo_vas(pdd, &qp);
++		kfd_queue_release_buffers(pdd, &qp, true);
+ 		goto exit;
+ 	}
+ 
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_queue.c b/drivers/gpu/drm/amd/amdkfd/kfd_queue.c
+index 6010a5d7a7eb..9dcf0134f35b 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_queue.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_queue.c
+@@ -239,7 +239,7 @@ static void kfd_queue_put_bos(struct queue_properties *properties)
+ 	kfd_queue_buffer_put(&properties->cwsr_bo);
+ }
+ 
+-int kfd_queue_acquire_buffers(struct kfd_process_device *pdd, struct queue_properties *properties)
++int kfd_queue_acquire_buffers(struct kfd_process_device *pdd, struct queue_properties *properties, bool is_criu)
+ {
+ 	struct kfd_topology_device *topo_dev;
+ 	u64 expected_queue_size;
+@@ -334,6 +334,12 @@ int kfd_queue_acquire_buffers(struct kfd_process_device *pdd, struct queue_prope
+ 
+ 	amdgpu_bo_unreserve(vm->root.bo);
+ 
++	/* CRIU svm buffers are restored at a later stage than queues. They'll be in
++	 * before the queue is actually used, so no risk here
++	 */
++	if (is_criu)
++		return 0;
++
+ 	err = kfd_queue_buffer_svm_get(pdd, properties->ctx_save_restore_area_address,
+ 				       total_cwsr_size);
+ 	if (err)
+@@ -362,7 +368,7 @@ int kfd_queue_acquire_buffers(struct kfd_process_device *pdd, struct queue_prope
+ 	return err;
+ }
+ 
+-int kfd_queue_release_buffers(struct kfd_process_device *pdd, struct queue_properties *properties)
++int kfd_queue_release_buffers(struct kfd_process_device *pdd, struct queue_properties *properties, bool is_criu)
+ {
+ 	struct kfd_topology_device *topo_dev;
+ 	u64 total_cwsr_size;
+@@ -380,7 +386,8 @@ int kfd_queue_release_buffers(struct kfd_process_device *pdd, struct queue_prope
+ 		return -EINVAL;
+ 	total_cwsr_size = ALIGN(total_cwsr_size, PAGE_SIZE);
+ 
+-	kfd_queue_buffer_svm_put(pdd, properties->ctx_save_restore_area_address, total_cwsr_size);
++	if (!is_criu)
++		kfd_queue_buffer_svm_put(pdd, properties->ctx_save_restore_area_address, total_cwsr_size);
+ 	return 0;
+ }
+ 

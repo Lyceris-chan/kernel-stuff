@@ -1,0 +1,45 @@
+From 732239b002678d8c534503f52a16afc310095523 Mon Sep 17 00:00:00 2001
+From: Perry Yuan <perry.yuan@amd.com>
+Date: Fri, 6 Nov 2026 11:11:09 +0800
+Subject: [PATCH] drm/amdkfd: check CRIU SVM priv data bounds before allocating
+
+kfd_criu_restore_svm() allocated the per-range metadata before checking
+that the range fits in the user supplied private data buffer, so an out
+of range offset cost a pointless kzalloc()/kfree() round trip. Do the
+bounds check first and return -EINVAL directly.
+
+v2:
+- split the original patch into two, one change per patch (Yifan)
+
+Signed-off-by: Perry Yuan <perry.yuan@amd.com>
+Reviewed-by: Yifan Zhang <yifan1.zhang@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+(cherry picked from commit 0c3caec1161e458092364cb448e5bd165a26dcdb)
+Cc: stable@vger.kernel.org
+---
+ drivers/gpu/drm/amd/amdkfd/kfd_svm.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c b/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
+index ed5e3318877b..7fd331612f08 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
+@@ -4245,15 +4245,14 @@ int kfd_criu_restore_svm(struct kfd_process *p,
+ 	svm_priv_data_size = sizeof(struct kfd_criu_svm_range_priv_data) +
+ 								svm_attrs_size;
+ 
++	if (*priv_data_offset + svm_priv_data_size > max_priv_data_size)
++		return -EINVAL;
++
+ 	criu_svm_md = kzalloc(svm_object_md_size, GFP_KERNEL);
+ 	if (!criu_svm_md) {
+ 		pr_err("failed to allocate memory to store svm metadata\n");
+ 		return -ENOMEM;
+ 	}
+-	if (*priv_data_offset + svm_priv_data_size > max_priv_data_size) {
+-		ret = -EINVAL;
+-		goto exit;
+-	}
+ 
+ 	ret = copy_from_user(&criu_svm_md->data, user_priv_ptr + *priv_data_offset,
+ 			     svm_priv_data_size);

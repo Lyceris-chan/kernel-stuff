@@ -182,7 +182,7 @@ pkgbase="linux-$_pkgsuffix"
 # snapshot DATE rather than by whichever mainline rc it happened to be cut
 # from. `_srctag` is defined first because pkgver is derived from it — a bump
 # that moves the tag but not the version is not possible.
-_srctag=next-20261111
+_srctag=next-20261113
 _srcname=${_srctag}
 _snapdate=${_srctag#next-}                                            # 20261111
 # Dotted (2026.10.09), and that is NOT cosmetic. Both tools that consume the
@@ -280,7 +280,7 @@ _nv_ver=610.43.02
 _nv_pkg="NVIDIA-Linux-x86_64-${_nv_ver}"
 _nv_open_pkg="NVIDIA-kernel-module-source-${_nv_ver}"
 source=(
-  "https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261111.tar.gz"
+  "https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261113.tar.gz"
   "config"
   "patches/0001-0049/0001-drm-amd-pm-Fix-typo-in-smu_v14_0_set_irq_state.patch"
   "patches/0001-0049/0002-drm-amd-pm-Fix-memory-leaks-in-smu_v14_0_fini_smc_ta.patch"
@@ -1154,7 +1154,7 @@ for _p in "${pkgname[@]}"; do
     }"
 done
 
-b2sums=('8b37054c8717c7459da0634cb03a81a3a31fa7580187973b60ce311ac80390f62a7b24626e6149b6c5dec9c9692a8dc68cbf3c04d0ecbf11c66f387609534394'
+b2sums=('c379ca6f5e5744ea6d134b073fea78716df248d4012adb66fe0982863a1f419a00a17ba009dc141d0ba5495b114adcbd2d40203a3cd41670c1a63eec19a488c4'
         '7517360503c9da93f405b810c81a7f1f2c8ca21a704f8251f62c400723f99bd9c14b8cb851c8f36663f412f9865cde759a3a10313e605e6172322bdfa12f6f38'
         'ff25ac7c89880886b454064ba57bd1196fb747cb80c7663d7981006cc603151aee075ebe1b49b1a92866ad2a212d1e599ce622f63bfd140ad64d37b463c17aad'
         '0806d7b3b8e4e9044c14843fc53255ff92b12aaf3b8e0d0490bbf6266aaa6b01872476ce34a65c5b694cda9a1d82e84a38df16dbb9c798ae9aa6d1c9097b32aa'

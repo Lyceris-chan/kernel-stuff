@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
 - **Base:** Linux `v7.3`
-- **Series:** 343 patches
+- **Series:** 364 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -22,23 +22,23 @@ are supplied by the generator instead, so every row below has a source.
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 30 |
-| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 31 |
-| `1100–1199` | AMD display (DCN4, colorops) | 33 |
+| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 46 |
+| `1100–1199` | AMD display (DCN4, colorops) | 36 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 32 |
 | `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 51 |
 | `2100–2199` | Memory management and swap (zstd, LRU-MARIE, gup, zswap) | 50 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 21 |
-| `2400–2499` | Core scheduler and sched-ext | 7 |
+| `2400–2499` | Core scheduler and sched-ext | 9 |
 | `2500–2599` | x86 and arch core | 2 |
 | `2600–2699` | Time and timers | 0 |
 | `2800–2899` | Memory management, second series (mm/swap follow-ups) | 11 |
 | `2900–2999` | VFS / core filesystem | 0 |
 | `3000–3099` | Platform, USB and hwmon (PROM21 chipset temperature) | 2 |
-| `9000–9099` | agd5f staging + userq lifecycle backports | 38 |
+| `9000–9099` | agd5f staging + userq lifecycle backports | 39 |
 | `9100–9199` | Retry-fault handling v4 (agd5f staging) | 11 |
 
-**Total: 343** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 364** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-19). The counts are now generated from the patch tree
@@ -12743,3 +12743,159 @@ on-target RDNA4 or kernel article.
 **359 patches** (356 + `1189`, `2423`, `2424`). `audit_series.py`:
 **359/359** on `v7.3`. The preview is **158 patches** and **158/158** on
 `next-20261111`.
+
+## Sweep 2026-11-13 — `next-20261113`; five rc carries
+
+Sources refreshed on 2026-11-13: torvalds `origin/master` `7e1392a42ea2`
+(2026-11-13; 378 commits since `067c5c24cef2`), linux-next `next-20261113`
+(`84abb955b101`, tag object `1b7a128c0c0f`, tagged at 17:44 UTC on
+2026-11-13; 1792 commits since `next-20261111`, 1431 non-merge), drm-next
+`a5b29fce2659` (unchanged), agd5f/amd-staging `47df73aa49d1` (unchanged; no
+branch updated since 2026-11-09), and `drm-misc`, `linux-pm`, `akpm-mm` and
+`tip` refreshed. The sixteen lore git mirrors were refreshed through
+2026-11-13; `lore-stable` remains stale at 2022-05-18 and is reported
+unrefreshed, not clean. The amd-gfx and dri-devel November archives were
+re-read. The drm/amd tracker returned 58 open issues updated since
+2026-11-11 (the `x-total` matched the rows), with comments through GraphQL.
+Phoronix was read through its RSS index through 2026-11-13.
+
+### Adopted — rc only (5)
+
+| Patch | Change | Why |
+|---|---|---|
+| `9092` | `drm/amdgpu: Fix UserQ slot availability checks` (Erhan Bilgili; `Reviewed-by: Alex Deucher`; merged as `6f062b0e46ef`) | The `AMDGPU_HW_IP_COMPUTE` query tested `sdma.disable_uq` and the `AMDGPU_HW_IP_DMA` query tested `gfx.disable_uq`. When the flags differ, compute hides slots or DMA reports slots of disabled queues. `Fixes: 78d0a27ae0e2`, in `v7.3`. The preview already carries the same change as `9212`. |
+| `1347` | `drm/amdkfd: Acquire buffers in CRIU queue restore (again)` (David Francis; `Reviewed-by: Felix Kuehling`; `56ca6fb5b148`) | CRIU restore did not take the buffer references normal queue create takes, so restored queue BOs could be freed underneath it. Adds the `is_criu` argument; defers the CWSR SVM reference to `1348`. `Cc: stable`. |
+| `1348` | `drm/amdkfd: Acquire cwsr buffer during CRIU resume` (David Francis; `Reviewed-by: Felix Kuehling`; `5a00bdd267a5`) | After the SVM ranges are restored in RESUME, walk the queues and take the CWSR reference normal creation would have taken. Depends on `1347`; exports `kfd_queue_buffer_svm_get()`. `Cc: stable`. |
+| `1349` | `drm/amdkfd: check CRIU SVM priv data bounds before allocating` (Perry Yuan; `Reviewed-by: Yifan Zhang`; `0c3caec1161e`) | `kfd_criu_restore_svm()` allocated per-range metadata before validating the offset against the user buffer; check first and return `-EINVAL`. `Cc: stable`. |
+| `1350` | `drm/amdkfd: skip GPUs without a VM when checkpointing the BO mappings` (Jesse Zhang; `794381c358d3`) | `criu_checkpoint_bos()` passed a NULL `drm_priv` for devices the process never acquired a VM on. The report is a navi48 + iGPU topology — this machine — checkpointing a dGPU-only process: KASAN null-ptr in `amdgpu_amdkfd_bo_mapped_to_dev+0x35`. `Fixes: f9e292cbba21`. |
+
+All five apply in series order; `audit_series.py` reports **364/364** on
+`v7.3`.
+
+### Preview bump to `next-20261113`
+
+`next-20261113` (`84abb955b101`, tag object `1b7a128c0c0f`) was tagged at
+17:44 UTC on 2026-11-13. `_srctag` moves from `next-20261111`; the package
+becomes `2026.11.13-1`. The snapshot adds 1792 commits, 1431 of them
+non-merge.
+
+The preview lists **158 patches**; **156 applied** and two were skipped:
+
+- **`2044`** `lib/group_cpus: snapshot cluster masks to keep grouping hotplug
+  invariant` — absorbed by the base commit `8e36c3f38cea`; `__try_group_cluster_cpus()`
+  is present in `lib/group_cpus.c`. The rc keeps `2044`; `v7.3` lacks it.
+- **`1317`** `gpu/buddy: restore two-pass clear dirty guard` — does not apply
+  to this snapshot. It is inert here anyway: `amdgpu_dm_update_memclk_states()`
+  returns early unless DCN 3.2/3.21, so DCN 4.0.1 never runs it.
+
+Both remain in `source=()` and are skipped on every build; removing them needs
+explicit approval (CLAUDE.md, YOU MUST NOT 8). No preview-only patch was added
+this cycle: the UserQ slot fix is already `9212`.
+
+### Version sweep
+
+Only one carried subject has a higher-version posting since 2026-11-11:
+`2423` (`sched_ext: make DSQ iterator stay drained after NULL`) v2 on
+`lore-sched-ext`, `lore-lkml` and `lore-mirror` (2026-11-13). The driver
+changed-line set is identical to the carried `fcbff7b56a88` backport (the only
+delta is the `-- ` signature); v2 adds a selftest patch, which is userspace
+coverage, not kernel code. No action.
+
+### Reverts and dropped work
+
+No revert targets carried work.
+
+- torvalds `067c5c24cef2..7e1392a42ea2` has one revert, of the Intel RAPL PMU
+  cpumask change — off-target.
+- `next-20261111..next-20261113` reverts `lib/sort.c` `_nonatomic()`, the
+  imx8qm DTS changes, the MacBookAir cs420x fixup, `khugepaged_mm_slot` and the
+  qcom qmp-pcie PHY reset; none is carried.
+- **SPM revert series** (Alex Deucher, 3 patches, 2026-11-13) reverts
+  `d44428868e5b` ("re-enable SPM updates in the IB path") and "reemit RLC SPM
+  register in ring reemit", then brings back the ring parameter. Neither
+  target is in `v7.3` or `next-20261113`; the carried `1331` (disallow GFXOFF
+  around the SPM VMID update) is untouched.
+- **A+A VF revert/rework** (Zhigang Luo, 7 patches, 2026-11-13) is the MI300
+  A+A VF path — not this silicon.
+- `2044` is the only carried patch the new snapshot absorbs.
+
+### Tracker and Phoronix
+
+58 open issues were updated since 2026-11-11. On-target threads: `#6128`
+(RX 9070 XT stutter 7.2.15 → 7.3.4), `#6127` (9070 XT 7.4-rc2 HDMI link
+failure at boot — the closest to this machine's HDMI-only topology), `#6122`
+(data-fabric sync flood under sudden 3D load), `#6121` (HDMI VRR), `#6116`
+(reset after sleep; reporter could not bisect), `#6100` (gfx1201 SMU
+DisallowGfxOff stall), `#6105` (boot/login flicker), `#6048` (inference
+wedge), `#6045` (MST blink; debug-only), `#5954` (UCLK pinned at max at
+idle), `#5511` (`63e19ef3ddab` is already in both bases) and `#5988` (280 Hz
+DP VRR; the FreeSync v2 series below). No new fix commit to carry.
+
+Phoronix 2026-11-11..13: no on-target RDNA4 kernel article. The R600 UVD fix
+is legacy, GFX13/RDNA5 Mesa bring-up is future silicon, and the rest is EPYC
+Zen 6, AOCL, Intel/NVIDIA, KDE, XRAID and the hwpoison-panic tool. No revert
+news.
+
+### Rejected and watch items
+
+- **FreeSync infopacket >255 Hz v2** (Cooper Morgan, 2 patches, 2026-11-12/13)
+  — correct for native DP sinks above 255 Hz and tested on an RX 9070 XT, but
+  this machine's connected outputs are HDMI 1080p; the v1-path saturation is
+  inert. Watch if a DP monitor is added.
+- **sched_ext kfunc/sub-scheduler series** (Tao Cui, 6 patches, 2026-11-12) —
+  the merged first patch (`700a332c3fe3`) rejects DSQ iterator kfuncs in
+  tracing programs; it does not apply to `v7.3` after `2423`/`2424`, and the
+  rest are sub-scheduler or tooling changes. Not carried.
+- **sched_ext entry-path contract fixes** (Tao Cui, 2 patches, 2026-11-12) —
+  first posting, no review; not carried.
+- **`drm/amdgpu: clear the entire mapping when partially unmapping`**
+  (Thadeu Lima de Souza Cascardo, 2026-11-11) — under review; Sashiko found a
+  surviving-endpoint case the patch does not cover. Not carried.
+- **UserQ fence iterator cleanup** (Erhan Bilgili, 2026-11-13) — Christian
+  König will fix `dma_fence_unwrap()` centrally. Not carried.
+- **`clear root PT after setting vm->is_npa`** (Shahyan Soltani, 2026-11-13)
+  — does not apply to the `v7.3` series tree; NPA VM path.
+- **`drm/amdkfd: Move gpu_recovery location`** (Amber Lin) — `git apply`
+  conflict in `amdgpu_gfx.c`; with `gpu_recovery=1` there is no behaviour
+  change.
+- **`drm/amd: Select the firmware signing scheme the PSP reports` v5** (Mario
+  Limonciello) — only MP0 15.0.0 reports the bits; this is PSP/SMU 14.0.0.
+  Inert.
+- **uniras ECC query, A+A VF rework, MES partition switch** — datacenter or
+  wrong IP.
+- **TTM `device_list` UAF on failed probe (3 patches), VFCT matching v7** —
+  failure and VF paths; not carried.
+- **DC accessor refactor (19 patches)** — a refactor, not a fix.
+- **r8169 RSS for the RTL8125B** (RFC net-next, 2026-11-11) — on-target NIC,
+  but RFC; watch.
+- **zswap/zsmalloc series** — merged into `next-20261113`; the stable fixes are
+  already `2806`/`2807`. `zswap: do not free the entry if its pool is NULL` is
+  part of the zsmalloc handle-embedding rework, not the xswap guard `2199`.
+- **`mm: bypass swap readahead for zswap` and swap-in pressure accounting** —
+  performance-only; the preview base absorbs them, and they are not
+  backported to `v7.3`.
+
+### Other sources
+
+- **CachyOS** — `cachyos-kernel-patches` is at `21d72141` ("7.3: Update
+  handheld patch", 2026-11-11), handheld/laptop only. `cachyos-linux`'s newest
+  branch remains `7.4/bbr3` (2026-11-04); no desktop-relevant change.
+- **sirlucjan** — unchanged at `7275a4ad` (2026-10-20).
+- **salkim** — `kernel-salkim`'s `salkim-7.3` advanced to `a7891cbb2`
+  (2026-11-12); the series was recommitted that day (68 commits on top of the
+  tree). Comparing subjects against the preview's `9200`-`9239` batch shows
+  roughly 15 additions, including Gang quantum 1.25 ms, relative UserQ
+  priorities, explicit VM-unmap synchronization, CPU page-table batching, TLB
+  fences on first UserQ creation, fence-iterator release and selftests.
+  `kernel-salkim-74`'s `salkim-7.4` is unchanged at `e179ea7f` (2026-11-09).
+  The preview already carries the 2026-11-08 batch; the 2026-11-12 refresh is
+  deferred until it can be ported as a unit.
+- **CAST and NAP** — no update: `lru_cast` `origin/main` is `ce117bb`
+  (v0.2.10, 2026-10-26) and firelzrd NAP is `v0.6.6` (`5092cfd`, 2026-11-01).
+  BORE 7.0.1r2 remains unused while `scx_cake` is the live scheduler.
+
+### Series state
+
+**364 patches** (359 + 5). `audit_series.py`: **364/364** on `v7.3`. The
+preview is **158 listed / 156 applied** on `next-20261113`; the two skips are
+`2044` (absorbed) and `1317` (context drift, inert).

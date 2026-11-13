@@ -1,0 +1,123 @@
+From 86aa8332ab2b2296cda98cde189e2ec539c4e1b3 Mon Sep 17 00:00:00 2001
+From: David Francis <David.Francis@amd.com>
+Date: Wed, 4 Nov 2026 10:25:27 -0500
+Subject: [PATCH] drm/amdkfd: Acquire cwsr buffer during CRIU resume
+
+In normal kfd queue create, a reference to the cwsr svm range
+is acquired so that this buffer is not freed from underneath the
+queue. We weren't doing that.
+
+After svm ranges are restored in RESUME phase of CRIU, go through
+all the queues and acquire a reference to the cwsr.
+
+Signed-off-by: David Francis <David.Francis@amd.com>
+Reviewed-by: Felix Kuehling <felix.kuehling@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+(cherry picked from commit 5a00bdd267a5d87307f9aaddabf550f2410c9d40)
+Cc: stable@vger.kernel.org
+---
+ drivers/gpu/drm/amd/amdkfd/kfd_chardev.c      |  2 ++
+ drivers/gpu/drm/amd/amdkfd/kfd_priv.h         |  3 ++
+ .../amd/amdkfd/kfd_process_queue_manager.c    | 32 +++++++++++++++++++
+ drivers/gpu/drm/amd/amdkfd/kfd_queue.c        |  4 +--
+ 4 files changed, 39 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c b/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c
+index ed5a6c3263bf..988f4cf6da90 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c
+@@ -2861,6 +2861,8 @@ static int criu_resume(struct file *filep,
+ 		goto exit;
+ 	}
+ 
++	kfd_criu_resume_queues(target);
++
+ 	ret =  amdgpu_amdkfd_criu_resume(target->kgd_process_info);
+ 	if (ret)
+ 		pr_err("amdgpu_amdkfd_criu_resume failed for %i\n", args->pid);
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_priv.h b/drivers/gpu/drm/amd/amdkfd/kfd_priv.h
+index 13852c2fd868..436160549386 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_priv.h
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_priv.h
+@@ -1376,6 +1376,8 @@ int kfd_criu_restore_event(struct file *devkfd,
+ 			   uint8_t __user *user_priv_data,
+ 			   uint64_t *priv_data_offset,
+ 			   uint64_t max_priv_data_size);
++
++int kfd_criu_resume_queues(struct kfd_process *p);
+ /* CRIU - End */
+ 
+ /* Queue Context Management */
+@@ -1392,6 +1394,7 @@ void kfd_queue_unref_bo_va(struct amdgpu_vm *vm, struct amdgpu_bo **bo);
+ int kfd_queue_unref_bo_vas(struct kfd_process_device *pdd,
+ 			   struct queue_properties *properties);
+ void kfd_queue_ctx_save_restore_size(struct kfd_topology_device *dev);
++int kfd_queue_buffer_svm_get(struct kfd_process_device *pdd, u64 addr, u64 size);
+ 
+ struct mqd_manager *mqd_manager_init_cik(enum KFD_MQD_TYPE type,
+ 		struct kfd_node *dev);
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_process_queue_manager.c b/drivers/gpu/drm/amd/amdkfd/kfd_process_queue_manager.c
+index 5741ed95c381..b68e884b1c37 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_process_queue_manager.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_process_queue_manager.c
+@@ -1124,6 +1124,38 @@ int kfd_criu_restore_queue(struct kfd_process *p,
+ 	return ret;
+ }
+ 
++int kfd_criu_resume_queues(struct kfd_process *p)
++{
++	int ret, i;
++	u64 total_cwsr_size;
++
++	for (i = 0; i < p->n_pdds; i++) {
++		struct kfd_process_device *pdd = p->pdds[i];
++		struct kfd_topology_device *topo_dev;
++		struct queue *q;
++
++		topo_dev = kfd_topology_device_by_id(pdd->dev->id);
++
++		list_for_each_entry(q, &pdd->qpd.queues_list, list) {
++			total_cwsr_size = q->properties.ctx_save_restore_area_size +
++					  topo_dev->node_props.debug_memory_size;
++			if (check_mul_overflow(total_cwsr_size,
++					       NUM_XCC(pdd->dev->xcc_mask),
++					       &total_cwsr_size))
++				return -EINVAL;
++			total_cwsr_size = ALIGN(total_cwsr_size, PAGE_SIZE);
++
++			ret = kfd_queue_buffer_svm_get(pdd, q->properties.ctx_save_restore_area_address,
++						       total_cwsr_size);
++			if (ret)
++				return ret;
++		}
++
++	}
++
++	return 0;
++}
++
+ int pqm_get_queue_checkpoint_info(struct process_queue_manager *pqm,
+ 				  unsigned int qid,
+ 				  uint32_t *mqd_size,
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_queue.c b/drivers/gpu/drm/amd/amdkfd/kfd_queue.c
+index 9dcf0134f35b..cd41b10e0873 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_queue.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_queue.c
+@@ -88,7 +88,7 @@ void uninit_queue(struct queue *q)
+ 
+ #if IS_ENABLED(CONFIG_HSA_AMD_SVM)
+ 
+-static int kfd_queue_buffer_svm_get(struct kfd_process_device *pdd, u64 addr, u64 size)
++int kfd_queue_buffer_svm_get(struct kfd_process_device *pdd, u64 addr, u64 size)
+ {
+ 	struct kfd_process *p = pdd->process;
+ 	struct list_head update_list;
+@@ -182,7 +182,7 @@ static void kfd_queue_buffer_svm_put(struct kfd_process_device *pdd, u64 addr, u
+ }
+ #else
+ 
+-static int kfd_queue_buffer_svm_get(struct kfd_process_device *pdd, u64 addr, u64 size)
++int kfd_queue_buffer_svm_get(struct kfd_process_device *pdd, u64 addr, u64 size)
+ {
+ 	return -EINVAL;
+ }

@@ -182,7 +182,7 @@ _rcver=
 
 pkgver=7.3.0
 _tagrel=1
-pkgrel=25
+pkgrel=26
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -424,6 +424,10 @@ source=(
   "patches/1300-1399/1344-drm-amdgpu-prevent-debugfs-nullptr-dereference.patch"
   "patches/1300-1399/1345-amdkfd-fix-memory-availability-double-accounting.patch"
   "patches/1300-1399/1346-drm-amdgpu-move-amdgpu_vm_bo_update-call-into-correct-location.patch"
+  "patches/1300-1399/1347-drm-amdkfd-acquire-buffers-in-CRIU-queue-restore-again.patch"
+  "patches/1300-1399/1348-drm-amdkfd-acquire-cwsr-buffer-during-CRIU-resume.patch"
+  "patches/1300-1399/1349-drm-amdkfd-check-CRIU-SVM-priv-data-bounds-before-allocating.patch"
+  "patches/1300-1399/1350-drm-amdkfd-skip-GPUs-without-a-VM-when-checkpointing-BO-mappings.patch"
 
   "patches/2000-2099/2000-block-mq-deadline-pass-in-queue-directly-to-dd_inser.patch"
   "patches/2000-2099/2001-block-mq-deadline-skip-expensive-merge-lookups-if-co.patch"
@@ -608,6 +612,7 @@ source=(
   "patches/9000-9099/9089-drm-amdkfd-split-vram_pages-of-SVM-ranges-prefetched.patch"
   "patches/9000-9099/9090-drm-amdgpu-userq-validate-evicted-BOs-on-the-individual-idle-list-on-restore.patch"
   "patches/9000-9099/9091-drm-amdgpu-userq-wait-for-GPU-reset-before-mapping-or-unmapping.patch"
+  "patches/9000-9099/9092-drm-amdgpu-correct-userq-slot-availability-checks.patch"
   "patches/9100-9199/9100-drm-amdgpu-Respect-noretry-flag-for-retry-faults-on-GFX12.1.patch"
   "patches/9100-9199/9101-drm-amdgpu-gfxhub-Enable-retry-fault-interrupts-in-L2_PROTECTION_FAULT_CNTL2.patch"
   "patches/9100-9199/9102-drm-amdgpu-ih-Dont-perturb-HW-registers-when-accessing-soft-IH-ring.patch"
@@ -1420,6 +1425,10 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         'a94a5e8962d109a57e47219aa1ca94c6b162dc3becab04f7e24ebbc748b94568ce356dc2b4ae8a8fd78f78edc958c7114eb9581c88febf70a13cc62938cf4b1e'
         'b1091dc02b1cb87607b6e934551b0fe8c69e4e847d4b2244c36815cdc6becfa908dd9ce903afa38f65f20d51c4a0e27c5313c9e5225b92806ff0b6343e6e4142'
         'a47aa2ac013606974b7a62bbc460e8912e5085f0ce7c14ddd863c50dbaf3753303fb356f255db9c275c97e37f0f9b92f85c4e1539497111e181ab306180d60ae'
+        '85a11291fc1af5ed24060c0c08a721cefe59a410a85ac3dd22f94081f8f2efac54218f62bf7db5c12d019355ad40274f7c773b8952bd18079cb26a09cc2e5360'
+        '9c1364dbf7d89ce455b2a6bd4849020f36fa981961b80509c3e2e99b6d40a556cc4dfec5afcb84c4ab2bf9b3c8a9d4f3d3673813dc22cf8f217d0b3730b03968'
+        '35a2c778ba5356a5ccc9037aa56a73200d4ec9c8cce68086de3806d550ef2fdc7b587d9a402c86dcab330b2fcae2771bd008af59531bfcc2b3ecaa3c00c9a973'
+        '12340000cd2fb0ded0441a1ea3fee0c197c09fe8fb30e80d8c1a9a25534e16ad28c4b68e0cbcb1793098334da7b7145eefac409d378e67fd4d4ea2cbcc73b24e'
         'c20b3b791715d02756742bfa34f4921bcaebeee62edf079fe15c89afdc11451a2656122f4f21335cd116676ff69c3b7eee80c6adfdcbfe838c0f1e9012ce0428'
         'df68cfd344b37cae25fa446c82c5897510de23c55761570969dc5a6f2a5bf4c11b31e50c1670a18bef1065af6597e72e0ed839e8fdbc0328cf2dcf34484e5758'
         '8bff27696075ec53ca042b0c9e0deae345712e652b3b66bab1da82c4deefdf35533d04c00d59de70cbf968380236131bc819e0eeaa8aa40edfd84df3bd0972ef'
@@ -1603,6 +1612,7 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         '522c769379f6ea061f6c717603d13fb73bd3206723ba46c67ed45677f3f703b181e99011bd4698ec396ebb1695e9cc1f4b0d55368a517cf1e8a06004eb73e798'
         '775ee6714cc0961fd12aba8dbe218548ead09cb8d45fd457a6fa5348453bb4b39737ee322ee8802e7b52fa4f5b91aef52cf4b14c154400e71e295ae0984333cc'
         'a0175809dcecbeeab4166c9897b99afd1094138602aa83b503aeb862c6505f8141cabcbc8821270c5da94126a5de6fe70221cdc77a7a2328e464b769f8f713fc'
+        'c748b2892806f722103b3f936bc107ecf6f438f953e223baa899a0c4305d3fdd8285cfee843008fd4f773dad4efc5a4893f28bf5846aa42a618236e687041c99'
         '7d255aa0a36601e07706af4e88fd24a3e100e205d58e40ea7cb0e935454bda0cb60c0a84eef6561ab52e136cecb4b8969aca83dcca1ee083c06558bb2644ae78'
         '373d04ee9f5fe3782345fd73d2840e9e35a20f8462f6806fd16828d6ea13e5fcf7f79f708b083537a81a27508b113dba9996ded8a18c6e675e043bf38f218484'
         '4d23de88c074df4d266e90a9ab07700628d307995656b1f723525eae4e19919cefa3cf2931ffce51ff9916dd1296deb4744403d0672e557b3d98ac5c60fb5ad5'

@@ -1,0 +1,38 @@
+From: Erhan Bilgili <erhan.bilgili@gmail.com>
+Date: Thu, 12 Nov 2026 12:40:49 +0100
+Subject: [PATCH] drm/amdgpu: Fix UserQ slot availability checks
+
+The compute and DMA queries check each other's disable_uq flags.
+When the flags differ, this can hide available slots or report slots
+for disabled UserQs.
+
+Check gfx.disable_uq for compute and sdma.disable_uq for DMA.
+
+Fixes: 78d0a27ae0e2 ("drm/amdgpu: Add user queue instance count in HW IP info")
+Signed-off-by: Erhan Bilgili <erhan.bilgili@gmail.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_kms.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_kms.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_kms.c
+index 14a72a406d37..c026a07bc050 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_kms.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_kms.c
+@@ -474,7 +474,7 @@ static int amdgpu_hw_ip_info(struct amdgpu_device *adev,
+ 			    !adev->gfx.compute_ring[i].no_user_submission)
+ 				++num_rings;
+
+-		if (!adev->sdma.disable_uq) {
++		if (!adev->gfx.disable_uq) {
+ 			for (i = 0; i < AMDGPU_MES_MAX_COMPUTE_PIPES; i++)
+ 				num_slots += hweight32(adev->mes.compute_hqd_mask[i]);
+ 		}
+@@ -489,7 +489,7 @@ static int amdgpu_hw_ip_info(struct amdgpu_device *adev,
+ 			    !adev->sdma.instance[i].ring.no_user_submission)
+ 				++num_rings;
+
+-		if (!adev->gfx.disable_uq) {
++		if (!adev->sdma.disable_uq) {
+ 			for (i = 0; i < AMDGPU_MES_MAX_SDMA_PIPES; i++)
+ 				num_slots += hweight32(adev->mes.sdma_hqd_mask[i]);
+ 		}

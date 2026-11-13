@@ -18,6 +18,44 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.11.13-1-sleepy-next (linux-next `next-20261113`)]: 2026-11-13
+
+`next-20261113` was tagged at 17:44 UTC on 2026-11-13. It is still cut
+from `7.4.0-rc2` and adds 1792 commits (1431 non-merge) over `next-20261111`.
+
+### Changed
+
+- Base `next-20261111` → `next-20261113`; release `2026.11.13-1`.
+- `2044` (`lib/group_cpus` cluster-mask snapshot) is absorbed by base commit
+  `8e36c3f38cea` and is skipped.
+- `1317` (`gpu/buddy` two-pass clear-dirty guard) no longer applies. It is
+  inert here regardless — `amdgpu_dm_update_memclk_states()` returns early
+  unless DCN 3.2/3.21.
+- No preview-only patch was added; the UserQ slot-availability fix is already
+  the preview's `9212`.
+
+## [7.3.0-26-sleepy-rc]: 2026-11-13
+
+### Added
+
+- **`9092`** — `drm/amdgpu: Fix UserQ slot availability checks` (Erhan
+  Bilgili, `Reviewed-by: Alex Deucher`, merged as `6f062b0e46ef`): the compute
+  query tested `sdma.disable_uq` and the DMA query tested `gfx.disable_uq`, so
+  differing flags hid or invented slots. The preview already carried this as
+  `9212`.
+- **`1347`** / **`1348`** — `drm/amdkfd`: CRIU queue restore now takes the
+  same buffer references normal queue creation does, and the RESUME phase
+  takes the CWSR SVM reference (`Cc: stable`).
+- **`1349`** — `drm/amdkfd`: validate the CRIU SVM private-data bounds before
+  allocating per-range metadata (`Cc: stable`).
+- **`1350`** — `drm/amdkfd`: skip devices without a VM when checkpointing BO
+  mappings. This fixes the navi48 + iGPU NULL dereference this machine's
+  topology can hit when checkpointing a dGPU-only process.
+
+### Changed
+
+- `pkgrel` 25 → 26.
+
 ## [2026.11.11-1-sleepy-next (linux-next `next-20261111`)]: 2026-11-11
 
 `next-20261111` was tagged at 17:42 UTC on 2026-11-11, thirteen hours after

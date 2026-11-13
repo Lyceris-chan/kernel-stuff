@@ -15,11 +15,11 @@ moved, so the full ledger is not duplicated here.
 
 | | |
 |---|---|
-| Snapshot | `next-20261110`, tag `793807ca13bf` (tag object `827b0a511f32`) |
-| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261110.tar.gz` |
+| Snapshot | `next-20261113`, tag `84abb955b101` (tag object `1b7a128c0c0f`) |
+| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261113.tar.gz` |
 | Snapshot tree `Makefile` | `7.4.0-rc2` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.11.10-1-sleepy-next` |
-| Package | `linux-sleepy-next-2026.11.10-1` |
+| Kernel release | `2026.11.13-1-sleepy-next` |
+| Package | `linux-sleepy-next-2026.11.13-1` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -1891,3 +1891,34 @@ confirmed by subject in the snapshot history. `sleepy-rc` keeps all nine;
 
 **158 patches** (166 - 9 absorbed + 1189). `audit_series.py`: **158/158** on
 `next-20261111`. The rc series is **359/359** on `v7.3`.
+
+## 2026-11-13 — bump to `next-20261113`; `2044` absorbed, `1317` skipped
+
+`next-20261113` (`84abb955b101`, tag object `1b7a128c0c0f`) was tagged at
+17:44 UTC on 2026-11-13. The base moves one snapshot; the package becomes
+`2026.11.13-1`. The delta is 1792 commits (1431 non-merge), still cut from
+`7.4.0-rc2`.
+
+The package lists **158 patches**; **156 applied**. Two were skipped:
+
+- **`2044`** `lib/group_cpus: snapshot cluster masks to keep grouping hotplug
+  invariant` — absorbed by the base commit `8e36c3f38cea`;
+  `__try_group_cluster_cpus()` is present in `lib/group_cpus.c`. The rc keeps
+  `2044`; `v7.3` lacks it.
+- **`1317`** `gpu/buddy: restore two-pass clear dirty guard` — context drift.
+  It is inert here anyway: `amdgpu_dm_update_memclk_states()` returns early
+  unless DCN 3.2/3.21, so DCN 4.0.1 never runs it.
+
+Both remain in `source=()` and are skipped on every build; removing them needs
+explicit approval (CLAUDE.md, YOU MUST NOT 8). No preview-only patch was added
+this cycle — the UserQ slot fix is already `9212`.
+
+Build: `linux-sleepy-next 2026.11.13-1`, 23 MB kernel and 34 MB headers. BTF
+verified: `CONFIG_DEBUG_INFO_BTF=y`, `CONFIG_DEBUG_INFO_BTF_MODULES=y`,
+`CONFIG_DEBUG_INFO_DWARF5=y`, module `.BTF` present; `CONFIG_TCP_CONG_BBR` is
+unset and `CONFIG_TCP_CONG_BBR3=y`; NAP and sched_ext remain enabled.
+
+### Series state
+
+**158 listed / 156 applied** on `next-20261113`. The rc series is **364/364**
+on `v7.3`.
