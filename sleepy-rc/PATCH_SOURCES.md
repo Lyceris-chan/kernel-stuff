@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
 - **Base:** Linux `v7.3`
-- **Series:** 364 patches
+- **Series:** 366 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -22,7 +22,7 @@ are supplied by the generator instead, so every row below has a source.
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 30 |
-| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 46 |
+| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 48 |
 | `1100–1199` | AMD display (DCN4, colorops) | 36 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 32 |
 | `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 51 |
@@ -38,7 +38,7 @@ are supplied by the generator instead, so every row below has a source.
 | `9000–9099` | agd5f staging + userq lifecycle backports | 39 |
 | `9100–9199` | Retry-fault handling v4 (agd5f staging) | 11 |
 
-**Total: 364** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 366** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-19). The counts are now generated from the patch tree
@@ -12768,6 +12768,8 @@ Phoronix was read through its RSS index through 2026-11-13.
 | `1348` | `drm/amdkfd: Acquire cwsr buffer during CRIU resume` (David Francis; `Reviewed-by: Felix Kuehling`; `5a00bdd267a5`) | After the SVM ranges are restored in RESUME, walk the queues and take the CWSR reference normal creation would have taken. Depends on `1347`; exports `kfd_queue_buffer_svm_get()`. `Cc: stable`. |
 | `1349` | `drm/amdkfd: check CRIU SVM priv data bounds before allocating` (Perry Yuan; `Reviewed-by: Yifan Zhang`; `0c3caec1161e`) | `kfd_criu_restore_svm()` allocated per-range metadata before validating the offset against the user buffer; check first and return `-EINVAL`. `Cc: stable`. |
 | `1350` | `drm/amdkfd: skip GPUs without a VM when checkpointing the BO mappings` (Jesse Zhang; `794381c358d3`) | `criu_checkpoint_bos()` passed a NULL `drm_priv` for devices the process never acquired a VM on. The report is a navi48 + iGPU topology — this machine — checkpointing a dGPU-only process: KASAN null-ptr in `amdgpu_amdkfd_bo_mapped_to_dev+0x35`. `Fixes: f9e292cbba21`. |
+| `1351` | `drm/amdgpu: Check cs flags.` (Bas Nieuwenhuizen; `Reviewed-by: Faith Ekstrand`; `4d01e15e7635`) | `amdgpu_cs_pass1()` never validated `cs->in.flags`; reject any nonzero value instead of silently ignoring unknown CS flags. Present in `next-20261113`; the preview already has it. |
+| `1352` | `drm/amdgpu: Ensure that harvest information gets set` (Kent Russell; `Fixes: 402e04f11ff7`; `Reviewed-by: Mario Limonciello`; `ca0812a625d1`) | When IP discovery is exported on probe failure, `amdgpu_discovery_sysfs_init()` can take its early exit before `amdgpu_discovery_get_harvest_info()` runs, leaving the sysfs harvest values unset. Add a call that populates them in the early-exit path. Present in `next-20261113`; the preview already has it. |
 
 All five apply in series order; `audit_series.py` reports **364/364** on
 `v7.3`.
@@ -12897,5 +12899,75 @@ news.
 ### Series state
 
 **364 patches** (359 + 5). `audit_series.py`: **364/364** on `v7.3`. The
+preview is **158 listed / 156 applied** on `next-20261113`; the two skips are
+`2044` (absorbed) and `1317` (context drift, inert).
+
+## Follow-up 2026-11-13 — 7.5 pulls, MRs, tip, CachyOS and a full tracker pass
+
+### AMD `drm-next-7.5-2026-11-12`
+
+The 2026-11-12 `[pull] amdgpu, amdkfd, drm, radeon, UAPI drm-next-7.5` tag is
+`amd-drm-next-7.5-2026-11-12` (base `a24121023a43`, tip `a6836fcbb5b2`). All
+156 commits in its shortlog are present in `next-20261113` — checked subject by
+subject against the snapshot's commit graph, not `--all`. The fixes not
+already in the rc were dry-run against the then-364-patch series tree:
+
+- **Already present** (reverse-applies cleanly to the series tree): `Fix
+  duplicate dependency fence releases`, `don't drop the gang dependency fence
+  twice`, `drop the dma-buf reference when a KFD import fails`, `check
+  amdgpu_vm_ready() in dma-buf move notify`, the WPTR BO eviction-fence fix,
+  the SMU14 STAPM update, the DCN401 DTB-DTO NULL check, the nominal-vtotal
+  VRR fix, the MES ring-timeout fix and the GEM_OP sign-extension fix. No
+  action.
+- **Adopted:** `1351` (`Check cs flags`) and `1352` (harvest information).
+- **7.5-only or wrong path:** the MES DBGEXT work-init fix, the DSC/DPMS and
+  unadvertised-mode changes, the 7.5 idle-work rework, the `navi10_ih`
+  RB_OVERFLOW fix (IH 6.0; this GPU uses `ih_v7_0`), the SR-IOV IH publish fix,
+  the legacy DCE HDMI-audio fix, the eDP/LVDS fallback and ATIF backlight
+  changes, the DCN401 RDPCS revert (the reverted commit is not in `v7.3`), and
+  the `GEM_USERPTR` 1 GiB cap (policy change, no stable tag).
+- The pull's firmware declarations cover `gc_9_5_0` and PSP 13.0.6/13.0.10,
+  not this GPU.
+
+### Other 7.5 DRM pulls and MRs
+
+- `drm-misc-next` 2026-11-13 (139 commits) and 2026-11-05 (162): connector
+  `atomic_create_state` conversions and panel/bridge work. The amdgpu changes
+  are the VKMS test conversion (11-13) and the DM connector conversion (11-05),
+  both 7.5 refactors. `dma-buf: explicitly forbid exposing pages from
+  get_user_pages()` is documentation only. Nothing to carry.
+- `drm-xe-next` 2026-11-12: 29 commits, all Xe; none targets amdgpu.
+  `drm-intel-fixes` and `drm-misc-fixes`: Intel and misc.
+- GitLab MRs: the REST API for `drm/amdgpu/kernel` returns 403, but GraphQL
+  reports **0 open MRs** for both `drm/amdgpu/kernel` and `drm/amd`.
+
+### tip and CachyOS
+
+- **tip** `origin/master` is `778e97bede35` (2026-11-13); no branch tip newer
+  than the 11-10 sweep. The new commits are x86/sev, net and misc; nothing in
+  `sched_ext`, `x86/mm`, `x86/pat`, `x86/bugs`, `x86/mce`, `io_uring` or
+  amdgpu.
+- **CachyOS** `cachyos-kernel-patches` is still `21d72141` (handheld patch
+  only); `cachyos-linux` has no ref newer than `7.4/bbr3` (2026-11-04);
+  sirlucjan remains `7275a4ad`. No desktop-relevant patch.
+
+### Tracker — full on-target pass
+
+All **405 issues updated since 2026-10-01** (317 open + 88 closed) were
+fetched. Comments on all 405 were read through GraphQL — the 233 that match
+this machine's hardware families and the remaining generic amdgpu/KFD ones —
+and every commit-like token was resolved against `torvalds` and `linux-next`.
+The on-target commits not already rejected in earlier sweeps were the SMU14
+OD/MCLK fixes (`239d0ccf567c`, `d81e52fc61fb`), which reverse-apply cleanly to
+the series tree — already present. The `_PR3`/BOCO fix (`1a039805354a`) is
+inert here because runtime PM is disabled on this machine. The recurring
+`63e19ef3ddab` page-flip fix is in both bases. No new fix commit to carry.
+Watch items unchanged: `#6115` (DCN401 idle-optimization v2), `#6127` (9070 XT
+HDMI link at boot), `#6100` (gfx1201 SMU stall), `#5954` (UCLK pinned),
+`#6088` (PSP 14.0.2 firmware/fan, not this PSP 14.0.0).
+
+### Series state
+
+**366 patches** (359 + 5 + 2). `audit_series.py`: **366/366** on `v7.3`. The
 preview is **158 listed / 156 applied** on `next-20261113`; the two skips are
 `2044` (absorbed) and `1317` (context drift, inert).

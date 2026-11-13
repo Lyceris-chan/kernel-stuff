@@ -34,6 +34,22 @@ from `7.4.0-rc2` and adds 1792 commits (1431 non-merge) over `next-20261111`.
 - No preview-only patch was added; the UserQ slot-availability fix is already
   the preview's `9212`.
 
+## [7.3.0-27-sleepy-rc]: 2026-11-13
+
+### Added
+
+- **`1351`** — `drm/amdgpu: Check cs flags.` (Bas Nieuwenhuizen, `Reviewed-by:
+  Faith Ekstrand`): reject nonzero `cs->in.flags` instead of silently ignoring
+  unknown CS flags. Present in `next-20261113`; the preview already has it.
+- **`1352`** — `drm/amdgpu: Ensure that harvest information gets set` (Kent
+  Russell, `Fixes: 402e04f11ff7`): populate the sysfs harvest values when IP
+  discovery takes its early-exit path on probe failure. Present in
+  `next-20261113`; the preview already has it.
+
+### Changed
+
+- `pkgrel` 26 → 27.
+
 ## [7.3.0-26-sleepy-rc]: 2026-11-13
 
 ### Added

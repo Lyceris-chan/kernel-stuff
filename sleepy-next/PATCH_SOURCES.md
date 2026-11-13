@@ -1920,5 +1920,5 @@ unset and `CONFIG_TCP_CONG_BBR3=y`; NAP and sched_ext remain enabled.
 
 ### Series state
 
-**158 listed / 156 applied** on `next-20261113`. The rc series is **364/364**
+**158 listed / 156 applied** on `next-20261113`. The rc series is **366/366**
 on `v7.3`.

@@ -1,0 +1,33 @@
+From 4d01e15e76358f60ef6734462d2b6d9972b9dfbc Mon Sep 17 00:00:00 2001
+From: Bas Nieuwenhuizen <bas@basnieuwenhuizen.nl>
+Date: Thu, 22 Oct 2026 01:30:54 +0100
+Subject: [PATCH] drm/amdgpu: Check cs flags.
+
+Had no validation before. libdrm_amdgpu memsets this, even
+for the raw/raw2 functions.
+
+We have a lot of functions touching the ioctl struct, no
+strong opinion on where this is placed, but I thought
+early would be good.
+
+Signed-off-by: Bas Nieuwenhuizen <bas@basnieuwenhuizen.nl>
+Reviewed-by: Faith Ekstrand <faith.ekstrand@collabora.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c
+index b55faf39ce5b..6281a3470778 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_cs.c
+@@ -189,6 +189,9 @@ static int amdgpu_cs_pass1(struct amdgpu_cs_parser *p,
+ 	int ret;
+ 	int i;
+ 
++	if (cs->in.flags)
++		return -EINVAL;
++
+ 	chunk_array = memdup_array_user(u64_to_user_ptr(cs->in.chunks),
+ 					cs->in.num_chunks,
+ 					sizeof(uint64_t));

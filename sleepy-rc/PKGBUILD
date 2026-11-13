@@ -182,7 +182,7 @@ _rcver=
 
 pkgver=7.3.0
 _tagrel=1
-pkgrel=26
+pkgrel=27
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -428,6 +428,8 @@ source=(
   "patches/1300-1399/1348-drm-amdkfd-acquire-cwsr-buffer-during-CRIU-resume.patch"
   "patches/1300-1399/1349-drm-amdkfd-check-CRIU-SVM-priv-data-bounds-before-allocating.patch"
   "patches/1300-1399/1350-drm-amdkfd-skip-GPUs-without-a-VM-when-checkpointing-BO-mappings.patch"
+  "patches/1300-1399/1351-drm-amdgpu-check-cs-flags.patch"
+  "patches/1300-1399/1352-drm-amdgpu-ensure-that-harvest-information-gets-set.patch"
 
   "patches/2000-2099/2000-block-mq-deadline-pass-in-queue-directly-to-dd_inser.patch"
   "patches/2000-2099/2001-block-mq-deadline-skip-expensive-merge-lookups-if-co.patch"
@@ -1429,6 +1431,8 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         '9c1364dbf7d89ce455b2a6bd4849020f36fa981961b80509c3e2e99b6d40a556cc4dfec5afcb84c4ab2bf9b3c8a9d4f3d3673813dc22cf8f217d0b3730b03968'
         '35a2c778ba5356a5ccc9037aa56a73200d4ec9c8cce68086de3806d550ef2fdc7b587d9a402c86dcab330b2fcae2771bd008af59531bfcc2b3ecaa3c00c9a973'
         '12340000cd2fb0ded0441a1ea3fee0c197c09fe8fb30e80d8c1a9a25534e16ad28c4b68e0cbcb1793098334da7b7145eefac409d378e67fd4d4ea2cbcc73b24e'
+        'ac9f71364c32f1d3e22c48139494e816433152a1399e2fecbd5db7484760e001ee26c566b67ef91d941652adbc0d16bad2d50c5ca5bc200d442d018467346277'
+        'fb1e2fc67691b7db12ff43b843c5ee228a06f6562d61b64b4185b7f0bdd90b283a54c3a91f2aaf357629020a56fbef1d5c245f8a4fc239b907ceebd1b01c02a8'
         'c20b3b791715d02756742bfa34f4921bcaebeee62edf079fe15c89afdc11451a2656122f4f21335cd116676ff69c3b7eee80c6adfdcbfe838c0f1e9012ce0428'
         'df68cfd344b37cae25fa446c82c5897510de23c55761570969dc5a6f2a5bf4c11b31e50c1670a18bef1065af6597e72e0ed839e8fdbc0328cf2dcf34484e5758'
         '8bff27696075ec53ca042b0c9e0deae345712e652b3b66bab1da82c4deefdf35533d04c00d59de70cbf968380236131bc819e0eeaa8aa40edfd84df3bd0972ef'
