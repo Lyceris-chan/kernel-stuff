@@ -15,11 +15,11 @@ moved, so the full ledger is not duplicated here.
 
 | | |
 |---|---|
-| Snapshot | `next-20261113`, tag `84abb955b101` (tag object `1b7a128c0c0f`) |
-| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261113.tar.gz` |
-| Snapshot tree `Makefile` | `7.4.0-rc2` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.11.13-3-sleepy-next` |
-| Package | `linux-sleepy-next-2026.11.13-3` |
+| Snapshot | `next-20261116`, commit `749a4de37040` (tag object `38c8be16846f`) |
+| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261116.tar.gz` |
+| Snapshot tree `Makefile` | `7.4.0-rc3` — the base release, **deliberately not used in the release name** |
+| Kernel release | `2026.11.16-1-sleepy-next` |
+| Package | `linux-sleepy-next-2026.11.16-1` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -1935,14 +1935,18 @@ The authoritative per-patch provenance for this pass is the `## Sweep
 2026-11-16` section in `sleepy-rc/PATCH_SOURCES.md`. This section records only
 what differs in the preview.
 
-### Base: unchanged, because `next-20261116` was never tagged
+### Base: `next-20261116`, tagged at 20:59:59 UTC
 
-`git ls-remote` against `git.kernel.org` was checked repeatedly through
-20:20 UTC on 2026-11-16; the newest linux-next tag remained `next-20261113`.
-No snapshot dropped that day, so the base stays `next-20261113` and the
-release moves `pkgrel` 2 → 3 (`2026.11.13-3`). If the tag appears later, the
-bump is a separate, mechanical change: `_srctag`, the source URL, `pkgrel` 1,
-`updpkgsums`, and a re-audit of this series against the new tag.
+The tag appeared late, after this sweep's `2026.11.13-3` release had already
+been built (which is why that release exists with `pkgrel` 3). It is cut from
+`7.4.0-rc3` and adds **1712 commits (1331 non-merge)** over `next-20261113`.
+The series was re-audited against it with
+`audit_series.py --tag next-20261116`: **173 listed, 171 applied**, the same
+two skips — `2044` (absorbed by `8e36c3f38cea`) and `1317` (context drift,
+inert). A subject probe of the 1331 new non-merge commits found no other match
+with a carried patch, so nothing new was absorbed into a duplicate. All nine
+new carries (`1190`–`1198`), `1353`, `1354`, `2068`, `2069`, `2425` and `9240`
+remain unmerged upstream on this snapshot.
 
 ### Carried as posted, not as the rc ports
 
@@ -1954,6 +1958,26 @@ bump is a separate, mechanical change: `_srctag`, the source URL, `pkgrel` 1,
 - **`1198`** is carried in full, including the `amdgpu_dm_ism_test.c` KUnit
   cases. The rc copy drops those two hunks because that file's layout differs;
   the functional `amdgpu_dm_ism.c` hunk is identical.
+
+### `2200` (NAP v0.6.6) ported to the `7.4-rc3` cpuidle API
+
+`next-20261116` is cut from `7.4.0-rc3`, which **moved the latency request out
+of the public header**: `cpuidle_governor_latency_req()` is no longer declared
+in `include/linux/cpuidle.h` (it moved to the private
+`drivers/cpuidle/cpuidle.h`) and the cpuidle core now stores the per-device
+value in `struct cpuidle_device.latency_req`, refreshed in `cpuidle_select()`
+*immediately before* the governor's `select()` runs. NAP v0.6.6's in-tree path
+still calls the old function, so the first build of this snapshot failed with
+`call to undeclared function 'cpuidle_governor_latency_req'` in `nap.c:283`.
+
+The preview copy is ported: the in-tree branch drops the
+`#define nap_latency_req cpuidle_governor_latency_req` line and the select path
+reads `dev->latency_req` directly. The value and its timing are identical —
+same computation, same point in the flow. The `NAP_OOT` test-harness branch is
+untouched. The rc keeps the original v0.6.6 because `v7.3` still has the
+function in the public header. Upstream NAP has no newer release (v0.6.6,
+2026-11-01), so this port is ours and is the one to re-check when firelzrd
+publishes v0.6.7.
 
 ### Preview-only carries
 
@@ -1972,6 +1996,6 @@ precedes them.
 
 ### Series state
 
-**173 listed / 171 applied** on `next-20261113`; the two skips are `2044`
+**173 listed / 171 applied** on `next-20261116`; the two skips are `2044`
 (absorbed by `8e36c3f38cea`) and `1317` (context drift, inert on DCN 4.0.1).
 The rc series is **379/379** on `v7.3`.

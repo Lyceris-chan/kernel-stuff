@@ -63,6 +63,28 @@ full entries remain in git history.
 - Series 366 → **379** patches. `audit_series.py`: 379/379 on `v7.3`.
 - `pkgrel` 28 → 29.
 
+## [2026.11.16-1-sleepy-next (linux-next `next-20261116`)]: 2026-11-16
+
+`next-20261116` was tagged at **20:59:59 UTC on 2026-11-16**, after the
+`2026.11.13-3` build of this sweep. It is cut from `7.4.0-rc3` and adds
+**1712 commits (1331 non-merge)** over `next-20261113`.
+
+### Changed
+
+- Base `next-20261113` → `next-20261116`; release `2026.11.16-1`.
+- The series re-audited unchanged: **173 listed / 171 applied**, the same two
+  skips (`2044` absorbed by `8e36c3f38cea`, `1317` context drift and inert).
+  No new carry was absorbed by the snapshot: a subject probe of all 1331 new
+  non-merge commits found no match with a carried patch.
+- **`2200` (NAP v0.6.6) ported to the 7.4-rc3 cpuidle API.** The snapshot moved
+  `cpuidle_governor_latency_req()` out of `include/linux/cpuidle.h` into the
+  private `drivers/cpuidle/cpuidle.h` and stores the value in
+  `struct cpuidle_device.latency_req`, refreshed in `cpuidle_select()` right
+  before the governor runs. The first build failed on the old call; the
+  preview copy now reads `dev->latency_req` directly (same value, same point).
+  The rc keeps the original v0.6.6.
+- This supersedes `2026.11.13-3` (same patch set, older snapshot).
+
 ## [2026.11.13-3-sleepy-next (linux-next `next-20261113`)]: 2026-11-16
 
 No `next-20261116` tag had been published on `git.kernel.org` when this

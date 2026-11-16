@@ -213,7 +213,7 @@ index 0000000000..a8e39e8457
 +#else
 +#include "../gov.h"
 +#define nap_sleep_length		tick_nohz_get_sleep_length
-+#define nap_latency_req			cpuidle_governor_latency_req
++/* v7.4-rc3: the latency request moved to struct cpuidle_device. */
 +#define nap_register_governor		cpuidle_register_governor
 +#endif
 +
@@ -409,7 +409,7 @@ index 0000000000..a8e39e8457
 +	d->ts_sel = local_clock();
 +	d->sleep_ns = ktime_to_ns(nap_sleep_length(&dt));
 +	d->tick_ns = ktime_to_ns(dt);
-+	lat = nap_latency_req(dev->cpu);
++	lat = dev->latency_req;
 +	min_state = nap_get_min_valid_state(d, drv, dev, lat);
 +	nap_irq_counts(&d->dev0, &d->loc0);
 +	d->active = true;
