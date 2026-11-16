@@ -1,0 +1,73 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Tao Cui <cuitao@kylinos.cn>
+Date: Thu, 12 Nov 2026 22:49:35 +0800
+Subject: sched_ext: Block a retained donor before PI deboost routes it back to sched_ext
+
+From: Tao Cui <cuitao@kylinos.cn>
+
+rt_mutex_setprio() is the only entry path into sched_ext that does not
+block a retained donor: an ext task PI-boosted by an rt waiter can
+block on a second kernel mutex while boosted, and on deboost is routed
+back to sched_ext carrying the queued+blocked state that
+scx_prepare_setscheduler() promises never happens; every PI cycle
+hands the BPF scheduler a queued+blocked donor it never admitted.
+
+Call scx_prepare_task_sched_change() before the sched_change guard when
+the class change routes the task back to sched_ext, which performs the
+missing sched_proxy_block_task() (plus an update_rq_clock() that is
+harmless here: the clock was already advanced, so the second advance
+only applies a small delta). The boost direction (ext -> rt) needs no
+handling.
+
+Fixes: be8be8acb268 ("sched_ext: Block proxy donors before taking control")
+Signed-off-by: Tao Cui <cuitao@kylinos.cn>
+---
+ 2 files changed, 14 insertions(+), 1 deletions(-)
+
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index f7a452123ef5..dcb16b006740 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -7816,6 +7816,18 @@ void rt_mutex_setprio(struct task_struct *p, struct task_struct *pi_task)
+ 	if (prev_class != next_class)
+ 		queue_flag |= DEQUEUE_CLASS;
+ 
++	/*
++	 * PI boost can route @p out of sched_ext: policy stays SCHED_EXT but
++	 * __setscheduler_class() follows the effective rt prio, and rt/fair
++	 * may have retained @p on the rq as a blocked donor. Block it before
++	 * sched_change_begin() records the queued state, the same way the
++	 * other entry points into sched_ext do.
++	 */
++#ifdef CONFIG_SCHED_CLASS_EXT
++	if ((queue_flag & DEQUEUE_CLASS) && next_class == &ext_sched_class)
++		scx_prepare_task_sched_change(p);
++#endif
++
+ 	scoped_guard (sched_change, p, queue_flag) {
+ 		/*
+ 		 * Boosting condition are:
+diff --git a/kernel/sched/ext/ext.h b/kernel/sched/ext/ext.h
+index d32bc01071b0..1a699be25331 100644
+--- a/kernel/sched/ext/ext.h
++++ b/kernel/sched/ext/ext.h
+@@ -19,6 +19,7 @@ void scx_rq_activate(struct rq *rq);
+ void scx_rq_deactivate(struct rq *rq);
+ int scx_check_setscheduler(struct task_struct *p, int policy);
+ void scx_prepare_setscheduler(struct task_struct *p, int policy);
++void scx_prepare_task_sched_change(struct task_struct *p);
+ bool task_should_scx(int policy);
+ bool scx_allow_ttwu_queue(const struct task_struct *p);
+ bool __scx_allow_proxy_exec(const struct task_struct *p);
+@@ -72,6 +73,7 @@ static inline void scx_rq_activate(struct rq *rq) {}
+ static inline void scx_rq_deactivate(struct rq *rq) {}
+ static inline int scx_check_setscheduler(struct task_struct *p, int policy) { return 0; }
+ static inline void scx_prepare_setscheduler(struct task_struct *p, int policy) {}
++static inline void scx_prepare_task_sched_change(struct task_struct *p) {}
+ static inline bool task_on_scx(const struct task_struct *p) { return false; }
+ static inline bool scx_allow_ttwu_queue(const struct task_struct *p) { return true; }
+ static inline bool scx_allow_proxy_exec(const struct task_struct *p) { return true; }
+-- 
+2.53.0
+
+base-commit: 5b740a72b55c4267ba4d8010f17dde26b26f52d3

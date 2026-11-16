@@ -18,8 +18,8 @@ moved, so the full ledger is not duplicated here.
 | Snapshot | `next-20261113`, tag `84abb955b101` (tag object `1b7a128c0c0f`) |
 | Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261113.tar.gz` |
 | Snapshot tree `Makefile` | `7.4.0-rc2` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.11.13-2-sleepy-next` |
-| Package | `linux-sleepy-next-2026.11.13-2` |
+| Kernel release | `2026.11.13-3-sleepy-next` |
+| Package | `linux-sleepy-next-2026.11.13-3` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -1928,3 +1928,50 @@ matching the signed kernel.org `sha256sums.asc`). The preview becomes
 
 **158 listed / 156 applied** on `next-20261113`. The rc series is **366/366**
 on `v7.3`.
+
+## Sweep 2026-11-16 — preview deltas for the FRL, elevator and userq carries
+
+The authoritative per-patch provenance for this pass is the `## Sweep
+2026-11-16` section in `sleepy-rc/PATCH_SOURCES.md`. This section records only
+what differs in the preview.
+
+### Base: unchanged, because `next-20261116` was never tagged
+
+`git ls-remote` against `git.kernel.org` was checked repeatedly through
+20:20 UTC on 2026-11-16; the newest linux-next tag remained `next-20261113`.
+No snapshot dropped that day, so the base stays `next-20261113` and the
+release moves `pkgrel` 2 → 3 (`2026.11.13-3`). If the tag appears later, the
+bump is a separate, mechanical change: `_srctag`, the source URL, `pkgrel` 1,
+`updpkgsums`, and a re-audit of this series against the new tag.
+
+### Carried as posted, not as the rc ports
+
+- **`1195`** and **`1196`** are carried **as the author posted them** on this
+  base. The rc copies are ports (the `v7.3` tree still uses the `max_polls`
+  loop and carries `1136`'s `flt_no_timeout` reset in the TxFFE block); the
+  preview base has the `poll_timeout_ns` loop the series was written against.
+  Same numbers, same subjects, same authors — different diff, by base.
+- **`1198`** is carried in full, including the `amdgpu_dm_ism_test.c` KUnit
+  cases. The rc copy drops those two hunks because that file's layout differs;
+  the functional `amdgpu_dm_ism.c` hunk is identical.
+
+### Preview-only carries
+
+| Patch | Subject | Why preview only |
+|---|---|---|
+| `2425` | `sched_ext: Block a retained donor before PI deboost routes it back to sched_ext` (Tao Cui) | `v7.3` has no `scx_prepare_task_sched_change()` or proxy-donor infrastructure; the patch cannot apply there. |
+| `9240` | `drm/amdgpu: Handle UserQ restore allocation failures` (Erhan Bilgili, salkim `fb85af1fa1ea`) | The UserQ restore path exists only in the 7.4 tree. |
+
+### Applied in order
+
+`1190` → `1191` → `1192` → `1193` → `1194` → `1195` → `1196` → `1197` →
+`1198`. `1193` depends on `1192` having moved the polling block; its guard is
+anchored on the moved block. `1195`–`1197` are independent of the polling
+lifetime fixes but share `link_hdmi_frl.c` with `1194`, which is why `1194`
+precedes them.
+
+### Series state
+
+**173 listed / 171 applied** on `next-20261113`; the two skips are `2044`
+(absorbed by `8e36c3f38cea`) and `1317` (context drift, inert on DCN 4.0.1).
+The rc series is **379/379** on `v7.3`.

@@ -1,0 +1,56 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Eren Özen <erenozen@protonmail.com>
+Date: Tue, 10 Nov 2026 07:21:57 +0300
+Subject: drm/amd/display: Destroy FRL status polling workqueue in amdgpu_dm_fini()
+
+From: Eren Özen <erenozen@protonmail.com>
+
+amdgpu_dm_init() allocates hdmi_frl_status_polling_wq on every device
+with at least one display link, but amdgpu_dm_fini() never destroys it,
+unlike the other display manager workqueues. Every unbind or unload of
+amdgpu leaks the workqueue and its rescuer thread, and each rebind adds
+another one, visible as an extra kworker/R-hdmi_frl_status_polling_wq
+thread.
+
+The polling work also re-queues itself every 200ms while an HDMI FRL
+stream is active and dereferences dm->dc under dm->dc_lock. Nothing on
+the teardown path cancels it, so if it is still pending when
+amdgpu_dm_fini() runs, it can run after dc_destroy() and
+mutex_destroy(&dm->dc_lock).
+
+Cancel the polling work and destroy its workqueue at the start of
+amdgpu_dm_fini(), next to the vblank control workqueue. With the
+previous patch, the work item is initialized before the workqueue is
+allocated, so checking the workqueue pointer is enough to know that
+both are valid, including on the amdgpu_dm_init() error path. This
+patch depends on that ordering.
+
+Fixes: 5c9b8b27a883 ("drm/amd/display: Tie FRL support into amdgpu_dm")
+Assisted-by: Claude:claude-opus-5-5
+Signed-off-by: Eren Özen <erenozen@protonmail.com>
+---
+ drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c | 7 ++++++-
+
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
+index bf2f74d7d9..fed1893d2f 100644
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
+@@ -889,6 +889,12 @@ static void amdgpu_dm_fini(struct amdgpu_device *adev)
+ 		adev->dm.vblank_control_workqueue = NULL;
+ 	}
+ 
++	if (adev->dm.hdmi_frl_status_polling_wq) {
++		cancel_delayed_work_sync(&adev->dm.hdmi_frl_status_polling_work);
++		destroy_workqueue(adev->dm.hdmi_frl_status_polling_wq);
++		adev->dm.hdmi_frl_status_polling_wq = NULL;
++	}
++
+ 	if (adev->dm.idle_workqueue) {
+ 		if (adev->dm.idle_workqueue->running) {
+ 			adev->dm.idle_workqueue->enable = false;
+
+-- 
+2.56.0
+
+
+

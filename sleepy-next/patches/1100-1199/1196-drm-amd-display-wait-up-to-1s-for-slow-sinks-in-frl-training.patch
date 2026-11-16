@@ -1,0 +1,45 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Andrzej Piątysek <andrzej.piatyszek@gmail.com>
+Date: Tue, 10 Nov 2026 14:09:55 +0100
+Subject: drm/amd/display: Wait up to 1 s for slow sinks in FRL link training
+
+LTS:3 gives the sink 220 ms (320 ms at 16 Gbps and above) to answer an
+LTP request before the driver gives up on the rate. A Samsung QE65Q80T
+(2020) sometimes answers at 10 Gbps x 4 only after 225 to 967 ms, so
+link verification falls back to 6 Gbps x 3.
+
+Wait up to 1 s at every rate. Sinks that answer within the old limit
+are unaffected; a sink that never answers costs up to 1 s per rate in
+the polling loop instead of 220 ms.
+
+Fixes: cbb8e2044b9e ("drm/amd/display: Add DC link support for FRL")
+Assisted-by: Claude:claude-opus-5-5
+Signed-off-by: Andrzej Piątysek <andrzej.piatyszek@gmail.com>
+---
+ drivers/gpu/drm/amd/display/dc/link/protocols/link_hdmi_frl.c | 10 ++++++----
+
+diff --git a/drivers/gpu/drm/amd/display/dc/link/protocols/link_hdmi_frl.c b/drivers/gpu/drm/amd/display/dc/link/protocols/link_hdmi_frl.c
+index 78e62bfec..97b2b9b74 100644
+--- a/drivers/gpu/drm/amd/display/dc/link/protocols/link_hdmi_frl.c
++++ b/drivers/gpu/drm/amd/display/dc/link/protocols/link_hdmi_frl.c
+@@ -612,10 +612,13 @@ static enum link_result hdmi_frl_perform_link_training(struct ddc_service *ddc_s
+ 
+ 		FRL_INFO("FRL LINK TRAINING:  Poll for FLT_UPDATE.\n");
+ 		/*LTS:3: Start Link Training*/
+-		/*Start FLT Timer = 200 ms, or 300ms if link rate >= 16Gbps*/
++		/*
++		 * Start FLT Timer. Some sinks need longer than the nominal 200 ms
++		 * (300 ms at 16 Gbps and above) to answer an LTP request, so wait
++		 * up to 1 s before giving up on this rate.
++		 */
+ 		num_polls = 0;
+-		if (link_settings->frl_link_rate >= HDMI_FRL_LINK_RATE_16GBPS)
+-			poll_timeout_ns = 320 * 1000 * 1000;
++		poll_timeout_ns = 1000 * 1000 * 1000;
+ 
+ 		flt_poll_start = dm_get_timestamp(ddc_service->ctx);
+ 		uint8_t prev_flt_update = 0;
+-- 
+2.56.0
+
+

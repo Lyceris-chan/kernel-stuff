@@ -18,6 +18,80 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-29-sleepy-rc]: 2026-11-16
+
+### Added
+
+- **`1190`–`1194`** — the HDMI FRL status-polling lifetime fixes. The
+  polling work is now initialized once at DM init instead of per connector
+  (Eren Özen), the workqueue is cancelled and destroyed in
+  `amdgpu_dm_fini()` (`1191`, Eren Özen), it is started and stopped outside
+  `dc_lock` so `cancel_delayed_work_sync()` can no longer deadlock against the
+  worker (`1192`, Fangzhi Zuo, DC patches 11-16), the queueing is skipped when
+  the workqueue allocation failed (`1193`, Eren Özen, rebased), and
+  `force_frl` flags set by a patched panel no longer leak to the next sink
+  (`1194`, Charlene Liu, DC patches 11-16).
+- **`1195`–`1197`** — Andrzej Piątysek's FRL training series for slow HDMI
+  sinks, measured on an **RX 9070 XT driving an HDMI TV**: program the
+  requested TxFFE level immediately instead of deferring it to a poll the sink
+  has usually already cleared, wait up to 1 s for an LTP answer, and retry the
+  same rate after a timeout before falling back. `1195`/`1196` are ported to
+  the `v7.3` poll loop; `1196` supersedes the 300 ms budget `1168` set (the
+  older patch stays in the series and is rewritten by the newer one).
+- **`1198`** — `drm/amd/display: Disallow idle on cursor update during ISM
+  hysteresis` (Claudio Forain, v2 of the DCN401 item tracked as `#6115`):
+  another CRTC's ISM can allow hardware-wide idle while this CRTC is still in
+  hysteresis, so every legacy cursor update exits and re-enters idle through
+  DMUB. The rc copy carries the functional hunk only; the KUnit file differs
+  on this base. The rc keeps `dcdebugmask=0x800`, so this is mostly insurance
+  here and full coverage on the preview.
+- **`1353`** — `drm/amdgpu: Fix HMM range retries` (Erhan Bilgili, from
+  salkim): free the previous `hmm_pfns` array before replacing it and treat a
+  range with no pfns as invalid.
+- **`1354`** — `drm/amdkfd: move TBA/TMA back to system memory` (Alex
+  Deucher, `Closes: #6116`): the VRAM placement introduced by `fe5966d4fdcb`
+  causes GPU resets after suspend in some apps on non-MI parts. The explicit
+  IP list excludes GC 12.0.0, so this Navi 48 returns to system memory.
+- **`2068`** / **`2069`** — `block: don't request a module for the none
+  elevator` and `block: return early when the elevator doesn't change`
+  (Qiliang Yuan, `Reviewed-by: Christoph Hellwig`): writing the scheduler a
+  queue already uses no longer freezes the queue for ~10 ms. The udev rule
+  writes `kyber` on every boot, so this removes a real boot-time stall.
+
+### Changed
+
+- Series 366 → **379** patches. `audit_series.py`: 379/379 on `v7.3`.
+- `pkgrel` 28 → 29.
+
+## [2026.11.13-3-sleepy-next (linux-next `next-20261113`)]: 2026-11-16
+
+No `next-20261116` tag had been published on `git.kernel.org` when this
+release was built (checked repeatedly through 20:20 UTC; the newest tag was
+still `next-20261113`), so the base is unchanged and the release moves by
+`pkgrel` only. The sweep's findings are in `PATCH_SOURCES.md`.
+
+### Added
+
+- **`1190`–`1198`** — the same HDMI FRL block as `7.3.0-29-sleepy-rc`, but the
+  FRL-training patches (`1195`/`1196`) and the cursor-ISM patch (`1198`) are
+  carried **as the authors posted them**, without the rc's ports: this base
+  already has the `poll_timeout_ns` training loop and the KUnit layout the
+  postings were written against.
+- **`1353`** (`drm/amdgpu: Fix HMM range retries`) and **`1354`**
+  (`drm/amdkfd: move TBA/TMA back to system memory`, `Closes: #6116`).
+- **`2068`** / **`2069`** — the two block-elevator early-return fixes.
+- **`2425`** — `sched_ext: Block a retained donor before PI deboost routes it
+  back to sched_ext` (Tao Cui), preview-only: the `v7.3` tree lacks
+  `scx_prepare_task_sched_change()` and the proxy-donor infrastructure.
+- **`9240`** — `drm/amdgpu: Handle UserQ restore allocation failures`
+  (preview-only; the UserQ restore path exists only here).
+
+### Changed
+
+- Series 158 → **173** patches; **171 applied** on `next-20261113` (`2044`
+  absorbed, `1317` context drift and inert).
+- `pkgrel` 2 → 3.
+
 ## [2026.11.13-2-sleepy-next (linux-next `next-20261113`)]: 2026-11-13
 
 ### Changed

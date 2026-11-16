@@ -1,0 +1,77 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claudio Forain <claudioforain@gmail.com>
+Date: Sun, 15 Nov 2026 18:11:51 -0600
+Subject: drm/amd/display: Disallow idle on cursor update during ISM hysteresis
+
+[Why]
+Idle optimizations are HW-wide, but the Idle State Manager (ISM) runs per
+CRTC. With two displays, a static CRTC's ISM reaches OPTIMIZED_IDLE and
+allows idle optimizations while another CRTC is receiving legacy cursor
+updates, which hold no vblank reference. The cursor CRTC's ISM then sits in
+HYSTERESIS_WAITING, and BEGIN_CURSOR_UPDATE only moves it to
+HYSTERESIS_BUSY without touching idle.
+
+Every cursor update then calls dc_stream_program_cursor_attributes(),
+which exits and re-enters idle through synchronous DMUB commands. On DCNs
+that set debug.exit_idle_opt_for_cursor_updates,
+dc_stream_program_cursor_position() does the same, for up to four DMUB
+commands per cursor update under dc_lock. On Xorg with an RX 9070 XT
+(DCN401) the cursor visibly speeds up and slows down.
+
+ISM tracing on v7.3.3 while moving the cursor: of 12675 cursor updates that
+started in HYSTERESIS_WAITING, 9172 ran with idle allowed; none of the 866
+that started in FULL_POWER_RUNNING did, as vblank was enabled there.
+
+[How]
+When BEGIN_CURSOR_UPDATE moves a CRTC from HYSTERESIS_WAITING to
+HYSTERESIS_BUSY, disallow idle. The CRTC's hysteresis timer, re-armed on
+END_CURSOR_UPDATE, allows idle again once the cursor stops. Only idle is
+touched; static screen optimizations are left alone. FULL_POWER states
+are not changed: no timer is pending there that would allow idle again.
+The change is not DCN specific, as the cursor attributes path exits idle
+on every DCN.
+
+With this change, the same trace shows none of 22732 cursor updates
+running with idle allowed, and idle is allowed again once the cursor
+stops. Static desktop GPU power is unchanged (25.9 W average over 40 s,
+with and without the change).
+
+Add KUnit tests for the veto and for FULL_POWER_RUNNING leaving idle
+untouched.
+
+Fixes: 754003486c3c ("drm/amd/display: Add Idle state manager(ISM)")
+Closes: https://gitlab.freedesktop.org/drm/amd/-/issues/6115
+Link: https://gitlab.freedesktop.org/drm/amd/-/issues/4906
+Assisted-by: Claude:claude-opus-5-5
+Signed-off-by: Claudio Forain <claudioforain@gmail.com>
+---
+ 2 files changed, 127 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_ism.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_ism.c
+index 127eaba4de..21eeae66cb 100644
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_ism.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_ism.c
+@@ -401,6 +401,23 @@ static enum amdgpu_dm_ism_event dm_ism_dispatch_power_state(
+ 			mod_delayed_work(system_dfl_wq, &ism->delayed_work,
+ 					 nsecs_to_jiffies(delay_ns));
+ 		break;
++	case DM_ISM_STATE_HYSTERESIS_BUSY:
++		/*
++		 * Idle optimizations are HW-wide, so another CRTC's ISM may have
++		 * allowed them while this CRTC was still in hysteresis. Every
++		 * cursor update would then exit and re-enter idle through DMUB.
++		 * Disallow idle when a cursor update starts here; this CRTC's
++		 * hysteresis timer, re-armed on END_CURSOR_UPDATE, allows it
++		 * again once the cursor stops. Only idle is touched, not static
++		 * screen optimizations.
++		 */
++		if (ism->previous_state == DM_ISM_STATE_HYSTERESIS_WAITING) {
++			struct amdgpu_crtc *acrtc = ism_to_amdgpu_crtc(ism);
++			struct dc *dc = drm_to_adev(acrtc->base.dev)->dm.dc;
++
++			dc_allow_idle_optimizations(dc, false);
++		}
++		break;
+ 	case DM_ISM_STATE_OPTIMIZED_IDLE:
+ 		sso_delay_ns = dm_ism_get_sso_delay(ism, acrtc_state->stream);
+ 		if (sso_delay_ns > 0) {

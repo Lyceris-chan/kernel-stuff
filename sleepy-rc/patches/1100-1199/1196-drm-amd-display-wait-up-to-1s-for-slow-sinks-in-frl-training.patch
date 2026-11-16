@@ -1,0 +1,45 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Andrzej Piątysek <andrzej.piatyszek@gmail.com>
+Date: Tue, 10 Nov 2026 14:09:55 +0100
+Subject: drm/amd/display: Wait up to 1 s for slow sinks in FRL link training
+
+LTS:3 gives the sink 220 ms (320 ms at 16 Gbps and above) to answer an
+LTP request before the driver gives up on the rate. A Samsung QE65Q80T
+(2020) sometimes answers at 10 Gbps x 4 only after 225 to 967 ms, so
+link verification falls back to 6 Gbps x 3.
+
+Wait up to 1 s at every rate. Sinks that answer within the old limit
+are unaffected; a sink that never answers costs up to 1 s per rate in
+the polling loop instead of 220 ms.
+
+Fixes: cbb8e2044b9e ("drm/amd/display: Add DC link support for FRL")
+Assisted-by: Claude:claude-opus-5-5
+Signed-off-by: Andrzej Piątysek <andrzej.piatyszek@gmail.com>
+---
+ drivers/gpu/drm/amd/display/dc/link/protocols/link_hdmi_frl.c | 14 +++++---------
+
+--- a/drivers/gpu/drm/amd/display/dc/link/protocols/link_hdmi_frl.c
++++ b/drivers/gpu/drm/amd/display/dc/link/protocols/link_hdmi_frl.c
+@@ -529,17 +529,13 @@
+ 		FRL_INFO("FRL LINK TRAINING:  Poll for FLT_UPDATE.\n");
+ 		/*LTS:3: Start Link Training*/
+ 		/*
+-		 * Start FLT Timer = 300 ms. HDMI 2.1 specifies FLT_TIMEOUT = 200 ms,
+-		 * but this budget runs from the FRL_Rate write to the final
+-		 * FLT_update and some sinks need more than that in total: an LG C2
+-		 * (2022) at 10G x4 raises its first FLT_update (the LTP request)
+-		 * ~45 ms after the rate write and reports lock a further ~180 ms
+-		 * later, ~225 ms in all, so it failed the 105-poll (~210 ms) budget on
+-		 * most DPMS wakes at 4K120 while at 6G x4 (~20 ms + ~180 ms) it just
+-		 * fit. Use the 300 ms already allowed for >= 16 Gbps at every rate.
++		 * Start FLT Timer. Some sinks need longer than the nominal 200 ms
++		 * (300 ms at 16 Gbps and above) to answer an LTP request, so wait
++		 * up to 1 s before giving up on this rate. The polling loop below
++		 * runs one poll every 2 ms, so 500 polls is the 1 s budget.
+ 		 */
+ 		num_polls = 0;
+-		max_polls = 155;
++		max_polls = 500;
+ 
+ 		while (num_polls < max_polls) {
+ 			flt_poll_cur_time = dm_get_timestamp(ddc_service->ctx);

@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
 - **Base:** Linux `v7.3`
-- **Series:** 366 patches
+- **Series:** 379 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -22,10 +22,10 @@ are supplied by the generator instead, so every row below has a source.
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 30 |
-| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 48 |
-| `1100–1199` | AMD display (DCN4, colorops) | 36 |
+| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 50 |
+| `1100–1199` | AMD display (DCN4, colorops) | 45 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 32 |
-| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 51 |
+| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 53 |
 | `2100–2199` | Memory management and swap (zstd, LRU-MARIE, gup, zswap) | 50 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 21 |
@@ -38,7 +38,7 @@ are supplied by the generator instead, so every row below has a source.
 | `9000–9099` | agd5f staging + userq lifecycle backports | 39 |
 | `9100–9199` | Retry-fault handling v4 (agd5f staging) | 11 |
 
-**Total: 366** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 379** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-19). The counts are now generated from the patch tree
@@ -12980,3 +12980,132 @@ A toolchain-only rebuild on 2026-11-13 moved both packages to ClangBuiltLinux
 matching the signed kernel.org `sha256sums.asc`; the extracted compiler
 reports `ClangBuiltLinux clang version 23.1.5`). The rc becomes
 `7.3.0-28`; no patch changes.
+
+## Sweep 2026-11-16 — HDMI FRL block, elevator, KFD TBA/TMA; preview carries
+
+Sources actually queried this pass: `torvalds` (origin/master, 11-16), `linux-next`
+(tags through `next-20261113`; `next-20261116` had **not** been tagged when this
+sweep ran), `drm-next` (11-14), `drm-misc` (11-16), `agd5f-linux`/`amd-staging-drm-next`
+(11-09), `linux-pm`, `akpm-mm` (all branches, tips 11-15), `tip`, the lore git
+mirrors for amd-gfx, dri-devel, lkml, linux-mm, netdev, linux-block, sched-ext and
+linux-pm (all fetched to 11-16), the amd-gfx/dri-devel November archives, the
+drm/amd work-items tracker (76 issues updated since 11-12, comments read for 27
+on-target ones), CachyOS `7.3/*` and `7.4/*`, sirlucjan, linux-tkg, salkim
+`7.3`/`7.4`, and firelzrd lru_cast/nap. Phoronix was checked through 11-16.
+
+### Adopted — the HDMI FRL block (`1190`–`1198`)
+
+The machine's display path is HDMI-only on DCN 4.0.1, and the last 11xx carries
+were from September. Nine patches from the 11-10/11-11/11-16 postings were
+verified against both bases and adopted in dependency order:
+
+| Patch | Subject | Author, provenance | Port |
+|---|---|---|---|
+| `1190` | Initialize FRL status polling work once at DM init | Eren Özen `<erenozen@protonmail.com>`, `<20261110-frl-polling-wq-teardown-v1-1-0ff028d5c35b@protonmail.com>` | rc: **ported** — `v7.3`'s `hdmi_frl_status_polling_work()` is `static` in `amdgpu_dm_connector.c`, so the port drops the `static`, adds the prototype to `amdgpu_dm_connector.h`, then moves the `INIT_DELAYED_WORK`; preview: as posted |
+| `1191` | Destroy FRL status polling workqueue in `amdgpu_dm_fini()` | same series, `…-v1-2-…` | as posted |
+| `1192` | Move HDMI FRL polling outside `dc_lock` | Fangzhi Zuo `<jerry.zuo@amd.com>`, DC patches 11-16 part 08/74, `<20261111014100.3596072-9-Wayne.Lin@amd.com>` | as posted |
+| `1193` | Don't queue FRL status polling on a NULL workqueue | Eren Özen, `…-v1-3-…` | **rebased**: the one-line guard now sits on the block `1192` moved, so the hunk was re-anchored; content unchanged |
+| `1194` | Keep patched HDMI panels on FRL across detect | Charlene Liu `<charlene.liu@amd.com>`, DC 11-16 part 48/74, `<20261111014100.3596072-49-Wayne.Lin@amd.com>` | as posted |
+| `1195` | Apply requested TxFFE level right away in FRL training | Andrzej Piątysek `<andrzej.piatyszek@gmail.com>`, `<20261110130956.160024-2-andrzej.piatyszek@gmail.com>` | rc: **ported** (block carries the `flt_no_timeout` reset from `1136`); preview: as posted |
+| `1196` | Wait up to 1 s for slow sinks in FRL training | same series `-3-` | rc: **ported** to the `max_polls` loop (`500 × 2 ms`); preview: as posted |
+| `1197` | Retry the same FRL rate after a sink timeout | same series `-4-` | as posted |
+| `1198` | Disallow idle on cursor update during ISM hysteresis | Claudio Forain `<claudioforain@gmail.com>`, `<20261116001151.28754-1-claudioforain@gmail.com>` | rc: **test hunks dropped** (the KUnit file differs; functional hunk applies); preview: as posted |
+
+Why these: `1190`/`1191`/`1193` close the workqueue lifetime holes (re-init on
+MST hotplug, leak and post-`dc_destroy()` run on unbind, NULL queue on failed
+allocation); `1192` removes the `cancel_delayed_work_sync()`-under-`dc_lock`
+deadlock; `1194` stops `force_frl` flags leaking from a patched panel to the
+next sink; `1195`–`1197` are measured on the **same RX 9070 XT + HDMI TV**
+combination as this machine (4 of 6 boots at 6G×3 without the series; 63/63 at
+10G×4 with it). `1198` is the v2 of the DCN401 idle-optimization item that has
+been on the watch list as tracker `#6115`; it applies functionally to both bases
+and keeps the KUnit coverage on the preview.
+
+**The first rc build caught what the cumulative audit cannot.** `1190` applied
+cleanly on `v7.3` and the audit reported 379/379, but the moved
+`INIT_DELAYED_WORK` named a function that is `static` in another translation
+unit on this base — `amdgpu_dm.c:753: error: use of undeclared identifier
+'hdmi_frl_status_polling_work'`. An apply check proves the hunk lands, not that
+its symbols resolve. The port adds the two missing pieces.
+
+`1196` supersedes the 300 ms budget `1168` established. `1168` is left in place
+— removal needs explicit approval — and `1196` rewrites its comment and value, so
+the end state is the 1 s budget. A future cleanup may drop `1168` entirely.
+
+### Adopted — others
+
+| Patch | Subject | Author, provenance | Packages |
+|---|---|---|---|
+| `1353` | `drm/amdgpu: Fix HMM range retries` | Erhan Bilgili, salkim `salkim-7.4` `2da4c5a6161f` (cherry-pick of `9a7ebd06b758`): frees the previous `hmm_pfns` array before replacing it and rejects a range with no pfns | both |
+| `1354` | `drm/amdkfd: move TBA/TMA back to system memory` | Alex Deucher, `<20261116144744.1904011-1-alexander.deucher@amd.com>`, `Closes: #6116`, `Fixes: fe5966d4fdcb` | both |
+| `2068` | `block: don't request a module for the none elevator` | Qiliang Yuan, `<20261114-bug-block-elevator-unchanged-v2-1-5a1fe7d72fa0@linux.dev>`, `Reviewed-by: Christoph Hellwig` | both |
+| `2069` | `block: return early when the elevator doesn't change` | same series `-2-` | both |
+| `2425` | `sched_ext: Block a retained donor before PI deboost routes it back to sched_ext` | Tao Cui, part 2/2 of the 11-12 entry-path series, `<74e9a8d104367bc7e8b03bfe1a8fcd54cf88ec73>` | preview only: `v7.3` lacks `scx_prepare_task_sched_change()` and the proxy-donor infrastructure |
+| `9240` | `drm/amdgpu: Handle UserQ restore allocation failures` | Erhan Bilgili, salkim `salkim-7.4` `fb85af1fa1ea` (cherry-pick of `0fe0f0ad91da`): checks `xa_store()` and frees the range on failure | preview only: the restore path exists only in the 7.4 tree |
+
+`1354` is a revert of `fe5966d4fdcb` for non-MI parts; the explicit IP list
+excludes GC 12.0.0 (this Navi 48), so TBA/TMA return to system memory and the
+post-suspend GPU resets from `#6116` are fixed by omission rather than by
+matching a version. It applies cleanly to both bases (Outlook-mangled mail:
+verified line-for-line, no fuzz). `2068`/`2069` cut a ~10 ms queue freeze per
+unconditional scheduler write — the udev rule writes kyber on every boot.
+
+### Version sweep (carried patches vs their latest postings)
+
+`415` carried subjects were matched against every lore mirror since 2026-10-15:
+**23 hits, 14 distinct after the package split**. `2044` v8 is content-identical
+to the carried v7 (forward apply reports "previously applied"; the apparent
+`return 0;` delta is a hunk-boundary artifact). `2315` v5 and `2317` v5 are
+resends (zero added lines). `2056` v4, `1179` v2, `1183` v2, `1330` v2, `1349`
+v2, `2423` v2, `2803` v2, `2806` v2, `2809` v2 and `2811` v2 are
+content-identical to the carried copies. The remaining rework is the
+`2313`/`2314` modpost series (v3/20 → v5/11, real delta): **deferred** — it is
+build-time only and piecemeal adoption of two parts of a reshaped series would
+leave the four carried parts inconsistent.
+
+### Rejected, with reasons
+
+- **MGLRU batch (18 patches, `mm-everything`/`mm-new`, 11-15/11-16).** Inert:
+  `2102` installs lru_cast, which owns reclaim; the repo trap records MGLRU as
+  inert under the MARIE/CAST family. Not carried.
+- **`zram: avoid duplicate slots in batched writeback` (`9924a6e8b4d7`).** Real
+  fix, but `CONFIG_ZRAM=y` with no zram device in use — swap is a 16 GiB
+  swapfile. Inert here; revisit if zram is ever enabled.
+- **The rest of the Tao Cui sched_ext series (parts 1, 3–6).** Tracing-program
+  lock contracts, invalid-CID lookups, pre-init `sub_caps` reads, sub-sched
+  hotplug callbacks and idle-mask hotplug transitions. `scx_cake` is a root
+  scheduler with no sub-schedulers, no `init_cids()` caps read and no CPU
+  hotplug. Only the PI-donor fix (`2425`) was taken, and only for the preview.
+- **`2313`/`2314` v5 modpost/kbuild.** Deferred, see above.
+- **Tracker `#5339` (RA24 little-endian on RDNA4).** Exact hardware and the
+  highest-priority open item; AMD says the fix is merged internally but it has
+  no public posting or sha. Nothing to carry without fabricating a diff.
+- **Tracker `#5988` (280 Hz DP panel at 24 Hz).** Two-patch fix applies to
+  >255 Hz DP sinks; this machine drives HDMI. Revisit only if a DP panel is
+  attached.
+- **Tracker `#6142` (MST mode pruning), `#6127`/`#6068` (Navi 48 HDMI black
+  screen), `#5954` (UCLK pinned), `#6144` (dm_connector_state UAF).** No public
+  patch or no on-target fix beyond what is carried.
+- **`b7483797b085` (UCLK DPM re-read).** DCN 3.2/3.21 only per its own commit
+  message — it would apply to Navi 48 and do nothing.
+- **`413c0775e3f7` (Remove DCN401 RDPCS PHY state reads) — a revert.** The
+  reverted code is 7.4+ and absent from `v7.3`; in `next-20261113` already.
+- **AMD `Revert "drm/amdgpu: Add CWSR infrastructure for user queues"`**
+  (`amd-staging` 11-09) — the tree carries no CWSR user-queue code, so nothing
+  to drop. **`Revert "drm/amd/display: Allocate DCN32/1 dmub memory to GTT"`**
+  (11-04) — DCN32/1 only, not carried.
+
+### Reverts checked against the series
+
+`2046` (our `nvme-pci` clamp revert) is now **upstream** as `2e8e30b3cf9f`
+(2026-10-15). The preview already excludes it; the rc keeps it until the base
+moves. No carried upstream id is the subject of any revert in `torvalds` since
+2026-06. Our own `1164` (MCCS FreeSync clear) is unaffected: upstream's
+`e4dca268eea6` restores the same VCP check but is not in `v7.3`, and the two
+compose without conflict.
+
+### Series state
+
+**379 patches.** `audit_series.py`: **379/379** on `v7.3`. The preview lists
+**173** and applies **171** on `next-20261113` (`2044` absorbed, `1317` context
+drift and inert).

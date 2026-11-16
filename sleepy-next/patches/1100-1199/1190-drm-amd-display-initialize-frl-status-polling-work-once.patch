@@ -1,0 +1,61 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Eren Özen <erenozen@protonmail.com>
+Date: Tue, 10 Nov 2026 07:21:56 +0300
+Subject: drm/amd/display: Initialize FRL status polling work once at DM init
+
+From: Eren Özen <erenozen@protonmail.com>
+
+hdmi_frl_status_polling_work is a single delayed work item shared by the
+whole display manager, but it is initialized from
+amdgpu_dm_connector_init_helper(), which runs once for every connector.
+That helper is also called at runtime from dm_dp_add_mst_connector()
+when a DisplayPort MST branch device is plugged in. If an HDMI FRL
+stream is active at that moment, the polling work is queued and
+re-arming itself every 200ms, and INIT_DELAYED_WORK() on it
+reinitializes the timer and work entry of a pending item, which can
+corrupt the timer and workqueue state.
+
+The work item belongs to the display manager, not to a connector, so
+initialize it, along with its polling delay, once in amdgpu_dm_init()
+next to the workqueue it runs on.
+
+Fixes: 5c9b8b27a883 ("drm/amd/display: Tie FRL support into amdgpu_dm")
+Assisted-by: Claude:claude-opus-5-5
+Signed-off-by: Eren Özen <erenozen@protonmail.com>
+---
+ 2 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
+index 33c73ca9cf..bf2f74d7d9 100644
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
+@@ -774,6 +774,10 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
+ 
+ 		dc_init_callbacks(adev->dm.dc, &init_params);
+ 	}
++
++	adev->dm.hdmi_frl_status_polling_delay_ms = 200;
++	INIT_DELAYED_WORK(&adev->dm.hdmi_frl_status_polling_work,
++			  hdmi_frl_status_polling_work);
+ 	if (adev->dm.dc->caps.max_links > 0) {
+ 		adev->dm.hdmi_frl_status_polling_wq =
+ 			create_singlethread_workqueue("hdmi_frl_status_polling_wq");
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
+index e8f050feb6..b1bdb94d74 100644
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
+@@ -3327,8 +3327,6 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
+ 		aconnector->hdmi_hpd_debounce_delay_ms = 0;
+ 	}
+ 
+-	dm->hdmi_frl_status_polling_delay_ms = 200;
+-	INIT_DELAYED_WORK(&dm->hdmi_frl_status_polling_work, hdmi_frl_status_polling_work);
+ 	/*
+ 	 * configure support HPD hot plug connector_>polled default value is 0
+ 	 * which means HPD hot plug not supported
+
+-- 
+2.56.0
+
+
+

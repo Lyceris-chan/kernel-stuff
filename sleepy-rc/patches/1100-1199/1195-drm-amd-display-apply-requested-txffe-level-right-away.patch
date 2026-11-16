@@ -1,0 +1,75 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Andrzej Piątysek <andrzej.piatyszek@gmail.com>
+Date: Tue, 10 Nov 2026 14:09:54 +0100
+Subject: drm/amd/display: Apply requested TxFFE level right away in FRL training
+
+When the sink answers an LTP request with 0xE (next TxFFE level) in
+LTS:3, hdmi_frl_perform_link_training() programs the new level only on
+the next poll, and only if the sink has set FLT_update again by then.
+The sink usually has not, as the driver has just cleared FLT_update.
+The sink keeps asking, and current_FFE advances without reaching the
+PHY.
+
+A Samsung QE65Q80T (2020) needs one TxFFE step at 10 Gbps x 4, so its
+link mostly ends up at 6 Gbps x 3.
+
+Program the requested level right away and drop the deferred
+programming.
+
+Fixes: cbb8e2044b9e ("drm/amd/display: Add DC link support for FRL")
+Assisted-by: Claude:claude-opus-5-5
+Signed-off-by: Andrzej Piątysek <andrzej.piatyszek@gmail.com>
+---
+ drivers/gpu/drm/amd/display/dc/link/protocols/link_hdmi_frl.c | 35 +++++++++++++----------------------
+
+--- a/drivers/gpu/drm/amd/display/dc/link/protocols/link_hdmi_frl.c
++++ b/drivers/gpu/drm/amd/display/dc/link/protocols/link_hdmi_frl.c
+@@ -558,28 +558,6 @@
+ 
+ 			FRL_INFO("FRL LINK TRAINING:  Read FLT_UPDATE = %d.  num_polls = %d\n",
+ 					scdc_update.fields.FLT_UPDATE, num_polls);
+-			/*Set TxFFE = TxFFE0*/
+-			/*Program FFE_Levels - scdc_config has this field at 0 */
+-			if (override_FFE) {
+-				if (flt_no_timeout)
+-					current_FFE = 0;
+-				if (current_FFE == 0)
+-					dio_link_enc->funcs->prog_eq_setting(dio_link_enc, current_FFE,
+-							test_req.fields.TXFFE_DEEMPHASIS,
+-							test_req.fields.TXFFE_PRESHOOT,
+-							test_req.fields.TXFFE_NOFFE,
+-							link_settings);
+-				else {
+-					if (scdc_update.fields.FLT_UPDATE)
+-						dio_link_enc->funcs->prog_eq_setting(dio_link_enc, current_FFE,
+-								test_req.fields.TXFFE_DEEMPHASIS,
+-								test_req.fields.TXFFE_PRESHOOT,
+-								test_req.fields.TXFFE_NOFFE,
+-								link_settings);
+-				}
+-				FRL_INFO("FRL LINK TRAINING:  TxFFE = %d.\n", current_FFE);
+-				override_FFE = false;
+-			}
+ 			if (scdc_update.fields.FLT_UPDATE || flt_no_timeout) {
+ 				offset = HDMI_SCDC_LTP_REQ;
+ 				link_query_ddc_data(ddc_service, slave_address,
+@@ -674,6 +652,19 @@
+ 					ln1_pattern = pre_ln1_pattern;
+ 					ln2_pattern = pre_ln2_pattern;
+ 					ln3_pattern = pre_ln3_pattern;
++
++					/*
++					 * The sink re-evaluates the link as soon as FLT_update
++					 * is cleared, so program the requested level now.
++					 */
++					dio_link_enc->funcs->prog_eq_setting(dio_link_enc,
++							current_FFE,
++							test_req.fields.TXFFE_DEEMPHASIS,
++							test_req.fields.TXFFE_PRESHOOT,
++							test_req.fields.TXFFE_NOFFE,
++							link_settings);
++					FRL_INFO("FRL LINK TRAINING:  TxFFE = %d.\n", current_FFE);
++					override_FFE = false;
+ 				}
+ 
+ 				FRL_INFO("FRL LINK TRAINING:  Setting Training Pattern [ln0,ln1,ln2,ln3] = [%d,%d,%d,%d].\n",

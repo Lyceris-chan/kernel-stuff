@@ -1,0 +1,35 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Eren Özen <erenozen@protonmail.com>
+Date: Tue, 10 Nov 2026 07:21:58 +0300
+Subject: drm/amd/display: Don't queue FRL status polling on a NULL workqueue
+
+From: Eren Özen <erenozen@protonmail.com>
+
+If create_singlethread_workqueue() fails in amdgpu_dm_init(), the
+driver only logs an error and continues with
+hdmi_frl_status_polling_wq set to NULL. The next atomic commit that
+enables an HDMI FRL stream then passes that NULL pointer to
+queue_delayed_work() and crashes.
+
+Skip the polling when the workqueue is missing, the same way
+amdgpu_dm_atomic_commit_tail() already checks vblank_control_workqueue
+before using it. FRL link status is then not polled, but the display
+keeps working.
+
+Fixes: 5c9b8b27a883 ("drm/amd/display: Tie FRL support into amdgpu_dm")
+Assisted-by: Claude:claude-opus-5-5
+Signed-off-by: Eren Özen <erenozen@protonmail.com>
+---
+ drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c | 2 +-
+
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
+@@ -4774,7 +4774,7 @@
+ 		}
+ 	}
+ 
+-	if (frl_stream_found) {
++	if (frl_stream_found && dm->hdmi_frl_status_polling_wq) {
+ 		if (queue_delayed_work(dm->hdmi_frl_status_polling_wq,
+ 				       &dm->hdmi_frl_status_polling_work,
+ 				       msecs_to_jiffies(dm->hdmi_frl_status_polling_delay_ms)))

@@ -1,0 +1,41 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alex Deucher <alexander.deucher@amd.com>
+Date: Mon, 16 Nov 2026 09:47:44 -0500
+Subject: drm/amdkfd: move TBA/TMA back to system memory
+
+For non-MI parts, move TBA/TMA back to system memory.
+Results in GPU resets in some apps after suspend.
+
+v2: add additional IP versions
+
+Closes: https://gitlab.freedesktop.org/drm/amd/-/work_items/6116
+Fixes: fe5966d4fdcb ("drm/amdkfd: move TBA/TMA from system to device memory")
+Cc: James Zhu <James.Zhu@amd.com>
+Cc: Vladimir Indic <vladimir.indic@amd.com>
+Cc: Harish Kasiviswanathan <Harish.Kasiviswanathan@amd.com>
+Cc: Philip Yang <philip.yang@amd.com>
+Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+---
+ drivers/gpu/drm/amd/amdkfd/kfd_process.c | 8 ++++++--
+
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_process.c b/drivers/gpu/drm/amd/amdkfd/kfd_process.c
+index 546721b4d59ac..b1b641ddbcf68 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_process.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_process.c
+@@ -1554,7 +1554,12 @@ static int kfd_process_device_init_cwsr_dgpu(struct kfd_process_device *pdd)
+ 	if (!dev->kfd->cwsr_enabled || !iosys_map_is_null(&qpd->cwsr_map) || !qpd->cwsr_base)
+ 		return 0;
+ 
+-	if (KFD_GC_VERSION(dev) >= IP_VERSION(9, 4, 2) && !dev->adev->apu_prefer_gtt)
++	if ((KFD_GC_VERSION(dev) == IP_VERSION(9, 4, 2) ||
++	     KFD_GC_VERSION(dev) == IP_VERSION(9, 4, 3) ||
++	     KFD_GC_VERSION(dev) == IP_VERSION(9, 4, 4) ||
++	     KFD_GC_VERSION(dev) == IP_VERSION(9, 5, 0) ||
++	     KFD_GC_VERSION(dev) == IP_VERSION(12, 1, 0)) &&
++	    !dev->adev->apu_prefer_gtt)
+ 		flags |= KFD_IOC_ALLOC_MEM_FLAGS_VRAM;
+ 	else
+ 		flags |= KFD_IOC_ALLOC_MEM_FLAGS_GTT;
+-- 
+2.56.0
+

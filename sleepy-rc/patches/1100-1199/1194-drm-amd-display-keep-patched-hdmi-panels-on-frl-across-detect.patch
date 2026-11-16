@@ -1,0 +1,88 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Charlene Liu <charlene.liu@amd.com>
+Date: Wed, 11 Nov 2026 09:28:54 +0800
+Subject: drm/amd/display: Keep patched HDMI panels on FRL across detect
+
+From: Charlene Liu <Charlene.Liu@amd.com>
+
+[Why]
+A patched panel sets force_frl so update_stream_signal() keeps an
+FRL stream instead of dropping it to TMDS. The flags stay on the
+link, so a later sink with no FRL rate can keep the previous
+panel's force_frl_always. Setting the flag on an encoder that
+cannot drive FRL also picks a signal the ASIC cannot output.
+
+[How]
+verify_link_capability() sets force_frl_always, force_frl_max and
+force_frl_dsc from the current panel patch when the encoder is FRL
+capable and max_frl_rate is non-zero. It does not clear a flag the
+patch leaves unset. Otherwise it clears those three flags.
+hdmi_frl_verify_link_cap() applies force_frl only when the encoder
+is FRL capable.
+
+Cc: Chris Park <chris.park@amd.com>
+Signed-off-by: Charlene Liu <Charlene.Liu@amd.com>
+Signed-off-by: Wayne Lin <wayne.lin@amd.com>
+---
+ 2 files changed, 32 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/display/dc/link/link_detection.c b/drivers/gpu/drm/amd/display/dc/link/link_detection.c
+index b4546f93af0c..5b257f003f13 100644
+--- a/drivers/gpu/drm/amd/display/dc/link/link_detection.c
++++ b/drivers/gpu/drm/amd/display/dc/link/link_detection.c
+@@ -1006,6 +1006,32 @@ static bool should_verify_link_capability_destructively(struct dc_link *link,
+ static void verify_link_capability(struct dc_link *link,
+ 		enum dc_detect_reason reason)
+ {
++	/* The FRL force flags are only fully recomputed on the destructive path
++	 * (hdmi_frl_verify_link_cap), so re-derive the sink driven part on every
++	 * detect. Without this a sink can either inherit flags from a previously
++	 * connected monitor, or stay cleared when a patched monitor is detected
++	 * through one of the non destructive paths (FRL already in use,
++	 * skip_frl_pre_training on an active link, or skip_detection_link_training).
++	 * Setting them is additive so SCDC test request results survive, and the
++	 * destructive path overwrites all of them anyway.
++	 */
++	if (link->link_enc &&
++			link->link_enc->features.flags.bits.IS_HDMI_FRL_CAPABLE &&
++			link->local_sink &&
++			link->local_sink->edid_caps.max_frl_rate != 0) {
++		if (link->local_sink->edid_caps.panel_patch.force_frl)
++			link->frl_flags.force_frl_always = true;
++
++		if (link->local_sink->edid_caps.panel_patch.hdmi_comp_auto) {
++			link->frl_flags.force_frl_max = true;
++			link->frl_flags.force_frl_dsc = true;
++		}
++	} else {
++		link->frl_flags.force_frl_always = false;
++		link->frl_flags.force_frl_max = false;
++		link->frl_flags.force_frl_dsc = false;
++	}
++
+ 	if (should_verify_link_capability_destructively(link, reason))
+ 		verify_link_capability_destructive(link, reason);
+ 	else
+diff --git a/drivers/gpu/drm/amd/display/dc/link/protocols/link_hdmi_frl.c b/drivers/gpu/drm/amd/display/dc/link/protocols/link_hdmi_frl.c
+index c31be4900e8d..3f687603a70c 100644
+--- a/drivers/gpu/drm/amd/display/dc/link/protocols/link_hdmi_frl.c
++++ b/drivers/gpu/drm/amd/display/dc/link/protocols/link_hdmi_frl.c
+@@ -902,8 +902,13 @@ void hdmi_frl_verify_link_cap(struct dc_link *link,
+ 	if (link->frl_flags.force_frl_rate == 0xF)
+ 		return;
+ 
++	/* Only honour the force FRL monitor patch when VBIOS reports the encoder
++	 * as FRL capable, otherwise the stream would be forced to a signal type
++	 * the ASIC cannot drive.
++	 */
+ 	if (link->local_sink &&
+-		link->local_sink->edid_caps.panel_patch.force_frl)
++		link->local_sink->edid_caps.panel_patch.force_frl &&
++		link->link_enc->features.flags.bits.IS_HDMI_FRL_CAPABLE)
+ 			link->frl_flags.force_frl_always = true;
+ 
+ 	if (!link->frl_flags.force_frl_max &&
+-- 
+2.43.0
+
+
