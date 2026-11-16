@@ -182,7 +182,7 @@ _rcver=
 
 pkgver=7.3.0
 _tagrel=1
-pkgrel=29
+pkgrel=30
 #_stable=${_major}.${_minor}
 #_stable=${_major}
 _stable=${_major}.${_minor}
@@ -495,6 +495,9 @@ source=(
   "patches/2000-2099/2067-net-8021q-restore-hw-vlan-tag-insertion-with-reorder-hdr-off.patch"
   "patches/2000-2099/2068-block-dont-request-a-module-for-the-none-elevator.patch"
   "patches/2000-2099/2069-block-return-early-when-the-elevator-doesnt-change.patch"
+  "patches/2000-2099/2070-io_uring-dont-run-canceled-local-work-from-a-foreign-mm-on-release.patch"
+  "patches/2000-2099/2071-io_uring-futex-fail-soft-links-when-cancelling-a-wait.patch"
+  "patches/2000-2099/2072-io_uring-rw-fail-soft-links-on-iopoll-short-or-error-io.patch"
   "patches/2100-2199/2100-zstd-7.3-merge-v1.6.0-into-kernel-tree.patch"
   "patches/2100-2199/2102-mm-7.3-lru_cast-v0.2.10.patch"
   "patches/2100-2199/2120-mm-gup-mm-gup-break-out-gup-fill-pages-helper.patch"
@@ -1510,6 +1513,9 @@ b2sums=('5624c5acd3f6bb4bb83a5c4b99e95a413b7f941607d3a5a6eea6747bf93e8f74c01e89b
         'c576e67d2c6a0f73b30ec8a97db3376e34b89b8f863d0425cc05313bd40ee5051c2f99b0dfb11e3792df0f3dfcab381c66319807cf9b06afef150c2b3e1da442'
         '5ea6ea58f14ac52e93ba9c402cb8a33f4b7f0528b06ac95a610e944a45e9b678104a4ecddcca2e5c33822bc4d5636bafcee7ac564567949f4383e2e673b9cfd6'
         '01e80960f518edf1151f55608ab71396adeab97b8032bafd4b3e8b725a1520cb469c1b99f09bf9b605b7fe272ba8c730d33c040f7e74b62c096fb1ddcf39694f'
+        '377af713c695e1558f5cf5c3062573591d9afd73113f1c452d97df7593c063583881b0fc4111efcdaac6344475921ab43a832c7d56d1d028d028be061b8186d8'
+        '1f1f7eb3a0883e85362512ba12ba5e239bdef90a187492eab62802053ff0ac2c40bccc43d670955d874f890544d9e604c88d82427cc0054e53d6ff0905de11b1'
+        '093674e059be0bc8aa55f4e8c0e1c340824c640ce69b718591a7112a2b99b17ed443dda3cec086d7c18643eb46c327bb86436a8fb003201e871132f9893c25bd'
         '04fe6270d9e54b974ee745261575fd710e3af252c6e2b2788a082455c6eeccfd2ea944245f5f58a9f4de418eca3058aaae8a27f90173b254aac15036c7a95c49'
         'ece197eb8e6d64d3692a5ae5abfb898828ef7e5eb783afecaec1f2bb17fac875139c507061689b6b4b6cbf55fd60026f858a76277270a3aaaac7589c4ecbc4d5'
         '0a8d29a0031cb1ff83c3a72115810747d109856da0da6f5b9c19aa2704aa5adc8c7c58f0dbaa127d2f006372b8ec9f9574e620513bb1a6b48669772c436cde5c'

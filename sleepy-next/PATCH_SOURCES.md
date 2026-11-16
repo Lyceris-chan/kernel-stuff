@@ -1998,4 +1998,4 @@ precedes them.
 
 **173 listed / 171 applied** on `next-20261116`; the two skips are `2044`
 (absorbed by `8e36c3f38cea`) and `1317` (context drift, inert on DCN 4.0.1).
-The rc series is **379/379** on `v7.3`.
+The rc series is **382/382** on `v7.3`.

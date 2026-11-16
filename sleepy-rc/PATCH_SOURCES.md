@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
 - **Base:** Linux `v7.3`
-- **Series:** 379 patches
+- **Series:** 382 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -25,7 +25,7 @@ are supplied by the generator instead, so every row below has a source.
 | `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 50 |
 | `1100–1199` | AMD display (DCN4, colorops) | 45 |
 | `1200–1299` | AMD power management (amd-pstate, CPPC) | 32 |
-| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 53 |
+| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 56 |
 | `2100–2199` | Memory management and swap (zstd, LRU-MARIE, gup, zswap) | 50 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 21 |
@@ -38,7 +38,7 @@ are supplied by the generator instead, so every row below has a source.
 | `9000–9099` | agd5f staging + userq lifecycle backports | 39 |
 | `9100–9199` | Retry-fault handling v4 (agd5f staging) | 11 |
 
-**Total: 379** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 382** patch files, all listed in `PKGBUILD`'s `source=()`.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-19). The counts are now generated from the patch tree
@@ -13108,4 +13108,124 @@ compose without conflict.
 
 **379 patches.** `audit_series.py`: **379/379** on `v7.3`. The preview lists
 **173** and applies **171** on `next-20261113` (`2044` absorbed, `1317` context
+drift and inert).
+
+## Sweep 2026-11-16 (second pass) — io_uring release fixes; next-20261116 verified
+
+Sources actually queried this pass: `torvalds` `origin/master` `141b164bbe18`
+(11-16), `linux-next` tags through `next-20261116` `749a4de37040` (the newest;
+no `next-20261117` exists), `drm-next` (11-14), `drm-misc` (11-16), `linux-pm`
+(11-15), `akpm-mm` (all branches, tips 11-15), `tip` (11-16), the lore git
+mirrors for amd-gfx, dri-devel, lkml, linux-mm, netdev, linux-block, sched-ext,
+io-uring, linux-pm, linux-nvme, cgroups, linux-fsdevel, linux-pci and stable
+(all fetched at 11-16 23:02; the stable mirror's own newest message is 05-18),
+the amd-gfx/dri-devel November archives, the
+drm/amd work-items tracker (32 issues updated since 11-15, comments read for the
+on-target ones), CachyOS `7.3/*` and `7.4/*`, sirlucjan, linux-tkg, salkim
+`7.3`/`7.4`, firelzrd lru_cast/nap, and xanmod/pixelcluster/cachymod. Phoronix
+was checked on 11-16. **`agd5f-linux`/`amd-staging-drm-next` are unrefreshed**:
+the fetch exited 128 and the clone remains at 11-09.
+
+### Snapshot
+
+`next-20261116` is the latest linux-next tag, verified against the kernel.org
+remote (`749a4de37040`). It was already bumped to `2026.11.16-1` and installed
+at 22:46, after the previous sweep closed; no newer snapshot exists. The
+snapshot adds 1,331 non-merge commits over `next-20261113`.
+
+### Adopted — io_uring release fixes (`2070`–`2072`)
+
+| Patch | Subject | Author, provenance | Why |
+|---|---|---|---|
+| `2070` | io_uring: don't run canceled local work from a foreign mm on release | Jens Axboe, `d2a64291eec3` (11-13, 7.4-rc pull) | `Fixes: 89baa3154a72`, the change our `2025` backports. The task dropping the last ring reference runs the first cancelation pass; with `DEFER_TASKRUN` it then runs pending local work in cancel mode even when it is a forked child holding an inherited ring fd, with a different `mm`. Restrict that to a task sharing the submitter's mm, or a kthread where the copies fail. Applies to the rc series tree (`tw.c` offset -34); the preview already carries it. |
+| `2071` | io_uring/futex: fail soft links when cancelling a wait | Yang Xiuwei, `9a7cbe50dd95` (11-14) | `__io_futex_cancel()` completes with `-ECANCELED` but never calls `req_set_fail()`, so `IOSQE_IO_LINK` dependents still run after the wait is cancelled. Adds the fail mark. Applies cleanly; in `next-20261116`. |
+| `2072` | io_uring/rw: fail soft links on IOPOLL short or error IO | Yang Xiuwei, `4d3db66c5363` (11-14) | `io_complete_rw_iopoll()` updates `cqe.res` when the transfer misses the requested length but does not mark the request failed, so soft-linked requests run after a short or failed IOPOLL IO. Adds `req_set_fail()` on the changed result. Applies cleanly; in `next-20261116`. |
+
+`io_uring: fail soft links on negative IOU_COMPLETE results` (`9ed19503a7b3`,
+the first patch of the same submission) **does not apply to `v7.3`**: it edits
+the core restart-code fixup that arrived with the 7.4 completion rework, and
+`v7.3` still sets the fail flag in the handlers. The preview already has it.
+The two `for-7.5` follow-ups (`1be3faa9a984`, `30f52fb5c7d6`) are refactors of
+that newer core and are not carried.
+
+### Deferred or rejected, with reasons
+
+- **GUP v5 (Rik van Riel, 8 patches, 11-16).** A real v4→v5 rework: a new
+  flush helper, the fill-outside-the-lock patch dropped, patch 8 rewritten
+  around a shared `gup_pte_batch_len()`, and a rebase onto `102d6c3d5892`
+  (`gup-7.5-ptebatch`). It cannot go into `v7.3`: patch 1 fails because the
+  base lacks the store-only `gup_fill_pages()` and the fast-path prerequisite.
+  Against `next-20261116` patches 1–2 apply and patch 3 fails at hunk 26: the
+  base has newer folio-refcount-limit handling in the same block. The rc keeps
+  the RFC v3 series (`2120`–`2127`); defer v5 to a dedicated rebase when the
+  preview base carries the whole sequence.
+- **salkim-7.4 `0b76ffb4bda2` “Fix UserQ userptr restoration” and
+  `b9eea54e7296` “Allow interrupting UserQ restore retries”.** Cherry-picks of
+  `355ebabb8620` and `0606b8cdf614`, neither of which exists in any clone
+  here. The pair is a ~1.2k-line rework of the preview's ported UserQ batch
+  (`9200`–`9240`); `0b76ffb` applies with offsets, `b9eea54` fails its
+  selftest hunks. Deferred to the next port pass; a future snapshot is the
+  safer source.
+- **MST logical-port series (Karol Baryła, 2 patches, amd-gfx/dri-devel 11-16,
+  tracker `#6142`).** `dm_dp_mst_is_port_support_mode()` only; this machine is
+  HDMI-only. Inert.
+- **`drm/amdgpu: require _PR3 for BOCO` (`28f3d169f162`, merged; tracker
+  `#6147`).** Changes the hybrid-ATPX branch of
+  `amdgpu_device_supports_boco()`; a single-GPU desktop never takes it. Inert.
+- **ACPI CPPC EPP width check (`7aca8e31a8fb`).** `v7.3`-compatible and
+  on-target, but the commit itself says no affected hardware is known. Inert
+  here.
+- **`drm/amd/display: Fix planes atomic_create_state` (`02d46912debf`).** Fixes
+  a 7.4-only conversion; `v7.3` still uses `.reset`. The preview base has it.
+- **SPM revert/rework series (Alex Deucher, 5 patches, 11-16).** Reverts
+  `d44428868e5b` and `8a4dfdc0d2ad`, both present in `next-20261116`, and
+  restores ring emission for gfxoff chips. Watch for merge; not carried.
+- **`drm/amdgpu: drain queued scheduler jobs before suspend`
+  (`2d3632cb05b8`).** Sashiko reports a High suspend deadlock and a race.
+  Do not carry until revised.
+- **Off-target:** XNACK retry on GFX12.1; A+A VF/SR-IOV; per-XCC CU bitmap;
+  MES gang-slot series (7.5 KFD); io-wq stuck-worker message (diagnostic
+  only). **Wrong-chip traps checked:** GFX 12.1 and DCN 3.1.5 threads in the
+  tracker do not cover `gfx1201`/DCN 4.0.1.
+
+### Version sweep
+
+Carried subjects were matched against every lore mirror since 2026-11-10: 15
+higher-version hits, of which all but GUP v5 are the already-carried v2
+postings (`2068`, `2069`, `1189`, `1198`, `1354`, `2423`) or resends. `2044`
+v8 (11-14) is content-identical to the carried v7. `2120`–`2127` have the
+real v5 rework described above.
+
+### Reverts checked against the series
+
+No revert in `torvalds`, `linux-next`, `drm-next` or `drm-misc` since
+2026-11-01 targets carried work. The range's reverts are ath10k, EDAC/i5000,
+`mm/khugepaged` (a definition revert) and `lib/sort.c`; the DCN32/1 DMUB revert
+remains off-target. `1354` is itself the non-MI revert of `fe5966d4fdcb` and
+remains correct.
+
+### Tracker
+
+`#6116` confirms the TBA/TMA bisect and agd5f's revert — carried as `1354`.
+`#6115` v2 is `1198`. `#6051`/`#5217` are covered by `63e19ef3ddab`, which is
+in `v7.3`. `#5339` (RA24) says merged internally but still has no public
+posting. `#6144` (dm_connector_state UAF), `#6045` (underflow DTN) and `#6142`
+(MST) have no adoptable on-target fix. `#6147` is the BOCO fix above.
+`#5100`/`#6143` are eGPU/Strix Halo configurations this machine does not have.
+
+### Other sources
+
+**No CAST or NAP update:** `lru_cast` `origin/main` is `ce117bb` (v0.2.10) and
+firelzrd NAP is `v0.6.6` (`5092cfd`). sirlucjan `origin/master` is unchanged at
+`7275a4ad`. CachyOS `7.3/*` is unchanged since 11-02; the new `7.4/*` commits
+are CACHYMOD `sched/fair` (inert under `scx_cake`), `kbuild` packaging, and
+hybrid-only HFI/asymmetric-capacity work; the zswap merge is already in
+`next-20261116`. linux-tkg, xanmod, pixelcluster and cachymod had nothing
+on-target. Phoronix had Linux 7.4-rc3, 7.5 NTFS/hwpoison/ARM items and the R600
+backend removal; no on-target RDNA4 article.
+
+### Series state
+
+**382 patches.** `audit_series.py`: **382/382** on `v7.3`. The preview lists
+**173** and applies **171** on `next-20261116` (`2044` absorbed, `1317` context
 drift and inert).

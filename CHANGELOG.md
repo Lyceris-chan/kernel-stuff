@@ -18,6 +18,29 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [7.3.0-30-sleepy-rc]: 2026-11-16
+
+### Added
+
+- **`2070`** — `io_uring: don't run canceled local work from a foreign mm on
+  release` (Jens Axboe, `d2a64291eec3`): `Fixes: 89baa3154a72`, the change our
+  `2025` backports. A task that drops the last ring reference can be a forked
+  child holding an inherited ring fd, so it must not run `DEFER_TASKRUN`
+  cancel-mode local work against a different `mm`. Only a task sharing the
+  submitter's mm, or a kthread, may run it. Merged for 7.4-rc and present in
+  `next-20261116`; rc-only here.
+- **`2071`** — `io_uring/futex: fail soft links when cancelling a wait`
+  (Yang Xiuwei, `9a7cbe50dd95`): `__io_futex_cancel()` completed with
+  `-ECANCELED` without `req_set_fail()`, so `IOSQE_IO_LINK` dependents still
+  ran.
+- **`2072`** — `io_uring/rw: fail soft links on IOPOLL short or error IO`
+  (Yang Xiuwei, `4d3db66c5363`): `io_complete_rw_iopoll()` changed `cqe.res`
+  on a short or failed IO without marking the request failed, so soft-linked
+  requests still ran.
+
+The preview is unchanged at `2026.11.16-1`: `next-20261116` is still the newest
+snapshot, and all three fixes above are already in its base.
+
 ## [7.3.0-29-sleepy-rc]: 2026-11-16
 
 ### Added

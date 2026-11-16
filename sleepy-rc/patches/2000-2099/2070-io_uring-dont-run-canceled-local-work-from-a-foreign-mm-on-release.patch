@@ -1,0 +1,85 @@
+From d2a64291eec3327cf5421cf228e8cbc6d1dd368f Mon Sep 17 00:00:00 2001
+From: Jens Axboe <axboe@kernel.dk>
+Date: Fri, 13 Nov 2026 08:33:19 -0700
+Subject: [PATCH] io_uring: don't run canceled local work from a foreign mm on
+ release
+
+Since commit 89baa3154a72 ("io_uring: run cancelations synchronously on
+ring release"), the task dropping the last reference to a ring runs the
+first cancelation pass itself. For DEFER_TASKRUN, that includes running
+the pending local work in cancel mode. That task need not be the one
+that submitted the requests, a forked child holding an inherited ring fd
+is one example.
+
+Only run canceled local work from a task that shares the mm of the
+submitter, or from a kthread like io_ring_exit_work() where such copies
+fail.
+
+Reported-by: Yingjie Wang <x-professor@outlook.com>
+Fixes: 89baa3154a72 ("io_uring: run cancelations synchronously on ring release")
+Signed-off-by: Jens Axboe <axboe@kernel.dk>
+---
+ io_uring/io_uring.c |  4 ++++
+ io_uring/tw.c       |  7 ++++---
+ io_uring/tw.h       | 11 +++++++++++
+ 3 files changed, 19 insertions(+), 3 deletions(-)
+
+diff --git a/io_uring/io_uring.c b/io_uring/io_uring.c
+index 5db57bf675f0..39bb18b96cb9 100644
+--- a/io_uring/io_uring.c
++++ b/io_uring/io_uring.c
+@@ -2550,6 +2550,10 @@ static __cold void io_ring_ctx_wait_inflight(struct io_ring_ctx *ctx)
+ 	/* Only wait if this task has attached to the ring */
+ 	if (!tctx || !xa_load(&tctx->xa, (unsigned long)ctx))
+ 		return;
++	/* Requests may sit in local work that only exit work can run */
++	if ((ctx->flags & IORING_SETUP_DEFER_TASKRUN) &&
++	    !io_local_work_cancel_allowed(ctx))
++		return;
+ 	if (atomic_read(&tctx->in_cancel))
+ 		return;
+ 
+diff --git a/io_uring/tw.c b/io_uring/tw.c
+index 0b5066f97224..b4a9e28ce779 100644
+--- a/io_uring/tw.c
++++ b/io_uring/tw.c
+@@ -286,10 +286,11 @@ void __cold io_cancel_local_task_work(struct io_ring_ctx *ctx)
+ 	 * The work list consumer side is serialized by ->uring_lock, see
+ 	 * __io_run_local_work(). Grab it to guard against racing with normal
+ 	 * task_work running, as the task may be exiting. The ring is going
+-	 * away, run the entries in cancel mode right here - the callers
+-	 * provide the same process context the per-ctx fallback work that
+-	 * they were previously punted to ran in.
++	 * away, run the entries in cancel mode right here, if allowed.
+ 	 */
++	if (!io_local_work_cancel_allowed(ctx))
++		return;
++
+ 	guard(mutex)(&ctx->uring_lock);
+ 
+ 	while (!mpscq_empty(&ctx->work_list)) {
+diff --git a/io_uring/tw.h b/io_uring/tw.h
+index 3ade5ad577fd..6bc69a234f05 100644
+--- a/io_uring/tw.h
++++ b/io_uring/tw.h
+@@ -88,6 +88,17 @@ static inline int io_run_task_work(void)
+ 	return ret;
+ }
+ 
++/*
++ * Canceled local work may still copy to user memory. Only run it from a kthread,
++ * where such copies fail, or from a task that shares the mm of the submitter.
++ */
++static inline bool io_local_work_cancel_allowed(struct io_ring_ctx *ctx)
++{
++	struct task_struct *tsk = ctx->submitter_task;
++
++	return !current->mm || (tsk && current->mm == READ_ONCE(tsk->mm));
++}
++
+ static inline bool io_local_work_pending(struct io_ring_ctx *ctx)
+ {
+ 	return !mpscq_empty(&ctx->work_list);
+-- 
+2.56.1
+
