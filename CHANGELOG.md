@@ -18,6 +18,18 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.11.17-3-sleepy-next]: 2026-11-18
+
+### Added
+
+- **`9228` ported** — `unmap_bo_from_gpuvm()` now returns the error from
+  `amdgpu_vm_clear_freed(&update_ctx, …)` instead of discarding it. This is
+  the one salkim fix in the removed VA-batch block that was not batch-specific
+  and applies directly after PRT; it keeps KFD aware of a failed unmap clear.
+
+The preview lists **176** patches and applies **174**; `1317` and `2044` are
+the two skips. No reboot or shutdown was performed.
+
 ## [2026.11.17-2-sleepy-next]: 2026-11-18
 
 ### Added

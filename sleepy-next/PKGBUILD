@@ -203,7 +203,7 @@ _snapdate=${_srctag#next-}                                            # 20261117
 _snapver="${_snapdate:0:4}.${_snapdate:4:2}.${_snapdate:6:2}"
 pkgver=${_snapver}
 _tagrel=1
-pkgrel=2
+pkgrel=3
 # Build parallelism. Previously capped at 8 on a diagnosis that did not hold up.
 #
 # The cap was added after an rc4-7 build thrashed badly — 6 watchdog firings and
@@ -469,6 +469,7 @@ source=(
   "patches/9200-9299/9216-drm-amdgpu-preserve-submitted-sdma-fences-on-rollover.patch"
   "patches/9200-9299/9218-drm-amdgpu-complete-prepared-vm-updates-after-errors.patch"
   "patches/9200-9299/9219-drm-amdgpu-factor-vm-update-setup-and-completion.patch"
+  "patches/9200-9299/9228-drm-amdgpu-propagate-kfd-unmap-clear-failures.patch"
   "patches/9200-9299/9230-drm-amdgpu-clean-up-failed-page-table-allocations.patch"
   "patches/9200-9299/9237-drm-amdgpu-preserve-userq-write-pointer-offsets.patch"
   "patches/9200-9299/9238-drm-amdgpu-take-userq-fence-references-before.patch"
@@ -1347,6 +1348,7 @@ b2sums=('fe957ac969777369dd464a7c0f1c4a008bb87dfe89e3a4738a3e2e2649a3a581ba0fe3c
         '9dfa4ad765ff527866b6dc488f4e057c7604db7fa5e84066527f6bdd48094cb6da6af85f1bb8027c8ea1352881531d2ac819650925294fd6c64ca9fe3e032bd3'
         '4a2fea76599e2460e2d3226104c31eec0e66443cfbc0d3000311995f60ce07e379d16aa8da394e5d062daf8b054a3a9376b85373bb533a247e3b4fb40e4cd60e'
         'a099948280b96413bcba57e508fa929478aa269f371f945e39dbe11d98133e372f95b0db40dd1bc3bcc8ebe6abc568d2329262f0e02812d29cd18605b9c4b474'
+        '1815815678413fd113ec72d2cf6192bb4b45a56a347c6643952d06d3ff7cd4414b8953634f1cb4b92665acca1fd82c43563d10b427a1308bdef5112c93cc6993'
         'bb4e13b164404b5c02cfda4c3d0b2690b5fa73adce5b2d84f52dbb8ada82f5ffcbe0978b688d5f43819e4667cab61c4d606ce7438f4ff809f0a1e826bf84138f'
         'f5ff5fa2685678fe47adfd559403ce43b6ea4b943733d0a2a78a8cb30ca7f475decae2956ae75d3b77c6ce0138db7720dc8c4673fc63a61effe5aae180b4729f'
         '521b40436f23a66f5b542d1cd420fb7b995abd2b239c3480709a56f910ba095691ddd36100a6360f7c35cf8c7a1d0f6915ab18f57bbb041779cf071a41bcdac0'

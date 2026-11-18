@@ -13302,10 +13302,12 @@ verified against the clean snapshot.
 
 - **PRT explicit-sync v2 (Natalie Vock, 10 patches, `20261117-prt-explicit-sync-v2-0-bb3851cb6a0c@pixelcluster.dev`).** Carried in the **preview only** as `0900`–`0909`, after the user explicitly accepted the review risk. It is generic amdgpu GPUVM work for sparse-binding stutter. The series has a new `AMDGPU_GEM_VA2` UAPI and a driver minor bump, no `Reviewed-by`/`Acked-by`, Dave Airlie asks for `VM_BIND` naming, and the Sashiko reviewer filed High-severity findings on the rollback lists, syncobj error paths and runtime PM; it remains a v2 under review.
   The preview carries it on top of a reduced salkim stack: the salkim
-  VA-batch block (`9217`, `9220`–`9229`, `9231`–`9236`, `9239`) was removed
-  because it is a second, incompatible VM-batch design (`AMDGPU_GEM_VA_BATCH`)
-  for the same functions PRT rewrites. The salkim UserQ/lifecycle half
-  (`9200`–`9216`, `9218`, `9219`, `9230`, `9237`, `9238`, `9240`) is kept.
+  VA-batch block (`9217`, `9220`–`9227`, `9229`, `9231`–`9236`, `9239`) was
+  removed because it is a second, incompatible VM-batch design
+  (`AMDGPU_GEM_VA_BATCH`) for the same functions PRT rewrites. The salkim
+  UserQ/lifecycle half (`9200`–`9216`, `9218`, `9219`, `9228`, `9230`,
+  `9237`, `9238`, `9240`) is kept; `9228` is ported to return the KFD unmap
+  clear error.
   `1058` and `9057` are ported to the PRT context; `1311` is superseded in the
   preview. See `sleepy-next/PATCH_SOURCES.md`. **The rc does not carry PRT**
   (the 7.3 base lacks the helpers and the salkim stack it was merged against).

@@ -18,8 +18,8 @@ moved, so the full ledger is not duplicated here.
 | Snapshot | `next-20261117`, commit `7cfbf79c66c6` (tag object `5ddd72f9b85f`) |
 | Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261117.tar.gz` |
 | Snapshot tree `Makefile` | `7.4.0-rc3` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.11.17-2-sleepy-next` |
-| Package | `linux-sleepy-next-2026.11.17-2` |
+| Kernel release | `2026.11.17-3-sleepy-next` |
+| Package | `linux-sleepy-next-2026.11.17-3` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -2061,9 +2061,10 @@ half**. The release is `2026.11.17-2`.
 
 ### Why the salkim VA-batch half is not carried
 
-Erhan Bilgili's `9217`, `9220`–`9229`, `9231`–`9236` and `9239` implement a
-second VA-batch design: `AMDGPU_GEM_VA_BATCH`, `amdgpu_gem_va_batch_ioctl()`,
-`amdgpu_vm_update_batch`, `amdgpu_vm_bo_update_done()`. PRT rewrites the same
+Erhan Bilgili's `9217`, `9220`–`9227`, `9229`, `9231`–`9236` and `9239`
+implement a second VA-batch design: `AMDGPU_GEM_VA_BATCH`,
+`amdgpu_gem_va_batch_ioctl()`, `amdgpu_vm_update_batch`,
+`amdgpu_vm_bo_update_done()`. PRT rewrites the same
 functions around `amdgpu_vm_update_ctx` and `AMDGPU_GEM_VA2`. A three-way merge
 of the two trees produced 78 semantic conflicts in `amdgpu_vm.c`,
 `amdgpu_vm.h`, `amdgpu_gem.c`, `amdgpu_gem.h`, `amdgpu_amdkfd_gpuvm.c` and
@@ -2078,10 +2079,11 @@ the salkim Proton work is kept.
 
 ### Kept salkim work (UserQ and lifecycle)
 
-`9200`–`9216`, `9218`, `9219`, `9230`, `9237`, `9238`, `9240`. These are the
-UserQ enablement, restore/validation, TLB-invalidation reporting, MES gang
-priority, fence and SDMA-rollover, page-table allocation, and restore-failure
-fixes. All apply cleanly after PRT; UserQ stays enabled by default.
+`9200`–`9216`, `9218`, `9219`, `9228` (ported, see below), `9230`, `9237`,
+`9238`, `9240`. These are the UserQ enablement, restore/validation,
+TLB-invalidation reporting, MES gang priority, fence and SDMA-rollover,
+page-table allocation, KFD unmap error propagation, and restore-failure fixes.
+All apply cleanly after PRT; UserQ stays enabled by default.
 
 ### Ports
 
@@ -2094,6 +2096,10 @@ fixes. All apply cleanly after PRT; UserQ stays enabled by default.
 - **`9081`** — the userq restore path's seq64 update was written against the
   old `amdgpu_vm_bo_update(adev, …)` signature. It now wraps the same update
   in `amdgpu_vm_update_ctx_init()`/`_fini()` and passes the context.
+- **`9228`** — `unmap_bo_from_gpuvm()` now keeps and returns the error from
+  `amdgpu_vm_clear_freed(&update_ctx, …)` instead of discarding it with
+  `(void)`. The rest of the salkim function is unchanged. This is an
+  independent KFD error-propagation fix that was not batch-specific.
 - **`1311` is dropped in the preview.** PRT replaces the synchronous
   input-fence wait with `amdgpu_sync_fence(&ctx->sync, …)`, so there is no
   `dma_fence_wait()` left to make interruptible. The rc keeps `1311`.
@@ -2101,5 +2107,5 @@ fixes. All apply cleanly after PRT; UserQ stays enabled by default.
 
 ### Series state
 
-**175 listed / 173 applied** on `next-20261117`; the skips are `1317` and
+**176 listed / 174 applied** on `next-20261117`; the skips are `1317` and
 `2044`. The rc is unchanged at **398/398** on `v7.3`.
