@@ -1985,6 +1985,7 @@ publishes v0.6.7.
 |---|---|---|
 | `2425` | `sched_ext: Block a retained donor before PI deboost routes it back to sched_ext` (Tao Cui) | `v7.3` has no `scx_prepare_task_sched_change()` or proxy-donor infrastructure; the patch cannot apply there. |
 | `9240` | `drm/amdgpu: Handle UserQ restore allocation failures` (Erhan Bilgili, salkim `fb85af1fa1ea`) | The UserQ restore path exists only in the 7.4 tree. |
+| `9241` | `drm/amdgpu: Enable TLB fences on first UserQ creation` (Erhan Bilgili, salkim `e45eee6487c8`) | The first-UserQ TLB flush is only needed where UserQ is enabled; the 7.3 base has no UserQ stack. |
 
 ### Applied in order
 
@@ -2080,9 +2081,10 @@ the salkim Proton work is kept.
 ### Kept salkim work (UserQ and lifecycle)
 
 `9200`–`9216`, `9218`, `9219`, `9228` (ported, see below), `9230`, `9237`,
-`9238`, `9240`. These are the UserQ enablement, restore/validation,
+`9238`, `9240`, `9241`. These are the UserQ enablement, restore/validation,
 TLB-invalidation reporting, MES gang priority, fence and SDMA-rollover,
-page-table allocation, KFD unmap error propagation, and restore-failure fixes.
+page-table allocation, KFD unmap error propagation, restore-failure fixes and
+the first-UserQ TLB-fence setup.
 All apply cleanly after PRT; UserQ stays enabled by default.
 
 ### Ports
@@ -2100,6 +2102,14 @@ All apply cleanly after PRT; UserQ stays enabled by default.
   `amdgpu_vm_clear_freed(&update_ctx, …)` instead of discarding it with
   `(void)`. The rest of the salkim function is unchanged. This is an
   independent KFD error-propagation fix that was not batch-specific.
+- **`9241`** — `amdgpu_vm_enable_tlb_fences()` and the
+  `need_tlb_fence = false` initialisation apply unchanged. The
+  `amdgpu_gem.c` hunk (a `READ_ONCE()` in `amdgpu_gem_va_batch_supported()`)
+  and the `test_va_batch.py` hunk are dropped: both belong to the salkim
+  VA-batch design removed with `09xx`. The new function flushes pending
+  `AMDGPU_FENCE_OWNER_VM` page-table writes and the PASID TLB before the
+  first user queue can submit, then sets `need_tlb_fence` so later updates
+  publish completion fences.
 - **`1311` is dropped in the preview.** PRT replaces the synchronous
   input-fence wait with `amdgpu_sync_fence(&ctx->sync, …)`, so there is no
   `dma_fence_wait()` left to make interruptible. The rc keeps `1311`.
@@ -2107,5 +2117,132 @@ All apply cleanly after PRT; UserQ stays enabled by default.
 
 ### Series state
 
-**176 listed / 174 applied** on `next-20261117`; the skips are `1317` and
+**177 listed / 175 applied** on `next-20261117`; the skips are `1317` and
 `2044`. The rc is unchanged at **398/398** on `v7.3`.
+
+## 2026-11-18 (third pass) — salkim TLB-fence fix ported; unmap/restore fixes deferred
+
+Context: a Predecessor session on `2026.11.17-3-sleepy-next` hit a UserQ
+hang at 20:12:55. The hang-detect worker tried a per-queue
+`MES_SCH_API_RESET` and MES answered with
+`status=0x81000800` (`MES_ERROR_API`, opcode 8, api_err 0), so the driver
+escalated to a full mode1 reset (`AMDGPU_RESET_SRC_USERQ`); VRAM loss then
+took down cosmic-comp and the session. Predecessor had run fine on the same
+kernel earlier, so the hang is intermittent. The audit below re-checks the
+salkim branch against the preview's current userq/VM carries.
+
+### Ported
+
+- **`9241`** — `e45eee6487c8` "Enable TLB fences on first UserQ creation"
+  (2026-11-08, cherry-picked from `d305fb5f579f`). Applies on top of `09xx`
+  with two hunks dropped (see *Ports* above). Verified forward with both
+  `git apply --check` and `patch -p1 --forward --dry-run -F2` against the
+  series-applied tree; the reverse check fails, so it is genuinely new.
+
+### Deferred, with reasons (checked against this tree, not the salkim tree)
+
+- **`072b48bf564d` "Add explicit synchronization for VM unmaps"**
+  (2026-11-11) cannot land on the PRT hybrid. It changes
+  `amdgpu_vm_bo_unmap()` to take a `bool explicit_sync` and threads a
+  second `freed_explicit` list through `amdgpu_vm.c`; this tree's signature
+  is `amdgpu_vm_bo_unmap(struct amdgpu_vm_update_ctx *, …)`, and PRT's
+  `AMDGPU_GEM_VA2` is already the explicit-sync VA path. Its
+  `amdgpu_amdkfd_gpuvm.c`, `amdgpu_csa.c` and `amdgpu_gem.c` hunks fail on
+  those signatures. Re-owning the unmap state machine would repeat the
+  two-design conflict that removed the salkim VA-batch block. radv-salkim
+  queries `AMDGPU_IDS_FLAGS_VM_UNMAP_EXPLICIT_SYNC`; without the flag it
+  keeps the legacy path, so this is a loss of an optimization, not of
+  correctness.
+- **`e49ec4b5bdb` "Fix UserQ userptr restoration" and `0d1c6d5c53c59`
+  "Allow interrupting UserQ restore retries"** (2026-11-12) are a ~1.2k-line
+  rework of `amdgpu_userq_vm_validate_and_restore_queue()`. The
+  eviction-fence rearm and the `amdgpu_vm.c` lock/validate hunks apply, but
+  four `amdgpu_userq.c` hunks and the `amdgpu_vm_lock_individual()` prototype
+  hunk assume the batch-era restore code; this tree's function carries
+  PRT's update context, the seq64 restore update and
+  `amdgpu_vm_spm_update()`. Deferred to the next port pass rather than
+  dropped: the fix is real, but it needs the restore state machine re-owned,
+  and `next-20261118` is the safer base.
+
+### Next base
+
+`next-20261118` exists (tag ref `66d427575d0a`); the follow-up is the version
+bump, which must re-validate this 177-patch series and the 398-patch rc
+series against the new snapshot. The bump is a separate pass per `CLAUDE.md`.
+
+## Bump 2026-11-18 — `next-20261118`
+
+`next-20261118` (tag ref `66d427575d0a`, peeled commit `e8017d29067f`) is the
+new preview base. `_srctag` moves to `next-20261118`, `pkgrel` resets to `1`
+and the release becomes **2026.11.18-1**. The rc series is unchanged
+(398/398 on `v7.3`).
+
+The snapshot is one day newer and pulls the next drm-next merge. The diff in
+the files our carries touch is small but decisive: `amdgpu_kms.c` gains the
+corrected UserQ slot checks and a revised vblank-cached read, `amdgpu_vm_pt.c`
+gains `amdgpu_vm_pt_clear_flags()`, and `kfd_svm.c` gains an `evict_lock`
+around the first SVM eviction. That absorbs five carries and shifts three
+more.
+
+### Absorbed by the new base — now skipped, removal pending approval
+
+Each of these fails forward and reverse-applies cleanly or is present in the
+new base's own form; none was removed from `source=()` without sign-off.
+
+| Patch | Evidence |
+|---|---|
+| `1192` | The base's `amdgpu_dm.c` already queues the FRL poll outside `dc_lock`; `patch` reports "Reversed (previously applied)". |
+| `1194` | Reverse-applies cleanly against the series tree; the base keeps patched HDMI panels on FRL across detect. |
+| `1320` | The base's `amdgpu_kms.c` contains the fix in a newer form (`in_task()` branch and the `drm_WARN_ON_ONCE` rationale). |
+| `1355` | Reverse-applies cleanly; the base allocates no per-VM kernel BO for the page table. |
+| `9212` | The base's `amdgpu_kms.c` already carries the corrected `adev->gfx.disable_uq` / `adev->sdma.disable_uq` checks. |
+| `1199` | **Removed from `source=()`** — it applied but installed a *second* `dm_plane_inherit_flip_time()`; the base already defines it (3 occurrences in the base, 5 in the series tree). The build failed on the redefinition, which is the duplicate-insertion trap. The file is kept on disk for provenance. |
+
+`1317` and `2044` remain the two long-standing inert skips.
+
+### Regenerated
+
+- **`1302`** — the retry-backoff hunk moved into the base's new
+  `if (evicted_ranges == 1)` block under `evict_lock`; the assignment is now
+  three tabs deep. The rest of the patch is unchanged.
+- **`9218`** — `amdgpu_vm_pt_clear()` was rebased onto the base's
+  `amdgpu_vm_pt_clear_flags()` helper. The patch's intent is preserved: the
+  commit still runs after a failed `update`, and the update error wins
+  (`ret = commit; if (!r) r = ret;`).
+- **`9219`** — applies unchanged once `9218` is in place; the earlier skip was
+  a cascade from the missing `9218` context, not a snapshot change.
+- **`9237`** — the kernel hunks applied unchanged. The `test_userq_upstream.py`
+  hunk was merged with the snapshot's new inline `userq_props` layout and
+  keeps the added `wptr_bo_offset` field.
+
+### Series state
+
+**176 listed / 169 applied** on `next-20261118`. Seven skips: `1317` and
+`2044` inert, and `1192`, `1194`, `1320`, `1355`, `9212` absorbed by the new
+base (removal awaits explicit approval). `1199` was removed from `source=()`
+because it applied as a duplicate definition and broke the build. The rc
+remains **398/398** on `v7.3`.
+
+### Revision check (2026-11-18, after the bump)
+
+Every carried patch was compared with the newest posting in the lore git
+mirrors. `1198`, `1239`–`1243`, `1354`, `2509`, `2068`/`2069`, `2427` and the
+PRT `0900`–`0909` series match the latest postings (v2/v3 where applicable).
+One newer revision exists: **`2044` is v7 here, v8 was posted 2026-11-14**
+(the `cluster_snapshot` NULL check moved from `goto no_cluster` to an early
+`return 0`). It is deferred: the preview skips `2044` because the snapshot
+already carries the fix, and the rc's `v7.3` copy applies and is not being
+rebuilt in this pass. No revert of any carried subject appeared in the lore
+mirrors, linux-next or mainline; the two SPM reverts in `next-20261118`
+(`amdgpu_fence.c`, `amdgpu_ib.c`) do not touch a carried patch (the preview
+does not carry `1331`).
+
+### Oldest-first carry check for the next sweep
+
+The salkim `salkim-7.4` tip is `5882e6cba106` (2026-11-14). Everything after
+our sync point is accounted for: `e45eee6487c8` is `9241`; `e49ec4b5bdb` and
+`0d1c6d533c59` are the deferred restore pair; `072b48bf564d` is the deferred
+unmap-sync patch (PRT owns that path here); `82255a55fc4b`, `54e057e7902b`,
+`1ef3dc7c8d57`, `f3fdd23a079c`, `6ca88a0094aa`, `29831c84c558`,
+`d9608d20cfb0` and `ef3bd4ad390e` build on the removed batch/private-gateway
+design and are not applicable.

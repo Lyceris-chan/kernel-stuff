@@ -1,4 +1,4 @@
-From d56b9554c43c118e725ac4e5cf9adcd46b89b303 Mon Sep 17 00:00:00 2001
+From d56b9554c43c118e725ac4e5cf9adcd46b89b303
 From: Erhan Bilgili <erhan.bilgili@gmail.com>
 Date: Wed, 4 Nov 2026 02:13:37 +0100
 Subject: [PATCH] drm/amdgpu: Preserve UserQ write-pointer offsets.
@@ -9,14 +9,14 @@ Subject: [PATCH] drm/amdgpu: Preserve UserQ write-pointer offsets.
  drivers/gpu/drm/amd/amdgpu/amdgpu_userq.h     |  2 +
  drivers/gpu/drm/amd/amdgpu/mes_userqueue.c    | 13 +++-
  .../drivers/amdgpu/test_userq_restore.py      | 36 ++++++++++-
- .../drivers/amdgpu/test_userq_upstream.py     | 61 ++++++++++++++++---
- 5 files changed, 102 insertions(+), 13 deletions(-)
+ .../drivers/amdgpu/test_userq_upstream.py     | 59 +++++++++++++++++--
+ 5 files changed, 101 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
-index fbbf4ca482e0..505eb610bcf1 100644
+index 4918977f00e7..7a99713f52ee 100644
 --- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
 +++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
-@@ -1574,7 +1574,8 @@ amdgpu_userq_vm_validate_and_restore_queue(struct amdgpu_userq_mgr *uq_mgr)
+@@ -1576,7 +1576,8 @@ amdgpu_userq_vm_validate_and_restore_queue(struct amdgpu_userq_mgr *uq_mgr)
  			goto unlock_all;
  		}
  
@@ -161,10 +161,10 @@ index 822896075d9f..f39ceadb5db6 100644
      struct amdgpu_usermode_queue queue = {.wptr_obj.obj = &target_bo};
      fpriv.userq_mgr.userq_xa.values[0] = &queue;
 diff --git a/tools/testing/selftests/drivers/amdgpu/test_userq_upstream.py b/tools/testing/selftests/drivers/amdgpu/test_userq_upstream.py
-index 3f9ae54d747d..e7b1c11291ac 100644
+index 7dda9865832a..20e8b33b59e5 100644
 --- a/tools/testing/selftests/drivers/amdgpu/test_userq_upstream.py
 +++ b/tools/testing/selftests/drivers/amdgpu/test_userq_upstream.py
-@@ -59,7 +59,10 @@ class UserqUpstreamTests(unittest.TestCase):
+@@ -53,7 +53,10 @@ class UserqUpstreamTests(unittest.TestCase):
      def test_wptr_buffers(self):
          body = self.function('amdgpu_userq_fence.c', 'amdgpu_userq_fence_read_wptr')
          body += '\n' + self.function('mes_userqueue.c', 'mes_userq_create_wptr_mapping')
@@ -175,8 +175,8 @@ index 3f9ae54d747d..e7b1c11291ac 100644
 +                self.run_program(source.replace('TEST_PAGE_SIZE', str(page_size)))
  
  
-     def test_firmware_copy_errors(self):
-@@ -237,7 +240,8 @@ WPTR_HARNESS = r'''
+ DESTROY_HARNESS = r'''
+@@ -157,7 +160,8 @@ WPTR_HARNESS = r'''
  #include <stdio.h>
  typedef uint64_t u64;
  #define AMDGPU_GPU_PAGE_SHIFT 12
@@ -186,7 +186,7 @@ index 3f9ae54d747d..e7b1c11291ac 100644
  #define TTM_NUM_MOVE_FENCES 2
  #define AMDGPU_GMC_HOLE_MASK 0x0000ffffffffffffULL
  #define DRM_EXEC_IGNORE_DUPLICATES 1
-@@ -248,14 +252,14 @@ typedef uint64_t u64;
+@@ -168,13 +172,13 @@ typedef uint64_t u64;
  #define drm_exec_retry_on_contention(e) ((void)0)
  struct drm_exec { int unused; };
  struct gem_object { size_t size; bool imported; };
@@ -196,23 +196,13 @@ index 3f9ae54d747d..e7b1c11291ac 100644
  struct amdgpu_bo_va_mapping { u64 start, last, offset; struct amdgpu_bo_va *bo_va; };
  struct amdgpu_vm { struct amdgpu_bo_va_mapping *mapping; };
  struct amdgpu_userq_obj { struct amdgpu_bo *obj; u64 gpu_addr; };
- struct userq_props { u64 wptr_gpu_addr; };
- struct amdgpu_usermode_queue { struct amdgpu_vm *vm; struct userq_props *userq_prop;
+ struct amdgpu_usermode_queue { struct amdgpu_vm *vm; struct { u64 wptr_gpu_addr; } *userq_prop;
 -                              struct amdgpu_userq_obj wptr_obj; };
 +                              struct amdgpu_userq_obj wptr_obj; u64 wptr_bo_offset; };
  struct amdgpu_userq_mgr { int evf_mgr; };
  struct amdgpu_device { int unused; };
  static int pd_error, bo_error, map_error, attach_error, gart_error;
-@@ -296,7 +300,7 @@ int main(void)
-     struct amdgpu_vm vm = {.mapping = &mapping};
-     struct userq_props props = {0};
-     struct amdgpu_usermode_queue queue = {.vm = &vm, .userq_prop = &props};
--    for (unsigned i = 0; i < 1024; ++i)
-+    for (unsigned i = 0; i < sizeof(bo.words) / sizeof(bo.words[0]); ++i)
-         bo.words[i] = 0x1000000000000000ULL + i;
-     u64 result = 0;
-     unsigned cases = 0;
-@@ -333,7 +337,27 @@ int main(void)
+@@ -252,7 +256,27 @@ int main(void)
      mapping.offset = 0;
      bo.tbo.base.size = PAGE_SIZE;
      struct amdgpu_userq_mgr mgr = {0};
@@ -241,7 +231,7 @@ index 3f9ae54d747d..e7b1c11291ac 100644
      assert(queue.wptr_obj.obj == &bo && bo.refs == 1);
      assert(queue.wptr_obj.gpu_addr == 0x2000000);
      struct amdgpu_bo imported = {.tbo.base = {.size = PAGE_SIZE, .imported = true}};
-@@ -350,6 +374,28 @@ int main(void)
+@@ -269,6 +293,28 @@ int main(void)
      assert(mes_userq_create_wptr_mapping(&adev, &mgr, &queue, base) == -EINVAL);
      assert(bo.refs == 0);
      bo.tbo.base.size = PAGE_SIZE;
@@ -270,7 +260,7 @@ index 3f9ae54d747d..e7b1c11291ac 100644
      attach_error = -ENOMEM;
      assert(mes_userq_create_wptr_mapping(&adev, &mgr, &queue, base) == -ENOMEM);
      assert(bo.refs == 0);
-@@ -357,7 +403,8 @@ int main(void)
+@@ -276,7 +322,8 @@ int main(void)
      gart_error = -EIO;
      assert(mes_userq_create_wptr_mapping(&adev, &mgr, &queue, base) == -EIO);
      assert(bo.refs == 0);

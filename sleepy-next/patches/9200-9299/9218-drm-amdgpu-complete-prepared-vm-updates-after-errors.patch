@@ -1,4 +1,4 @@
-From eaa4d43d25623e75c0f4e0b6dc952104bb5fac62 Mon Sep 17 00:00:00 2001
+From eaa4d43d25623e75c0f4e0b6dc952104bb5fac62
 From: Erhan Bilgili <erhan.bilgili@gmail.com>
 Date: Wed, 28 Oct 2026 00:58:48 +0100
 Subject: [PATCH] drm/amdgpu: Complete prepared VM updates after errors.
@@ -10,10 +10,10 @@ Subject: [PATCH] drm/amdgpu: Complete prepared VM updates after errors.
  2 files changed, 23 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
-index f98d675c2e97..0b46b3b2866f 100644
+index e1016155b3df..8d41beace8bc 100644
 --- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
 +++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
-@@ -1102,7 +1102,7 @@ int amdgpu_vm_update_pdes(struct amdgpu_device *adev,
+@@ -1106,7 +1106,7 @@ int amdgpu_vm_update_pdes(struct amdgpu_device *adev,
  	struct amdgpu_vm_update_params params;
  	struct amdgpu_vm_bo_base *entry, *tmp;
  	bool flush_tlb_needed = false;
@@ -22,7 +22,7 @@ index f98d675c2e97..0b46b3b2866f 100644
  
  	amdgpu_vm_assert_locked(vm);
  
-@@ -1128,15 +1128,17 @@ int amdgpu_vm_update_pdes(struct amdgpu_device *adev,
+@@ -1132,15 +1132,17 @@ int amdgpu_vm_update_pdes(struct amdgpu_device *adev,
  
  		r = amdgpu_vm_pde_update(&params, entry);
  		if (r)
@@ -75,22 +75,22 @@ index f98d675c2e97..0b46b3b2866f 100644
  
  	if (params.needs_flush) {
 diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c
-index 98b8d18c4301..1a0a194f89a6 100644
+index c4c739404084..9bd24bd3302f 100644
 --- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c
 +++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c
-@@ -370,7 +370,7 @@ int amdgpu_vm_pt_clear(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+@@ -396,7 +396,7 @@ int amdgpu_vm_pt_clear(struct amdgpu_device *adev, struct amdgpu_vm *vm,
  	struct amdgpu_bo *bo = &vmbo->bo;
- 	uint64_t value = 0, flags = 0;
- 	uint64_t addr;
+ 	unsigned int entries;
+ 	uint64_t flags;
 -	int r, idx;
 +	int r, ret, idx;
  
  	/* Figure out our place in the hierarchy */
  	if (ancestor->parent) {
-@@ -424,10 +424,10 @@ int amdgpu_vm_pt_clear(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+@@ -432,10 +432,10 @@ int amdgpu_vm_pt_clear(struct amdgpu_device *adev, struct amdgpu_vm *vm,
  
- 	r = vm->update_funcs->update(&params, vmbo, addr, 0, entries,
- 				     value, flags);
+ 	flags = amdgpu_vm_pt_clear_flags(adev, vm, level);
+ 	r = vm->update_funcs->update(&params, vmbo, 0, 0, entries, 0, flags);
 -	if (r)
 -		goto exit;
  
@@ -101,7 +101,7 @@ index 98b8d18c4301..1a0a194f89a6 100644
  exit:
  	drm_dev_exit(idx);
  	return r;
-@@ -701,7 +701,7 @@ static void amdgpu_vm_pte_update_noretry_flags(struct amdgpu_device *adev,
+@@ -709,7 +709,7 @@ static void amdgpu_vm_pte_update_noretry_flags(struct amdgpu_device *adev,
   *
   * Make sure to set the right flags for the PTEs at the desired level.
   */
@@ -110,7 +110,7 @@ index 98b8d18c4301..1a0a194f89a6 100644
  				       struct amdgpu_bo_vm *pt,
  				       unsigned int level,
  				       uint64_t pe, uint64_t addr,
-@@ -735,7 +735,7 @@ static void amdgpu_vm_pte_update_flags(struct amdgpu_vm_update_params *params,
+@@ -737,7 +737,7 @@ static void amdgpu_vm_pte_update_flags(struct amdgpu_vm_update_params *params,
  	if (level == AMDGPU_VM_PTB)
  		amdgpu_vm_pte_update_noretry_flags(adev, &flags);
  

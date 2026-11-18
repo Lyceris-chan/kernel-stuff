@@ -1,0 +1,111 @@
+From 9665cad6cb5c221fb67e3e9cb335f3b81f5c0bc6 Mon Sep 17 00:00:00 2001
+From: Erhan Bilgili <erhan.bilgili@gmail.com>
+Date: Sun, 8 Nov 2026 02:37:21 +0100
+Subject: [PATCH] drm/amdgpu: Enable TLB fences on first UserQ creation.
+
+(cherry picked from commit d305fb5f579f60384f4e94ceb7a8ff0b81a7c200)
+
+Backport notes:
+Drop the amdgpu_gem.c hunk (amdgpu_gem_va_batch_supported) and the
+test_va_batch.py hunk: the salkim batch design those touch was removed
+when the preview adopted PRT explicit-sync v2 (0900-0909).
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c |  3 ++
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c    | 49 ++++++++++++++++++++++-
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h    |  1 +
+ 3 files changed, 52 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+index ef11d886c828..694a441e03d0 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_userq.c
+@@ -977,7 +977,10 @@ amdgpu_userq_create(struct drm_file *filp, union drm_amdgpu_userq *args)
+ 		amdgpu_bo_unreserve(fpriv->vm.root.bo);
+ 		goto free_fence_drv;
+ 	}
++	r = amdgpu_vm_enable_tlb_fences(adev, &fpriv->vm);
+ 	amdgpu_bo_unreserve(fpriv->vm.root.bo);
++	if (r)
++		goto free_fence_drv;
+ 
+ 	/* Convert relative doorbell offset into absolute doorbell index */
+ 	db_info.queue_type = queue->queue_type;
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+index 70c3721fb29e..372e03460e29 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+@@ -3035,7 +3035,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+ 	ttm_lru_bulk_move_init(&vm->lru_bulk_move);
+ 
+ 	vm->is_compute_context = false;
+-	vm->need_tlb_fence = amdgpu_userq_enabled(&adev->ddev);
++	vm->need_tlb_fence = false;
+ 
+ 	vm->use_cpu_for_update = !!(adev->vm_manager.vm_update_mode &
+ 				    AMDGPU_VM_USE_CPU_FOR_GFX);
+@@ -3107,6 +3107,53 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+ 	return r;
+ }
+ 
++/**
++ * amdgpu_vm_enable_tlb_fences - prepare a VM for its first user queue
++ * @adev: amdgpu device
++ * @vm: VM whose root reservation is held
++ *
++ * Kernel queues use tlb_seq when assigning their VMID. Before user queues can
++ * bypass that submission path, finish earlier page-table writes and invalidate
++ * their translations once. Later updates then provide TLB completion fences.
++ */
++int amdgpu_vm_enable_tlb_fences(struct amdgpu_device *adev, struct amdgpu_vm *vm)
++{
++	struct dma_resv *resv = vm->root.bo->tbo.base.resv;
++	struct dma_resv_iter cursor;
++	struct drm_sched_fence *s_fence;
++	struct dma_fence *fence;
++	int r;
++
++	dma_resv_assert_held(resv);
++	if (vm->need_tlb_fence)
++		return 0;
++
++	mutex_lock(&vm->eviction_lock);
++	r = dma_fence_wait(vm->last_unlocked, true);
++	if (r)
++		goto unlock;
++
++	/* Every locked SDMA update publishes its fence on the root reservation.
++	 * Do not wait for rendering or eviction fences, which can need a queue
++	 * that userspace has not created yet.
++	 */
++	dma_resv_for_each_fence(&cursor, resv, DMA_RESV_USAGE_BOOKKEEP, fence) {
++		s_fence = to_drm_sched_fence(fence);
++		if (!s_fence || s_fence->owner != AMDGPU_FENCE_OWNER_VM)
++			continue;
++		r = dma_fence_wait(fence, true);
++		if (r)
++			goto unlock;
++	}
++
++	r = amdgpu_gmc_flush_gpu_tlb_pasid(adev, vm->pasid, 2, true, 0);
++	if (!r)
++		WRITE_ONCE(vm->need_tlb_fence, true);
++unlock:
++	mutex_unlock(&vm->eviction_lock);
++	return r;
++}
++
+ /**
+  * amdgpu_vm_make_compute - Turn a GFX VM into a compute VM
+  *
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
+index 1752ddc7b5d8..4adb14652405 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
+@@ -512,6 +512,7 @@ void amdgpu_vm_manager_fini(struct amdgpu_device *adev);
+ 
+ long amdgpu_vm_wait_idle(struct amdgpu_vm *vm, long timeout);
+ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm, int32_t xcp_id);
++int amdgpu_vm_enable_tlb_fences(struct amdgpu_device *adev, struct amdgpu_vm *vm);
+ int amdgpu_vm_make_compute(struct amdgpu_device *adev, struct amdgpu_vm *vm);
+ int amdgpu_vm_make_npa(struct amdgpu_device *adev, struct amdgpu_vm *vm);
+ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm);
