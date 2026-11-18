@@ -1,0 +1,119 @@
+From 20261118000631.17771-1-stefanomunari.sm@gmail.com Mon Sep 17 00:00:00 2001
+From: Stefano Munari <stefanomunari.sm@gmail.com>
+Date: Wed, 18 Nov 2026 01:06:31 +0100
+Subject: [PATCH net v1] r8169: fix RTNL deadlock in runtime suspend
+
+rtl8169_runtime_suspend() and the paths that resume the device under
+RTNL wait for each other in opposite order:
+
+ - The runtime suspend callback runs with the device in RPM_SUSPENDING
+   and then calls rtnl_lock(): it owns the suspend in progress and waits
+   for RTNL.
+
+ - rtl8169_close() and the ethtool ioctl/netlink paths run with RTNL
+   held and then call pm_runtime_get_sync(), which sleeps
+   uninterruptibly in rpm_resume() until the device leaves
+   RPM_SUSPENDING: they own RTNL and wait for the suspend to finish.
+
+If the suspend starts after the other task has taken RTNL but before it
+reaches pm_runtime_get_sync(), neither can make progress:
+
+  ip link set down / ethtool              pm workqueue
+  --------------------------              ------------
+  rtnl_lock()
+                                          rpm_suspend()
+                                            status = RPM_SUSPENDING
+                                            rtl8169_runtime_suspend()
+  pm_runtime_get_sync()
+    rpm_resume()
+      wait for !RPM_SUSPENDING
+                                              rtnl_lock()
+
+RTNL is never released, so every later RTNL user blocks behind it.
+
+The suspend is the delayed one scheduled by rtl8169_runtime_idle():
+the interface is up w/out link and runtime PM is enabled
+(power/control = auto).
+
+Blocked tasks, "ip link set down":
+
+  task:kworker/u66:4   state:D
+  Workqueue: pm pm_runtime_work
+   __mutex_lock
+   rtl8169_runtime_suspend+0x1a/0x70 [r8169]
+   pci_pm_runtime_suspend+0x78/0x230
+   __rpm_callback+0x56/0x1e0
+   rpm_callback+0x30/0x80
+   rpm_suspend+0xe7/0x630
+   pm_runtime_work+0x57/0xb0
+
+  task:python3         state:D
+   rpm_resume+0x1d0/0x750
+   __pm_runtime_resume+0x43/0x60
+   rtl8169_close+0x32/0x100 [r8169]
+   __dev_close_many+0xaf/0x1b0
+   __dev_change_flags+0xe2/0x1f0
+   netif_change_flags+0x27/0x70
+   do_setlink.isra.0+0x367/0xe70
+   rtnl_newlink+0x4c6/0xab0
+
+Use rtnl_trylock() and return -EBUSY if RTNL is contended. The PM core
+then sets the device back to RPM_ACTIVE and wakes up the waiters in
+rpm_resume(), without recording a runtime PM error. In the deadlock
+scenario the RTNL holder is the task holding runtime PM reference, so
+the suspend is rescheduled by rtl8169_runtime_idle() when it drops its
+usage count. If RTNL is held by an unrelated task, the device stays
+active until the next idle check (usage count drop or link down).
+
+This issue was found using an AI code review agent.
+
+Tested on RTL8168gu/8111gu (XID 509), net tree 7.4.0-rc2.
+Setup: interface up, cable unplugged, power/control = auto.
+
+It was reproduced with the unpatched driver by timing
+"ip link set down" to the expiry of the 10s runtime suspend timer.
+It was also reproduced deterministically with a debug-only msleep()
+before rtnl_lock() in rtl8169_runtime_suspend() to widen the race window
+and "ethtool -i" issued during the sleep.
+
+With the patch the timed reproducer completed 100 attempts, hitting
+the race window in 12 of them, without deadlock.
+The deterministic msleep() variant no longer hangs.
+Kernel selftests were not run.
+
+Fixes: abe5fc42f9ce ("r8169: use RTNL to protect critical sections")
+Signed-off-by: Stefano Munari <stefanomunari.sm@gmail.com>
+---
+Race window (RTNL held before rtl8169_close() reaches
+pm_runtime_get_sync()) on the unpatched driver, measured with kprobes
+over 200 x "ip link set down":
+
+  idle:           median ~175 us, 95% below 250 us, max 3.1 ms
+  moderate load:  median ~165 us, 95% below 2.1 ms, max 6.0 ms
+---
+ drivers/net/ethernet/realtek/r8169_main.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/realtek/r8169_main.c b/drivers/net/ethernet/realtek/r8169_main.c
+index f151ab681393..c60d87015eb9 100644
+--- a/drivers/net/ethernet/realtek/r8169_main.c
++++ b/drivers/net/ethernet/realtek/r8169_main.c
+@@ -5975,7 +5975,14 @@ static int rtl8169_runtime_suspend(struct device *device)
+ 		return 0;
+ 	}
+ 
+-	rtnl_lock();
++	/*
++	 * Do not block on RTNL.
++	 * Other callers holding RTNL may wait for suspend to complete
++	 * in pm_runtime_get_sync(), which would deadlock.
++	 */
++	if (!rtnl_trylock())
++		return -EBUSY;
++
+ 	__rtl8169_set_wol(tp, WAKE_PHY);
+ 	rtl8169_net_suspend(tp);
+ 	rtnl_unlock();
+-- 
+2.55.0
+

@@ -3,7 +3,7 @@
 Provenance for every patch in `source=()` of `sleepy-rc/PKGBUILD`.
 
 - **Base:** Linux `v7.3`
-- **Series:** 382 patches
+- **Series:** 398 patches
 - **Companion documents:** `../CHANGELOG.md` records what changed in each
   release. `../LESSONS.md` records the traps. The authoritative range-to-source
   table is in the `patch-audit` skill.
@@ -22,17 +22,17 @@ are supplied by the generator instead, so every row below has a source.
 | `0050–0099` | EDID and display mailing-list patches | 5 |
 | `0101–0113` | CachyOS branch squashes | 6 |
 | `1000–1099` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) | 30 |
-| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 50 |
-| `1100–1199` | AMD display (DCN4, colorops) | 45 |
-| `1200–1299` | AMD power management (amd-pstate, CPPC) | 32 |
-| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 56 |
+| `1300–1399` | GPU core follow-ups (KFD SMI/VM, CS validation) | 51 |
+| `1100–1199` | AMD display (DCN4, colorops) | 46 |
+| `1200–1299` | AMD power management (amd-pstate, CPPC) | 37 |
+| `2000–2099` | Block, I/O, buffers and network (bfq, mq-deadline, zram, io_uring, r8169) | 60 |
 | `2100–2199` | Memory management and swap (zstd, LRU-MARIE, gup, zswap) | 50 |
 | `2200–2299` | CPU idle (NAP governor) | 1 |
 | `2300–2399` | Build system and kbuild | 21 |
-| `2400–2499` | Core scheduler and sched-ext | 9 |
-| `2500–2599` | x86 and arch core | 2 |
+| `2400–2499` | Core scheduler and sched-ext | 11 |
+| `2500–2599` | x86 and arch core | 4 |
 | `2600–2699` | Time and timers | 0 |
-| `2800–2899` | Memory management, second series (mm/swap follow-ups) | 11 |
+| `2800–2899` | Memory management, second series (mm/swap follow-ups) | 12 |
 | `2900–2999` | VFS / core filesystem | 0 |
 | `3000–3099` | Platform, USB and hwmon (PROM21 chipset temperature) | 2 |
 | `9000–9099` | agd5f staging + userq lifecycle backports | 39 |
@@ -13229,3 +13229,152 @@ backend removal; no on-target RDNA4 article.
 **382 patches.** `audit_series.py`: **382/382** on `v7.3`. The preview lists
 **173** and applies **171** on `next-20261116` (`2044` absorbed, `1317` context
 drift and inert).
+
+## Sweep 2026-11-18 — next-20261117; sixteen fixes, CAST v0.2.11
+
+Sources actually queried this pass: `torvalds` `origin/master` `20eef29b7c84`
+(11-17), `linux-next` tags through `next-20261117` `7cfbf79c66c6` (the newest;
+no `next-20261118` tag exists as of 14:36 UTC 11-18), `drm-next` (11-14),
+`drm-misc` (11-16), `linux-pm`, `tip`, `akpm-mm` (all branches, tips 11-15),
+the lore git mirrors for amd-gfx, dri-devel, lkml (epoch 21 recovered),
+linux-mm, netdev (epoch 4 recovered), linux-block, sched-ext, io-uring,
+linux-pm, linux-nvme, cgroups, linux-fsdevel, linux-pci and stable (epoch 2
+recovered), the amd-gfx/dri-devel November archives, the drm/amd work-items
+tracker (51 issues updated since 11-16; comments read for the on-target ones),
+CachyOS `7.3/*` and `7.4/*`, sirlucjan, linux-tkg, xanmod, salkim
+`salkim-7.3`/`salkim-7.4`, firelzrd lru_cast/NAP and pixelcluster. Phoronix
+was checked through 11-18. **`agd5f-linux`/`amd-staging-drm-next` are
+unrefreshed**: their fetch failed again (exit 128) and the clones remain at
+11-09.
+
+### Adopted — amd-pstate v2 correctness series (`1239`–`1243`)
+
+Mario Limonciello posted a v2 of seven independent fixes on 11-18
+(`<20261117-superm1-linux-fabc6bcb-984e-4ba7-bb57-02cc3af08fa7-v2-0-2a0048f563c7@amd.com>`);
+all six driver-side fixes apply to `v7.3`. Parts 1–4 and 6 are carried; 5 and 7
+are UT-only or cosmetic (see the rejections).
+
+| Patch | Subject | Why |
+|---|---|---|
+| `1239` | Fix NULL dereference in `amd_prefcore_param()` | `amd_prefcore` on the cmdline without a value dereferenced a NULL string during early boot. `Fixes: f3a052391822`. |
+| `1240` | Fix EPP extraction in `shmem_get_epp()` | The bits 31:24 mask was applied to the unshifted 8-bit value, so shared-memory CPPC always returned 0 and the firmware default EPP was lost. `Fixes: 555bbe67a622`. |
+| `1241` | Fix unit mismatch in `amd_pstate_init_freq()` | The quirk `lowest_freq` (MHz) was passed to `freq_to_perf()` beside a kHz `nominal_freq`, yielding `lowest_perf = 1`. `Fixes: 009d1c29a451`. |
+| `1242` | Require exact mode string match | `get_mode_idx_from_str()` accepted any prefix, so `undefi` was silently accepted. `Fixes: abd61c08ef34`. |
+| `1243` | Snapshot policy limits in `amd_pstate_update_min_max_limit()` | The function can run from the scheduler fast path without `policy->rwsem`; repeated `policy->min`/`max` reads could cache a frequency that disagrees with the programmed perf. Reads are snapshotted once. **Ported**: `v7.3` lacks the 7.4 `max_freq` branch, so the hunk was regenerated against this base; the added lines are the author's semantics. `Fixes: 009d1c29a451`. |
+
+### Adopted — I/O, scheduler, x86 and MM fixes
+
+| Patch | Subject | Source and why |
+|---|---|---|
+| `2073` | `io_uring/kbuf: initialize arg->out_len from arg->max_len` | Siddharth Chintamaneni, `b7322810d187`, `Fixes: 35c8711c8fc4`. The legacy provided-buffer path left `out_len` at 0, so `io_provided_buffers_select()` ignored the user's `sqe->len` limit and selected the full buffer. |
+| `2074` | `io_uring/rsrc: keep the old file when a file update fails` | Cheng Yongkang, `e5a346e4309d`, `Fixes: c3a31e605620`, `Cc: stable`. The slot was reset before `fget()`; a failed update left the old file gone and later requests saw `-EBADF`. |
+| `2075` | `io_uring/timeout: don't rearm a multishot timeout on cancel` | Cheng Yongkang, `97d4a585db2b`, `Fixes: ea97f6c8558e`. The cancel path still posted `IORING_CQE_F_MORE` and rearmed; with a zero interval it could delay ring teardown indefinitely. |
+| `2078` | `r8169: fix RTNL deadlock in runtime suspend` | Stefano Munari, `<20261118000631.17771-1-stefanomunari.sm@gmail.com>`. The runtime-suspend callback takes RTNL while the RTNL-held close/ethtool paths call `pm_runtime_get_sync()`; opposite order deadlocks. This is the RTL8125B's driver. |
+| `2426` | `sched: Lift cgroup update locking to core to prevent CFS/SCX divergence` | Michal Blaszczyk, tip `342fe98c3431`, `Fixes: 819513666966`, `Reviewed-by: Andrea Righi`, `Acked-by: Tejun Heo`. CFS updates held `shares_mutex` but released it before `scx_group_set_weight()`, so concurrent cgroup writes could leave CFS, `tg->scx.weight` and the BPF scheduler on different values. **Ported**: `v7.3` uses explicit `mutex_lock`/`mutex_unlock` in `sched_group_set_idle()`; the hunk was regenerated for that shape. |
+| `2427` | `sched_ext: Don't route tasks to SCX before __scx_enabled is fully patched` | Kuba Piecuch, `for-7.4-fixes`, `Fixes: f0e1a0643a59`, `Cc: stable`. `static_branch_enable()` patches jump labels in address order; a concurrent fork/setscheduler could move a task to `ext_sched_class` while `__schedule()` still skipped it, warning in `put_prev_task_scx()`. Gate on `scx_task_switch_enabled`. |
+| `2508` | `x86/mm: Ensure write visibility during LDT installation` | Dave Hansen, `0dc2a4dac3d0`, `Cc: stable`, `Acked-by: Linus Torvalds`, `Acked-by: Peter Zijlstra`. The LDT-installing CPU wrote `mm->context.ldt` before reading `mm_cpumask()` with no ordering; a new mm user could miss the new LDT. |
+| `2509` | `x86/mce/amd: Don't poll unpopulated SMCA banks` | Zak Brighton Knight, `<20261117003700.4155635-1-zakbrightonknight@gmail.com>`, `Reviewed-by: Yazen Ghannam`, `Cc: stable`. Unused SMCA banks can return `MCi_STATUS` with the Valid bit set; their `ctl` was still polled, logging bogus errors. Clear it during SMCA init. |
+| `2812` | `mm: memcontrol: don't lose track of exiting OOM victims` | Chris Down, `fd8f3c026fb1`, `Fixes: a72f73c4dd9b`, `Cc: stable`. `css_task_iter` skips exiting tasks before `exit_mm()`, so an OOM victim could vanish from the memcg scan while still holding its memory, causing a second unnecessary kill (and a whole `memory.oom.group` workload kill). |
+| `1199` | `drm/amd/display: Keep FreeSync flip timing across plane resets` | Davey Hughes, agd5f `67a282e9ceb7`, `Fixes: 180db303ff46`, `Cc: stable`, `Reviewed-by: Harry Wentland`. A plane reset zeroes the DC plane's flip timing; `mod_freesync_handle_preflip()` then uses the raw 32-bit microsecond clock as the last render time, engaging BTR (or locking to max refresh) after every color-management commit. Copy the timing from the old plane when the plane stays on the same CRTC. |
+| `1355` | `drm/amdgpu: don't take a per VM kernel BO for a page table` | Jesse Zhang, agd5f `25f531acfce9`, v2 per Christian König. `amdgpu_vm_bo_lock_lists()` treated the per-render-node CWSR TMA BO as a page table; after a VRAM-losing reset it entered the page-table update list and `amdgpu_vm_update_pdes()` warned (`amdgpu_vm_pt.c:671`) and every submit failed with `-EINVAL`. Mark PD/PT BOs explicitly instead of keying on `ttm_bo_type_kernel`. This is the exact navi48 reset-then-submit failure. |
+
+### Updated — CAST (`2102`) v0.2.10 → v0.2.11
+
+Masahito Suzuki released v0.2.11 on 2026-11-18 (`lru_cast` `fe915da`,
+`patches/0001-7.3-rc7-lru_cast-v0.2.11.patch`). The functional delta is two
+changes in `policy/balance.c` and one in `compat/kernel.h`: anon swapped to
+zram/zswap is no longer counted as anon memory in the pressure curves (its
+refault is already a weighed miss; counting it again pressed anon below the
+chosen split), and `lru_cast_page_memcg_is()` returns true when `CONFIG_MEMCG`
+is off. The `mm/filemap.c` and `mm/rmap.c` changes (add `linux/mm_inline.h`,
+require `pte_present()` in the rmap look-around) are part of the same release.
+The rc copy is the author's 7.3 patch, byte-identical. The preview copy is the
+author's 7.4-rc3 content adapted to `next-20261117`; the previous local
+7.4-rc1 port was the base, and the four changed regions were transplanted and
+verified against the clean snapshot.
+
+### Rejected or deferred, with reasons
+
+- **PRT explicit-sync v2 (Natalie Vock, 10 patches, `20261117-prt-explicit-sync-v2-0-bb3851cb6a0c@pixelcluster.dev`).** Generic amdgpu GPUVM work
+  for sparse-binding stutter, and it **applies cleanly to `next-20261117`**,
+  but it is a feature series: new `AMDGPU_GEM_VA2` UAPI, driver minor bump, no
+  `Reviewed-by`/`Acked-by`, Dave Airlie asks for `VM_BIND` naming, and the
+  Sashiko reviewer filed High-severity findings on the rollback lists,
+  syncobj error paths and runtime PM. Do not carry a new UAPI while review is
+  open. Revisit at v3.
+- **`blk-flush: fix a possible deadlock in the nvme timeout path` v4** (Ye Bin,
+  11-17). Hunk 2 expects the newer `if (error != BLK_STS_OK)` guard in
+  `flush_end_io()`; `v7.3` still assigns unconditionally. Portable only by
+  rewriting that branch; deferred rather than hand-porting a refcount change.
+- **`cpufreq: CPPC: Enable boost by default` v4** (Pengjie Zhang, 11-18). A
+  policy change, not a correctness fix; it changes the default power/boost
+  behaviour on this machine. Not carried.
+- **amd-pstate v2 parts 5/7 and 7/7.** Part 5 is `amd-pstate-ut` only and
+  `CONFIG_X86_AMD_PSTATE_UT` is not set. Part 7's driver change is the EPP
+  alias-name display; its UT hunk is inert here. Both are cosmetic.
+- **io_uring drain series (Zhiqi Zhang, 2 patches, 11-17).** The mirror holds
+  the cover and 2/2 but not 1/2; carrying half a state-lifecycle fix is worse
+  than none. Revisit when the full series is archived.
+- **Other agd5f-only fixes from 11-17.** `307da04f9625` (cleared PDE/PTE
+  flags), `e74f54c83950` (vblank counter in IRQ during reset),
+  `f7053847051c` (SPM VMID ring parameter), `c15be1f36de0` (VRR vblank
+  reference), `ae60ec4dcfc4`/`bedad38a7ddf` (FreeSync above 255 Hz) apply in
+  neither direction to `v7.3`, and only `67a282e9ceb7`/`25f531acfce9` were
+  takeable. `2fa617236a00` (HDMI RGB range) touches only the DP-signal branch
+  and is inert on this HDMI-only box. `62d67d118592` reverts an SPM commit
+  that is not carried.
+- **Tracker `#5339` (RA24 little-endian on RDNA4) — verdict changed.** A public
+  fix now exists: Harry Wentland's `2d89ba959b9342f0b01713664978518285b04e5a`
+  plus the DC series (`[31/33] drm/amd/display: Fix DCE crossbar for RGBA8888
+  surface format`, patchwork 770173). It supersedes our `1183`, which takes the
+  opposite approach (drop RGBA8888 from the plane format lists). **Removing
+  `1183` needs explicit approval**; the public series is not in any tree yet.
+- **Tracker `#6154` (RX 9070 XT, HDMI 4K120, 7.4-rc3: blinking, then PCIe
+  device loss/SMU hang), `#6156` (same CPU/GPU, `gfx_0.0.0` ring timeout/MES
+  hang), `#6155` (GFX pinned at 100%), `#6151` (RDNA4 DDC/I2C EDID), `#6141`
+  (post-reset VRAM not cleared), `#5949` (HDMI audio 0x28 underruns, GFXOFF
+  implicated).** New on-target reports with no adoptable patch; tracked for the
+  next sweep. `#6154` is the closest match to this machine's display path and
+  overlaps the carried FRL block `1190`–`1198`.
+- **PRT v2's `mm/filemap.c`/rmap observations do not apply to the rc** — they
+  are part of the CAST release, not the PRT series.
+- **`1183` v2 (drop RGBA8888) test-expectation fix.** The newer posting changes
+  four KUNIT expected counts (14→13, 20→19, 9→8, 14→13). Both packages have
+  `CONFIG_KUNIT` unset, so the test is never built; the 7.3 copy also needs a
+  one-hunk rebase because the four cases live in two functions there. Deferred
+  until KUNIT is enabled or the series is rebased.
+
+### Upstream state and reverts
+
+No revert in `torvalds`, `linux-next`, `drm-next` or `drm-misc` since
+2026-11-01 targets carried work. The range's reverts are ath10k, EDAC/i5000,
+`mm/khugepaged` (a definition revert) and `lib/sort.c`; the DCN32/1 DMUB revert
+remains off-target. `1354` is itself the non-MI revert of `fe5966d4fdcb`.
+Linux 7.3.5 is the current 7.3 stable (7.3.1–7.3.5 exist); this package
+deliberately stays on the 7.3.0 base and backports selected fixes, as before.
+CachyOS `7.3/base` moved to `cachyos-7.3.5-1`; sirlucjan has not moved since
+2026-10-20. CAST is at v0.2.11; NAP is still v0.6.6; salkim's branches were
+force-rebased on 11-17 without content changes to `1353`/`9240`.
+
+### Version sweep
+
+Carried subjects were matched against every lore mirror since 2026-10-15:
+18 logical subjects have higher-version postings. The ones with a real content
+delta are handled above or deferred: `1190`/`1193` v2 (FRL), `2068`/`2069` v3
+(elevator), `1330` v2, `2803` v2, `1179`/`1183` v2, `2806` v2, `2028` v2,
+`1349` v2, `2423`/`2424` v2, `2044` v8, `1354` v2, `1198` v2 and `2056` v4.
+The remainder are resends or already-carried content. The detailed comparison
+found only one other real delta: **`1183` v2** changes four KUNIT expected
+counts (14→13, 20→19, 9→8, 14→13). It is test-only and `CONFIG_KUNIT` is
+unset, so it is deferred. `2423` v2 removes a comment, `2044` v8 changes a
+`goto` to the identical `return 0`, `1198` v2 adds a KUNIT file, and `1190` v2
+drops the 7.3 linkage hunks because 7.4 made the symbol non-static; all are
+non-functional for this base.
+
+### Series state
+
+**398 patches.** `audit_series.py`: **398/398** on `v7.3`. The preview lists
+**184** and applies **182** on `next-20261117`; the two skips are `1317`
+(context drift, inert on DCN 4.0.1) and `2044` (absorbed by the base). The
+preview's `1243` is the author's unported 7.4 patch; the rc copy is the port
+described above.

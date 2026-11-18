@@ -1,0 +1,42 @@
+From 20261117-superm1-linux-fabc6bcb-984e-4ba7-bb57-02cc3af08fa7-v2-4-2a0048f563c7@amd.com Mon Sep 17 00:00:00 2001
+From: Mario Limonciello <mario.limonciello@amd.com>
+Date: Tue, 17 Nov 2026 21:27:50 -0600
+Subject: [PATCH v2 4/7] cpufreq: amd-pstate: Require exact mode string match
+
+get_mode_idx_from_str() compares with strncmp() bounded by the caller's
+input length, so any prefix of a mode name matches. Writing a 6 or 7
+byte prefix such as "undefi", "passiv" or "disabl" to the status sysfs
+file passes the size check in amd_pstate_update_status() and resolves to
+a valid mode index. For "undefi" that is AMD_PSTATE_UNDEFINED, which has
+no entry in mode_state_machine, so the store is silently accepted with
+no state change instead of failing with -EINVAL.
+
+Require the input length to equal the mode string length as well as
+matching its contents.
+
+Fixes: abd61c08ef34 ("cpufreq: amd-pstate: add driver working mode switch support")
+Reported-by: Sashiko <sashiko-bot@kernel.org>
+Link: https://sashiko.dev/#/bug/linux-f75b8476-e226-4056-92fc-96a7b92126f5
+Signed-off-by: Mario Limonciello <mario.limonciello@amd.com>
+---
+ drivers/cpufreq/amd-pstate.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/amd-pstate.c b/drivers/cpufreq/amd-pstate.c
+index e73f30b6fb30f..574dfffc18f05 100644
+--- a/drivers/cpufreq/amd-pstate.c
++++ b/drivers/cpufreq/amd-pstate.c
+@@ -238,7 +238,8 @@ static inline int get_mode_idx_from_str(const char *str, size_t size)
+ 	int i;
+ 
+ 	for (i = 0; i < AMD_PSTATE_MAX; i++) {
+-		if (!strncmp(str, amd_pstate_mode_string[i], size))
++		if (size == strlen(amd_pstate_mode_string[i]) &&
++		    !strncmp(str, amd_pstate_mode_string[i], size))
+ 			return i;
+ 	}
+ 	return -EINVAL;
+
+-- 
+2.43.0
+

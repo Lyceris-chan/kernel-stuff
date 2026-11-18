@@ -1,0 +1,39 @@
+From 20261117-superm1-linux-fabc6bcb-984e-4ba7-bb57-02cc3af08fa7-v2-1-2a0048f563c7@amd.com Mon Sep 17 00:00:00 2001
+From: Mario Limonciello <mario.limonciello@amd.com>
+Date: Tue, 17 Nov 2026 21:27:47 -0600
+Subject: [PATCH v2 1/7] cpufreq: amd-pstate: Fix NULL dereference in amd_prefcore_param()
+
+amd_prefcore_param() is registered with early_param() and passes its
+argument straight to strcmp(). When "amd_prefcore" is given on the kernel
+command line without a value, do_early_param() calls the handler with a
+NULL string, causing a NULL pointer dereference and a panic during early
+boot.
+
+Return -EINVAL for a NULL argument, as amd_pstate_param() already does.
+
+Fixes: f3a052391822 ("cpufreq: amd-pstate: Enable amd-pstate preferred core support")
+Reported-by: Sashiko <sashiko-bot@kernel.org>
+Link: https://sashiko.dev/#/bug/linux-fabc6bcb-984e-4ba7-bb57-02cc3af08fa7
+Signed-off-by: Mario Limonciello <mario.limonciello@amd.com>
+---
+ drivers/cpufreq/amd-pstate.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/cpufreq/amd-pstate.c b/drivers/cpufreq/amd-pstate.c
+index 4bedfbfc18b66..eedc5fcd9c542 100644
+--- a/drivers/cpufreq/amd-pstate.c
++++ b/drivers/cpufreq/amd-pstate.c
+@@ -2478,6 +2478,9 @@ static int __init amd_pstate_param(char *str)
+ 
+ static int __init amd_prefcore_param(char *str)
+ {
++	if (!str)
++		return -EINVAL;
++
+ 	if (!strcmp(str, "disable"))
+ 		amd_pstate_prefcore = false;
+ 
+
+-- 
+2.43.0
+

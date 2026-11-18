@@ -91,8 +91,8 @@ index fa60b7494c58..3d85c138e1c7 100644
 +++ b/net/core/sock.c
 @@ -3380,7 +3380,7 @@ int __sk_mem_raise_allocated(struct sock *sk, int size, int amt, int kind)
  		if (atomic_read(&sk->sk_rmem_alloc) < sk_get_rmem0(sk, prot))
- 			return 1;
- 
+ 			return SKB_NOT_DROPPED_YET;
+
 -	} else { /* SK_MEM_SEND */
 +	} else if (kind == SK_MEM_SEND) {
  		int wmem0 = sk_get_wmem0(sk, prot);
@@ -121,7 +121,7 @@ index 562752352afe..5cc2bfc8a90d 100644
 +	struct sock *sk;
 +};
 +
-+/* Keep the size argument to __sk_mem_raise_allocated() within int. */
++/* Keep the size argument to __sk_mem_raise_allocated_reason() within int. */
 +#define TCP_ZEROCOPY_MEM_CHUNK (INT_MAX >> PAGE_SHIFT)
 +
 +static void tcp_zc_mem_uncharge(struct sock *sk, unsigned long nr_pages)
@@ -140,14 +140,14 @@ index 562752352afe..5cc2bfc8a90d 100644
 +{
 +	unsigned long charged = 0;
 +	unsigned int chunk;
-+	int ret;
++	enum skb_drop_reason reason;
 +
 +	while (nr_pages) {
 +		chunk = min_t(unsigned long, nr_pages,
 +			      TCP_ZEROCOPY_MEM_CHUNK);
-+		ret = __sk_mem_raise_allocated(sk, chunk << PAGE_SHIFT,
-+					       chunk, SK_MEM_RECV_ZEROCOPY);
-+		if (!ret) {
++		reason = __sk_mem_raise_allocated_reason(sk, chunk << PAGE_SHIFT,
++							 chunk, SK_MEM_RECV_ZEROCOPY);
++		if (reason != SKB_NOT_DROPPED_YET) {
 +			tcp_zc_mem_uncharge(sk, charged);
 +			return -ENOMEM;
 +		}

@@ -1,0 +1,100 @@
+From 20261118102453.1315267-1-jpiecuch@google.com Mon Sep 17 00:00:00 2001
+From: Kuba Piecuch <jpiecuch@google.com>
+Date: Wed, 18 Nov 2026 10:24:52 +0000
+Subject: [PATCH sched_ext/for-7.4-fixes] sched_ext: Don't route tasks to SCX before __scx_enabled is fully patched
+
+scx_root_enable_workfn() sets scx_switching_all and calls
+static_branch_enable(&__scx_enabled) before switching tasks, and
+task_should_scx() gates only on scx_enabled(). static_branch_enable()
+patches jump-label sites in address order rather than atomically:
+task_should_scx() may be patched before __schedule().
+
+If a concurrent fork or sched_setscheduler() runs in that window,
+task_should_scx() observes scx_enabled() and moves the running task
+from fair_sched_class to ext_sched_class, setting need_resched on the
+class degradation. The following __schedule() can still observe
+!scx_enabled() in next_active_class(), skip ext_sched_class, and pick
+rq->idle while the runnable SCX task is still rq->donor:
+
+  WARNING: kernel/sched/ext/ext.c:3840 at put_prev_task_scx+0x405/0x7a0
+  Sched_ext: enq_select_cpu (enabling+all), task: runnable_at=+0ms
+  Call Trace:
+   __schedule+0x5cc/0x1100
+   preempt_schedule_common+0x12/0x40
+   preempt_schedule_thunk+0x16/0x40
+   __sched_setscheduler+0x8d8/0x920
+
+Gate task_should_scx() on a scx_task_switch_enabled flag that is set with
+release semantics only after static_branch_enable(&__scx_enabled) has
+finished patching all call sites and scx_switching_all is updated, and
+cleared on disable alongside scx_switching_all.
+
+This bug was found and the patch was written with the help of an AI
+coding assistant.
+
+Fixes: f0e1a0643a59 ("sched_ext: Implement BPF extensible scheduler class")
+Cc: stable@vger.kernel.org # v6.12+
+Signed-off-by: Kuba Piecuch <jpiecuch@google.com>
+---
+ kernel/sched/ext/ext.c | 20 +++++++++++++++++---
+ 1 file changed, 17 insertions(+), 3 deletions(-)
+
+diff --git a/kernel/sched/ext/ext.c b/kernel/sched/ext/ext.c
+index 10de6bd865e8..e8c30a21e03e 100644
+--- a/kernel/sched/ext/ext.c
++++ b/kernel/sched/ext/ext.c
+@@ -134,6 +134,7 @@ DEFINE_PERCPU_RWSEM(scx_fork_rwsem);
+ static atomic_t scx_enable_state_var = ATOMIC_INIT(SCX_DISABLED);
+ static DEFINE_RAW_SPINLOCK(scx_bypass_lock);
+ static bool scx_init_task_enabled;
++static bool scx_task_switch_enabled;
+ static bool scx_switching_all;
+ DEFINE_STATIC_KEY_FALSE(__scx_switched_all);
+ static DEFINE_STATIC_KEY_FALSE(__scx_tid_to_task_enabled);
+@@ -6493,6 +6494,15 @@ bool task_should_scx(int policy)
+ 	if (!scx_enabled())
+ 		return false;
+ 
++	/*
++	 * static_branch_enable(&__scx_enabled) patches call sites one by one.
++	 * Wait until all sites are patched before routing tasks to SCX, so
++	 * __schedule() never sees !scx_enabled() when a task is on SCX. Pairs
++	 * with smp_store_release() in scx_root_enable_workfn().
++	 */
++	if (unlikely(!smp_load_acquire(&scx_task_switch_enabled)))
++		return false;
++
+ 	/* scx is taking over all SCHED_OTHER and SCHED_EXT tasks */
+ 	if (READ_ONCE(scx_switching_all))
+ 		return true;
+@@ -7568,6 +7578,7 @@ static void scx_root_disable(struct scx_sched *sch)
+ 
+ 	static_branch_disable(&__scx_switched_all);
+ 	WRITE_ONCE(scx_switching_all, false);
++	WRITE_ONCE(scx_task_switch_enabled, false);
+ 
+ 	/*
+ 	 * Shut down cgroup support before tasks so that the cgroup attach and
+@@ -8965,11 +8976,14 @@ static void scx_root_enable_workfn(struct kthread_work *work)
+ 	percpu_up_write(&scx_fork_rwsem);
+ 
+ 	/*
+-	 * All tasks are READY. It's safe to turn on scx_enabled() and switch
+-	 * all eligible tasks.
++	 * All tasks are READY. Finish patching all scx_enabled() sites before
++	 * opening task_should_scx() and switching eligible tasks.
+ 	 */
+-	WRITE_ONCE(scx_switching_all, !(ops->flags & SCX_OPS_SWITCH_PARTIAL));
++	WARN_ON_ONCE(scx_task_switch_enabled);
+ 	static_branch_enable(&__scx_enabled);
++	WRITE_ONCE(scx_switching_all, !(ops->flags & SCX_OPS_SWITCH_PARTIAL));
++	/* pairs with smp_load_acquire() in task_should_scx() */
++	smp_store_release(&scx_task_switch_enabled, true);
+ 
+ 	/*
+ 	 * We're fully committed and can't fail. The task READY -> ENABLED
+
+base-commit: 700a332c3fe33014bbd5ae852d71ba679fc29e0a
+-- 
+2.56.0.679.gc527c65306-goog
+

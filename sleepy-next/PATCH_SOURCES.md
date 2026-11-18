@@ -15,11 +15,11 @@ moved, so the full ledger is not duplicated here.
 
 | | |
 |---|---|
-| Snapshot | `next-20261116`, commit `749a4de37040` (tag object `38c8be16846f`) |
-| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261116.tar.gz` |
+| Snapshot | `next-20261117`, commit `7cfbf79c66c6` (tag object `5ddd72f9b85f`) |
+| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261117.tar.gz` |
 | Snapshot tree `Makefile` | `7.4.0-rc3` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.11.16-1-sleepy-next` |
-| Package | `linux-sleepy-next-2026.11.16-1` |
+| Kernel release | `2026.11.17-1-sleepy-next` |
+| Package | `linux-sleepy-next-2026.11.17-1` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -1999,3 +1999,55 @@ precedes them.
 **173 listed / 171 applied** on `next-20261116`; the two skips are `2044`
 (absorbed by `8e36c3f38cea`) and `1317` (context drift, inert on DCN 4.0.1).
 The rc series is **382/382** on `v7.3`.
+
+## Bump 2026-11-18 — `next-20261117`
+
+`next-20261117` (`7cfbf79c66c6`, tag object `5ddd72f9b85f`, tagged 2026-11-17
+23:43 UTC) is the newest linux-next tag; no `next-20261118` existed as of
+14:36 UTC on 11-18. It adds 1,758 non-merge commits over `next-20261116`. The
+preview release is **2026.11.17-1**.
+
+### Ported — `2036` to the new socket-memory API
+
+The snapshot renamed `__sk_mem_raise_allocated()` to
+`__sk_mem_raise_allocated_reason()`, which returns `enum skb_drop_reason` and
+uses `SKB_NOT_DROPPED_YET` for success. The first build failed at
+`net/ipv4/tcp.c:1935` with `call to undeclared function
+'__sk_mem_raise_allocated'`. The preview copy now calls the new helper and
+tests `reason != SKB_NOT_DROPPED_YET`; the `net/core/sock.c` hunk's context
+line was updated to `return SKB_NOT_DROPPED_YET;`, which is the base's return
+in that block. Both `git apply --check` and GNU `patch -F2` are clean. The rc
+copy keeps the old API because `v7.3` still has `__sk_mem_raise_allocated()`.
+
+### Updated — CAST (`2102`) v0.2.10 → v0.2.11
+
+The author's `0001-7.4-rc3-lru_cast-v0.2.11.patch` does not apply to
+`next-20261117` as produced (the snapshot's 7.5 MM changes drift
+`mmzone.h`, `swap_ops.h`, `page_io.c` and `vmscan.c`). The preview copy is the
+author's 7.4-rc3 **content** with those base adaptations kept from the
+previous local port; the four v0.2.11 regions (`mm/filemap.c` include,
+`mm/rmap.c` `pte_present()` guard, `compat/kernel.h` memcg-off branch,
+`policy/balance.c` zspages removal) were transplanted and verified against a
+clean `next-20261117` worktree. `LRU_CAST_VERSION` is `0.2.11`; the zspages
+helpers are gone.
+
+### New carries
+
+| Patch | Subject | Why preview |
+|---|---|---|
+| `1239`–`1243` | amd-pstate v2 correctness fixes | The driver is present and the fixes are not in the snapshot. `1243` is the author's unported 7.4 patch here; the rc copy is the v7.3 port. |
+| `2078` | `r8169: fix RTNL deadlock in runtime suspend` | Posted after the snapshot; the preview's RTL8125B uses the same driver. |
+| `2426` | `sched: Lift cgroup update locking to core` | Merged in tip `342fe98c3431` after the snapshot; `scx_cake` is live. Preview uses the same v7.3-style port as the rc. |
+| `2427` | `sched_ext: Don't route tasks to SCX before __scx_enabled is fully patched` | `for-7.4-fixes`, not in the snapshot; `scx_cake` uses this path. |
+| `2509` | `x86/mce/amd: Don't poll unpopulated SMCA banks` | Posted 11-17 after the snapshot; Zen 4 SMCA. |
+| `1199` | `drm/amd/display: Keep FreeSync flip timing across plane resets` | agd5f 11-17, not in the snapshot; VRR. Applies with fuzz 2 in the commit-planes hunk, and the inserted call lands on the same `dc_plane` block. |
+| `1355` | `drm/amdgpu: don't take a per VM kernel BO for a page table` | agd5f 11-17, not in the snapshot; exact navi48 reset-then-submit `-EINVAL` failure. |
+
+`2073`–`2075`, `2508` and `2812` are rc-only because the snapshot already
+contains them.
+
+### Series state
+
+**184 listed / 182 applied** on `next-20261117`; the two skips are `1317`
+(context drift, inert on DCN 4.0.1) and `2044` (absorbed by the base). The rc
+series is **398/398** on `v7.3`.

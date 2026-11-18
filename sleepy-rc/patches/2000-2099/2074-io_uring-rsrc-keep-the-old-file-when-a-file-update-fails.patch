@@ -1,0 +1,57 @@
+From e5a346e4309d720c47fe8331a00068608fad47dd Mon Sep 17 00:00:00 2001
+From: Cheng Yongkang <teel4res@gmail.com>
+Date: Sun, 15 Nov 2026 20:45:31 -0800
+Subject: [PATCH] io_uring/rsrc: keep the old file when a file update fails
+
+__io_sqe_files_update() resets the slot before it calls fget() on the
+new fd. If fget() fails, the fd is an io_uring file, or the node
+allocation fails, the update stops and reports that entry as not done,
+but the old file has already been removed. Later requests that use the
+slot fail with -EBADF, and if the old file was registered with a tag,
+its tag CQE is posted as if it had been removed on purpose.
+
+Reset the slot only after the new file has been checked and its node
+allocated, as io_install_fixed_file() does. Removal with fd == -1 still
+resets the slot right away.
+
+Fixes: c3a31e605620 ("io_uring: add support for IORING_REGISTER_FILES_UPDATE")
+Cc: stable@vger.kernel.org
+Signed-off-by: Cheng Yongkang <teel4res@gmail.com>
+Link: https://patch.msgid.link/20261116044531.281978-1-teel4res@gmail.com
+Signed-off-by: Jens Axboe <axboe@kernel.dk>
+---
+ io_uring/rsrc.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/io_uring/rsrc.c b/io_uring/rsrc.c
+index 8de5737d223e..0b811d3c9c0e 100644
+--- a/io_uring/rsrc.c
++++ b/io_uring/rsrc.c
+@@ -363,8 +363,6 @@ static int __io_sqe_files_update(struct io_ring_ctx *ctx,
+ 		if (i >= ctx->file_table.data.nr)
+ 			break;
+ 		i = array_index_nospec(i, ctx->file_table.data.nr);
+-		if (io_reset_rsrc_node(ctx, &ctx->file_table.data, i))
+-			io_file_bitmap_clear(&ctx->file_table, i);
+ 
+ 		if (fd != -1) {
+ 			struct file *file = fget(fd);
+@@ -388,11 +386,15 @@ static int __io_sqe_files_update(struct io_ring_ctx *ctx,
+ 				fput(file);
+ 				break;
+ 			}
++			if (io_reset_rsrc_node(ctx, &ctx->file_table.data, i))
++				io_file_bitmap_clear(&ctx->file_table, i);
+ 			ctx->file_table.data.nodes[i] = node;
+ 			if (tag)
+ 				node->tag = tag;
+ 			io_fixed_file_set(node, file);
+ 			io_file_bitmap_set(&ctx->file_table, i);
++		} else if (io_reset_rsrc_node(ctx, &ctx->file_table.data, i)) {
++			io_file_bitmap_clear(&ctx->file_table, i);
+ 		}
+ 	}
+ 	return done ? done : err;
+-- 
+2.56.1
+

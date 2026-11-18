@@ -1,0 +1,43 @@
+From 20261117-superm1-linux-fabc6bcb-984e-4ba7-bb57-02cc3af08fa7-v2-2-2a0048f563c7@amd.com Mon Sep 17 00:00:00 2001
+From: Mario Limonciello <mario.limonciello@amd.com>
+Date: Tue, 17 Nov 2026 21:27:48 -0600
+Subject: [PATCH v2 2/7] cpufreq/amd-pstate: Fix EPP extraction in shmem_get_epp()
+
+On shared-memory CPPC systems, cppc_get_epp_perf() returns the EPP value
+unshifted in bits 7:0. shmem_get_epp() applies
+FIELD_GET(AMD_CPPC_EPP_PERF_MASK, ...), which extracts bits 31:24, so it
+always returns 0.
+
+If firmware initializes the ENERGY_PERF register to a non-zero value,
+amd_pstate_epp_cpu_init() then caches 0 in cpudata->cppc_req_cached. A
+later shmem_set_epp() call with EPP 0 (performance) sees
+epp == epp_cached, skips the write, and leaves the hardware at the
+firmware-programmed EPP.
+
+Return the 8-bit register value directly.
+
+Fixes: 555bbe67a622 ("cpufreq/amd-pstate: Convert all perf values to u8")
+Reported-by: Sashiko <sashiko-bot@kernel.org>
+Link: https://sashiko.dev/#/bug/linux-bfeec24a-9e2b-4c78-bad6-a4f5dc0273ab
+Signed-off-by: Mario Limonciello <mario.limonciello@amd.com>
+---
+ drivers/cpufreq/amd-pstate.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/amd-pstate.c b/drivers/cpufreq/amd-pstate.c
+index eedc5fcd9c542..6136437562545 100644
+--- a/drivers/cpufreq/amd-pstate.c
++++ b/drivers/cpufreq/amd-pstate.c
+@@ -278,7 +278,7 @@ static int shmem_get_epp(struct amd_cpudata *cpudata)
+ 		return ret;
+ 	}
+ 
+-	return FIELD_GET(AMD_CPPC_EPP_PERF_MASK, epp);
++	return (u8)epp;
+ }
+ 
+ static int msr_update_perf(struct cpufreq_policy *policy, u8 min_perf,
+
+-- 
+2.43.0
+

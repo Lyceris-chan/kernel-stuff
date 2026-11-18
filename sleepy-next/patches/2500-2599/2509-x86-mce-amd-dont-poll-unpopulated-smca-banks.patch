@@ -1,0 +1,123 @@
+From 20261117003700.4155635-1-zakbrightonknight@gmail.com Mon Sep 17 00:00:00 2001
+From: Zak Brighton Knight <zakbrightonknight@gmail.com>
+Date: Tue, 17 Nov 2026 00:37:00 +0000
+Subject: [PATCH v2] x86/mce/amd: Don't poll unpopulated SMCA banks
+
+By default, the MCE init code will attempt to set MCi_CTL for all MCA
+banks on a CPU. This includes unused MCA banks which are read-as-zero
+(RAZ) and writes-ignored (WI). The init code will check for this by
+reading back the MCi_CTL register. If no bits are set, then the bank is
+marked as "not initialized".
+
+However, "not initialized" only affects the MCE sysfs interface and
+later writes to MCi_CTL. The bank's "ctl" value is still set, and this
+is checked in the MCE polling functions.
+
+Normally this is benign, since an unused bank would return '0' for
+MCi_STATUS. But in some cases, the MCi_STATUS register will have a value
+with the "Valid" bit set. And this results in logging bogus errors.
+They're determined to be bogus based on the combination of status bits
+set. Also, they are logged from MCA banks that have an MCA_IPID value of
+'0', i.e. reserved/unused.
+
+Clear a bank's "ctl" value during SMCA init for unused banks. This will
+save an unnecessary MSR read during normal operation, and it will avoid
+logging bogus error values that may be present on some systems.
+
+Signed-off-by: Zak Brighton Knight <zakbrightonknight@gmail.com>
+Reviewed-by: Yazen Ghannam <yazen.ghannam@amd.com>
+Cc: stable@vger.kernel.org
+---
+v2:
+- Changed commit message based on feedback
+- Shorten the code comment to Yazen's wording.
+- Move the background and the test results below the cut.
+- Add Yazen's Reviewed-by.
+- Rebase on today's tip master. The code itself is the same as in v1.
+
+v1: https://lore.kernel.org/all/20261107111211.578991-1-zakbrightonknight@gmail.com/
+
+Thanks to Yazen for the review and the new commit message.
+
+The background from v1. On a Ryzen 9 5900X (family 19h model 21h) the
+kernel logs a bogus "System Fatal error" every week or two. It always
+comes from CPU 1 and from a bank that CPU doesn't have.
+
+  mce: [Hardware Error]: Machine check events logged
+  [Hardware Error]: System Fatal error.
+  [Hardware Error]: CPU:1 (19:21:2) MC14_STATUS[Over|UE|MiscV|AddrV|PCC|SyndV|UECC|Deferred|Poison|Scrub]: 0xffffffff8b416928
+  [Hardware Error]: Error Addr: 0x0000000000000000
+  [Hardware Error]: IPID: 0x0000000000000000, Syndrome: 0x0000000000000000
+  [Hardware Error]: Bank 14 is reserved.
+  [Hardware Error]: cache level: RESV, tx: GEN
+
+Only CPU 0 has the shared banks like L3, UMC and PSP. On the other CPUs
+banks 4 and 7-27 are unused. On CPU 1 their MCA_STATUS and MCA_DESTAT
+now and then return a non-zero value. The values look like memory
+contents rather than error status. They include page table entries,
+instruction bytes and kernel pointers. If bit 63 happens to be set the
+value gets logged. This machine logged 39 of them between July 2025 and
+October 2026. Owners of other Zen3 desktop parts (5800X, 5800X3D and
+5950X) report the same thing, also always from CPU 1. Commit
+0422b07bc4c2 ("x86/mce/amd: Filter bogus hardware errors on Zen3
+clients") filters a related signature but only on Cezanne A0.
+
+The junk can reach more than the log. On 24 Oct 2025 one of these
+records came out as a deferred error with AddrV set. The kernel then
+tried to take page 0 out of use.
+
+  Memory failure: 0x0: unhandlable page.
+  Memory failure: 0x0: recovery action for get hwpoison page: Ignored
+  [Hardware Error]: Deferred error, no action required.
+  [Hardware Error]: CPU:1 (19:21:2) MC9_STATUS[-|-|-|AddrV|-|-|UECC|Deferred|Poison|-]: 0x84453c75c085c589
+  [Hardware Error]: Error Addr: 0x0000000000000000
+  [Hardware Error]: IPID: 0x0000000000000000
+  [Hardware Error]: Bank 9 is reserved.
+
+It did no harm only because the address read as zero.
+
+The testing is the same as for v1 because the code hasn't changed. With
+check_interval set to 1 second, stock 7.2.11 logged 34 bogus records in
+22 hours. The same change on 7.2.13 logged none in 8 hours 10 minutes,
+where about 12.5 were expected. Reading the unused banks directly
+through /dev/cpu/*/msr shows that CPU 1 still returns junk under the
+patch. So the clean run is down to the patch. Updating the BIOS to 1.D3
+doesn't fix it. The full test notes and links to the other reports are
+in v1. This version builds without warnings with W=1 on tip master.
+
+There is no Fixes: tag. Every bank up to MCG_CAP[Count] has been
+polled since long before SMCA. The v1 notes list the two closest
+commits.
+
+mce_no_way_out() reads every bank whatever its ctl. So junk there
+during a real #MC on CPU 1 could turn it into a panic. CPU 1 here still
+returns junk from these banks about once every few million reads. I can
+test a change there if that helps.
+
+Claude Code (Anthropic) did the log analysis and wrote the code change,
+the v1 changelog and the test scripts. I ran the test kernels and the
+probe on this machine.
+
+ arch/x86/kernel/cpu/mce/amd.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/x86/kernel/cpu/mce/amd.c b/arch/x86/kernel/cpu/mce/amd.c
+index 1cc20b855b7e..9e6fe5798181 100644
+--- a/arch/x86/kernel/cpu/mce/amd.c
++++ b/arch/x86/kernel/cpu/mce/amd.c
+@@ -345,6 +345,10 @@ static void smca_configure(unsigned int bank, unsigned int cpu)
+ 	hwid_mcatype = HWID_MCATYPE(val.h & MCI_IPID_HWID,
+ 				    (val.h & MCI_IPID_MCATYPE) >> 16);
+ 
++	/* Skip init for unused banks */
++	if (!hwid_mcatype)
++		this_cpu_ptr(mce_banks_array)[bank].ctl = 0;
++
+ 	for (i = 0; i < ARRAY_SIZE(smca_hwid_mcatypes); i++) {
+ 		s_hwid = &smca_hwid_mcatypes[i];
+ 
+
+base-commit: be3c65835ade4d487ccbeb08c827662db09ee7e2
+-- 
+2.56.0
+

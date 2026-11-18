@@ -1,0 +1,50 @@
+From 20261117-superm1-linux-fabc6bcb-984e-4ba7-bb57-02cc3af08fa7-v2-3-2a0048f563c7@amd.com Mon Sep 17 00:00:00 2001
+From: Mario Limonciello <mario.limonciello@amd.com>
+Date: Tue, 17 Nov 2026 21:27:49 -0600
+Subject: [PATCH v2 3/7] cpufreq/amd-pstate: Fix unit mismatch in amd_pstate_init_freq()
+
+When cpufreq quirks are present, amd_pstate_init_freq() loads
+quirks->lowest_freq in MHz and passes it to freq_to_perf() together with
+nominal_freq, which has already been converted to kHz. The conversion of
+min_freq to kHz only happens after the call.
+
+freq_to_perf() divides the requested frequency by nominal_freq, so the
+off-by-1000 mismatch yields a near-zero value that gets clamped up to 1
+and overwrites perf.lowest_perf. This defeats the purpose of the lowest
+frequency quirk and exposes an invalid minimum to the cpufreq core.
+
+Convert min_freq to kHz before calling freq_to_perf() in the quirk path,
+and do the same for the non-quirk path so both end up in kHz.
+
+Fixes: 009d1c29a451 ("cpufreq/amd-pstate: Move perf values into a union")
+Reported-by: Sashiko <sashiko-bot@kernel.org>
+Link: https://sashiko.dev/#/bug/linux-515ed05d-eed1-45b5-82cd-41b86ca2ee88
+Signed-off-by: Mario Limonciello <mario.limonciello@amd.com>
+---
+ drivers/cpufreq/amd-pstate.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/cpufreq/amd-pstate.c b/drivers/cpufreq/amd-pstate.c
+index 6136437562545..e73f30b6fb30f 100644
+--- a/drivers/cpufreq/amd-pstate.c
++++ b/drivers/cpufreq/amd-pstate.c
+@@ -1057,13 +1057,11 @@ static int amd_pstate_init_freq(struct amd_cpudata *cpudata)
+ 	nominal_freq *= 1000;
+ 
+ 	if (quirks && quirks->lowest_freq) {
+-		min_freq = quirks->lowest_freq;
++		min_freq = quirks->lowest_freq * 1000;
+ 		perf.lowest_perf = freq_to_perf(perf, nominal_freq, min_freq);
+ 		WRITE_ONCE(cpudata->perf, perf);
+ 	} else
+-		min_freq = cppc_perf.lowest_freq;
+-
+-	min_freq *= 1000;
++		min_freq = cppc_perf.lowest_freq * 1000;
+ 
+ 	WRITE_ONCE(cpudata->nominal_freq, nominal_freq);
+ 
+
+-- 
+2.43.0
+

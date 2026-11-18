@@ -1,0 +1,72 @@
+From 20261117-superm1-linux-fabc6bcb-984e-4ba7-bb57-02cc3af08fa7-v2-6-2a0048f563c7@amd.com Mon Sep 17 00:00:00 2001
+From: Mario Limonciello <mario.limonciello@amd.com>
+Date: Tue, 17 Nov 2026 21:27:52 -0600
+Subject: [PATCH v2 6/7] cpufreq/amd-pstate: Snapshot policy limits in amd_pstate_update_min_max_limit()
+
+amd_pstate_update_min_max_limit() reads policy->max and policy->min
+several times. It can run from the scheduler fast path without
+policy->rwsem held, so cpufreq_set_policy() can update the limits midway
+through the function.
+
+The perf limits can then be computed from the old policy->max while
+cpudata->max_limit_freq caches the new one. The cached value then matches
+the policy, so later limit updates are skipped even though the perf
+values programmed are stale, decoupling the hardware state from the user
+policy.
+
+Read policy->min and policy->max once into locals with READ_ONCE() and
+use them for all computations and cached values, including the
+min_limit_freq cap.
+
+Fixes: 009d1c29a451 ("cpufreq/amd-pstate: Move perf values into a union")
+Reported-by: Sashiko <sashiko-bot@kernel.org>
+Link: https://sashiko.dev/#/bug/linux-f43c6bc5-cbcc-4959-af2b-f4e5afa1e3a3
+Signed-off-by: Mario Limonciello <mario.limonciello@amd.com>
+---
+ drivers/cpufreq/amd-pstate.c | 18 ++++++++++++------
+ 1 file changed, 12 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/cpufreq/amd-pstate.c b/drivers/cpufreq/amd-pstate.c
+index 574dfffc18f05..0acb545a5f4fa 100644
+--- a/drivers/cpufreq/amd-pstate.c
++++ b/drivers/cpufreq/amd-pstate.c
+@@ -738,12 +738,18 @@ static void amd_pstate_update_min_max_limit(struct cpufreq_policy *policy)
+ {
+ 	struct amd_cpudata *cpudata = policy->driver_data;
+ 	union perf_cached perf = READ_ONCE(cpudata->perf);
++	/*
++	 * This can run without policy->rwsem held; snapshot the limits so
++	 * the programmed perf values and the cached frequencies agree.
++	 */
++	unsigned int policy_max = READ_ONCE(policy->max);
++	unsigned int policy_min = READ_ONCE(policy->min);
+ 
+-	if (policy->max >= READ_ONCE(cpudata->max_freq))
++	if (policy_max >= READ_ONCE(cpudata->max_freq))
+ 		perf.max_limit_perf = perf.highest_perf;
+ 	else
+-		perf.max_limit_perf = freq_to_perf(perf, cpudata->nominal_freq, policy->max);
+-	WRITE_ONCE(cpudata->max_limit_freq, policy->max);
++		perf.max_limit_perf = freq_to_perf(perf, cpudata->nominal_freq, policy_max);
++	WRITE_ONCE(cpudata->max_limit_freq, policy_max);
+ 
+ 	if (cpudata->policy == CPUFREQ_POLICY_PERFORMANCE) {
+ 		u8 min_limit_perf = perf.bios_min_perf ?: perf.nominal_perf;
+@@ -770,10 +776,10 @@ static void amd_pstate_update_min_max_limit(struct cpufreq_policy *policy)
+ 		min_limit_freq = perf_to_freq(perf, cpudata->nominal_freq, min_limit_perf);
+ 		perf.min_limit_perf = min_limit_perf;
+ 
+-		WRITE_ONCE(cpudata->min_limit_freq, min(min_limit_freq, cpudata->max_limit_freq));
++		WRITE_ONCE(cpudata->min_limit_freq, min(min_limit_freq, policy_max));
+ 	} else {
+-		perf.min_limit_perf = freq_to_perf(perf, cpudata->nominal_freq, policy->min);
+-		WRITE_ONCE(cpudata->min_limit_freq, policy->min);
++		perf.min_limit_perf = freq_to_perf(perf, cpudata->nominal_freq, policy_min);
++		WRITE_ONCE(cpudata->min_limit_freq, policy_min);
+ 	}
+ 
+ 	WRITE_ONCE(cpudata->perf, perf);
+
+-- 
+2.43.0
+

@@ -18,6 +18,81 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.11.17-1-sleepy-next]: 2026-11-18
+
+### Changed
+
+- **Snapshot `next-20261116` → `next-20261117`** (`7cfbf79c66c6`, tagged
+  2026-11-17 23:43 UTC; 1,758 non-merge commits). No `next-20261118` tag
+  existed when the bump was cut.
+- **CAST `2102` v0.2.10 → v0.2.11.** Anon swapped to zram/zswap is no longer
+  counted as anon memory in the pressure curves — its refault is already a
+  weighed miss, and counting it again pressed anon below the chosen split.
+  `lru_cast_page_memcg_is()` also returns true when `CONFIG_MEMCG` is off.
+  The preview copy is the author's 7.4-rc3 content adapted to this snapshot.
+- **`2036` ported to the new socket-memory API.** `next-20261117` renamed
+  `__sk_mem_raise_allocated()` to `__sk_mem_raise_allocated_reason()`; the
+  zero-copy receive charge now checks `reason != SKB_NOT_DROPPED_YET`.
+
+### Added
+
+- **`1239`–`1243`** — amd-pstate v2 correctness fixes: NULL `amd_prefcore`
+  cmdline value, `shmem_get_epp()` mask, `lowest_freq` unit mismatch, prefix
+  mode-string match, and the `update_min_max_limit()` limit snapshot.
+- **`2078`** — `r8169: fix RTNL deadlock in runtime suspend`.
+- **`2426`** — `sched: Lift cgroup update locking to core` (tip
+  `342fe98c3431`), preventing CFS/SCX cgroup-weight divergence; ported to the
+  v7.3 explicit-mutex shape.
+- **`2427`** — `sched_ext: Don't route tasks to SCX before __scx_enabled is
+  fully patched`.
+- **`2509`** — `x86/mce/amd: Don't poll unpopulated SMCA banks`.
+- **`1199`** — `drm/amd/display: Keep FreeSync flip timing across plane
+  resets`.
+- **`1355`** — `drm/amdgpu: don't take a per VM kernel BO for a page table`,
+  the navi48 reset-then-submit `-EINVAL` fix.
+
+The preview lists **184** patches and applies **182**; `1317` is inert context
+drift and `2044` is absorbed by the base. No reboot or install was performed
+after the build.
+
+## [7.3.0-31-sleepy-rc]: 2026-11-18
+
+### Added
+
+- **`1239`–`1243`** — the amd-pstate v2 correctness batch. The fixes cover a
+  NULL dereference when `amd_prefcore` is passed without a value, the
+  `shmem_get_epp()` bits-31:24 mask on an unshifted 8-bit value, the
+  `lowest_freq` MHz/kHz mismatch in `amd_pstate_init_freq()`, prefix matching
+  in the mode string, and a limit snapshot in
+  `amd_pstate_update_min_max_limit()`. `1243` is ported to `v7.3`'s simpler
+  `max_freq` branch.
+- **`2073`–`2075`** — three io_uring fixes: the legacy provided-buffer path
+  ignored `sqe->len`; a failed `IORING_REGISTER_FILES_UPDATE` dropped the old
+  file; a cancelled multishot timeout still rearmed.
+- **`2078`** — `r8169: fix RTNL deadlock in runtime suspend` for the RTL8125B.
+- **`2426`** — `sched: Lift cgroup update locking to core` (tip
+  `342fe98c3431`, `Acked-by: Tejun Heo`), closing the CFS/SCX cgroup-weight
+  serialization gap. Ported to the v7.3 explicit-mutex shape.
+- **`2427`** — `sched_ext: Don't route tasks to SCX before __scx_enabled is
+  fully patched` (`for-7.4-fixes`, `Cc: stable`).
+- **`2508`** — `x86/mm: Ensure write visibility during LDT installation`.
+- **`2509`** — `x86/mce/amd: Don't poll unpopulated SMCA banks` (Zen 4 SMCA).
+- **`2812`** — `mm: memcontrol: don't lose track of exiting OOM victims`.
+- **`1199`** — `drm/amd/display: Keep FreeSync flip timing across plane
+  resets` (VRR).
+- **`1355`** — `drm/amdgpu: don't take a per VM kernel BO for a page table`
+  (navi48 reset-then-submit `-EINVAL`).
+
+### Changed
+
+- **CAST `2102` v0.2.10 → v0.2.11** — the zspages accounting is removed from
+  the anon/file balance, and the memcg-off path is fixed. The rc copy is the
+  author's 7.3 patch, byte-identical.
+
+**398 patches** apply cleanly to `v7.3`. The 7.3.5 stable line exists; this
+package deliberately stays on the `7.3.0` base and backports selected fixes.
+No reboot or install was performed after the build.
+
 ## [7.3.0-30-sleepy-rc]: 2026-11-16
 
 ### Added
