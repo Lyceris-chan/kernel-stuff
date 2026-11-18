@@ -112,6 +112,7 @@ Run these in order. Copy the commands exactly — do not improvise.
    | `90xx` | agd5f staging + userq lifecycle backports |
    | `91xx` | Retry-fault handling v4 (agd5f staging, 9100–9110) |
    | `92xx` | salkim userq lifecycle series — `sleepy-next/` preview only; its VA-batch block was replaced by `09xx` PRT on 2026-11-18 |
+   | `93xx` | Local fixups to carried series (PRT v2 Sashiko review fixes) — `sleepy-next/` preview only, applied last; opened 2026-11-18 |
 
    A new category gets a new range; add it to this table when you create one.
    ```bash

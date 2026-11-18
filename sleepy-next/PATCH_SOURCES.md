@@ -2246,3 +2246,45 @@ unmap-sync patch (PRT owns that path here); `82255a55fc4b`, `54e057e7902b`,
 `1ef3dc7c8d57`, `f3fdd23a079c`, `6ca88a0094aa`, `29831c84c558`,
 `d9608d20cfb0` and `ef3bd4ad390e` build on the removed batch/private-gateway
 design and are not applicable.
+
+## 2026-11-18 (fourth pass) — Sashiko review of PRT v2; local fixups `9300`–`9301`
+
+Sashiko reviewed the carried PRT explicit-sync v2 series (`0900`–`0909`;
+7 of the 10 patches) on 2026-11-17: **1 Critical, 23 High, 12 Medium and
+5 Low** findings, unrebutted at the time of this pass. The only human reply
+was Dave Airlie's request to name the new ioctl VM_BIND rather than
+`AMDGPU_GEM_VA2`.
+
+Two preview-only fixups now sit in the new `9300`–`9399` range, applied
+after the whole series. Release **`2026.11.18-2`** (pkgrel 2, the same
+`next-20261118` base):
+
+- **`9300`** — `amdgpu_vm_update_ctx_rollback()` unlinks `ctx->cleared`
+  and frees the mappings on `ctx->new` (Critical from patch 08, High from
+  patch 06); an unmap of a mapping already staged for clearing moves it to
+  `ctx->deleted` (High, patch 05); `amdgpu_vm_bo_del()` unlinks a still-dirty
+  `update_link` before freeing the `bo_va` (High, patch 05);
+  `unmap_bo_from_gpuvm()` commits the context before clearing freed PTEs
+  (High, patches 04/08); `amdgpu_vm_bo_map()` walks every overlapping
+  mapping and rejects overlaps not covered by the ranges cleared in the
+  context (High, patch 08).
+- **`9301`** — `DRM_IOCTL_AMDGPU_GEM_VA2` uses the 56-byte
+  `drm_amdgpu_gem_va2` (High — it previously copied 8 bytes past the user
+  struct); VA2 unmaps pass the VA, not the flags (High); runtime PM is
+  acquired (High); the gobj and fence references are released on the error
+  paths (High); the output fence is initialized when `clear_freed()` fails
+  (High); `amdgpu_gem_add_input_fence()` returns the right error and drops
+  the fence on failure, and the legacy ioctl releases the context on that
+  path (High); the timeline handle array is freed on success (High).
+
+Still deferred, with reasons: the `clear_freed()` span clamp (patch 04 —
+needs the freed-mapping split reworked), the stale `vm->delayed_freed`
+overwrite (patch 02 — deferred-update semantics), the 32-bit PFN truncation
+(patch 03 — x86_64-only target), and the VA2 dirty-BO locking and
+`last_pt_update` merge (patch 09 — needs the lock set reworked). Carry these
+forward to the next PRT revision (v3).
+
+### Series state
+
+**178 listed / 171 applied** on `next-20261118`; the seven skips are
+unchanged. The rc remains **398/398** on `v7.3`.

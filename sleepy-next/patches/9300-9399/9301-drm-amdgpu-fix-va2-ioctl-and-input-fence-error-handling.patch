@@ -1,0 +1,146 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Sleepy <sleepy@localhost>
+Date: Wed, 18 Nov 2026 21:45:00 +0100
+Subject: [PATCH] drm/amdgpu: fix VA2 ioctl and input-fence error handling
+
+Sashiko's review of the new AMDGPU_GEM_VA2 ioctl found a set of error-path
+and bookkeeping bugs. Fix the mechanical ones:
+
+- The ioctl definition used struct drm_amdgpu_gem_va (64 bytes) instead of
+  the 56-byte drm_amdgpu_gem_va2, so drm_ioctl() copied eight bytes past the
+  user structure. Use the right type.
+- AMDGPU_VA_OP_UNMAP passed mappings[i].flags as the virtual address; pass
+  mappings[i].va.
+- Acquire runtime PM like the legacy GEM_VA ioctl does, so a non-delayed
+  update cannot touch the GPU while it is runtime-suspended.
+- Drop the gobj reference when drm_exec_lock_obj() fails with a
+  non-contention error, and release the pre-merge fence after
+  dma_fence_unwrap_merge().
+- Initialize the output fence when amdgpu_vm_clear_freed() fails instead of
+  passing an uninitialized pointer to the syncobj code.
+- amdgpu_gem_add_input_fence() returned PTR_ERR() of the wrong pointer and
+  leaked the fence when amdgpu_sync_fence() failed; the legacy ioctl also
+  leaked update_ctx.sync when adding an input fence failed. Release both.
+- amdgpu_gem_prepare_timeline_nodes() leaked the syncobj handle array on the
+  success path.
+
+Still deferred from the review: locking every dirty BO before
+amdgpu_vm_bo_update(), the unlocked amdgpu_vm_bo_find() walk, and merging
+bo_va->last_pt_update instead of overwriting it.
+
+Signed-off-by: Sleepy <sleepy@localhost>
+Assisted-by: Claude <noreply@anthropic.com>
+---
+drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c | 26 +++++++++++++++++++++-----
+ include/uapi/drm/amdgpu_drm.h           |  2 +-
+ 2 files changed, 22 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
+index 4a3e98ab82a4..11c4557373b1 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
+@@ -74,7 +74,7 @@ amdgpu_gem_add_input_fence(struct drm_file *filp,
+ 					      size_mul(sizeof(uint64_t), num_syncobj_handles));
+ 		if (IS_ERR(syncobj_points)) {
+ 			kfree(syncobj_handles);
+-			return PTR_ERR(syncobj_handles);
++			return PTR_ERR(syncobj_points);
+ 		}
+ 	} else {
+ 		syncobj_points = NULL;
+@@ -94,8 +94,10 @@ amdgpu_gem_add_input_fence(struct drm_file *filp,
+ 			goto free_memdup;
+ 
+ 		ret = amdgpu_sync_fence(&update_ctx->sync, fence, GFP_KERNEL);
+-		if (ret)
++		if (ret) {
++			dma_fence_put(fence);
+ 			goto free_memdup;
++		}
+ 
+ 		dma_fence_put(fence);
+ 	}
+@@ -174,6 +176,7 @@ static int amdgpu_gem_prepare_timeline_nodes(
+ 		}
+ 	}
+ 
++	kfree(syncobj_handles);
+ 	return 0;
+ 
+ err_free_sync:
+@@ -1099,8 +1102,10 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
+ 	r = amdgpu_gem_add_input_fence(filp, &update_ctx,
+ 				       args->input_fence_syncobj_handles, 0,
+ 				       args->num_syncobj_handles);
+-	if (r)
++	if (r) {
++		amdgpu_vm_update_ctx_fini(&update_ctx);
+ 		goto error_put_gobj;
++	}
+ 
+ 	drm_exec_init(&exec, DRM_EXEC_INTERRUPTIBLE_WAIT |
+ 		      DRM_EXEC_IGNORE_DUPLICATES, 0);
+@@ -1231,6 +1236,12 @@ int amdgpu_gem_va2_ioctl(struct drm_device *dev, void *data,
+ 	u32 i;
+ 	int r;
+ 
++	PM_RUNTIME_ACQUIRE_IF_ENABLED_AUTOSUSPEND(dev->dev, lock);
++
++	r = PM_RUNTIME_ACQUIRE_ERR(&lock);
++	if (r)
++		return r;
++
+ 	mappings = vmemdup_array_user(u64_to_user_ptr(args->mappings),
+ 				      args->num_mappings,
+ 				      sizeof(struct drm_amdgpu_gem_va_mapping));
+@@ -1317,8 +1328,11 @@ int amdgpu_gem_va2_ioctl(struct drm_device *dev, void *data,
+ 					amdgpu_vm_update_ctx_rollback(
+ 						&update_ctx);
+ 				drm_exec_retry_on_contention(&exec);
+-				if (unlikely(r))
++				if (unlikely(r)) {
++					/* exec does not own gobj on failure */
++					drm_gem_object_put(gobj);
+ 					goto out;
++				}
+ 			}
+ 
+ 			switch (mappings[i].operation) {
+@@ -1331,7 +1345,7 @@ int amdgpu_gem_va2_ioctl(struct drm_device *dev, void *data,
+ 				break;
+ 			case AMDGPU_VA_OP_UNMAP:
+ 				r = amdgpu_vm_bo_unmap(&update_ctx, bo_va,
+-						       mappings[i].flags);
++						       mappings[i].va);
+ 				break;
+ 
+ 			case AMDGPU_VA_OP_CLEAR:
+@@ -1377,6 +1391,7 @@ int amdgpu_gem_va2_ioctl(struct drm_device *dev, void *data,
+ 		if (r) {
+ 			drm_err(adev_to_drm(adev),
+ 				"Could not clear freed PT entries: %d\n", r);
++			fence = dma_fence_get_stub();
+ 			goto insert_fence;
+ 		}
+ 
+@@ -1413,6 +1428,7 @@ int amdgpu_gem_va2_ioctl(struct drm_device *dev, void *data,
+ 			dma_fence_wait(fence, false);
+ 			merged = dma_fence_get_stub();
+ 		}
++		dma_fence_put(fence);
+ 		fence = merged;
+ 
+ insert_fence:
+diff --git a/include/uapi/drm/amdgpu_drm.h b/include/uapi/drm/amdgpu_drm.h
+index c9e52bfa7d02..dfd37c195dda 100644
+--- a/include/uapi/drm/amdgpu_drm.h
++++ b/include/uapi/drm/amdgpu_drm.h
+@@ -84,7 +84,7 @@ extern "C" {
+ #define DRM_IOCTL_AMDGPU_GEM_LIST_HANDLES DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_LIST_HANDLES, struct drm_amdgpu_gem_list_handles)
+ #define DRM_IOCTL_AMDGPU_PROC_OPTIONS	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_PROC_OPTIONS, struct drm_amdgpu_proc_options)
+ #define DRM_IOCTL_AMDGPU_UALINK_HANDLE DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_UALINK_HANDLE, union drm_amdgpu_ualink_handle)
+-#define DRM_IOCTL_AMDGPU_GEM_VA2	DRM_IOW(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_VA2, struct drm_amdgpu_gem_va)
++#define DRM_IOCTL_AMDGPU_GEM_VA2	DRM_IOW(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_VA2, struct drm_amdgpu_gem_va2)
+ 
+ /**
+  * DOC: memory domains

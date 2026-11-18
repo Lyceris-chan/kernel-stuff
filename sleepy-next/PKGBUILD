@@ -203,7 +203,7 @@ _snapdate=${_srctag#next-}                                            # 20261118
 _snapver="${_snapdate:0:4}.${_snapdate:4:2}.${_snapdate:6:2}"
 pkgver=${_snapver}
 _tagrel=1
-pkgrel=1
+pkgrel=2
 # Build parallelism. Previously capped at 8 on a diagnosis that did not hold up.
 #
 # The cap was added after an rc4-7 build thrashed badly — 6 watchdog firings and
@@ -474,6 +474,8 @@ source=(
   "patches/9200-9299/9238-drm-amdgpu-take-userq-fence-references-before.patch"
   "patches/9200-9299/9240-drm-amdgpu-userq-handle-restore-allocation-failures.patch"
   "patches/9200-9299/9241-drm-amdgpu-enable-tlb-fences-on-first-userq-creation.patch"
+  "patches/9300-9399/9300-drm-amdgpu-fix-vm-update-context-rollback-and-bookkeeping.patch"
+  "patches/9300-9399/9301-drm-amdgpu-fix-va2-ioctl-and-input-fence-error-handling.patch"
   # 1008/1012/1013/1014/1017 (amdgpu TLB-invalidation rework) are excluded from the
   # preview package only: 1008 no longer applies to this snapshot while 1012/1013 do,
   # and 1012/1013 consume the tlb_inv_num_dw member and amdgpu_emit_tlb_inv() helper
@@ -1353,6 +1355,8 @@ b2sums=('c93e181e03ad821111f22608c13046f04e934fafff09c9eec9ae31bd917779169755f6b
         '521b40436f23a66f5b542d1cd420fb7b995abd2b239c3480709a56f910ba095691ddd36100a6360f7c35cf8c7a1d0f6915ab18f57bbb041779cf071a41bcdac0'
         '51385b27136adec6ff202f40bd1a3c9742038eb9ecd0e34c71c882ab23e4999f6ae02c92bd7d96f21e64b10e94a319eb7d8513eeeb5d3d121f9788313ea83052'
         'eadace55dc994c344f56f08ce093aea6fc9eb0d596948cc4ec58240e15c277d1198da5aa6ba4a581d5616609b94fbee6bb04ba4a23b1b932c1b6ffa71246bcaa'
+        '91b8608d154a50cb3cbc36297b7546bff87d1bcee11c1dc58460d6a674813968587d2fc219d9fa21f8c9c7f1e7e1d60b5cfe69f60bf447fe9466714a05c352db'
+        '87b4342c17f160ab5368704713a464033ea0eb79716d306da39c97f8f69d0bf740e5a4ffcd9bf24dba879119f91822b8cbdb31f9c6716579f9b0ade2a5745811'
         '9b95b584d6a85f5617bee5ce989018501ac631d3abe64e8380cfe9c37bc537ffb9e4ee87324a749179ca2ec5141fd3d2e18e9f76eb1c838697a79e2a76d46997')
 
 if [ "$_use_kernel_org_llvm" = "yes" ]; then

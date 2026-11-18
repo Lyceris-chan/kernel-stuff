@@ -1,0 +1,154 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Sleepy <sleepy@localhost>
+Date: Wed, 18 Nov 2026 21:45:00 +0100
+Subject: [PATCH] drm/amdgpu: fix VM update context rollback and bookkeeping
+
+Sashiko's review of the PRT explicit-sync v2 series found several defects in
+the new VM update context. Fix the ones that are local and unambiguous:
+
+- amdgpu_vm_update_ctx_rollback() left mappings staged on ctx->cleared
+  linked to a stack context that was about to disappear, and leaked every
+  mapping on ctx->new that had not been committed yet. Unlink the cleared
+  list and free the new mappings (Sashiko Critical, patch 08; High, patch
+  06).
+- amdgpu_vm_update_ctx_add_freed_mapping() skipped a mapping that was
+  already staged for clearing, so a later unmap in the same context left it
+  in vm->va and execute_replace() resurrected its gaps. Move it to the
+  deleted list instead (High, patch 05).
+- amdgpu_vm_bo_del() freed a bo_va that an enclosing update context still
+  held on its dirty list; unlink update_link first (High, patch 05).
+- unmap_bo_from_gpuvm() cleared freed PTEs without committing the context,
+  so the unmapped range never reached ctx->freed and its PTEs were left
+  stale. Commit before clearing (High, patches 04 and 08).
+- amdgpu_vm_bo_map() only checked the first overlapping mapping and missed
+  conflicts on later nodes; walk all of them. It also treated a partially
+  cleared mapping as fully free; reject any overlap that is not covered by
+  the ranges cleared in this context (High, patch 08).
+
+Still deferred from the review: the clear_freed() span clamp (patch 04), the
+stale vm->delayed_freed PTE overwrite (patch 02) and the 32-bit PFN
+truncation (patch 03).
+
+Signed-off-by: Sleepy <sleepy@localhost>
+Assisted-by: Claude <noreply@anthropic.com>
+---
+drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gpuvm.c |  3 ++
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c           | 60 +++++++++++++++++++-----
+ 2 files changed, 52 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gpuvm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gpuvm.c
+index 2492e72bc3f2..da0631234247 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gpuvm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gpuvm.c
+@@ -1301,6 +1301,9 @@ static int unmap_bo_from_gpuvm(struct kgd_mem *mem,
+ 	if (!amdgpu_vm_ready(vm))
+ 		goto out;
+ 
++	/* Move the unmapped range to ctx->freed before clearing its PTEs. */
++	amdgpu_vm_update_ctx_commit(&update_ctx);
++
+ 	ret = amdgpu_vm_clear_freed(&update_ctx, &bo_va->last_pt_update);
+ 
+ 	(void)amdgpu_sync_fence(sync, bo_va->last_pt_update, GFP_KERNEL);
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+index 372e03460e29..0df7974ac499 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+@@ -1868,8 +1868,14 @@ amdgpu_vm_update_ctx_add_freed_mapping(struct amdgpu_vm_update_ctx *ctx,
+ {
+ 	if (list_empty(&mapping->bo_va->update_link))
+ 		list_add(&mapping->bo_va->update_link, &ctx->dirty_bo_vas);
+-	if (list_empty(&mapping->pending_list))
+-		list_add(&mapping->pending_list, &ctx->deleted);
++	/*
++	 * A mapping already staged on ctx->cleared must be fully freed. Drop it
++	 * from that list first, otherwise execute_replace() would resurrect its
++	 * surviving gaps after the unmap.
++	 */
++	if (!list_empty(&mapping->pending_list))
++		list_del_init(&mapping->pending_list);
++	list_add(&mapping->pending_list, &ctx->deleted);
+ }
+ 
+ int amdgpu_vm_update_ctx_execute_replace(struct amdgpu_vm_update_ctx *ctx)
+@@ -2017,10 +2023,15 @@ void amdgpu_vm_update_ctx_rollback(struct amdgpu_vm_update_ctx *ctx)
+ 	struct interval_tree_node *node, *next_node;
+ 	struct amdgpu_bo_va *bo_va, *next_bo_va;
+ 
+-	list_for_each_entry_safe(mapping, next, &ctx->new, pending_list)
++	list_for_each_entry_safe(mapping, next, &ctx->new, pending_list) {
++		/* Not yet linked into vm->va; drop the only reference. */
+ 		list_del_init(&mapping->pending_list);
++		kfree(mapping);
++	}
+ 	list_for_each_entry_safe(mapping, next, &ctx->deleted, pending_list)
+ 		list_del_init(&mapping->pending_list);
++	list_for_each_entry_safe(mapping, next, &ctx->cleared, pending_list)
++		list_del_init(&mapping->pending_list);
+ 
+ 	list_for_each_entry_safe(bo_va, next_bo_va, &ctx->dirty_bo_vas,
+ 				 update_link)
+@@ -2372,14 +2383,31 @@ int amdgpu_vm_bo_map(struct amdgpu_vm_update_ctx *ctx,
+ 	saddr /= AMDGPU_GPU_PAGE_SIZE;
+ 	eaddr = saddr + (size - 1) / AMDGPU_GPU_PAGE_SIZE;
+ 
+-	tmp = amdgpu_vm_it_iter_first(&vm->va, saddr, eaddr);
+-	if (tmp && list_empty(&tmp->pending_list)) {
+-		/* bo and tmp overlap, invalid addr */
+-		dev_err(ctx->adev->dev,
+-			"bo %p va 0x%010Lx-0x%010Lx conflict with "
+-			"0x%010Lx-0x%010Lx\n", bo, saddr, eaddr,
+-			tmp->start, tmp->last + 1);
+-		return -EINVAL;
++	for (tmp = amdgpu_vm_it_iter_first(&vm->va, saddr, eaddr); tmp;
++	     tmp = amdgpu_vm_it_iter_next(tmp, saddr, eaddr)) {
++		uint64_t cur, last;
++
++		if (list_empty(&tmp->pending_list))
++			goto conflict;
++
++		/*
++		 * This mapping is being cleared in the current context. Only
++		 * the ranges explicitly cleared may be reused; any surviving
++		 * part of the mapping still conflicts.
++		 */
++		cur = max(saddr, tmp->start);
++		last = min(eaddr, tmp->last);
++		while (cur <= last) {
++			struct interval_tree_node *range;
++
++			range = interval_tree_iter_first(&ctx->cleared_ranges,
++							 cur, last);
++			if (!range || range->start > cur)
++				goto conflict;
++			if (range->last >= last)
++				break;
++			cur = range->last + 1;
++		}
+ 	}
+ 
+ 	mapping = kmalloc_obj(*mapping);
+@@ -2400,6 +2428,12 @@ int amdgpu_vm_bo_map(struct amdgpu_vm_update_ctx *ctx,
+ 	}
+ 
+ 	return 0;
++
++conflict:
++	dev_err(ctx->adev->dev,
++		"bo %p va 0x%010Lx-0x%010Lx conflict with 0x%010Lx-0x%010Lx\n",
++		bo, saddr, eaddr, tmp->start, tmp->last + 1);
++	return -EINVAL;
+ }
+ 
+ /**
+@@ -2658,6 +2692,10 @@ void amdgpu_vm_bo_del(struct amdgpu_device *adev,
+ 	if (bo && bo_va->is_xgmi)
+ 		amdgpu_xgmi_set_pstate(adev, AMDGPU_XGMI_PSTATE_MIN);
+ 
++	/* An enclosing update context may still hold this bo_va as dirty. */
++	if (!list_empty(&bo_va->update_link))
++		list_del_init(&bo_va->update_link);
++
+ 	kfree(bo_va);
+ }
+ 
