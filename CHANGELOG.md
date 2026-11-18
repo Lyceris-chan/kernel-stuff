@@ -18,6 +18,35 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.11.17-2-sleepy-next]: 2026-11-18
+
+### Added
+
+- **Natalie Vock's PRT explicit-sync v2** (`0900`–`0909`, preview-only):
+  `amdgpu_vm_update_ctx`, per-context pending map/clear tracking, rollback,
+  VA-op validation helper, the new `AMDGPU_GEM_VA2` ioctl, and the 3.67 driver
+  minor bump. It is carried at the user's request despite the open
+  High-severity review findings; it applies cleanly to `next-20261117`.
+
+### Changed
+
+- **The salkim stack is reduced to its UserQ/lifecycle half** — `9200`–`9216`,
+  `9218`, `9219`, `9230`, `9237`, `9238`, `9240`. The duplicate salkim VA-batch
+  block (`9217`, `9220`–`9229`, `9231`–`9236`, `9239`) is removed: it is a
+  second, incompatible VM-batch design (`AMDGPU_GEM_VA_BATCH`) over the same
+  functions PRT rewrites with `amdgpu_vm_update_ctx`. UserQ stays enabled by
+  default; the salkim lifecycle, TLB/MES and restore fixes remain.
+- **`1058`, `9057` and `9081` are ported** to the PRT context: `1058` uses
+  `ctx->adev` and the `current_domain` local; `9057` re-adds a failed clear to
+  `ctx->freed` so `ctx_fini` moves it to `vm->delayed_freed` for retry; `9081`
+  wraps the userq seq64 restore update in a context.
+- **`1311` is dropped in the preview**: PRT replaces the synchronous
+  input-fence wait with `amdgpu_sync_fence(&ctx->sync, …)`, so there is no
+  `dma_fence_wait()` left to make interruptible. The rc keeps it.
+
+The preview lists **175** patches and applies **173**; `1317` and `2044` are
+the two skips. No reboot or shutdown was performed.
+
 ## [2026.11.17-1-sleepy-next]: 2026-11-18
 
 ### Changed

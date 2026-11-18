@@ -1,0 +1,124 @@
+From 20261117-prt-explicit-sync-v2-7-bb3851cb6a0c@pixelcluster.dev Mon Sep 17 00:00:00 2001
+From: Natalie Vock <nat@pixelcluster.dev>
+Date: Tue, 17 Nov 2026 13:50:13 +0100
+Subject: [PATCH v2 07/10] drm/amdgpu: Move some VA op validation to a helper
+
+To be reused in a new VA ioctl in a subsequent patch.
+
+Signed-off-by: Natalie Vock <nat@pixelcluster.dev>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c | 71 +++++++++++++++++++--------------
+ 1 file changed, 40 insertions(+), 31 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
+index 39c72bfb73e71..fb7abb095b8ec 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_gem.c
+@@ -878,9 +878,11 @@ amdgpu_gem_va_update_vm(struct amdgpu_vm_update_ctx *ctx,
+ 	return fence;
+ }
+ 
+-int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
+-			  struct drm_file *filp)
++static int amdgpu_gem_va_validate_args(struct amdgpu_device *adev, uint64_t va,
++				       uint64_t size, uint32_t flags)
+ {
++	uint64_t vm_size, map_end;
++
+ 	const uint32_t valid_flags = AMDGPU_VM_DELAY_UPDATE |
+ 		AMDGPU_VM_PAGE_READABLE | AMDGPU_VM_PAGE_WRITEABLE |
+ 		AMDGPU_VM_PAGE_EXECUTABLE | AMDGPU_VM_MTYPE_MASK |
+@@ -888,53 +890,60 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
+ 	const uint32_t prt_flags = AMDGPU_VM_DELAY_UPDATE |
+ 		AMDGPU_VM_PAGE_PRT;
+ 
+-	struct drm_amdgpu_gem_va *args = data;
+-	struct drm_gem_object *gobj;
+-	struct amdgpu_device *adev = drm_to_adev(dev);
+-	struct amdgpu_fpriv *fpriv = filp->driver_priv;
+-	struct amdgpu_bo *abo;
+-	struct amdgpu_bo_va *bo_va;
+-	struct drm_syncobj *timeline_syncobj = NULL;
+-	struct dma_fence_chain *timeline_chain = NULL;
+-	struct amdgpu_vm_update_ctx update_ctx;
+-	struct drm_exec exec;
+-	uint64_t vm_size, tmp;
+-	int r = 0;
+-
+-	/* Validate virtual address range against reserved regions. */
+-	if (args->va_address < AMDGPU_VA_RESERVED_BOTTOM) {
+-		dev_dbg(dev->dev,
++	if (va < AMDGPU_VA_RESERVED_BOTTOM) {
++		dev_dbg(adev_to_drm(adev)->dev,
+ 			"va_address 0x%llx is in reserved area 0x%llx\n",
+-			args->va_address, AMDGPU_VA_RESERVED_BOTTOM);
++			va, AMDGPU_VA_RESERVED_BOTTOM);
+ 		return -EINVAL;
+ 	}
+ 
+-	if (args->va_address >= AMDGPU_GMC_HOLE_START &&
+-	    args->va_address < AMDGPU_GMC_HOLE_END) {
+-		dev_dbg(dev->dev,
++	if (va >= AMDGPU_GMC_HOLE_START && va < AMDGPU_GMC_HOLE_END) {
++		dev_dbg(adev_to_drm(adev)->dev,
+ 			"va_address 0x%llx is in VA hole 0x%llx-0x%llx\n",
+-			args->va_address, AMDGPU_GMC_HOLE_START,
++			va, AMDGPU_GMC_HOLE_START,
+ 			AMDGPU_GMC_HOLE_END);
+ 		return -EINVAL;
+ 	}
+ 
+-	args->va_address &= AMDGPU_GMC_HOLE_MASK;
+-
+ 	vm_size = adev->vm_manager.max_pfn * AMDGPU_GPU_PAGE_SIZE;
+ 	vm_size -= AMDGPU_VA_RESERVED_TOP;
+-	if (check_add_overflow(args->va_address, args->map_size, &tmp) || tmp > vm_size) {
+-		dev_dbg(dev->dev,
++	if (check_add_overflow(va & AMDGPU_GMC_HOLE_MASK, size, &map_end) || map_end > vm_size) {
++		dev_dbg(adev_to_drm(adev)->dev,
+ 			"va_address 0x%llx is in top reserved area 0x%llx\n",
+-			args->va_address + args->map_size, vm_size);
++			va + size, vm_size);
+ 		return -EINVAL;
+ 	}
+ 
+-	if ((args->flags & ~valid_flags) && (args->flags & ~prt_flags)) {
+-		dev_dbg(dev->dev, "invalid flags combination 0x%08X\n",
+-			args->flags);
++	if ((flags & ~valid_flags) && (flags & ~prt_flags)) {
++		dev_dbg(adev_to_drm(adev)->dev, "invalid flags combination 0x%08X\n",
++			flags);
+ 		return -EINVAL;
+ 	}
+ 
++	return 0;
++}
++
++int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
++			  struct drm_file *filp)
++{
++	struct drm_amdgpu_gem_va *args = data;
++	struct drm_gem_object *gobj;
++	struct amdgpu_device *adev = drm_to_adev(dev);
++	struct amdgpu_fpriv *fpriv = filp->driver_priv;
++	struct amdgpu_bo *abo;
++	struct amdgpu_bo_va *bo_va;
++	struct drm_syncobj *timeline_syncobj = NULL;
++	struct dma_fence_chain *timeline_chain = NULL;
++	struct amdgpu_vm_update_ctx update_ctx;
++	struct drm_exec exec;
++	int r = 0;
++
++	r = amdgpu_gem_va_validate_args(adev, args->va_address, args->map_size, args->flags);
++	if (r)
++		return r;
++
++	args->va_address &= AMDGPU_GMC_HOLE_MASK;
++
+ 	/* Validate operation type. */
+ 	switch (args->operation) {
+ 	case AMDGPU_VA_OP_MAP:
+
+-- 
+2.56.1
+

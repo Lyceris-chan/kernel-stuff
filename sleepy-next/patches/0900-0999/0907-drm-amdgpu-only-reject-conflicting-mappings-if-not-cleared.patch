@@ -1,0 +1,32 @@
+From 20261117-prt-explicit-sync-v2-8-bb3851cb6a0c@pixelcluster.dev Mon Sep 17 00:00:00 2001
+From: Natalie Vock <nat@pixelcluster.dev>
+Date: Tue, 17 Nov 2026 13:50:14 +0100
+Subject: [PATCH v2 08/10] drm/amdgpu: Only reject conflicting mappings if they are not cleared
+
+Cleared mappings will not immediately disappear from the VM interval
+tree, instead they will be in a pending list. For the REPLACE_MAPPING
+op to work correctly, skip rejecting these conflicts as they will be
+properly resolved later.
+
+Signed-off-by: Natalie Vock <nat@pixelcluster.dev>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+index ac4a1ed9b1196..491f4b50f7602 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+@@ -2241,7 +2241,7 @@ int amdgpu_vm_bo_map(struct amdgpu_vm_update_ctx *ctx,
+ 	eaddr = saddr + (size - 1) / AMDGPU_GPU_PAGE_SIZE;
+ 
+ 	tmp = amdgpu_vm_it_iter_first(&vm->va, saddr, eaddr);
+-	if (tmp) {
++	if (tmp && list_empty(&tmp->pending_list)) {
+ 		/* bo and tmp overlap, invalid addr */
+ 		dev_err(ctx->adev->dev,
+ 			"bo %p va 0x%010Lx-0x%010Lx conflict with "
+
+-- 
+2.56.1
+

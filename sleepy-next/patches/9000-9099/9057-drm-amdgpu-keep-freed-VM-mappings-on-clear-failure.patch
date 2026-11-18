@@ -31,22 +31,19 @@ Signed-off-by: oushinnyo <oushinnyo@163.com>
  1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
-index 47cde5459469..e20905d2d90c 100644
 --- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
 +++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
-@@ -1606,11 +1606,12 @@ int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
- 		r = amdgpu_vm_update_range(adev, vm, false, false, true, false,
- 					   &sync, mapping->start, mapping->last,
+@@ -2021,11 +2021,12 @@
+ 		r = amdgpu_vm_update_range(ctx->adev, ctx->vm, false, false, true, false,
+ 					   &ctx->sync, mapping->start, mapping->last,
  					   0, 0, 0, NULL, NULL, &f);
--		amdgpu_vm_free_mapping(adev, vm, mapping, f);
+-		amdgpu_vm_free_mapping(ctx->adev, ctx->vm, mapping, f);
  		if (r) {
-+			list_add(&mapping->list, &vm->freed);
++			list_add(&mapping->list, &ctx->freed);
  			dma_fence_put(f);
- 			goto error_free;
+ 			return r;
  		}
-+		amdgpu_vm_free_mapping(adev, vm, mapping, f);
++		amdgpu_vm_free_mapping(ctx->adev, ctx->vm, mapping, f);
  	}
  
  	if (fence && f) {
--- 
-2.25.1

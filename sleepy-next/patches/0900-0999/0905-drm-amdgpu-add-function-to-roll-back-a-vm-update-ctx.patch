@@ -1,0 +1,99 @@
+From 20261117-prt-explicit-sync-v2-6-bb3851cb6a0c@pixelcluster.dev Mon Sep 17 00:00:00 2001
+From: Natalie Vock <nat@pixelcluster.dev>
+Date: Tue, 17 Nov 2026 13:50:12 +0100
+Subject: [PATCH v2 06/10] drm/amdgpu: Add function to roll back a VM update ctx
+
+Used for discarding pending operations and retrying. This is needed when
+we do lots of mapping operations at once and drm_exec tells us to drop
+everything and retry to avoid deadlocks.
+
+Signed-off-by: Natalie Vock <nat@pixelcluster.dev>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c | 41 +++++++++++++++++++++-------------
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h |  1 +
+ 2 files changed, 27 insertions(+), 15 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+index 330c288053352..ac4a1ed9b1196 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+@@ -1874,37 +1874,48 @@ void amdgpu_vm_update_ctx_init(struct amdgpu_vm_update_ctx *ctx,
+ }
+ 
+ /**
+- * amdgpu_vm_update_ctx_fini - finish a VM update operation
+- * @ctx: The context of the update
++ * amdgpu_vm_update_ctx_rollback - clear pending VM updates
++ * @ctx: The context to roll back
+  *
+- * Adds any leftover mappings needing to be cleared to the VM's delayed free list,
+- * then frees up resources used by the context.
++ * Cleans up any pending mapping changes, but does not reset
++ * anything else (like attached syncobjs).
+  */
+-void amdgpu_vm_update_ctx_fini(struct amdgpu_vm_update_ctx *ctx)
++void amdgpu_vm_update_ctx_rollback(struct amdgpu_vm_update_ctx *ctx)
+ {
++	struct amdgpu_bo_va_mapping *mapping, *next;
+ 	struct interval_tree_node *node, *next_node;
+ 	struct amdgpu_bo_va *bo_va, *next_bo_va;
+ 
+-	list_splice(&ctx->freed, &ctx->vm->delayed_freed);
+-	amdgpu_sync_free(&ctx->sync);
++	list_for_each_entry_safe(mapping, next, &ctx->new, pending_list)
++		list_del_init(&mapping->pending_list);
++	list_for_each_entry_safe(mapping, next, &ctx->deleted, pending_list)
++		list_del_init(&mapping->pending_list);
+ 
+ 	list_for_each_entry_safe(bo_va, next_bo_va, &ctx->dirty_bo_vas,
+-				 update_link) {
++				 update_link)
+ 		list_del_init(&bo_va->update_link);
+-	}
+ 
+-	rbtree_postorder_for_each_entry_safe(node, next_node, &ctx->pending_maps.rb_root, rb) {
++	rbtree_postorder_for_each_entry_safe(node, next_node, &ctx->pending_maps.rb_root, rb)
+ 		kfree(node);
+-	}
+-	rbtree_postorder_for_each_entry_safe(node, next_node, &ctx->cleared_ranges.rb_root, rb) {
++	rbtree_postorder_for_each_entry_safe(node, next_node, &ctx->cleared_ranges.rb_root, rb)
+ 		kfree(node);
+-	}
+ 
+ 	ctx->pending_maps = RB_ROOT_CACHED;
+ 	ctx->cleared_ranges = RB_ROOT_CACHED;
++}
+ 
+-	WARN_ON(!list_empty(&ctx->new));
+-	WARN_ON(!list_empty(&ctx->deleted));
++/**
++ * amdgpu_vm_update_ctx_fini - finish a VM update operation
++ * @ctx: The context of the update
++ *
++ * Adds any leftover mappings needing to be cleared to the VM's delayed free list,
++ * then frees up resources used by the context.
++ */
++void amdgpu_vm_update_ctx_fini(struct amdgpu_vm_update_ctx *ctx)
++{
++	amdgpu_vm_update_ctx_rollback(ctx);
++	list_splice(&ctx->freed, &ctx->vm->delayed_freed);
++	amdgpu_sync_free(&ctx->sync);
+ }
+ 
+ /**
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
+index 7a5f558970b5c..8d4f59c286c2a 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
+@@ -623,6 +623,7 @@ void amdgpu_vm_update_ctx_init(struct amdgpu_vm_update_ctx *ctx,
+ 			       struct amdgpu_vm *vm);
+ int amdgpu_vm_update_ctx_execute_replace(struct amdgpu_vm_update_ctx *ctx);
+ void amdgpu_vm_update_ctx_commit(struct amdgpu_vm_update_ctx *ctx);
++void amdgpu_vm_update_ctx_rollback(struct amdgpu_vm_update_ctx *ctx);
+ void amdgpu_vm_update_ctx_fini(struct amdgpu_vm_update_ctx *ctx);
+ int amdgpu_vm_update_ctx_ensure_unmap_synced(struct amdgpu_vm_update_ctx *ctx);
+ 
+
+-- 
+2.56.1
+

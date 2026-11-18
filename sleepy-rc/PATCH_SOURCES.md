@@ -38,7 +38,12 @@ are supplied by the generator instead, so every row below has a source.
 | `9000–9099` | agd5f staging + userq lifecycle backports | 39 |
 | `9100–9199` | Retry-fault handling v4 (agd5f staging) | 11 |
 
-**Total: 382** patch files, all listed in `PKGBUILD`'s `source=()`.
+**Total: 398** patch files, all listed in `PKGBUILD`'s `source=()`.
+
+**`0900–0999` is preview-only (10 patches).** Natalie Vock's PRT
+explicit-sync series is carried in `sleepy-next/` after the base/0113 block and
+before the GPU carries; it is not part of the rc counts above. The rc has no
+salkim stack for it to merge with.
 
 The table above had drifted from the tree for several ranges (it was last
 reconciled on 2026-10-19). The counts are now generated from the patch tree
@@ -13295,13 +13300,15 @@ verified against the clean snapshot.
 
 ### Rejected or deferred, with reasons
 
-- **PRT explicit-sync v2 (Natalie Vock, 10 patches, `20261117-prt-explicit-sync-v2-0-bb3851cb6a0c@pixelcluster.dev`).** Generic amdgpu GPUVM work
-  for sparse-binding stutter, and it **applies cleanly to `next-20261117`**,
-  but it is a feature series: new `AMDGPU_GEM_VA2` UAPI, driver minor bump, no
-  `Reviewed-by`/`Acked-by`, Dave Airlie asks for `VM_BIND` naming, and the
-  Sashiko reviewer filed High-severity findings on the rollback lists,
-  syncobj error paths and runtime PM. Do not carry a new UAPI while review is
-  open. Revisit at v3.
+- **PRT explicit-sync v2 (Natalie Vock, 10 patches, `20261117-prt-explicit-sync-v2-0-bb3851cb6a0c@pixelcluster.dev`).** Carried in the **preview only** as `0900`–`0909`, after the user explicitly accepted the review risk. It is generic amdgpu GPUVM work for sparse-binding stutter. The series has a new `AMDGPU_GEM_VA2` UAPI and a driver minor bump, no `Reviewed-by`/`Acked-by`, Dave Airlie asks for `VM_BIND` naming, and the Sashiko reviewer filed High-severity findings on the rollback lists, syncobj error paths and runtime PM; it remains a v2 under review.
+  The preview carries it on top of a reduced salkim stack: the salkim
+  VA-batch block (`9217`, `9220`–`9229`, `9231`–`9236`, `9239`) was removed
+  because it is a second, incompatible VM-batch design (`AMDGPU_GEM_VA_BATCH`)
+  for the same functions PRT rewrites. The salkim UserQ/lifecycle half
+  (`9200`–`9216`, `9218`, `9219`, `9230`, `9237`, `9238`, `9240`) is kept.
+  `1058` and `9057` are ported to the PRT context; `1311` is superseded in the
+  preview. See `sleepy-next/PATCH_SOURCES.md`. **The rc does not carry PRT**
+  (the 7.3 base lacks the helpers and the salkim stack it was merged against).
 - **`blk-flush: fix a possible deadlock in the nvme timeout path` v4** (Ye Bin,
   11-17). Hunk 2 expects the newer `if (error != BLK_STS_OK)` guard in
   `flush_end_io()`; `v7.3` still assigns unconditionally. Portable only by

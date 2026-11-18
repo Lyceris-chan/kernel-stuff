@@ -1,0 +1,55 @@
+From 20261117-prt-explicit-sync-v2-1-bb3851cb6a0c@pixelcluster.dev Mon Sep 17 00:00:00 2001
+From: Natalie Vock <nat@pixelcluster.dev>
+Date: Tue, 17 Nov 2026 13:50:07 +0100
+Subject: [PATCH v2 01/10] drm/amdgpu: Remove unused parameter from amdgpu_vm_pte_fragment
+
+Trivial cleanup. No functional change.
+
+Signed-off-by: Natalie Vock <nat@pixelcluster.dev>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c
+index c73eb416c0e26..4eae6a831b4ee 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c
+@@ -745,14 +745,13 @@ static void amdgpu_vm_pte_update_flags(struct amdgpu_vm_update_params *params,
+  * @params: see amdgpu_vm_update_params definition
+  * @start: first PTE to handle
+  * @end: last PTE to handle
+- * @flags: hw mapping flags
+  * @frag: resulting fragment size
+  * @frag_end: end of this fragment
+  *
+  * Returns the first possible fragment for the start and end address.
+  */
+ static void amdgpu_vm_pte_fragment(struct amdgpu_vm_update_params *params,
+-				   uint64_t start, uint64_t end, uint64_t flags,
++				   uint64_t start, uint64_t end,
+ 				   unsigned int *frag, uint64_t *frag_end)
+ {
+ 	/**
+@@ -825,8 +824,7 @@ int amdgpu_vm_ptes_update(struct amdgpu_vm_update_params *params,
+ 	int r;
+ 
+ 	/* figure out the initial fragment */
+-	amdgpu_vm_pte_fragment(params, frag_start, end, flags, &frag,
+-			       &frag_end);
++	amdgpu_vm_pte_fragment(params, frag_start, end, &frag, &frag_end);
+ 
+ 	/* walk over the address space and update the PTs */
+ 	amdgpu_vm_pt_start(adev, params->vm, start, &cursor);
+@@ -932,7 +930,7 @@ int amdgpu_vm_ptes_update(struct amdgpu_vm_update_params *params,
+ 			if (frag_start >= frag_end) {
+ 				/* figure out the next fragment */
+ 				amdgpu_vm_pte_fragment(params, frag_start, end,
+-						       flags, &frag, &frag_end);
++						       &frag, &frag_end);
+ 				if (frag < shift)
+ 					break;
+ 			}
+
+-- 
+2.56.1
+

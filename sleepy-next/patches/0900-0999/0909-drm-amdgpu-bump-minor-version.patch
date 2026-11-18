@@ -1,0 +1,32 @@
+From 20261117-prt-explicit-sync-v2-10-bb3851cb6a0c@pixelcluster.dev Mon Sep 17 00:00:00 2001
+From: Natalie Vock <nat@pixelcluster.dev>
+Date: Tue, 17 Nov 2026 13:50:16 +0100
+Subject: [PATCH v2 10/10] drm/amdgpu: Bump minor version
+
+To signal availability of the new AMDGPU_GEM_VA2 ioctl to userspace.
+
+Signed-off-by: Natalie Vock <nat@pixelcluster.dev>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c
+index 188c8ec234c02..5b0c373102068 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c
+@@ -129,9 +129,10 @@
+  * - 3.64.0 - Userq IP support query
+  * - 3.65.0 - Add userq syncobj timeline signaling support
+  * - 3.66.0 - Allow jpeg type 4 packets and VCE SEI command
++ * - 3.67.0 - Add AMDGPU_GEM_VA2 ioctl
+  */
+ #define KMS_DRIVER_MAJOR	3
+-#define KMS_DRIVER_MINOR	66
++#define KMS_DRIVER_MINOR	67
+ #define KMS_DRIVER_PATCHLEVEL	0
+ 
+ /*
+
+-- 
+2.56.1
+

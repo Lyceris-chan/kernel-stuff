@@ -94,6 +94,7 @@ Run these in order. Copy the commands exactly — do not improvise.
    |--------|----------|
    | `00xx` | Local / hand-selected (0001–0049) or EDID/display ML (0050–0099) |
    | `01xx` | CachyOS branch squashes (0101–0113; carried set in `patch-cachy-branches`) |
+   | `09xx` | amdgpu VM update context / PRT explicit-sync (Natalie Vock) — `sleepy-next/` preview only, applied before the GPU carries |
    | `10xx` | GPU core (GFX12, GMC, SDMA, PSP, TTM, TLB) |
    | `11xx` | AMD Display (DCN4/DCN401, FRL, colorops) |
    | `12xx` | AMD Power Management (amd-pstate, CPPC) |
@@ -110,7 +111,7 @@ Run these in order. Copy the commands exactly — do not improvise.
    | `30xx` | Platform, USB and hwmon (PROM21 chipset temperature) |
    | `90xx` | agd5f staging + userq lifecycle backports |
    | `91xx` | Retry-fault handling v4 (agd5f staging, 9100–9110) |
-   | `92xx` | salkim userq experimental series — `sleepy-next/` preview only |
+   | `92xx` | salkim userq lifecycle series — `sleepy-next/` preview only; its VA-batch block was replaced by `09xx` PRT on 2026-11-18 |
 
    A new category gets a new range; add it to this table when you create one.
    ```bash

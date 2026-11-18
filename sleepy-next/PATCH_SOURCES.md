@@ -18,8 +18,8 @@ moved, so the full ledger is not duplicated here.
 | Snapshot | `next-20261117`, commit `7cfbf79c66c6` (tag object `5ddd72f9b85f`) |
 | Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261117.tar.gz` |
 | Snapshot tree `Makefile` | `7.4.0-rc3` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.11.17-1-sleepy-next` |
-| Package | `linux-sleepy-next-2026.11.17-1` |
+| Kernel release | `2026.11.17-2-sleepy-next` |
+| Package | `linux-sleepy-next-2026.11.17-2` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -2051,3 +2051,55 @@ contains them.
 **184 listed / 182 applied** on `next-20261117`; the two skips are `1317`
 (context drift, inert on DCN 4.0.1) and `2044` (absorbed by the base). The rc
 series is **398/398** on `v7.3`.
+
+## 2026-11-18 (second pass) — PRT explicit-sync carried; salkim VA-batch replaced
+
+The preview now carries Natalie Vock's **PRT explicit-sync v2** as
+`0900`–`0909` in a new preview-only range. The series applies cleanly to
+`next-20261117` **after the salkim stack is reduced to its UserQ/lifecycle
+half**. The release is `2026.11.17-2`.
+
+### Why the salkim VA-batch half is not carried
+
+Erhan Bilgili's `9217`, `9220`–`9229`, `9231`–`9236` and `9239` implement a
+second VA-batch design: `AMDGPU_GEM_VA_BATCH`, `amdgpu_gem_va_batch_ioctl()`,
+`amdgpu_vm_update_batch`, `amdgpu_vm_bo_update_done()`. PRT rewrites the same
+functions around `amdgpu_vm_update_ctx` and `AMDGPU_GEM_VA2`. A three-way merge
+of the two trees produced 78 semantic conflicts in `amdgpu_vm.c`,
+`amdgpu_vm.h`, `amdgpu_gem.c`, `amdgpu_gem.h`, `amdgpu_amdkfd_gpuvm.c` and
+the UAPI header: both designs want to own the VM update state machine. Keeping
+both would mean one batch path running on top of the other's pending lists.
+The preview keeps PRT's upstream batching and drops the duplicate salkim
+block.
+
+**What is lost:** the `AMDGPU_GEM_VA_BATCH` ioctl and its cookie/query UAPI.
+Userspace that calls that ioctl must move to `AMDGPU_GEM_VA2`. The rest of
+the salkim Proton work is kept.
+
+### Kept salkim work (UserQ and lifecycle)
+
+`9200`–`9216`, `9218`, `9219`, `9230`, `9237`, `9238`, `9240`. These are the
+UserQ enablement, restore/validation, TLB-invalidation reporting, MES gang
+priority, fence and SDMA-rollover, page-table allocation, and restore-failure
+fixes. All apply cleanly after PRT; UserQ stays enabled by default.
+
+### Ports
+
+- **`1058`** — `amdgpu_vm_bo_update()` now takes the PRT context, so the
+  `current_domain` local and the `amdgpu_vm_bo_needs_eviction(ctx->adev, …)`
+  call were adapted to `ctx`. The other 11 hunks are unchanged.
+- **`9057`** — `amdgpu_vm_clear_freed(ctx)` now re-adds a failed mapping to
+  `ctx->freed` instead of freeing it; `amdgpu_vm_update_ctx_fini()` moves it
+  to `vm->delayed_freed`, so the clear is retried.
+- **`9081`** — the userq restore path's seq64 update was written against the
+  old `amdgpu_vm_bo_update(adev, …)` signature. It now wraps the same update
+  in `amdgpu_vm_update_ctx_init()`/`_fini()` and passes the context.
+- **`1311` is dropped in the preview.** PRT replaces the synchronous
+  input-fence wait with `amdgpu_sync_fence(&ctx->sync, …)`, so there is no
+  `dma_fence_wait()` left to make interruptible. The rc keeps `1311`.
+- `1317` and `2044` remain the two skipped patches.
+
+### Series state
+
+**175 listed / 173 applied** on `next-20261117`; the skips are `1317` and
+`2044`. The rc is unchanged at **398/398** on `v7.3`.

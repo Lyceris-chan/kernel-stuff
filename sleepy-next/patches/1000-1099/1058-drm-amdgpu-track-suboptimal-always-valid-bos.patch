@@ -19,10 +19,9 @@ that ever fails, so as to not unnecessarily try moving things around.
 Signed-off-by: Natalie Vock <natalie.vock@gmx.de>
 
 diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
-index 1baad7624f1f..f17c63ac7e26 100644
 --- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
 +++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
-@@ -142,6 +142,7 @@ static void amdgpu_vm_assert_locked(struct amdgpu_vm *vm)
+@@ -144,6 +144,7 @@
  static void amdgpu_vm_bo_status_init(struct amdgpu_vm_bo_status *lists)
  {
  	INIT_LIST_HEAD(&lists->evicted);
@@ -30,7 +29,7 @@ index 1baad7624f1f..f17c63ac7e26 100644
  	INIT_LIST_HEAD(&lists->needs_update);
  	INIT_LIST_HEAD(&lists->idle);
  }
-@@ -197,19 +198,53 @@ bool amdgpu_vm_is_bo_always_valid(struct amdgpu_vm *vm, struct amdgpu_bo *bo)
+@@ -199,19 +200,53 @@
   * amdgpu_vm_bo_evicted - vm_bo is evicted
   *
   * @vm_bo: vm_bo which is evicted
@@ -86,7 +85,7 @@ index 1baad7624f1f..f17c63ac7e26 100644
  /**
   * amdgpu_vm_bo_needs_update - vm_bo needs pagetable update
   *
-@@ -395,6 +430,7 @@ void amdgpu_vm_update_stats(struct amdgpu_vm_bo_base *base,
+@@ -405,6 +440,7 @@
  /**
   * amdgpu_vm_bo_base_init - Adds bo to the list of bos associated with the vm
   *
@@ -94,7 +93,7 @@ index 1baad7624f1f..f17c63ac7e26 100644
   * @base: base structure for tracking BO usage in a VM
   * @vm: vm to which bo is to be added
   * @bo: amdgpu buffer object
-@@ -402,9 +438,12 @@ void amdgpu_vm_update_stats(struct amdgpu_vm_bo_base *base,
+@@ -412,9 +448,12 @@
   * Initialize a bo_va_base structure and add it to the appropriate lists
   *
   */
@@ -108,7 +107,7 @@ index 1baad7624f1f..f17c63ac7e26 100644
  	base->vm = vm;
  	base->bo = bo;
  	base->next = NULL;
-@@ -429,6 +468,8 @@ void amdgpu_vm_bo_base_init(struct amdgpu_vm_bo_base *base,
+@@ -439,6 +478,8 @@
  
  	ttm_bo_set_bulk_move(&bo->tbo, &vm->lru_bulk_move);
  
@@ -117,7 +116,7 @@ index 1baad7624f1f..f17c63ac7e26 100644
  	/*
  	 * When a per VM isn't in the desired domain put it into the evicted
  	 * state to make sure that it gets validated on the next best occasion.
-@@ -437,7 +478,7 @@ void amdgpu_vm_bo_base_init(struct amdgpu_vm_bo_base *base,
+@@ -447,7 +488,7 @@
  	    amdgpu_mem_type_to_domain(bo->tbo.resource->mem_type))
  		amdgpu_vm_bo_needs_update(base);
  	else
@@ -126,7 +125,7 @@ index 1baad7624f1f..f17c63ac7e26 100644
  }
  
  /**
-@@ -658,6 +699,26 @@ restart:
+@@ -719,6 +760,26 @@
  	}
  	spin_unlock(&vm->individual_lock);
  
@@ -153,15 +152,15 @@ index 1baad7624f1f..f17c63ac7e26 100644
  	return 0;
  }
  
-@@ -1268,6 +1329,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
+@@ -1390,6 +1451,7 @@
  	struct dma_fence **last_update;
  	dma_addr_t *pages_addr = NULL;
  	struct ttm_resource *mem;
 +	uint32_t current_domain;
- 	struct amdgpu_sync sync;
  	bool flush_tlb = clear;
  	uint64_t vram_base;
-@@ -1381,10 +1443,12 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
+ 	uint64_t flags;
+@@ -1497,10 +1559,12 @@
  	 * next command submission.
  	 */
  	if (amdgpu_vm_is_bo_always_valid(vm, bo)) {
@@ -171,14 +170,14 @@ index 1baad7624f1f..f17c63ac7e26 100644
 -			amdgpu_vm_bo_evicted(&bo_va->base);
 +		current_domain = amdgpu_mem_type_to_domain(
 +					bo->tbo.resource->mem_type);
-+		if (amdgpu_vm_bo_needs_eviction(adev, &bo_va->base))
++		if (amdgpu_vm_bo_needs_eviction(ctx->adev, &bo_va->base))
 +			amdgpu_vm_bo_evicted(&bo_va->base,
 +					     bo->preferred_domains &
 +					     current_domain);
  		else
  			amdgpu_vm_bo_idle(&bo_va->base);
- 	} else {
-@@ -1664,7 +1728,7 @@ int amdgpu_vm_handle_moved(struct amdgpu_device *adev,
+ 	} else if (bo) {
+@@ -2142,7 +2206,7 @@
  		    drm_gem_is_imported(&bo_va->base.bo->tbo.base) &&
  		    (!bo_va->base.bo->tbo.resource ||
  		     bo_va->base.bo->tbo.resource->mem_type == TTM_PL_SYSTEM))
@@ -187,7 +186,7 @@ index 1baad7624f1f..f17c63ac7e26 100644
  
  		spin_lock(&vm->individual_lock);
  	}
-@@ -1745,7 +1809,7 @@ struct amdgpu_bo_va *amdgpu_vm_bo_add(struct amdgpu_device *adev,
+@@ -2220,7 +2284,7 @@
  	if (bo_va == NULL) {
  		return NULL;
  	}
@@ -196,7 +195,7 @@ index 1baad7624f1f..f17c63ac7e26 100644
  
  	bo_va->ref_count = 1;
  	bo_va->last_pt_update = dma_fence_get_stub();
-@@ -2282,7 +2346,7 @@ void amdgpu_vm_bo_invalidate(struct amdgpu_bo *bo, bool evicted)
+@@ -2645,7 +2709,7 @@
  		struct amdgpu_vm *vm = bo_base->vm;
  
  		if (evicted && amdgpu_vm_is_bo_always_valid(vm, bo)) {
@@ -205,7 +204,7 @@ index 1baad7624f1f..f17c63ac7e26 100644
  			continue;
  		}
  
-@@ -2625,7 +2689,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+@@ -3008,7 +3072,7 @@
  		goto error_free_delayed;
  	}
  
@@ -215,10 +214,9 @@ index 1baad7624f1f..f17c63ac7e26 100644
  	if (r)
  		goto error_free_root;
 diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
-index 5822836fa4a3..763f06b166a1 100644
 --- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
 +++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h
-@@ -227,6 +227,12 @@ struct amdgpu_vm_bo_status {
+@@ -229,6 +229,12 @@
  	/* BOs evicted which need to move into place again */
  	struct list_head		evicted;
  
@@ -231,7 +229,7 @@ index 5822836fa4a3..763f06b166a1 100644
  	/* BOs whose mappings changed but PDs/PTs haven't been updated */
  	struct list_head		needs_update;
  
-@@ -528,7 +534,8 @@ int amdgpu_vm_flush_compute_tlb(struct amdgpu_device *adev,
+@@ -535,7 +541,8 @@
  				struct amdgpu_vm *vm,
  				uint32_t flush_type,
  				uint32_t xcc_mask);
@@ -242,12 +240,11 @@ index 5822836fa4a3..763f06b166a1 100644
  int amdgpu_vm_update_range(struct amdgpu_device *adev, struct amdgpu_vm *vm,
  			   bool immediate, bool unlocked, bool flush_tlb,
 diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c
-index e43a60d09808..ac8b63d1b3f0 100644
 --- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c
 +++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vm_pt.c
-@@ -518,7 +518,7 @@ static int amdgpu_vm_pt_alloc(struct amdgpu_device *adev,
+@@ -544,7 +544,7 @@
+ 	 * freeing them up in the wrong order.
  	 */
- 	pt_bo = &pt->bo;
  	pt_bo->parent = amdgpu_bo_ref(cursor->parent->bo);
 -	amdgpu_vm_bo_base_init(entry, p->vm, pt_bo);
 +	amdgpu_vm_bo_base_init(p->adev, entry, p->vm, pt_bo);
