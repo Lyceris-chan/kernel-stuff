@@ -18,6 +18,52 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.11.20-1-sleepy-next]: 2026-11-20
+
+### Changed
+
+- **Base bump to `next-20261120`** (`909ef7a9a30f`). The two-day range
+  (`next-20261118` → `next-20261120`) absorbs four more carries, now skipped:
+  `2068`/`2069` (elevator change) and `2426`/`2427` (cgroup update locking and
+  `__scx_enabled` task gating). `1320` remains listed but hard-fails; the base
+  has the fix in its `in_task()` form.
+- **`9237` regenerated** for the named `struct userq_props` layout, and
+  **`9212` reduced to its selftest half** because the base absorbed its kernel
+  hunks.
+
+### Added
+
+- **`9242`** — salkim `6d5962449a37`: skip `drm_exec_init()` for UserQ waits
+  that carry only syncobj handles and no BO lists. Preview-only.
+- CAST v0.2.11 and NAP v0.6.6 confirmed current. CachyOS and sirlucjan had no
+  new on-target carries.
+
+The preview lists **179** patches and applies **169**; ten skip. No reboot
+or shutdown was performed.
+
+## [2026.11.18-2-sleepy-next]: 2026-11-18
+
+### Fixed
+
+- **PRT v2 Sashiko findings** — preview-only fixups `9300`/`9301` repair the
+  update-context rollback and bookkeeping, the `AMDGPU_GEM_VA2` ioctl struct
+  size, unmap VA handling, runtime PM, and several fence/syncobj leaks. Four
+  findings are deferred with reasons in `PATCH_SOURCES.md`.
+
+## [2026.11.18-1-sleepy-next]: 2026-11-18
+
+### Changed
+
+- **Base bump to `next-20261118`** — absorbs five carries (`1192`, `1194`,
+  `1320`, `1355`, `9212`), removes `1199` after it installed a duplicate
+  `dm_plane_inherit_flip_time()`, and regenerates `1302`, `9218`, `9219` and
+  `9237`.
+
+### Added
+
+- **`9241`** — salkim `e45eee6487c8`: enable TLB fences on first UserQ
+  creation.
+
 ## [2026.11.17-3-sleepy-next]: 2026-11-18
 
 ### Added

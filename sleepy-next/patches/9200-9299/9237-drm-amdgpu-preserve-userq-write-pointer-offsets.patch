@@ -186,7 +186,7 @@ index 7dda9865832a..20e8b33b59e5 100644
  #define TTM_NUM_MOVE_FENCES 2
  #define AMDGPU_GMC_HOLE_MASK 0x0000ffffffffffffULL
  #define DRM_EXEC_IGNORE_DUPLICATES 1
-@@ -168,13 +172,13 @@ typedef uint64_t u64;
+@@ -168,14 +172,14 @@ typedef uint64_t u64;
  #define drm_exec_retry_on_contention(e) ((void)0)
  struct drm_exec { int unused; };
  struct gem_object { size_t size; bool imported; };
@@ -196,7 +196,8 @@ index 7dda9865832a..20e8b33b59e5 100644
  struct amdgpu_bo_va_mapping { u64 start, last, offset; struct amdgpu_bo_va *bo_va; };
  struct amdgpu_vm { struct amdgpu_bo_va_mapping *mapping; };
  struct amdgpu_userq_obj { struct amdgpu_bo *obj; u64 gpu_addr; };
- struct amdgpu_usermode_queue { struct amdgpu_vm *vm; struct { u64 wptr_gpu_addr; } *userq_prop;
+ struct userq_props { u64 wptr_gpu_addr; };
+ struct amdgpu_usermode_queue { struct amdgpu_vm *vm; struct userq_props *userq_prop;
 -                              struct amdgpu_userq_obj wptr_obj; };
 +                              struct amdgpu_userq_obj wptr_obj; u64 wptr_bo_offset; };
  struct amdgpu_userq_mgr { int evf_mgr; };

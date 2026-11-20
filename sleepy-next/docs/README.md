@@ -2,12 +2,12 @@
 
 `linux-sleepy-next` is a custom Arch Linux kernel for one machine: an AMD
 Ryzen 7 7700 (Zen 4) desktop with a Radeon RX 9070 XT (Navi 48 / RDNA 4). It is
-built from a **linux-next snapshot (`next-20261118`)** plus a sanitized
-[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 178-patch
+built from a **linux-next snapshot (`next-20261120`)** plus a sanitized
+[CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 179-patch
 series. It is not a general-purpose kernel.
 
-**Base version:** `2026.11.18-2` · **Artifact:**
-`linux-sleepy-next-2026.11.18-2-x86_64.pkg.tar.zst`
+**Base version:** `2026.11.20-1` · **Artifact:**
+`linux-sleepy-next-2026.11.20-1-x86_64.pkg.tar.zst`
 
 The release is named for the **snapshot date**, not the mainline release the
 snapshot was cut from — linux-next is a daily tree, and its base release goes
@@ -133,7 +133,7 @@ preview: it exists to exercise the snapshot's display code with IPS enabled.
 
 ## Patch series
 
-177 patch entries in `source=()`, one file per entry. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
+179 patch entries in `source=()`, one file per entry. `PATCH_SOURCES.md` is the authoritative per-patch ledger.
 On a linux-next snapshot a large fraction are skipped rather than failed, since
 the snapshot already carries much of what the series adds — a skip is only safe
 for a self-contained patch, so interdependent groups are excluded outright
@@ -161,6 +161,8 @@ snapshot's `mm/gup.c`.
 | `2800–2899` | Memory / swap follow-ups |
 | `2900–2999` | VFS / core filesystem |
 | `9000–9099` | agd5f staging + userq lifecycle backports |
+| `9200–9299` | salkim UserQ lifecycle series (preview only) |
+| `9300–9399` | Local fixups to carried series (preview only) |
 
 ## Documentation
 

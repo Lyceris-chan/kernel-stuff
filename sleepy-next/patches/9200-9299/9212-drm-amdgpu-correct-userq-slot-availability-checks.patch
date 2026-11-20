@@ -5,32 +5,9 @@ Subject: [PATCH] drm/amdgpu: Correct UserQ slot availability checks.
 
 (cherry picked from commit 6918d668e3aea55c54a0c2f434b528e509918a0c)
 ---
- drivers/gpu/drm/amd/amdgpu/amdgpu_kms.c       |   4 +-
- .../drivers/amdgpu/test_userq_upstream.py     | 179 +++++++++++++++++-
- 2 files changed, 175 insertions(+), 8 deletions(-)
+ .../drivers/amdgpu/test_userq_upstream.py          |  179 +++++++++++++++++++-
+ 1 file changed, 173 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_kms.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_kms.c
-index b6802d824e33..f8a8a48deb75 100644
---- a/drivers/gpu/drm/amd/amdgpu/amdgpu_kms.c
-+++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_kms.c
-@@ -474,7 +474,7 @@ static int amdgpu_hw_ip_info(struct amdgpu_device *adev,
- 			    !adev->gfx.compute_ring[i].no_user_submission)
- 				++num_rings;
- 
--		if (!adev->sdma.disable_uq) {
-+		if (!adev->gfx.disable_uq) {
- 			for (i = 0; i < AMDGPU_MES_MAX_COMPUTE_PIPES; i++)
- 				num_slots += hweight32(adev->mes.compute_hqd_mask[i]);
- 		}
-@@ -489,7 +489,7 @@ static int amdgpu_hw_ip_info(struct amdgpu_device *adev,
- 			    !adev->sdma.instance[i].ring.no_user_submission)
- 				++num_rings;
- 
--		if (!adev->gfx.disable_uq) {
-+		if (!adev->sdma.disable_uq) {
- 			for (i = 0; i < AMDGPU_MES_MAX_SDMA_PIPES; i++)
- 				num_slots += hweight32(adev->mes.sdma_hqd_mask[i]);
- 		}
 diff --git a/tools/testing/selftests/drivers/amdgpu/test_userq_upstream.py b/tools/testing/selftests/drivers/amdgpu/test_userq_upstream.py
 index 7dda9865832a..3f9ae54d747d 100644
 --- a/tools/testing/selftests/drivers/amdgpu/test_userq_upstream.py

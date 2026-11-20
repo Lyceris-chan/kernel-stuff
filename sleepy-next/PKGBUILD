@@ -182,9 +182,9 @@ pkgbase="linux-$_pkgsuffix"
 # snapshot DATE rather than by whichever mainline rc it happened to be cut
 # from. `_srctag` is defined first because pkgver is derived from it — a bump
 # that moves the tag but not the version is not possible.
-_srctag=next-20261118
+_srctag=next-20261120
 _srcname=${_srctag}
-_snapdate=${_srctag#next-}                                            # 20261118
+_snapdate=${_srctag#next-}                                            # 20261120
 # Dotted (2026.10.09), and that is NOT cosmetic. Both tools that consume the
 # release string require it to BEGIN with dotted decimal notation:
 #
@@ -203,7 +203,7 @@ _snapdate=${_srctag#next-}                                            # 20261118
 _snapver="${_snapdate:0:4}.${_snapdate:4:2}.${_snapdate:6:2}"
 pkgver=${_snapver}
 _tagrel=1
-pkgrel=2
+pkgrel=1
 # Build parallelism. Previously capped at 8 on a diagnosis that did not hold up.
 #
 # The cap was added after an rc4-7 build thrashed badly — 6 watchdog firings and
@@ -280,7 +280,7 @@ _nv_ver=610.43.02
 _nv_pkg="NVIDIA-Linux-x86_64-${_nv_ver}"
 _nv_open_pkg="NVIDIA-kernel-module-source-${_nv_ver}"
 source=(
-  "https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261118.tar.gz"
+  "https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261120.tar.gz"
   "config"
   "patches/0001-0049/0001-drm-amd-pm-Fix-typo-in-smu_v14_0_set_irq_state.patch"
   "patches/0001-0049/0002-drm-amd-pm-Fix-memory-leaks-in-smu_v14_0_fini_smc_ta.patch"
@@ -474,6 +474,7 @@ source=(
   "patches/9200-9299/9238-drm-amdgpu-take-userq-fence-references-before.patch"
   "patches/9200-9299/9240-drm-amdgpu-userq-handle-restore-allocation-failures.patch"
   "patches/9200-9299/9241-drm-amdgpu-enable-tlb-fences-on-first-userq-creation.patch"
+  "patches/9200-9299/9242-drm-amdgpu-skip-bo-lock-setup-for-syncobj-only-userq-waits.patch"
   "patches/9300-9399/9300-drm-amdgpu-fix-vm-update-context-rollback-and-bookkeeping.patch"
   "patches/9300-9399/9301-drm-amdgpu-fix-va2-ioctl-and-input-fence-error-handling.patch"
   # 1008/1012/1013/1014/1017 (amdgpu TLB-invalidation rework) are excluded from the
@@ -1177,7 +1178,7 @@ for _p in "${pkgname[@]}"; do
     }"
 done
 
-b2sums=('c93e181e03ad821111f22608c13046f04e934fafff09c9eec9ae31bd917779169755f6b8af1885441e9fe8e40e083326b1d16ee77854fb3f6f1bdbd418e0c662'
+b2sums=('1fec3bed19d183e20413686f829c6d1541006a19eea059f7fdd97fa108c55e7e05edd3508ceedbcad0063d62acceefff372ac11ccf3fd20abcc0b4b8ed158cd8'
         '7517360503c9da93f405b810c81a7f1f2c8ca21a704f8251f62c400723f99bd9c14b8cb851c8f36663f412f9865cde759a3a10313e605e6172322bdfa12f6f38'
         'ff25ac7c89880886b454064ba57bd1196fb747cb80c7663d7981006cc603151aee075ebe1b49b1a92866ad2a212d1e599ce622f63bfd140ad64d37b463c17aad'
         '0806d7b3b8e4e9044c14843fc53255ff92b12aaf3b8e0d0490bbf6266aaa6b01872476ce34a65c5b694cda9a1d82e84a38df16dbb9c798ae9aa6d1c9097b32aa'
@@ -1342,7 +1343,7 @@ b2sums=('c93e181e03ad821111f22608c13046f04e934fafff09c9eec9ae31bd917779169755f6b
         '66b06ed83f5cabcd4ddd23ca13a73e5a69abba6078fb805fffd3441bb676fabcd78f77d7bf54dd05fd7f5d49f84cd8b47274de6fa668e69c947b0bb5b7648498'
         'f52abb9fd878132c03a0416c76553c5e0399496e0398973e033691fd6f1187eed4b9d9d02292efa11d992d4753fe2b9e629abfc1d92199e64e66e49035d0b07f'
         '52348367c01c5dac5bae7475b1a7e917fe5ead92e91114d67adc35030a85830e16773955ee49c5dba57cce343de0e7756a57112edcb23c9736e466f54e38c257'
-        '6ecd4e26070a8a8c9c1952406055bda0bd7b392363e9bf0bc5bbef8e54acb8a6384f22bc7df342455280c9a080f78076f0a8683b414ce1e32647952ed54911bb'
+        'b449b79ad4d5b78c66456b4df5da22c7d2ab944c79223ee56d1c1dd8628f47bb7d077b198033e018349c05cbebb23e689dff783e561dc3cfc5e609ea66b0cc18'
         'e8dbef6185447af9f206be73a1673f1aa4899ba710eefe950564815dfc3f3e85fb0aeaca45e1f11b604b43070700b18665b2883b3583b367874f6f109043f29b'
         '053101f909dce5263b8dce8ed67bc1acaef2d1c5617d09247cbebc60064cef615f15bdeab9ef68143ae29650b2be2f473cf871570f7c21cebd5f0634f71f0383'
         '4d1c151e7cb33cfcd1aeb1d08c3bb09beb3a77d9dbe36b9f0c2853b51205e76b05ee8dd377d31ce3230d3f9e87da71a0615fdb8c21d677e9fa394701772a05fb'
@@ -1351,10 +1352,11 @@ b2sums=('c93e181e03ad821111f22608c13046f04e934fafff09c9eec9ae31bd917779169755f6b
         'a099948280b96413bcba57e508fa929478aa269f371f945e39dbe11d98133e372f95b0db40dd1bc3bcc8ebe6abc568d2329262f0e02812d29cd18605b9c4b474'
         '1815815678413fd113ec72d2cf6192bb4b45a56a347c6643952d06d3ff7cd4414b8953634f1cb4b92665acca1fd82c43563d10b427a1308bdef5112c93cc6993'
         'bb4e13b164404b5c02cfda4c3d0b2690b5fa73adce5b2d84f52dbb8ada82f5ffcbe0978b688d5f43819e4667cab61c4d606ce7438f4ff809f0a1e826bf84138f'
-        '0d7ab0b48ac3b2dd50e6f925fc7f937b51be8e93cc54e4cc0e7c20c0683a73b0f3016eec837c21143f6f8bd5c41ba7b10e36ca798861a400ffd210f199fc6217'
+        '1fd5475c26d11e0326bfcc069a8b5bead9bb72f81e3d604cbc393152063f1fecb591922100700efc1909ea4c6e8c4d39842802f488e5626ff2fc6d8538fec2ea'
         '521b40436f23a66f5b542d1cd420fb7b995abd2b239c3480709a56f910ba095691ddd36100a6360f7c35cf8c7a1d0f6915ab18f57bbb041779cf071a41bcdac0'
         '51385b27136adec6ff202f40bd1a3c9742038eb9ecd0e34c71c882ab23e4999f6ae02c92bd7d96f21e64b10e94a319eb7d8513eeeb5d3d121f9788313ea83052'
         'eadace55dc994c344f56f08ce093aea6fc9eb0d596948cc4ec58240e15c277d1198da5aa6ba4a581d5616609b94fbee6bb04ba4a23b1b932c1b6ffa71246bcaa'
+        '9becc091def7bd767629cc3aedb9524ae783913e39591a3e171e342d8ff9717cac1e11412b86ff7fc6234d58b430bc339cd7acb75bad8ec1d7e7ca418badc491'
         '91b8608d154a50cb3cbc36297b7546bff87d1bcee11c1dc58460d6a674813968587d2fc219d9fa21f8c9c7f1e7e1d60b5cfe69f60bf447fe9466714a05c352db'
         '87b4342c17f160ab5368704713a464033ea0eb79716d306da39c97f8f69d0bf740e5a4ffcd9bf24dba879119f91822b8cbdb31f9c6716579f9b0ade2a5745811'
         '9b95b584d6a85f5617bee5ce989018501ac631d3abe64e8380cfe9c37bc537ffb9e4ee87324a749179ca2ec5141fd3d2e18e9f76eb1c838697a79e2a76d46997')

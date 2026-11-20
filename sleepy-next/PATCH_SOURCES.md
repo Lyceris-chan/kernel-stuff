@@ -15,11 +15,11 @@ moved, so the full ledger is not duplicated here.
 
 | | |
 |---|---|
-| Snapshot | `next-20261117`, commit `7cfbf79c66c6` (tag object `5ddd72f9b85f`) |
-| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261117.tar.gz` |
+| Snapshot | `next-20261120`, commit `909ef7a9a30f` (tag object `2c0da72bad56`) |
+| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261120.tar.gz` |
 | Snapshot tree `Makefile` | `7.4.0-rc3` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.11.17-3-sleepy-next` |
-| Package | `linux-sleepy-next-2026.11.17-3` |
+| Kernel release | `2026.11.20-1-sleepy-next` |
+| Package | `linux-sleepy-next-2026.11.20-1` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -2288,3 +2288,110 @@ forward to the next PRT revision (v3).
 
 **178 listed / 171 applied** on `next-20261118`; the seven skips are
 unchanged. The rc remains **398/398** on `v7.3`.
+
+## Bump 2026-11-20 — `next-20261120`; salkim syncobj BO-lock fix `9242`
+
+`next-20261120` (tag ref `2c0da72bad56`, peeled commit `909ef7a9a30f`) is
+the new preview base. `_srctag` moves to `next-20261120`, `pkgrel` resets to
+`1`, and the release becomes **2026.11.20-1**. The rc series is unchanged.
+
+The two-day range (`next-20261118` → `next-20261120`, 2,572 commits) pulls
+the next drm-next and sched_ext merges. In our files that absorbs four more
+carries and leaves one context failure.
+
+### Newly absorbed by the base — now skipped, removal pending approval
+
+| Patch | Evidence |
+|---|---|
+| `2068` | The base's elevator rework carries the “don't request a module for the none elevator” behaviour; `patch` reports “Skipping patch”. |
+| `2069` | Same: the base's `elevator_change()` returns early when the elevator does not change. |
+| `2426` | The base has tip commit `342fe98c3431` (“Lift cgroup update locking to core”); the patch reverse-matches. |
+| `2427` | The base carries the `__scx_enabled` task-switch gate; the patch reverse-matches. |
+
+These join `1192`, `1194` and `1355` from the previous bump, and the two
+long-standing inert skips `1317` and `2044`.
+
+### Regenerated
+
+- **`9212`** — the kernel hunks are fully absorbed by the base (the corrected
+  `disable_uq` checks are already there), so the patch now carries only its
+  selftest half: the `struct userq_props` split and the slot-availability test
+  cases. This makes the patch a clean one-file apply in both the cumulative
+  audit and `prepare()`, which previously skipped the whole patch and left the
+  named-struct layout uninstalled.
+- **`9237`** — the selftest hunk now targets that named `struct userq_props`
+  layout; the previous revision expected the anonymous inline struct. Kernel
+  hunks are unchanged.
+
+### Hard failure — absorbed, left in place
+
+- **`1320`** no longer reverse-matches after the display merge; hunk #1 fails
+  at `amdgpu_kms.c:1699`. The base still contains the fix in its newer
+  `in_task()` form, so the patch stays listed and `prepare()` skips it.
+
+### Added — `9242`, salkim syncobj-only UserQ waits
+
+`9242` carries Erhan Bilgili's `6d5962449a37` (2026-11-19) from
+`nanomatters/kernel-salkim` `salkim-7.4`: when a UserQ wait has neither read
+nor write BO handles, skip `drm_exec_init()` and go straight to counting or
+returning fences. The kernel hunks applied unchanged; the selftest's
+`check_empty_bo_lists()` call site was rebased onto this tree's
+`check_reference_publication()` context, and the call itself moved with the
+rejected hunk. The patch is experimental salkim work with no
+`Signed-off-by`, consistent with `9200`–`9241`.
+
+Rejected from the same branch: `7e56dcf10ab5` (prioritize revalidation of
+evicted private BOs) and `0504f1c07a19` (validate high-priority BO-list
+entries first). Both build on the `amdgpu_salkim.c` private-gateway design
+removed with the VA-batch block on 2026-11-18; `7e56dcf10ab5` edits
+`amdgpu_salkim.c` directly.
+
+### Source sweep
+
+- **drm/amd work items** (79 open and 12 closed issues updated in the window):
+  the two threads that produced patches are already carried — `#6115`
+  (DCN401 cursor stutter) is `1198` v2, and `#6116` (RX 9070 XT reset after
+  suspend) is `1354` v2. `#6051`/`#5217`'s `63e19ef3ddab` is in both bases.
+  Six fixes merged upstream on 2026-11-17/18 are all in `next-20261118`; each
+  is on a path this machine does not use (DP, MST, eDP/PSR) or cosmetic. No
+  new adoptable commit.
+- **Watch, not carried**: `#6141` (uncleared VRAM after GPU reset, security)
+  and `#6151` (zero-sized AUX transactions) have patch attachments under
+  review, not commits. `#6169` (VCN forces MCLK), `#6161` (HDMI FRL
+  `FLT_UPDATE` timeout), `#6154` (HDMI 4K120 blinking) and `#6156` (GFX12 ring
+  timeout) are on-target bug reports with no fix.
+- **New on-target postings, triaged and deferred**: the r8169 MDIO-bus lock
+  (`<20261117060120.1175-2-javen_xu@realsil.com.cn>`, v3 1/3), the NVMe
+  passthrough doorbell fix (`<20261117130743.2871972-1-houtao@huaweicloud.com>`)
+  and the zswap root-memcg shrinker fix
+  (`<20261114002822.1043378-2-joannelkoong@gmail.com>`, v3 1/4) all apply
+  cleanly to the series tree, but each is an early part of a series still under
+  review. Keep the current carries and re-check at the next sweep.
+- **CAKE v11 3/4** (`<QDISC-BA27.v11.r0.20261116134053-3@mojatatu.com>`)
+  expands `2054` from 12 to 29 qdiscs. The archive copy is corrupted at
+  `sch_plug.c` (a wrapped line decodes as `...+<`), so it needs a deliberate
+  reconstruction against the base, not a drop-in. Deferred.
+- **UserQ gang and doorbell-range query** (Alex Deucher, 2026-11-18, 11
+  patches) adds new UAPI and is not carried. **io_uring drain** is now complete
+  in the archive; the ledger's half-archived note is stale. **sched_ext 7.5
+  fixes** (idle stacking, `dispatch_max_batch`) target a newer base than
+  `7.4-rc3`. All deferred.
+- **CAST** (`lru_cast`) is v0.2.11 (`fe915da3`, 2026-11-18), already carried
+  as `2102`; no newer posting.
+- **NAP** is v0.6.6 (`5092cfd`, 2026-11-01), already carried as `2200`; no
+  newer posting.
+- **CachyOS** `7.4/*` moved on 2026-11-15/16, but the deltas are hybrid-only
+  (amd-pstate CAS / HFI) or already in the base (zswap request stack); `0101`
+  already contains the `7.4/bbr3` head's content. No new on-target carry.
+- **sirlucjan** has no `7.4` line; its newest branch is the 2026-10-20 `7.3`
+  update. Nothing to regenerate.
+- **Phoronix** 2026-11-17–20: the only relevant kernel story is the PRT
+  explicit-sync v2 write-up — already carried as `0900`–`0909` plus the local
+  `9300`/`9301` fixups. No Navi 48 / DCN 4.0.1 / amd-pstate / zswap kernel
+  news.
+
+### Series state
+
+**179 listed / 169 applied** on `next-20261120`; the ten skips are
+`1192`, `1194`, `1317`, `1320`, `1355`, `2044`, `2068`, `2069`, `2426`
+and `2427`. The rc remains **398/398** on `v7.3`.
