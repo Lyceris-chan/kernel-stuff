@@ -13387,3 +13387,66 @@ non-functional for this base.
 (context drift, inert on DCN 4.0.1) and `2044` (absorbed by the base). The
 preview's `1243` is the author's unported 7.4 patch; the rc copy is the port
 described above.
+
+## Sweep 2026-11-23 — lru_cast v0.3.0; rc bbr3 zero-MSS guard; 398/398
+
+The preview moves to `next-20261123`; the rc base is unchanged at `v7.3`. Two
+rc series changes came out of the sweep.
+
+### `2102` → lru_cast v0.3.0
+
+The author's release `c2aed944f2b7` ("lru_cast v0.3.0", 2026-11-24 02:48
++0900, i.e. 2026-11-23 17:48 UTC) replaces v0.2.11. It is a redesign, not a
+version bump: walks are demand-driven (at most one per 250 ms) instead of once
+a tick; an unmapped file page is known after its first read and waits on a
+separate arrival-order list; a mapped newcomer waits four walks before it is
+weighed; the newcomer window may grow past its share while memory is free and
+is trimmed by a worker; an ended swap write is freed from the window's tail
+first; and the reclaim entry points moved into `mm/page_io.c` and
+`mm/page_alloc.c`.
+
+The rc copy is `2102-mm-7.3-lru_cast-v0.3.0.patch`, byte-identical to the
+author's `0001-7.3-rc7-lru_cast-v0.3.0.patch`. Verified at `2102`'s position
+(after the 248 preceding patches): `patch -p1 --forward -F2 --dry-run` exits
+0 with no fuzz and no rejects; the series then audits **398/398**. The preview
+copy is the author's 7.4-rc3 patch, ported to that snapshot; the five ported
+hunks are listed in `sleepy-next/PATCH_SOURCES.md`.
+
+### `0101` bbr3 zero-MSS guard
+
+The rc's `0101` was byte-identical to CachyOS `7.3/bbr3`, whose
+`bbr_tso_segs()` lacks the guard in the `7.4/bbr3` head (`84f7d94553f6`): a
+BPF caller can pass `mss_now == 0` into `bbr_tso_segs_generic()`, which
+divides by it. The rc copy now matches the 7.4 head (`u32 mss_now`, the
+`unlikely(!mss_now)` early return of `sysctl_tcp_min_tso_segs`). Regenerated
+at `0101`'s position; the only changed lines are the guard and
+`unsigned int` → `u32`. The preview already had the guard.
+
+### Checked and not adopted
+
+- **CAKE v12** (`2054`/`2055`) is preview-only; the rc does not carry CAKE.
+- **gup v6** — `[PATCH v6 0/9] mm/gup: walk and batch whole PTE tables in slow
+  GUP` (Rik van Riel, 2026-11-23). Our `2120`–`2127` are RFC v3; v6 adds a
+  ninth part and is under active review. Deferred to a dedicated pass.
+- **`1183` v2, `1190` v2, `2044` v8, `2811` v2, `2056` v4, `1198` v2, `2423`
+  v2** — as recorded on 2026-11-20, non-functional for this base: `CONFIG_KUNIT`
+  is unset (`1183`, `1198` test files), or the delta is a comment, a
+  `goto`→`return 0` rewrite, or the posting lacks the 7.3 port hunks
+  (`1190`). No action.
+- **salkim 2026-11-23 SVM series** — six `kfd_svm.c`/`kfd_migrate.c` fixes and
+  one HDMI FRL line, authored today on `salkim-7.3`; none is on `salkim-7.4`.
+  Deferred.
+- **drm/amd work items** — #6116's TBA/TMA revert is already `1354` v2 and
+  #6115 is `1198` v2. #6141 (uncleared VRAM) and #6151 (zero-sized AUX) are
+  attachments under review, not commits. #4773 (Chrontel CH7218 VRR) is a
+  specific adapter this machine does not have. #5988's >255 Hz VRR fix is in
+  the 7.4 base but not in `v7.3`; it is not carried.
+- **NAP** v0.6.6 (`5092cfd`, 2026-11-01) is current. **BORE** 7.0.1 for
+  7.4-rc4 exists but BORE is dropped from this stack. **sirlucjan** still has
+  no `7.4` line.
+
+### Series state
+
+**398 patches.** `audit_series.py`: **398/398** on `v7.3`. The package becomes
+`7.3.0-32` so the changed `0101` and `2102` are released rather than sitting
+unbuilt in the tree.

@@ -6,8 +6,8 @@ built from **mainline Linux 7.3** plus a sanitized
 [CachyOS](https://github.com/CachyOS/linux-cachyos) patchset, in a 398-patch
 series. It is not a general-purpose kernel.
 
-**Base version:** `7.3.0-31` · **Artifact:**
-`linux-sleepy-rc-7.3.0-31-x86_64.pkg.tar.zst`
+**Base version:** `7.3.0-32` · **Artifact:**
+`linux-sleepy-rc-7.3.0-32-x86_64.pkg.tar.zst`
 
 ## Target hardware
 
@@ -24,14 +24,18 @@ series. It is not a general-purpose kernel.
 
 - **Clang ThinLTO `-O3 -march=znver4`** via the kernel.org ClangBuiltLinux
   pre-built LLVM 23.1.5.
-- **lru_cast 0.2.10 (CAST)** page eviction — Masahito Suzuki's successor to
+- **lru_cast 0.3.0 (CAST)** page eviction — Masahito Suzuki's successor to
   LRU-MARIE, carried as `2102`. It keeps Marie's per-PFN state array, SIMD PTE
   walker, rmap-fed bloom filter, look-around, kcompressd and clean-file floor,
-  and replaces the generational ring with a measured, self-tuning LRFU
-  ranking. It adds per-lruvec reclaim — so `memory.max` is enforced through
-  the active policy — and a runtime switch at
-  `/sys/kernel/mm/lru_cast/enabled`. Both packages carry v0.2.10; the preview
-  applies a port of the same patch to the linux-next base.
+  and ranks pages with a measured, self-tuning LRFU key. v0.3.0 makes the PTE
+  walk demand-driven (at most one per 250 ms) instead of once a tick, weighs
+  mapped newcomers after four walks, gives unmapped file pages their own
+  arrival-order list that needs a second read before promotion, and lets the
+  newcomer window grow while memory is free with a worker trimming it. It adds
+  per-lruvec reclaim — so `memory.max` is enforced through the active policy —
+  and a runtime switch at `/sys/kernel/mm/lru_cast/enabled`. Both packages
+  carry v0.3.0; the preview applies a port of the same patch to the linux-next
+  base.
 - **`mm/gup` folio batching** (Rik van Riel's series) for mTHP throughput.
 - **BBR3** default + CAKE SQM via `net-tune`; ACPI CPPC hardening + per-core EPP
   boost for `amd-pstate`.

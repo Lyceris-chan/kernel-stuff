@@ -1,13 +1,13 @@
-From b5152cadeb1a7459ceef8a396ea442969e792e5c Mon Sep 17 00:00:00 2001
+From cdefc8b3c2d2f3e33205e7c5dfdc0cf96c87949a Mon Sep 17 00:00:00 2001
 From: Masahito S <firelzrd@gmail.com>
-Date: Wed, 18 Nov 2026 04:31:11 +0900
-Subject: [PATCH] 7.3-rc7-lru_cast-v0.2.11
+Date: Tue, 24 Nov 2026 02:37:40 +0900
+Subject: [PATCH] 7.3-rc7-lru_cast-v0.3.0
 
 ---
- include/linux/lru_cast.h           | 480 +++++++++++++++++
+ include/linux/lru_cast.h           | 489 ++++++++++++++
  include/linux/mm_inline.h          |  14 +-
  include/linux/mm_types.h           |  21 +
- include/linux/mmzone.h             |  96 ++++
+ include/linux/mmzone.h             | 119 ++++
  include/linux/page-flags.h         |   7 +
  include/linux/sched.h              |   6 +
  include/linux/swap_ops.h           |  12 +
@@ -16,79 +16,79 @@ Subject: [PATCH] 7.3-rc7-lru_cast-v0.2.11
  mm/Kconfig                         |  20 +-
  mm/Makefile                        |   1 +
  mm/filemap.c                       |  34 +-
- mm/folio.c                         |  17 +
+ mm/folio.c                         |  23 +
  mm/huge_memory.c                   |   3 +
  mm/khugepaged.c                    |   2 +
- mm/lru_cast/Makefile               |  31 ++
- mm/lru_cast/check-layers.sh        |  58 +++
+ mm/lru_cast/Makefile               |  31 +
+ mm/lru_cast/check-layers.sh        |  58 ++
  mm/lru_cast/compat/caps.h          |  72 +++
- mm/lru_cast/compat/kernel.h        | 215 ++++++++
+ mm/lru_cast/compat/kernel.h        | 225 +++++++
  mm/lru_cast/compat/vmap.h          |  27 +
- mm/lru_cast/control.c              | 209 ++++++++
+ mm/lru_cast/control.c              | 219 +++++++
  mm/lru_cast/control.h              |  15 +
- mm/lru_cast/core/clock.c           | 224 ++++++++
- mm/lru_cast/core/core.h            | 225 ++++++++
- mm/lru_cast/core/inl.h             | 120 +++++
- mm/lru_cast/core/key.c             | 151 ++++++
+ mm/lru_cast/core/clock.c           | 242 +++++++
+ mm/lru_cast/core/core.h            | 236 +++++++
+ mm/lru_cast/core/inl.h             | 132 ++++
+ mm/lru_cast/core/key.c             | 151 +++++
  mm/lru_cast/core/prefetch.c        |  76 +++
- mm/lru_cast/core/prefetch.h        |  60 +++
- mm/lru_cast/core/state.c           | 249 +++++++++
- mm/lru_cast/core/store.c           | 197 +++++++
+ mm/lru_cast/core/prefetch.h        |  60 ++
+ mm/lru_cast/core/state.c           | 306 +++++++++
+ mm/lru_cast/core/store.c           | 197 ++++++
  mm/lru_cast/core/store.h           |  25 +
  mm/lru_cast/hooks.c                |  28 +
- mm/lru_cast/policy/balance.c       | 240 +++++++++
- mm/lru_cast/policy/ghost.c         | 176 +++++++
- mm/lru_cast/policy/params.c        |  70 +++
- mm/lru_cast/policy/policy.h        |  78 +++
- mm/lru_cast/policy/reclaim.c       | 197 +++++++
- mm/lru_cast/policy/ring.c          | 796 +++++++++++++++++++++++++++++
- mm/lru_cast/sysfs.c                | 293 +++++++++++
- mm/lru_cast/tune/cost.c            | 504 ++++++++++++++++++
+ mm/lru_cast/policy/balance.c       | 240 +++++++
+ mm/lru_cast/policy/ghost.c         | 176 +++++
+ mm/lru_cast/policy/params.c        |  70 ++
+ mm/lru_cast/policy/policy.h        |  86 +++
+ mm/lru_cast/policy/reclaim.c       | 479 ++++++++++++++
+ mm/lru_cast/policy/ring.c          | 989 +++++++++++++++++++++++++++++
+ mm/lru_cast/sysfs.c                | 293 +++++++++
+ mm/lru_cast/tune/cost.c            | 504 +++++++++++++++
  mm/lru_cast/tune/cost.h            |  12 +
  mm/lru_cast/tune/decay.c           |  76 +++
  mm/lru_cast/tune/decay.h           |  14 +
  mm/lru_cast/tune/evidence.c        | 111 ++++
  mm/lru_cast/tune/evidence.h        |  48 ++
- mm/lru_cast/tune/protect.c         | 236 +++++++++
- mm/lru_cast/tune/readahead.c       |  66 +++
- mm/lru_cast/tune/sample.c          |  35 ++
+ mm/lru_cast/tune/protect.c         | 236 +++++++
+ mm/lru_cast/tune/readahead.c       |  66 ++
+ mm/lru_cast/tune/sample.c          |  35 +
  mm/lru_cast/tune/sample.h          |  25 +
- mm/lru_cast/tune/shape.h           |  60 +++
- mm/lru_cast/tune/share.c           | 105 ++++
+ mm/lru_cast/tune/shape.h           |  60 ++
+ mm/lru_cast/tune/share.c           | 105 +++
  mm/lru_cast/tune/share.h           |  12 +
- mm/lru_cast/tune/sim.c             | 733 ++++++++++++++++++++++++++
+ mm/lru_cast/tune/sim.c             | 733 +++++++++++++++++++++
  mm/lru_cast/tune/sim.h             |  53 ++
- mm/lru_cast/tune/tune.c            | 475 +++++++++++++++++
- mm/lru_cast/tune/tune.h            |  97 ++++
+ mm/lru_cast/tune/tune.c            | 475 ++++++++++++++
+ mm/lru_cast/tune/tune.h            |  97 +++
  mm/lru_cast/tune/world.c           |  56 ++
  mm/lru_cast/tune/world.h           |  15 +
  mm/lru_cast/tune/wshare.c          |  82 +++
  mm/lru_cast/tune/wshare.h          |  21 +
  mm/lru_cast/version.h              |  15 +
- mm/lru_cast/walk/bloom.c           |  65 +++
- mm/lru_cast/walk/lookaround.c      | 101 ++++
+ mm/lru_cast/walk/bloom.c           |  65 ++
+ mm/lru_cast/walk/lookaround.c      | 101 +++
  mm/lru_cast/walk/simd.h            |  27 +
- mm/lru_cast/walk/simd_generic.c    |  34 ++
- mm/lru_cast/walk/simd_x86.c        |  70 +++
- mm/lru_cast/walk/simd_x86_avx2.S   | 170 ++++++
- mm/lru_cast/walk/simd_x86_avx512.S | 220 ++++++++
- mm/lru_cast/walk/simd_x86_sse2.S   | 158 ++++++
- mm/lru_cast/walk/walk.c            | 307 +++++++++++
+ mm/lru_cast/walk/simd_generic.c    |  34 +
+ mm/lru_cast/walk/simd_x86.c        |  70 ++
+ mm/lru_cast/walk/simd_x86_avx2.S   | 170 +++++
+ mm/lru_cast/walk/simd_x86_avx512.S | 220 +++++++
+ mm/lru_cast/walk/simd_x86_sse2.S   | 158 +++++
+ mm/lru_cast/walk/walk.c            | 346 ++++++++++
  mm/lru_cast/walk/walk.h            |  28 +
- mm/lru_cast/walk/young.h           |  58 +++
+ mm/lru_cast/walk/young.h           |  83 +++
  mm/memcontrol.c                    |   1 +
  mm/memory.c                        |  29 +-
  mm/migrate.c                       |   3 +
  mm/mm_init.c                       |   3 +
  mm/mmzone.c                        |   2 +
- mm/page_alloc.c                    |   2 +
- mm/page_io.c                       | 288 ++++++++++-
+ mm/page_alloc.c                    |  27 +
+ mm/page_io.c                       | 288 ++++++++-
  mm/rmap.c                          |   3 +
  mm/shmem.c                         |   4 +
  mm/swap.h                          |  18 +
- mm/vmscan.c                        | 304 ++++++++++-
+ mm/vmscan.c                        | 308 ++++++++-
  mm/workingset.c                    |  27 +
- 84 files changed, 9304 insertions(+), 26 deletions(-)
+ 84 files changed, 10036 insertions(+), 26 deletions(-)
  create mode 100644 include/linux/lru_cast.h
  create mode 100644 mm/lru_cast/Makefile
  create mode 100755 mm/lru_cast/check-layers.sh
@@ -150,10 +150,10 @@ Subject: [PATCH] 7.3-rc7-lru_cast-v0.2.11
 
 diff --git a/include/linux/lru_cast.h b/include/linux/lru_cast.h
 new file mode 100644
-index 0000000000..1fc24924c9
+index 0000000000..8d67ab638e
 --- /dev/null
 +++ b/include/linux/lru_cast.h
-@@ -0,0 +1,480 @@
+@@ -0,0 +1,489 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +/*
 + * CAST -- what the rest of the kernel sees (mm/lru_cast/).
@@ -382,6 +382,8 @@ index 0000000000..1fc24924c9
 +void lru_cast_refault(struct folio *folio, void *shadow);
 +void __lru_cast_reset(struct page *page, unsigned int order);
 +void __lru_cast_copy(struct folio *dst, struct folio *src);
++/* a walk of the page tables is asked for (mm/lru_cast/walk/walk.c) */
++void lru_cast_walk_ask(void);
 +void __lru_cast_migrate(struct folio *dst, struct folio *src);
 +void lru_cast_evicted(struct pglist_data *pgdat, int type, unsigned long nr);
 +void lru_cast_init_lruvec(struct lruvec *lruvec);
@@ -395,6 +397,9 @@ index 0000000000..1fc24924c9
 +	if (lru_cast_enabled())
 +		__lru_cast_reset(page, order);
 +}
++
++/* the state words, by PFN (mm/lru_cast/core/store.c): for mm/page_alloc.c to prefetch one */
++extern u32 *lru_cast_states;
 +
 +/* migration, and the folios a split leaves: they carry the history */
 +static inline void lru_cast_copy(struct folio *dst, struct folio *src)
@@ -606,6 +611,10 @@ index 0000000000..1fc24924c9
 +{
 +}
 +
++static inline void lru_cast_walk_ask(void)
++{
++}
++
 +static inline void lru_cast_copy(struct folio *dst, struct folio *src)
 +{
 +}
@@ -730,10 +739,18 @@ index f3e5a2fadb..33c9268add 100644
  	struct ma_state mas;
  };
 diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
-index 94f9c3ff54..ad917e7e2a 100644
+index 94f9c3ff54..717c49a34c 100644
 --- a/include/linux/mmzone.h
 +++ b/include/linux/mmzone.h
-@@ -24,6 +24,7 @@
+@@ -5,6 +5,7 @@
+ #ifndef __ASSEMBLER__
+ #ifndef __GENERATING_BOUNDS_H
+ 
++#include <linux/workqueue_types.h>
+ #include <linux/spinlock.h>
+ #include <linux/list.h>
+ #include <linux/list_nulls.h>
+@@ -24,6 +25,7 @@
  #include <linux/local_lock.h>
  #include <linux/zswap.h>
  #include <linux/sizes.h>
@@ -741,7 +758,7 @@ index 94f9c3ff54..ad917e7e2a 100644
  #include <asm/page.h>
  
  /* Free memory management - zoned buddy allocator.  */
-@@ -762,6 +763,79 @@ struct lru_cost {
+@@ -762,6 +764,101 @@ struct lru_cost {
  	unsigned long		last_rotated;
  	unsigned long		last_io;
  };
@@ -756,6 +773,8 @@ index 94f9c3ff54..ad917e7e2a 100644
 +#define LRU_CAST_CANDS		128
 +#define LRU_CAST_SAMPLES	128
 +#define LRU_CAST_BLOCKS	256
++/* walks of the page tables a mapped newcomer waits through before it is weighed */
++#define LRU_CAST_LOOKS	4
 +#define LRU_CAST_LIDS		512	/* an lruvec's number in its node's owner tags */
 +
 +struct lru_cast_cand {
@@ -787,6 +806,26 @@ index 94f9c3ff54..ad917e7e2a 100644
 +	long			victim;
 +	/* pages that may come into W before its size is looked at again */
 +	long			w_room;
++	/*
++	 * ([1], the file LRU) W's unmapped folios: read once and no more as
++	 * far as is known, and all of it is known. In the order they came, for
++	 * reclaim to take (policy/reclaim.c). The inactive list holds the rest
++	 * of W; both are counted as the inactive list is.
++	 */
++	struct list_head	cold;
++	/*
++	 * W's mapped newcomers the walker has yet to tell of, a list for the
++	 * walks ended as each came in (modulo the lists); the walks ended when
++	 * the lists were last turned; the pages put on each list, those put on
++	 * any since the last walk, and how many of these ask for the next
++	 * (policy/reclaim.c).
++	 */
++	struct list_head	wait[LRU_CAST_LOOKS + 1];
++	unsigned long		wait_epoch;
++	unsigned long		wait_nr[LRU_CAST_LOOKS + 1], wait_in, wait_goal;
++	/* W's excess joins M by this, off the path folios come in by; its type */
++	struct work_struct	admit_work;
++	u8			admit_type;
 +};
 +
 +/*
@@ -821,7 +860,7 @@ index 94f9c3ff54..ad917e7e2a 100644
  
  struct lruvec {
  	struct list_head		lists[NR_LRU_LISTS];
-@@ -791,6 +865,11 @@ struct lruvec {
+@@ -791,6 +888,11 @@ struct lruvec {
  	struct lru_gen_mm_state		mm_state;
  #endif
  #endif /* CONFIG_LRU_GEN */
@@ -833,7 +872,7 @@ index 94f9c3ff54..ad917e7e2a 100644
  #ifdef CONFIG_MEMCG
  	struct pglist_data *pgdat;
  #endif
-@@ -1535,6 +1614,20 @@ typedef struct pglist_data {
+@@ -1535,6 +1637,20 @@ typedef struct pglist_data {
  
  	atomic_t kswapd_failures;	/* Number of 'reclaimed == 0' runs */
  
@@ -854,7 +893,7 @@ index 94f9c3ff54..ad917e7e2a 100644
  #ifdef CONFIG_COMPACTION
  	int kcompactd_max_order;
  	enum zone_type kcompactd_highest_zoneidx;
-@@ -1599,6 +1692,9 @@ typedef struct pglist_data {
+@@ -1599,6 +1715,9 @@ typedef struct pglist_data {
  	/* lru_gen_folio list */
  	struct lru_gen_memcg memcg_lru;
  #endif
@@ -1123,7 +1162,7 @@ index 00fd89cf6f..3709c2d19d 100644
  		filemap_invalidate_unlock_shared(mapping);
  	if (fpin)
 diff --git a/mm/folio.c b/mm/folio.c
-index 50a6dbe559..57708320ba 100644
+index 50a6dbe559..0dd8e00676 100644
 --- a/mm/folio.c
 +++ b/mm/folio.c
 @@ -20,6 +20,7 @@
@@ -1134,15 +1173,21 @@ index 50a6dbe559..57708320ba 100644
  #include <linux/percpu_counter.h>
  #include <linux/memremap.h>
  #include <linux/percpu.h>
-@@ -424,6 +425,16 @@ void folio_mark_accessed(struct folio *folio)
+@@ -424,6 +425,22 @@ void folio_mark_accessed(struct folio *folio)
  {
  	if (folio_test_dropbehind(folio))
  		return;
 +
 +	if (lru_cast_enabled()) {
-+		/* a read: recorded in the folio's state word, nothing moves */
++		/*
++		 * A read: recorded in the folio's state word, nothing moves.
++		 * PG_referenced is tested before it is cleared: clear already
++		 * but for the first sighting of a folio, the atomic clearing
++		 * was a write to the struct page of a page every CPU reads.
++		 */
 +		if (!folio_test_unevictable(folio))
-+			lru_cast_access_seen(folio, folio_test_clear_referenced(folio));
++			lru_cast_access_seen(folio, folio_test_referenced(folio) &&
++						    folio_test_clear_referenced(folio));
 +		if (folio_test_idle(folio))
 +			folio_clear_idle(folio);
 +		return;
@@ -1151,7 +1196,7 @@ index 50a6dbe559..57708320ba 100644
  	if (lru_gen_enabled()) {
  		lru_gen_inc_refs(folio);
  		return;
-@@ -486,6 +497,10 @@ void folio_add_lru(struct folio *folio)
+@@ -486,6 +503,10 @@ void folio_add_lru(struct folio *folio)
  			folio_mark_accessed(folio);
  	}
  
@@ -1162,7 +1207,7 @@ index 50a6dbe559..57708320ba 100644
  	folio_batch_add_and_move(folio, lru_add);
  }
  EXPORT_SYMBOL(folio_add_lru);
-@@ -1152,6 +1167,8 @@ void lru_reparent_memcg(struct mem_cgroup *memcg, struct mem_cgroup *parent, int
+@@ -1152,6 +1173,8 @@ void lru_reparent_memcg(struct mem_cgroup *memcg, struct mem_cgroup *parent, int
  
  	child_lruvec = mem_cgroup_lruvec(memcg, NODE_DATA(nid));
  	parent_lruvec = mem_cgroup_lruvec(parent, NODE_DATA(nid));
@@ -1386,10 +1431,10 @@ index 0000000000..4ec4b82f2b
 +#endif /* _MM_LRU_CAST_COMPAT_CAPS_H */
 diff --git a/mm/lru_cast/compat/kernel.h b/mm/lru_cast/compat/kernel.h
 new file mode 100644
-index 0000000000..c38e9bf92f
+index 0000000000..fd46a0ecc7
 --- /dev/null
 +++ b/mm/lru_cast/compat/kernel.h
-@@ -0,0 +1,215 @@
+@@ -0,0 +1,225 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +/*
 + * The host kernel's API, as mm/lru_cast/ uses it. Each adapter picks its
@@ -1456,6 +1501,16 @@ index 0000000000..c38e9bf92f
 +	return READ_ONCE(page->flags.f);
 +#else
 +	return READ_ONCE(page->flags);
++#endif
++}
++
++/* @page's flags, the word itself: for a bit operation on it */
++static inline unsigned long *lru_cast_page_flagsp(struct page *page)
++{
++#if LRU_CAST_CAP_MEMDESC_FLAGS
++	return &page->flags.f;
++#else
++	return &page->flags;
 +#endif
 +}
 +
@@ -1640,10 +1695,10 @@ index 0000000000..ba34ea86e4
 +#endif /* _MM_LRU_CAST_COMPAT_VMAP_H */
 diff --git a/mm/lru_cast/control.c b/mm/lru_cast/control.c
 new file mode 100644
-index 0000000000..5c72a04d1a
+index 0000000000..77c371eca7
 --- /dev/null
 +++ b/mm/lru_cast/control.c
-@@ -0,0 +1,209 @@
+@@ -0,0 +1,219 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * CAST -- switching it on and off.
@@ -1765,8 +1820,18 @@ index 0000000000..5c72a04d1a
 +/* M is the active list already */
 +static void lru_cast_drain(struct lruvec *lruvec)
 +{
++	int type, i;
++
 +	spin_lock_irq(&lruvec->lru_lock);
 +	WRITE_ONCE(lruvec->lru_cast_on, false);
++	/* W's cold folios are of the inactive list, and its oldest; what waits, its newest */
++	for (type = 0; type < ANON_AND_FILE; type++) {
++		list_splice_tail_init(&lruvec->lru_cast[type].cold,
++				      &lruvec->lists[LRU_INACTIVE_ANON + type * LRU_FILE]);
++		for (i = 0; i <= LRU_CAST_LOOKS; i++)
++			list_splice_init(&lruvec->lru_cast[type].wait[i],
++					 &lruvec->lists[LRU_INACTIVE_ANON + type * LRU_FILE]);
++	}
 +	lru_cast_ring_reset(lruvec);
 +	spin_unlock_irq(&lruvec->lru_lock);
 +}
@@ -1876,10 +1941,10 @@ index 0000000000..c9c67ed18a
 +#endif /* _MM_LRU_CAST_CONTROL_H */
 diff --git a/mm/lru_cast/core/clock.c b/mm/lru_cast/core/clock.c
 new file mode 100644
-index 0000000000..777830bb5a
+index 0000000000..1632be9a54
 --- /dev/null
 +++ b/mm/lru_cast/core/clock.c
-@@ -0,0 +1,224 @@
+@@ -0,0 +1,242 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * CAST -- the clock.
@@ -2025,6 +2090,24 @@ index 0000000000..777830bb5a
 +	put_cpu_ptr(&lru_cast_pending);
 +}
 +
++/*
++ * The other time there is: how many times the page tables have been walked
++ * over for their young bits (walk/walk.c). A read of a mapped page is known
++ * only from one walk to the next, and what waits to be known waits by walks
++ * (policy/reclaim.c).
++ */
++static unsigned long lru_cast_walks_done;
++
++unsigned long lru_cast_walks(void)
++{
++	return data_race(lru_cast_walks_done);
++}
++
++void lru_cast_walked(void)
++{
++	data_race(lru_cast_walks_done++);
++}
++
 +/* @nr pages of @folio's node taken in */
 +void lru_cast_installed(struct folio *folio, unsigned long nr)
 +{
@@ -2106,10 +2189,10 @@ index 0000000000..777830bb5a
 +}
 diff --git a/mm/lru_cast/core/core.h b/mm/lru_cast/core/core.h
 new file mode 100644
-index 0000000000..bf2265e01d
+index 0000000000..bf2450d870
 --- /dev/null
 +++ b/mm/lru_cast/core/core.h
-@@ -0,0 +1,225 @@
+@@ -0,0 +1,236 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +/*
 + * CAST -- the core: what a folio's reads were, and when.
@@ -2297,6 +2380,17 @@ index 0000000000..bf2265e01d
 +void lru_cast_released(int nid, unsigned long nr);
 +void lru_cast_shadowed(struct pglist_data *pgdat, int type, unsigned long nr);
 +void lru_cast_returned(struct pglist_data *pgdat, int type, unsigned long nr);
++/*
++ * A folio read once, put at W's tail with its write to swap ended, is marked
++ * in the gap codes, which one read once has no use for (policy/reclaim.c).
++ * The next read takes the mark off: read again, it is not one to be freed for
++ * being written.
++ */
++#define LRU_CAST_WRITTEN	40U
++void lru_cast_mark_written(struct folio *folio);
++bool lru_cast_marked_written(struct folio *folio);
++unsigned long lru_cast_walks(void);		/* walks of the page tables ended so far */
++void lru_cast_walked(void);
 +unsigned long lru_cast_ticks_now(void);		/* every node's ticks, summed */
 +int lru_cast_clock_show(char *buf);
 +
@@ -2337,10 +2431,10 @@ index 0000000000..bf2265e01d
 +#endif /* _MM_LRU_CAST_CORE_H */
 diff --git a/mm/lru_cast/core/inl.h b/mm/lru_cast/core/inl.h
 new file mode 100644
-index 0000000000..14b8c41302
+index 0000000000..7910033fca
 --- /dev/null
 +++ b/mm/lru_cast/core/inl.h
-@@ -0,0 +1,120 @@
+@@ -0,0 +1,132 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +/*
 + * CAST -- the inline forms of core's functions that policy/ calls in its
@@ -2458,6 +2552,18 @@ index 0000000000..14b8c41302
 +		}
 +	}
 +	return end;
++}
++
++/*
++ * Whether @folio's word has an owner tag: asked under the lru_lock of every
++ * folio that comes in, where a call and the calls it makes are time every
++ * other CPU adding to the LRU waits.
++ */
++static __always_inline bool lru_cast_owned_inl(struct folio *folio)
++{
++	u32 *p = lru_cast_word(folio_pfn(folio));
++
++	return p && (READ_ONCE(*p) & LRU_CAST_OWNER_MASK);
 +}
 +
 +#endif /* _MM_LRU_CAST_CORE_INL_H */
@@ -2768,10 +2874,10 @@ index 0000000000..a3c067a782
 +#endif /* _MM_LRU_CAST_CORE_PREFETCH_H */
 diff --git a/mm/lru_cast/core/state.c b/mm/lru_cast/core/state.c
 new file mode 100644
-index 0000000000..84f4ee71f3
+index 0000000000..0fac438aec
 --- /dev/null
 +++ b/mm/lru_cast/core/state.c
-@@ -0,0 +1,249 @@
+@@ -0,0 +1,306 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * CAST -- the per-folio state word.
@@ -2902,27 +3008,47 @@ index 0000000000..84f4ee71f3
 +		;
 +}
 +
-+/* a read: push the tick, count it; lock-free */
-+/* a read: push the tick, count it -- or, @kept, count it as the most there are; lock-free */
-+static void lru_cast_record(struct folio *folio, enum lru_cast_read how, bool kept)
++/*
++ * A read: push the tick, count it -- or, @kept, count it as the most there
++ * are; lock-free. @p is @folio's word and @old what was read of it; @also,
++ * flags of the folio set along with PG_rekey, in the one write.
++ */
++static __always_inline void lru_cast_record_word(struct folio *folio, u32 *p, u32 old,
++						 enum lru_cast_read how, bool kept,
++						 unsigned long also)
 +{
 +	u8 t = lru_cast_tick(folio_pgdat(folio), folio_is_file_lru(folio));
-+	u32 *p = lru_cast_word(folio_pfn(folio)), old, new;
++	unsigned long flags = BIT(PG_rekey) | also;
++	u32 new;
 +
-+	if (!p)
-+		return;
-+	old = READ_ONCE(*p);
 +	do {
 +		u32 n = kept ? 255 : min((old >> 24) + 1, 255u);
 +
 +		new = lru_cast_push(old, t, n);
++		/*
++		 * Read as often as a word counts, and again in the same tick:
++		 * the word would be written as it is. It is left alone, and
++		 * its line with the CPUs reading it -- the text every process
++		 * runs is read by them all, and written each time the line
++		 * went from one to the next.
++		 */
++		if (new == old)
++			break;
 +	} while (!try_cmpxchg(p, &old, new));
 +	/* after the word (the cmpxchg orders it): its key is to be taken again */
-+	if (!folio_test_rekey(folio))
-+		folio_set_rekey(folio);
++	if ((lru_cast_page_flags(&folio->page) & flags) != flags)
++		set_mask_bits(lru_cast_page_flagsp(&folio->page), 0, flags);
 +
 +	/* whoever watches reads sees this one (lru_cast_hook_read()) */
 +	lru_cast_hook_read(folio, how);
++}
++
++static void lru_cast_record(struct folio *folio, enum lru_cast_read how, bool kept)
++{
++	u32 *p = lru_cast_word(folio_pfn(folio));
++
++	if (p)
++		lru_cast_record_word(folio, p, READ_ONCE(*p), how, kept, 0);
 +}
 +
 +void lru_cast_access(struct folio *folio)
@@ -2961,11 +3087,36 @@ index 0000000000..84f4ee71f3
 + */
 +void lru_cast_enter(struct folio *folio)
 +{
-+	if (folio_test_unevictable(folio) || (lru_cast_read(folio) >> 24))
++	u32 *p, old;
++
++	if (folio_test_unevictable(folio))
++		return;
++	/* the word read once: for what it says, and for the read pushed into it */
++	p = lru_cast_word(folio_pfn(folio));
++	old = p ? READ_ONCE(*p) : 0;
++	if (old >> 24)
 +		return;
 +	lru_cast_installed(folio, folio_nr_pages(folio));
-+	lru_cast_access(folio);
-+	folio_set_referenced(folio);
++	if (p)
++		lru_cast_record_word(folio, p, old, LRU_CAST_READ, false, BIT(PG_referenced));
++	else
++		folio_set_referenced(folio);
++}
++
++/* @folio, read once, is at W's tail for its write to swap having ended */
++void lru_cast_mark_written(struct folio *folio)
++{
++	u32 w = lru_cast_read(folio);
++
++	if ((w >> 24) == 1)
++		lru_cast_write(folio, (w & ~LRU_CAST_W_GAPS) | LRU_CAST_WRITTEN << LRU_CAST_W_GAP);
++}
++
++bool lru_cast_marked_written(struct folio *folio)
++{
++	u32 w = lru_cast_read(folio);
++
++	return (w >> 24) == 1 && (w & LRU_CAST_W_GAPS) >> LRU_CAST_W_GAP == LRU_CAST_WRITTEN;
 +}
 +
 +/*
@@ -2992,6 +3143,18 @@ index 0000000000..84f4ee71f3
 +
 +	if (!p)
 +		return;
++	/*
++	 * Read since its key was last taken -- a folio of W always, never
++	 * placed by one -- its word has those reads, and is not looked at to
++	 * know: read here it was in no cache, the page having been in use
++	 * since it was written, and every page freed waited for it. Written
++	 * only, the write waits for the line and the CPU does not.
++	 */
++	if (test_bit(PG_rekey, lru_cast_page_flagsp(page))) {
++		lru_cast_released(page_to_nid(page), 1UL << order);
++		WRITE_ONCE(*p, 0);
++		return;
++	}
 +	w = READ_ONCE(*p);
 +	if (w & ~LRU_CAST_OWNER_MASK)
 +		lru_cast_released(page_to_nid(page), 1UL << order);
@@ -3795,10 +3958,10 @@ index 0000000000..d032ff4630
 +}
 diff --git a/mm/lru_cast/policy/policy.h b/mm/lru_cast/policy/policy.h
 new file mode 100644
-index 0000000000..ad9271c982
+index 0000000000..4f25cc76aa
 --- /dev/null
 +++ b/mm/lru_cast/policy/policy.h
-@@ -0,0 +1,78 @@
+@@ -0,0 +1,86 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +/*
 + * CAST -- the policy: the main cache, run inside reclaim.
@@ -3851,6 +4014,8 @@ index 0000000000..ad9271c982
 +/* reclaim.c: under the lruvec's lru_lock */
 +#define LRU_CAST_ADMIT	2	/* W's tail admitted per page reclaim asks for */
 +#define LRU_CAST_W_SLACK	32	/* pages W may hold over its share as folios come in */
++#define LRU_CAST_ADMIT_BATCH	64	/* pages the work admits each time it takes the lock */
++
 +unsigned long lru_cast_w_admit(struct lruvec *lruvec, int type, unsigned long *nr_w,
 +			    unsigned long *nr_m, unsigned long slack, unsigned long budget);
 +
@@ -3861,6 +4026,12 @@ index 0000000000..ad9271c982
 +void lru_cast_ring_out(struct folio *folio);
 +void lru_cast_ring_admit(struct lruvec *lruvec, struct folio *folio, int type);
 +struct folio *lru_cast_ring_min(struct lruvec *lruvec, int type, long *bucket);
++long lru_cast_ring_key(struct lruvec *lruvec, struct folio *folio, int type);
++#define LRU_CAST_WAITS	(LRU_CAST_LOOKS + 1)
++void lru_cast_wait_turn(struct lruvec *lruvec, int type);
++#define LRU_CAST_WAIT_LOOK	1024UL	/* pages come in to wait between two looks at what W has weighed */
++void lru_cast_wait_goal(struct lruvec *lruvec, int type);
++void lru_cast_ring_unmin(struct lruvec *lruvec, int type);
 +void lru_cast_ring_reset(struct lruvec *lruvec);
 +void lru_cast_ring_init(struct lruvec *lruvec);
 +void lru_cast_ring_exit(struct lruvec *lruvec);
@@ -3879,10 +4050,10 @@ index 0000000000..ad9271c982
 +#endif /* _MM_LRU_CAST_POLICY_H */
 diff --git a/mm/lru_cast/policy/reclaim.c b/mm/lru_cast/policy/reclaim.c
 new file mode 100644
-index 0000000000..c598c51651
+index 0000000000..9f66e32839
 --- /dev/null
 +++ b/mm/lru_cast/policy/reclaim.c
-@@ -0,0 +1,197 @@
+@@ -0,0 +1,479 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * CAST -- the choice of victims.
@@ -3921,6 +4092,116 @@ index 0000000000..c598c51651
 +#include "policy/policy.h"
 +
 +/*
++ * @folio, at W's tail, was written to swap and its write has ended: it was
++ * put there for reclaim to free (folio_rotate_reclaimable(), or reclaim's
++ * own putback), and marked as it was (policy/ring.c).
++ *
++ * W's tail is where a folio goes on into M; a written one went with the
++ * rest, to be found again by its key, and reclaim wrote another in its
++ * place meanwhile: twice the pages written for those freed. Taken from W's
++ * tail before anything of M, and not admitted into M, they are freed as
++ * they are written.
++ *
++ * The mark is what tells it from a folio read ahead from swap and never
++ * mapped, which is in the swap cache, unmapped and clean as well, and comes
++ * to W's tail with memory to spare and no reclaim to take it: W's admission
++ * stopped at those, W's cold folios were left behind them, and reclaim took
++ * what a sweep of M found in their place -- a working set of 300 MiB under a
++ * stream lost twenty thousand pages or more in 6 runs of 54. Read again or
++ * mapped again or dirtied, a folio is no longer written and to be freed,
++ * and is weighed as any other.
++ */
++static bool lru_cast_written(struct folio *folio)
++{
++	return folio_test_swapbacked(folio) && folio_test_swapcache(folio) &&
++	       !folio_mapped(folio) && !folio_test_dirty(folio) &&
++	       !folio_test_writeback(folio) && !folio_test_locked(folio) &&
++	       lru_cast_marked_written(folio);
++}
++
++/*
++ * W's mapped newcomers wait before they are weighed.
++ *
++ * A mapped page is read through its page tables, and all that is known of
++ * that is what the walker finds. Its first walk gives the fault's own young
++ * bit away (walk/young.h); only the walks after it tell whether the page was
++ * used again. Weighed before then, the heap of a running process and a
++ * stream never to be touched again weigh the same, and reclaim took both
++ * alike: of a kernel build on tmpfs in 2 GiB it wrote a million anonymous
++ * pages to swap, and 300 thousand of them were taken back from the swap
++ * cache by their tasks before they were freed, where the multi-gen LRU wrote
++ * three thousand. An unmapped page waits for nothing: every read of it is
++ * recorded as it is made, and one read once has not been read since.
++ *
++ * They wait on lists by walk. A mapped newcomer read once is put on the
++ * list of the walks ended as it came in (__lru_cast_add_folio()). When
++ * LRU_CAST_LOOKS walks have ended since, all that is on that list has been
++ * walked over as often, and the list as a whole joins the inactive list --
++ * W's weighed part -- as its newest. Nothing on the inactive list waits, and
++ * nothing that waits is in the way of what does not; no folio carries when
++ * it came, where it is tells. (They waited at W's tail once, each with the
++ * walk it came in during in its state word, and whatever came in behind one
++ * that waited could neither join M nor be met with M's lowest.)
++ *
++ * The lists are turned here, wherever W is looked at; under the lru_lock.
++ */
++void lru_cast_wait_turn(struct lruvec *lruvec, int type)
++{
++	struct lru_cast *k = &lruvec->lru_cast[type];
++	struct list_head *w = &lruvec->lists[type ? LRU_INACTIVE_FILE : LRU_INACTIVE_ANON];
++	long now = lru_cast_walks(), was = k->wait_epoch, e;
++
++	if (now == was)
++		return;
++	/* the lists hold the walks was - LOOKS + 1 .. was; those LOOKS walks old go, oldest first */
++	for (e = was - LRU_CAST_LOOKS + 1; e <= was && e <= now - LRU_CAST_LOOKS; e++) {
++		if (e < 0)
++			continue;
++		list_splice_init(&k->wait[e % LRU_CAST_WAITS], w);
++		k->wait_nr[e % LRU_CAST_WAITS] = 0;
++	}
++	k->wait_epoch = now;
++	/* a walk has been made: what comes in to wait from now asks for the next */
++	k->wait_in = 0;
++	lru_cast_wait_goal(lruvec, type);
++}
++
++/*
++ * What comes in to wait asks for a walk once there is more of it since the
++ * last than W has weighed (__lru_cast_add_folio()): W less what waits,
++ * counted as it was put on the lists -- a folio freed or weighed since is
++ * counted still, and the walk comes the sooner for it.
++ *
++ * Taken anew as they come in, every LRU_CAST_WAIT_LOOK pages of them, not
++ * only when a walk has been made: what W had weighed at the last walk may be
++ * long gone. A memcg whose stream was killed kept the measure of that stream,
++ * and the task that came next, smaller than it, never asked: it was walked
++ * over first when reclaim was at work on it.
++ */
++void lru_cast_wait_goal(struct lruvec *lruvec, int type)
++{
++	struct lru_cast *k = &lruvec->lru_cast[type];
++	unsigned long waits = 0, nr_w;
++	int i;
++
++	nr_w = lru_cast_lru_size(lruvec, type ? LRU_INACTIVE_FILE : LRU_INACTIVE_ANON);
++	for (i = 0; i < LRU_CAST_WAITS; i++)
++		waits += k->wait_nr[i];
++	k->wait_goal = max(nr_w > waits ? nr_w - waits : 0UL, LRU_CAST_WAIT_LOOK);
++}
++
++/* the folio that has waited longest, if any waits */
++static struct folio *lru_cast_wait_oldest(struct lru_cast *k)
++{
++	long e;
++
++	for (e = (long)k->wait_epoch - LRU_CAST_LOOKS + 1; e <= (long)k->wait_epoch; e++)
++		if (e >= 0 && !list_empty(&k->wait[e % LRU_CAST_WAITS]))
++			return lru_to_folio(&k->wait[e % LRU_CAST_WAITS]);
++	return NULL;
++}
++
++/*
 + * W's excess joins M by key, its tail first, at most @budget pages, once
 + * W is over its share by more than @slack; the lists' sizes, *@nr_w and
 + * *@nr_m, follow, once per zone. Run where a folio enters W
@@ -3938,14 +4219,23 @@ index 0000000000..c598c51651
 +	unsigned long moved[MAX_NR_ZONES] = { 0 }, admitted = 0, nr_pages;
 +	int zid;
 +
++	lru_cast_wait_turn(lruvec, type);
 +	if (*nr_w <= target + slack)
 +		return 0;
 +	lru_cast_ring_prepare(lruvec, type);
 +	while (budget && *nr_w > target && !list_empty(w)) {
 +		struct folio *folio = lru_to_folio(w);
++		struct list_head *prev = folio->lru.prev;
++
++		/* the one after it, cold since it came in: asked for while this one is placed */
++		if (prev != w)
++			lru_cast_prefetch_frame(folio_pfn(list_entry(prev, struct folio, lru)), true);
 +
 +		/* still being read in: it has not arrived, and waits in W until it has */
 +		if (folio_test_locked(folio))
++			break;
++		/* nor one written and to be freed: reclaim takes it from here */
++		if (lru_cast_written(folio))
 +			break;
 +
 +		nr_pages = folio_nr_pages(folio);
@@ -3975,18 +4265,169 @@ index 0000000000..c598c51651
 +	enum lru_list lru_w = s->type ? LRU_INACTIVE_FILE : LRU_INACTIVE_ANON;
 +	struct list_head *w = &lruvec->lists[lru_w];
 +	unsigned long nr_w = s->nr_w, nr_m = s->nr_m, scan = 0, nr_pages;
++	struct lru_cast *k = &lruvec->lru_cast[s->type];
++	unsigned long joined[MAX_NR_ZONES] = { 0 }, nr_joined = 0;
++	struct folio *held = NULL;
++	long held_bm = 0;
 +	LIST_HEAD(aside_w);
++	LIST_HEAD(aside_c);
 +	LIST_HEAD(aside_m);
++	int zid;
 +
 +	lru_cast_w_admit(lruvec, s->type, &nr_w, &nr_m, 0, s->nr_to_scan * LRU_CAST_ADMIT);
 +	lru_cast_ring_prepare(lruvec, s->type);
 +
 +	while (scan < s->nr_to_scan) {
 +		struct folio *folio;
-+		bool from_m = true;
++		bool from_m = true, from_c = false;
 +		long bm = 0;
 +
-+		folio = nr_m ? lru_cast_ring_min(lruvec, s->type, &bm) : NULL;
++		/*
++		 * W's cold: the unmapped folios of the file LRU, in the order
++		 * they came (struct lru_cast). Every read of one is recorded as
++		 * it is made, so one read once is known to be that, and there is
++		 * nothing to wait for: its tail meets M's lowest, the lower of
++		 * the two goes, and nothing read once joins M. One read again
++		 * since has its place in M; one mapped since, that the walker
++		 * has yet to tell of, waits with the others that do.
++		 *
++		 * Joined to M as the rest of W is, the pages of a file read
++		 * once were where a sweep came by them and not where reclaim
++		 * needed one, and a sweep that found fewer than its 128 of them
++		 * in its 4096 frames handed out what else was there: of 300 MiB
++		 * of files read over and over beside a stream, a tenth to a
++		 * fifth were evicted a run, four in five of them with a key
++		 * above tau.
++		 */
++		if (!list_empty(&k->cold) && !folio_test_locked(lru_to_folio(&k->cold))) {
++			struct folio *c = lru_to_folio(&k->cold);
++
++			nr_pages = folio_nr_pages(c);
++			if ((lru_cast_read(c) >> 24) >= 2) {
++				list_del(&c->lru);
++				folio_set_active(c);
++				joined[folio_zonenum(c)] += nr_pages;
++				nr_joined += nr_pages;
++				lru_cast_ring_admit(lruvec, c, s->type);
++				nr_w -= min(nr_w, nr_pages);
++				nr_m += nr_pages;
++				scan += nr_pages;
++				s->nr_scanned += nr_pages;
++				continue;
++			}
++			if (folio_mapped(c)) {
++				list_move(&c->lru, &k->wait[k->wait_epoch % LRU_CAST_WAITS]);
++				k->wait_nr[k->wait_epoch % LRU_CAST_WAITS] += nr_pages;
++				scan += nr_pages;
++				s->nr_scanned += nr_pages;
++				continue;
++			}
++			if (!held && nr_m)
++				held = lru_cast_ring_min(lruvec, s->type, &held_bm);
++			if (held && held_bm < lru_cast_ring_key(lruvec, c, s->type)) {
++				folio = held;
++				bm = held_bm;
++				held = NULL;
++				WRITE_ONCE(k->victim, bm);
++			} else {
++				folio = c;
++				from_m = false;
++				from_c = true;
++			}
++			goto got;
++		}
++
++		/* written, its write ended: freed before anything else is written */
++		if (!list_empty(w) && lru_cast_written(lru_to_folio(w))) {
++			folio = lru_to_folio(w);
++			from_m = false;
++			goto got;
++		}
++		/*
++		 * The weighed part of W is in the order its folios came, and
++		 * its tail is its oldest, not its coldest. One at the tail that
++		 * was read again has its place in M, as one of W's cold has,
++		 * and is not met with M's lowest: left there, a working set's
++		 * folio with the key of M's candidates -- the same working set
++		 * -- stood between reclaim and the stream read once behind it,
++		 * and M's candidates went, all of them.
++		 */
++		if (!list_empty(w) && !folio_test_locked(lru_to_folio(w)) &&
++		    (lru_cast_read(lru_to_folio(w)) >> 24) >= 2) {
++			struct folio *c = lru_to_folio(w);
++
++			nr_pages = folio_nr_pages(c);
++			list_del(&c->lru);
++			folio_set_active(c);
++			joined[folio_zonenum(c)] += nr_pages;
++			nr_joined += nr_pages;
++			lru_cast_ring_admit(lruvec, c, s->type);
++			nr_w -= min(nr_w, nr_pages);
++			nr_m += nr_pages;
++			scan += nr_pages;
++			s->nr_scanned += nr_pages;
++			continue;
++		}
++		if (held) {
++			folio = held;
++			bm = held_bm;
++			held = NULL;
++		} else {
++			folio = nr_m ? lru_cast_ring_min(lruvec, s->type, &bm) : NULL;
++		}
++		/*
++		 * W's tail is still at the gate, weighed and not admitted, more
++		 * of W being due than one call admits. With its key below M's lowest
++		 * it is the one to go and M's goes back -- or what is in W would
++		 * be kept at the cost of all that is in M, a working set read a
++		 * thousand times for a stream that came in a moment ago. Met
++		 * only when it waited, a stream's folio the walker had seen
++		 * young once more than its fault no longer waited, and in a
++		 * memcg whose M was its working set and no more, that working
++		 * set was handed out by M's sweep, all of it, before the stream.
++		 */
++		if (folio && !list_empty(w)) {
++			struct folio *last = lru_to_folio(w);
++
++			if (!folio_test_locked(last) &&
++			    lru_cast_ring_key(lruvec, last, s->type) < bm) {
++				list_move(&folio->lru, &aside_m);
++				nr_m -= min(nr_m, (unsigned long)folio_nr_pages(folio));
++				folio = NULL;
++			}
++		}
++		/*
++		 * What waits is not weighed, and reclaim does not wait for it
++		 * to be: the walks are asked for ahead of it (walk/walk.c). The
++		 * one that has waited longest goes with its key below that of
++		 * what would go otherwise -- M's lowest, or the weighed tail of
++		 * W -- or with nothing else to take. One seen in use while it
++		 * waited waits no more: it is weighed, and not in the way of
++		 * those behind it.
++		 */
++		{
++			struct folio *wt = lru_cast_wait_oldest(k);
++			long other;
++			int n;
++
++			for (n = 0; wt && n < 2 * SWAP_CLUSTER_MAX && (lru_cast_read(wt) >> 24) >= 2; n++) {
++				list_move(&wt->lru, w);
++				wt = lru_cast_wait_oldest(k);
++			}
++			other = folio ? bm : list_empty(w) ? LONG_MAX :
++				lru_cast_ring_key(lruvec, lru_to_folio(w), s->type);
++			if (wt && !folio_test_locked(wt) &&
++			    ((!folio && list_empty(w)) ||
++			     lru_cast_ring_key(lruvec, wt, s->type) < other)) {
++				if (folio) {
++					list_move(&folio->lru, &aside_m);
++					nr_m -= min(nr_m, (unsigned long)folio_nr_pages(folio));
++				}
++				folio = wt;
++				from_m = false;
++				goto got;
++			}
++		}
 +		if (folio) {
 +			WRITE_ONCE(lruvec->lru_cast[s->type].victim, bm);
 +		} else if (!list_empty(w)) {
@@ -3996,6 +4437,7 @@ index 0000000000..c598c51651
 +			break;
 +		}
 +
++got:
 +		nr_pages = folio_nr_pages(folio);
 +		s->nr_scanned += nr_pages;
 +		if (from_m)
@@ -4043,10 +4485,21 @@ index 0000000000..c598c51651
 +		s->nr_taken += nr_pages;
 +		continue;
 +aside:
-+		list_move(&folio->lru, from_m ? &aside_m : &aside_w);
++		list_move(&folio->lru, from_m ? &aside_m : from_c ? &aside_c : &aside_w);
 +	}
 +
++	if (held)
++		lru_cast_ring_unmin(lruvec, s->type);
++	for (zid = 0; nr_joined && zid < MAX_NR_ZONES; zid++) {
++		if (!joined[zid])
++			continue;
++		lru_cast_update_lru_size(lruvec, lru_w, zid, -joined[zid]);
++		lru_cast_update_lru_size(lruvec, lru_w + LRU_ACTIVE, zid, joined[zid]);
++	}
++	if (nr_joined)
++		lru_cast_age_nonresident(lruvec, nr_joined);
 +	list_splice(&aside_w, w);
++	list_splice(&aside_c, &k->cold);
 +	while (!list_empty(&aside_m)) {
 +		struct folio *folio = lru_to_folio(&aside_m);
 +
@@ -4082,10 +4535,10 @@ index 0000000000..c598c51651
 +}
 diff --git a/mm/lru_cast/policy/ring.c b/mm/lru_cast/policy/ring.c
 new file mode 100644
-index 0000000000..14e3265be0
+index 0000000000..04afe13c46
 --- /dev/null
 +++ b/mm/lru_cast/policy/ring.c
-@@ -0,0 +1,796 @@
+@@ -0,0 +1,989 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * CAST -- keys, and M's lowest found by a sweep.
@@ -4146,6 +4599,7 @@ index 0000000000..14e3265be0
 +#include <linux/hash.h>
 +#include <linux/xarray.h>
 +#include <linux/workqueue.h>
++#include <linux/uaccess.h>
 +#include "policy/policy.h"
 +#include "core/inl.h"
 +
@@ -4279,19 +4733,32 @@ index 0000000000..14e3265be0
 +	__set_bit((folio_pfn(folio) - lruvec_pgdat(lruvec)->node_start_pfn) >> shift, k->blocks);
 +}
 +
++static void lru_cast_admit_fn(struct work_struct *work);
++
 +void lru_cast_ring_init(struct lruvec *lruvec)
 +{
 +	static atomic_t next;
++	int type, i;
 +
 +	lruvec->lru_cast[0].tag = atomic_inc_return(&next);
 +	lruvec->lru_cast[0].lid = 0;
++	for (type = 0; type < ANON_AND_FILE; type++) {
++		INIT_WORK(&lruvec->lru_cast[type].admit_work, lru_cast_admit_fn);
++		INIT_LIST_HEAD(&lruvec->lru_cast[type].cold);
++		for (i = 0; i < LRU_CAST_WAITS; i++)
++			INIT_LIST_HEAD(&lruvec->lru_cast[type].wait[i]);
++		lruvec->lru_cast[type].admit_type = type;
++	}
 +}
 +
 +/* its number back to the node; no folio is left with it */
 +void lru_cast_ring_exit(struct lruvec *lruvec)
 +{
 +	u16 lid = lruvec->lru_cast[0].lid;
++	int type;
 +
++	for (type = 0; type < ANON_AND_FILE; type++)
++		cancel_work_sync(&lruvec->lru_cast[type].admit_work);
 +	if (lid && lid != LRU_CAST_LID_SPILL)
 +		clear_bit(lid, lruvec_pgdat(lruvec)->lru_cast_clock.lids);
 +	lruvec->lru_cast[0].lid = 0;
@@ -4307,6 +4774,18 @@ index 0000000000..14e3265be0
 +void lru_cast_ring_reparent(struct lruvec *child, struct lruvec *parent)
 +{
 +	u16 lid = child->lru_cast[0].lid;
++	int type, i;
++
++	/*
++	 * W's cold, and what waits, go with the inactive list, which
++	 * mm/folio.c splices and counts
++	 */
++	for (type = 0; type < ANON_AND_FILE; type++) {
++		list_splice_tail_init(&child->lru_cast[type].cold, &parent->lru_cast[type].cold);
++		for (i = 0; i < LRU_CAST_WAITS; i++)
++			list_splice_tail_init(&child->lru_cast[type].wait[i],
++					      &parent->lru_cast[type].wait[i]);
++	}
 +
 +	if (!lid)
 +		return;
@@ -4447,6 +4926,19 @@ index 0000000000..14e3265be0
 +{
 +	if (lru_cast_spilled(lru_cast_set_owner(folio, 0)))
 +		lru_cast_spill_store(folio_pfn(folio), NULL);
++}
++
++/*
++ * The folio lru_cast_ring_min() gave last was neither taken nor set aside:
++ * it is offered again. (One no longer a candidate by then is passed over as
++ * any is.)
++ */
++void lru_cast_ring_unmin(struct lruvec *lruvec, int type)
++{
++	struct lru_cast *k = &lruvec->lru_cast[type];
++
++	if (k->pos)
++		k->pos--;
 +}
 +
 +/*
@@ -4768,6 +5260,13 @@ index 0000000000..14e3265be0
 + * M's lowest folio, and its key; taken off the candidates. When the
 + * candidates run out, a sweep; when it finds none, M's oldest-added folio.
 + */
++/* @folio's key now, as lru_cast_ring_min() tells that of the folio it gives */
++long lru_cast_ring_key(struct lruvec *lruvec, struct folio *folio, int type)
++{
++	return lru_cast_key_now(folio, lru_cast_tick(lruvec_pgdat(lruvec), type),
++				lruvec->lru_cast[type].ring_le);
++}
++
 +struct folio *lru_cast_ring_min(struct lruvec *lruvec, int type, long *bucket)
 +{
 +	struct lru_cast *k = &lruvec->lru_cast[type];
@@ -4815,12 +5314,89 @@ index 0000000000..14e3265be0
 +			  n[SW_GATE], n[SW_FALLBACK], n[SW_SPILLED], n[SW_PROBED]);
 +}
 +
++#define LRU_CAST_W_LAZY		1024	/* pages into W between looks, reclaim not near */
++
++/*
++ * Whether @pgdat's free memory is down to what W holds over its share,
++ * @excess pages, and twice the high watermarks: time W was brought within
++ * it, before reclaim runs.
++ */
++static bool lru_cast_w_due(struct pglist_data *pgdat, unsigned long excess)
++{
++	unsigned long free = sum_zone_node_page_state(pgdat->node_id, NR_FREE_PAGES);
++	unsigned long high = 0;
++	int zid;
++
++	for (zid = 0; zid < MAX_NR_ZONES; zid++) {
++		struct zone *zone = pgdat->node_zones + zid;
++
++		if (managed_zone(zone))
++			high += high_wmark_pages(zone);
++	}
++	return free < excess + 2 * high;
++}
++
++/*
++ * The folios the work admits next, W's last @nr, and their words, read
++ * before the lock is taken: they came in long ago and are in no cache, and
++ * each is found only through the one after it, so that the lock was held
++ * for one memory read after another. The list is walked with no lock: what
++ * is read may be anything by the time it is, so a pointer is followed only
++ * to a page frame's struct page, and read with a fault allowed for. Nothing
++ * is decided by what is found, only fetched.
++ */
++static void lru_cast_w_warm(struct lruvec *lruvec, int type, unsigned int nr)
++{
++	struct list_head *w = &lruvec->lists[type ? LRU_INACTIVE_FILE : LRU_INACTIVE_ANON];
++	struct list_head *p = READ_ONCE(w->prev);
++
++	while (nr-- && p != w) {
++		struct folio *folio = list_entry(p, struct folio, lru);
++		unsigned long pfn = page_to_pfn(&folio->page);
++
++		if (!pfn_valid(pfn) || pfn_to_page(pfn) != &folio->page)
++			break;
++		lru_cast_prefetch_frame(pfn, true);
++		if (get_kernel_nofault(p, &folio->lru.prev))
++			break;
++	}
++}
++
++/*
++ * W's excess over its share joins M (lru_cast_w_admit()), a batch each time
++ * the lock is taken, until W is within its share or its last folio is not
++ * to be admitted yet. Queued by __lru_cast_add_folio(); reclaim admits for
++ * itself, with the lock it holds.
++ */
++static void lru_cast_admit_fn(struct work_struct *work)
++{
++	struct lru_cast *k = container_of(work, struct lru_cast, admit_work);
++	int type = k->admit_type;
++	struct lruvec *lruvec = container_of(k - type, struct lruvec, lru_cast[0]);
++	enum lru_list lru = type ? LRU_INACTIVE_FILE : LRU_INACTIVE_ANON;
++	unsigned long nr_w, nr_m, admitted;
++
++	do {
++		lru_cast_w_warm(lruvec, type, LRU_CAST_ADMIT_BATCH);
++		admitted = 0;
++		spin_lock_irq(&lruvec->lru_lock);
++		if (lru_cast_on(lruvec)) {
++			nr_w = lru_cast_lru_size(lruvec, lru);
++			nr_m = lru_cast_lru_size(lruvec, lru + LRU_ACTIVE);
++			admitted = lru_cast_w_admit(lruvec, type, &nr_w, &nr_m, 0,
++						    LRU_CAST_ADMIT_BATCH);
++		}
++		spin_unlock_irq(&lruvec->lru_lock);
++		cond_resched();
++	} while (admitted >= LRU_CAST_ADMIT_BATCH);
++}
++
 +/*
 + * lruvec_add_folio(), on an lruvec CAST runs: an active folio goes into
-+ * M; the rest into W, the inactive list, after which W's excess over its
-+ * share, once more than a slack, joins M (lru_cast_w_admit()). A folio new to
-+ * the cache had its entry counted in folio_add_lru() (lru_cast_enter()),
-+ * before the lock: this runs under it, for every folio the LRU takes in.
++ * M; the rest into W, the inactive list. W's excess over its share joins M
++ * elsewhere (lru_cast_admit_fn(), and reclaim). A folio new to the cache had
++ * its entry counted in folio_add_lru() (lru_cast_enter()), before the lock:
++ * this runs under it, for every folio the LRU takes in.
 + */
 +bool __lru_cast_add_folio(struct lruvec *lruvec, struct folio *folio, bool tail)
 +{
@@ -4832,15 +5408,66 @@ index 0000000000..14e3265be0
 +		enum lru_list lru = folio_lru_list(folio);
 +		int type = folio_is_file_lru(folio);
 +		struct lru_cast *k = &lruvec->lru_cast[type];
-+		unsigned long nr_w, nr_m, nr = folio_nr_pages(folio);
++		unsigned long nr_w, nr_m, target, nr = folio_nr_pages(folio);
 +
-+		folio_set_rekey(folio);		/* W's: never placed by a key */
-+		lru_cast_ring_out(folio);		/* deactivated: no longer of M */
++		/*
++		 * W's: never placed by a key; and, deactivated, no longer of M.
++		 * A folio new to the cache -- most that come in -- is marked
++		 * already (lru_cast_enter()) and has no tag to lose: asked first,
++		 * for the lock is held, and neither write is made in vain.
++		 */
++		if (!folio_test_rekey(folio))
++			folio_set_rekey(folio);
++		if (lru_cast_owned_inl(folio))
++			lru_cast_ring_out(folio);
 +		lru_cast_update_lru_size(lruvec, lru, folio_zonenum(folio), nr);
-+		if (tail)
++		if (type && (tail || !folio_mapped(folio))) {
++			/*
++			 * A file folio not mapped: every read of it is recorded
++			 * as it is made, and it has had one. It is of W's cold
++			 * (policy/reclaim.c), the last to have come -- or,
++			 * written back and here for reclaim to free, the first
++			 * to go.
++			 */
++			if (tail)
++				list_add_tail(&folio->lru, &k->cold);
++			else
++				list_add(&folio->lru, &k->cold);
++		} else if (tail) {
++			/*
++			 * At the tail for reclaim to free, its write to swap
++			 * ended (folio_rotate_reclaimable(), or reclaim's own
++			 * putback): marked, for a folio read ahead from swap
++			 * looks the same once it is W's tail, and is not that.
++			 */
++			if (folio_test_swapbacked(folio) && folio_test_swapcache(folio) &&
++			    !folio_mapped(folio) && !folio_test_dirty(folio) &&
++			    !folio_test_writeback(folio))
++				lru_cast_mark_written(folio);
 +			list_add_tail(&folio->lru, &lruvec->lists[lru]);
-+		else
++		} else if (folio_mapped(folio) && (lru_cast_read(folio) >> 24) <= 1) {
++			/*
++			 * Mapped and read once: it waits, with those that came
++			 * in since the same walk, for the walker to tell of it
++			 * (policy/reclaim.c).
++			 */
++			lru_cast_wait_turn(lruvec, type);
++			list_add(&folio->lru, &k->wait[k->wait_epoch % LRU_CAST_WAITS]);
++			k->wait_nr[k->wait_epoch % LRU_CAST_WAITS] += nr;
++			k->wait_in += nr;
++			if (k->wait_in / LRU_CAST_WAIT_LOOK != (k->wait_in - nr) / LRU_CAST_WAIT_LOOK)
++				lru_cast_wait_goal(lruvec, type);
++			/*
++			 * More has come in to wait since the last walk than W
++			 * has weighed, which is what reclaim may take without
++			 * learning anything: it will want these, and a walk
++			 * now tells of them before it does.
++			 */
++			if (k->wait_in >= k->wait_goal)
++				lru_cast_walk_ask();
++		} else {
 +			list_add(&folio->lru, &lruvec->lists[lru]);
++		}
 +		/*
 +		 * W kept to its share as it fills, not only once reclaim runs.
 +		 * Its size, summed over the zones on lines every CPU adding to
@@ -4854,10 +5481,29 @@ index 0000000000..14e3265be0
 +			return true;
 +		nr_w = lru_cast_lru_size(lruvec, lru);
 +		nr_m = lru_cast_lru_size(lruvec, lru + LRU_ACTIVE);
-+		lru_cast_w_admit(lruvec, type, &nr_w, &nr_m, LRU_CAST_W_SLACK,
-+				 LRU_CAST_W_SLACK + nr);
-+		k->w_room = clamp_t(long, (nr_w + nr_m) * lru_cast_param_w(type) / 1000 +
-+				    LRU_CAST_W_SLACK - nr_w, 1, LRU_CAST_W_SLACK);
++		target = (nr_w + nr_m) * lru_cast_param_w(type) / 1000;
++		/*
++		 * Over its share, W's excess is not admitted here: an admission
++		 * reads folios that came in long ago, and their words, and under
++		 * this lock every CPU adding to the LRU waited while it did. It
++		 * is left where it is while the node has memory free for what
++		 * comes in: a key does not change while a folio is not read, so
++		 * one weighed later is weighed the same, and one freed before
++		 * then was never moved. The work is given it once the free
++		 * memory is no more than it would take to admit it in, so that
++		 * reclaim finds W within its share; W is looked at again
++		 * LRU_CAST_W_LAZY pages on.
++		 */
++		if (nr_w > target + LRU_CAST_W_SLACK) {
++			if (lru_cast_w_due(lruvec_pgdat(lruvec), nr_w - target) &&
++			    !work_pending(&k->admit_work))
++				lru_cast_queue_work(&k->admit_work);
++			k->w_room = LRU_CAST_W_LAZY;
++			return true;
++		}
++		/* within its share: what has waited its walks is weighed from now */
++		lru_cast_wait_turn(lruvec, type);
++		k->w_room = clamp_t(long, target + LRU_CAST_W_SLACK - nr_w, 1, LRU_CAST_W_SLACK);
 +		return true;
 +	}
 +	lru_cast_update_lru_size(lruvec, folio_lru_list(folio), folio_zonenum(folio),
@@ -8145,7 +8791,7 @@ index 0000000000..ac9d33c024
 +#endif /* _MM_LRU_CAST_TUNE_WSHARE_H */
 diff --git a/mm/lru_cast/version.h b/mm/lru_cast/version.h
 new file mode 100644
-index 0000000000..cae576625c
+index 0000000000..b1a1105588
 --- /dev/null
 +++ b/mm/lru_cast/version.h
 @@ -0,0 +1,15 @@
@@ -8161,7 +8807,7 @@ index 0000000000..cae576625c
 +#define LRU_CAST_PROGNAME	"lru_cast"
 +#define LRU_CAST_AUTHOR	"Masahito Suzuki"
 +
-+#define LRU_CAST_VERSION	"0.2.11"
++#define LRU_CAST_VERSION	"0.3.0"
 +
 +#endif /* _MM_LRU_CAST_VERSION_H */
 diff --git a/mm/lru_cast/walk/bloom.c b/mm/lru_cast/walk/bloom.c
@@ -9059,10 +9705,10 @@ index 0000000000..01a84569f4
 +SYM_FUNC_END(lru_cast_simd_scan_sse2)
 diff --git a/mm/lru_cast/walk/walk.c b/mm/lru_cast/walk/walk.c
 new file mode 100644
-index 0000000000..3566d1c9ae
+index 0000000000..cb11d7d38f
 --- /dev/null
 +++ b/mm/lru_cast/walk/walk.c
-@@ -0,0 +1,307 @@
+@@ -0,0 +1,346 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * CAST -- the walker: reads of mapped pages, from the young bits.
@@ -9120,6 +9766,8 @@ index 0000000000..3566d1c9ae
 +#include "walk/simd.h"
 +#include "walk/young.h"
 +
++#define LRU_CAST_WALK_MS	250	/* no walk sooner than this after the last */
++#define LRU_CAST_TICK_MS	100	/* nor a tick's sooner than this: it comes once, and far from the next */
 +static unsigned int lru_cast_walk_on = 1;
 +static long lru_cast_walk_net, lru_cast_walk_next;		/* the clock, net, as told */
 +static unsigned long lru_cast_walk_last;
@@ -9328,10 +9976,50 @@ index 0000000000..3566d1c9ae
 +	kvfree(mms);
 +	lru_cast_bloom_swap();
 +	atomic_long_inc(&lru_cast_walk_walks);
++	lru_cast_walked();
 +	atomic64_add(ktime_get_ns() - t0, &lru_cast_walk_ns);
 +}
 +
-+/* the clock moved by @nr pages taken in, of @size: a tick on, walk */
++/*
++ * A walk is asked for. By what happens, and by nothing else: a tick of the
++ * clock (below), newcomers come in to wait in number (policy/ring.c),
++ * reclaim at work (mm/vmscan.c). No walk is made for time having passed; a
++ * machine nothing comes into and nothing is reclaimed on is not walked.
++ *
++ * LRU_CAST_WALK_MS is the least there is between two walks, whoever asks: a
++ * gate that what is asked for passes, not a period walks are made at. A
++ * walk tells a page in use from one that is not by its having been touched
++ * since the walk before: closer together, walks find a page read every tenth
++ * of a second idle, and W's newcomers, which wait LRU_CAST_LOOKS walks, have
++ * waited no time at all -- with half the time between walks, or half the
++ * walks, a kernel build in 2 GiB took three times the major faults.
++ *
++ * A walk asked for sooner than that is not made, and not made later either:
++ * whoever asked asks again if the need is still there. Held until it might
++ * be made, a walk was made every LRU_CAST_WALK_MS of a kernel build in
++ * 2 GiB, two in three more than were, and the build took three times the
++ * major faults.
++ *
++ * Nobody waits for the walk asked for. Reclaim that did, with only what
++ * waits left to take, kept a working set whole and held the task filling the
++ * memory back to a fifth of its speed, and less.
++ */
++static void lru_cast_walk_asked(unsigned int ms)
++{
++	if (!READ_ONCE(lru_cast_walk_on))
++		return;
++	if (time_before(jiffies, data_race(lru_cast_walk_last) + msecs_to_jiffies(ms)))
++		return;
++	data_race(lru_cast_walk_last = jiffies);
++	lru_cast_queue_work(&lru_cast_walk_work);
++}
++
++void lru_cast_walk_ask(void)
++{
++	lru_cast_walk_asked(LRU_CAST_WALK_MS);
++}
++
++/* the clock moved by @nr pages taken in, of @size: a tick on, a walk */
 +void lru_cast_walk_installed(long nr, unsigned long size)
 +{
 +	if (!READ_ONCE(lru_cast_walk_on))
@@ -9340,10 +10028,7 @@ index 0000000000..3566d1c9ae
 +	if (data_race(lru_cast_walk_net) < data_race(lru_cast_walk_next))
 +		return;
 +	data_race(lru_cast_walk_next = lru_cast_walk_net + (long)max(size / 4, 1024UL));
-+	if (time_before(jiffies, data_race(lru_cast_walk_last) + HZ / 10))
-+		return;
-+	data_race(lru_cast_walk_last = jiffies);
-+	lru_cast_queue_work(&lru_cast_walk_work);
++	lru_cast_walk_asked(LRU_CAST_TICK_MS);
 +}
 +
 +bool lru_cast_walk_enabled(void)
@@ -9406,10 +10091,10 @@ index 0000000000..8b3635caac
 +#endif /* _MM_LRU_CAST_WALK_H */
 diff --git a/mm/lru_cast/walk/young.h b/mm/lru_cast/walk/young.h
 new file mode 100644
-index 0000000000..63314ed39b
+index 0000000000..e6029c57f5
 --- /dev/null
 +++ b/mm/lru_cast/walk/young.h
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,83 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +/*
 + * CAST -- what the walker and the look-around share, inside walk/:
@@ -9433,6 +10118,31 @@ index 0000000000..63314ed39b
 +{
 +	u32 w = lru_cast_read(folio);
 +
++	/*
++	 * The young bit of the fault that brought the folio in, the mark
++	 * still on it: taken whenever it is met. It tells nothing and is
++	 * given away (lru_cast_young_record()), and until it is, the next one
++	 * cannot be told from it. Left until the folio was a tick old, it was
++	 * taken with memory full and reclaim at work, and the folio stood read
++	 * once and not young until its task touched it again: a working set
++	 * read every 100 ms lost a third of itself to a stream in one run of
++	 * thirty, and more often the faster the folios came in.
++	 */
++	if (folio_test_referenced(folio))
++		return true;
++	/*
++	 * Read once: whether it is in use at all is told as soon as it is
++	 * seen, tick or no tick. A tick is a quarter of the node's memory
++	 * taken in; in a memcg of an eighth of the node, or with no pages
++	 * coming in, none passes, and a working set walked over four times
++	 * stood read once beside the stream that came after it. How often a
++	 * folio is read is still counted by the tick: by the walk it was
++	 * counted by how often the walker walked, and a loop over more than
++	 * memory, where the page longest unread is the next to be read, was
++	 * a fifth slower for the order being kept so well.
++	 */
++	if ((w >> 24) == 1)
++		return true;
 +	return !(w >> 24) ||
 +	       lru_cast_age(w, lru_cast_tick(folio_pgdat(folio), folio_is_file_lru(folio)));
 +}
@@ -9611,7 +10321,7 @@ index 9cc9ef5885..4ad8f97d73 100644
  
  #if defined(CONFIG_NUMA_BALANCING) && !defined(LAST_CPUPID_NOT_IN_PAGE_FLAGS)
 diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index 12fac9084c..1efdd08a36 100644
+index 12fac9084c..934e9c4de0 100644
 --- a/mm/page_alloc.c
 +++ b/mm/page_alloc.c
 @@ -46,6 +46,7 @@
@@ -9622,14 +10332,60 @@ index 12fac9084c..1efdd08a36 100644
  #include <linux/memcontrol.h>
  #include <linux/ftrace.h>
  #include <linux/lockdep.h>
-@@ -1418,6 +1419,7 @@ static __always_inline bool __free_pages_prepare(struct page *page,
- 	reset_page_owner(page, order);
- 	page_table_check_free(page, order);
- 	pgalloc_tag_sub(page, 1 << order);
-+	lru_cast_reset(page, order);
+@@ -61,6 +62,23 @@
+ #include "shuffle.h"
+ #include "page_reporting.h"
  
- 	if (!PageHighMem(page) && !(fpi_flags & FPI_NOLOCK)) {
- 		debug_check_no_locks_freed(page_address(page),
++#ifdef CONFIG_LRU_CAST
++/* CAST: @page's state word (mm/lru_cast/core/store.c) pulled in, to be written */
++static inline void lru_cast_prefetch_word(struct page *page)
++{
++	if (lru_cast_enabled()) {
++		u32 *states = READ_ONCE(lru_cast_states);
++
++		if (states)
++			prefetchw(states + page_to_pfn(page));
++	}
++}
++#else
++static inline void lru_cast_prefetch_word(struct page *page)
++{
++}
++#endif
++
+ /* Free Page Internal flags: for internal, non-pcp variants of free_pages(). */
+ typedef int __bitwise fpi_t;
+ 
+@@ -1413,6 +1431,7 @@ static __always_inline bool __free_pages_prepare(struct page *page,
+ 	}
+ 
+ 	page_cpupid_reset_last(page);
++	lru_cast_reset(page, order);	/* before the flags go: it reads one */
+ 	page->flags.f &= ~PAGE_FLAGS_CHECK_AT_PREP;
+ 	page->private = 0;
+ 	reset_page_owner(page, order);
+@@ -1876,6 +1895,7 @@ inline void post_alloc_hook(struct page *page, unsigned int order,
+ static void prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags,
+ 							unsigned int alloc_flags)
+ {
++	lru_cast_prefetch_word(page);	/* not from a list above: asked for before it is cleared */
+ 	post_alloc_hook(page, order, gfp_flags, alloc_flags);
+ 
+ 	if (order && (gfp_flags & __GFP_COMP))
+@@ -3362,6 +3382,13 @@ struct page *__rmqueue_pcplist(struct zone *zone, unsigned int order,
+ 		page = list_first_entry(list, struct page, pcp_list);
+ 		list_del(&page->pcp_list);
+ 		pcp->count -= 1 << order;
++		/*
++		 * CAST: the page this CPU takes next, its state word asked
++		 * for now: written as the page enters the LRU, it is there
++		 * by then, a page fault from now and not a page's clearing.
++		 */
++		if (!list_empty(list))
++			lru_cast_prefetch_word(list_first_entry(list, struct page, pcp_list));
+ 	} while (check_new_pages(page, order));
+ 
+ 	return page;
 diff --git a/mm/page_io.c b/mm/page_io.c
 index 88962571cb..23a4fb8dde 100644
 --- a/mm/page_io.c
@@ -10090,7 +10846,7 @@ index 90a551a88d..a63d058223 100644
  {
  	return -EINVAL;
 diff --git a/mm/vmscan.c b/mm/vmscan.c
-index f11491ee9e..1eae4ba578 100644
+index f11491ee9e..d12c6dc58b 100644
 --- a/mm/vmscan.c
 +++ b/mm/vmscan.c
 @@ -148,6 +148,9 @@ struct scan_control {
@@ -10303,8 +11059,14 @@ index f11491ee9e..1eae4ba578 100644
  		if (stalled)
  			return 0;
  
-@@ -2011,8 +2133,12 @@ static unsigned long shrink_inactive_list(unsigned long nr_to_scan,
+@@ -2009,10 +2131,18 @@ static unsigned long shrink_inactive_list(unsigned long nr_to_scan,
  
+ 	lru_add_drain();
+ 
++	/* reclaim at work: the walker is to tell of what it is about to weigh */
++	if (lru_cast_on(lruvec))
++		lru_cast_walk_ask();
++
  	lruvec_lock_irq(lruvec);
  
 -	nr_taken = isolate_lru_folios(nr_to_scan, lruvec, &folio_list,
@@ -10318,7 +11080,7 @@ index f11491ee9e..1eae4ba578 100644
  
  	__mod_node_page_state(pgdat, NR_ISOLATED_ANON + file, nr_taken);
  	item = PGSCAN_KSWAPD + reclaimer_offset(sc);
-@@ -2176,6 +2302,33 @@ static unsigned int reclaim_folio_list(struct list_head *folio_list,
+@@ -2176,6 +2306,33 @@ static unsigned int reclaim_folio_list(struct list_head *folio_list,
  	return nr_reclaimed;
  }
  
@@ -10352,7 +11114,7 @@ index f11491ee9e..1eae4ba578 100644
  unsigned long reclaim_pages(struct list_head *folio_list)
  {
  	int nid;
-@@ -2212,6 +2365,11 @@ unsigned long reclaim_pages(struct list_head *folio_list)
+@@ -2212,6 +2369,11 @@ unsigned long reclaim_pages(struct list_head *folio_list)
  static unsigned long shrink_list(enum lru_list lru, unsigned long nr_to_scan,
  				 struct lruvec *lruvec, struct scan_control *sc)
  {
@@ -10364,7 +11126,7 @@ index f11491ee9e..1eae4ba578 100644
  	if (is_active_lru(lru)) {
  		if (sc->may_deactivate & (1 << is_file_lru(lru)))
  			shrink_active_list(nr_to_scan, lruvec, sc, lru);
-@@ -2439,6 +2597,14 @@ static void prepare_scan_control(pg_data_t *pgdat, struct scan_control *sc)
+@@ -2439,6 +2601,14 @@ static void prepare_scan_control(pg_data_t *pgdat, struct scan_control *sc)
  			!(sc->may_deactivate & DEACTIVATE_ANON) &&
  			anon >> sc->priority;
  	}
@@ -10379,7 +11141,7 @@ index f11491ee9e..1eae4ba578 100644
  }
  
  static inline void calculate_pressure_balance(struct scan_control *sc,
-@@ -2575,6 +2741,42 @@ static void get_scan_count(struct lruvec *lruvec, struct scan_control *sc,
+@@ -2575,6 +2745,42 @@ static void get_scan_count(struct lruvec *lruvec, struct scan_control *sc,
  		goto out;
  	}
  
@@ -10422,7 +11184,7 @@ index f11491ee9e..1eae4ba578 100644
  	/* If we have no swap space, do not bother scanning anon folios. */
  	if (!sc->may_swap || !can_reclaim_anon_pages(memcg, pgdat->node_id, sc)) {
  		scan_balance = SCAN_FILE;
-@@ -2641,6 +2843,10 @@ static void get_scan_count(struct lruvec *lruvec, struct scan_control *sc,
+@@ -2641,6 +2847,10 @@ static void get_scan_count(struct lruvec *lruvec, struct scan_control *sc,
  		if (!scan && !mem_cgroup_online(memcg))
  			scan = min(lruvec_size, SWAP_CLUSTER_MAX);
  
@@ -10433,7 +11195,7 @@ index f11491ee9e..1eae4ba578 100644
  		switch (scan_balance) {
  		case SCAN_EQUAL:
  			/* Scan lists relative to size */
-@@ -2692,7 +2898,8 @@ static bool can_age_anon_pages(struct lruvec *lruvec,
+@@ -2692,7 +2902,8 @@ static bool can_age_anon_pages(struct lruvec *lruvec,
  #ifdef CONFIG_LRU_GEN
  
  DEFINE_STATIC_KEY_FALSE(lru_switch);
@@ -10443,7 +11205,7 @@ index f11491ee9e..1eae4ba578 100644
  DEFINE_STATIC_KEY_ARRAY_TRUE(lru_gen_caps, NR_LRU_GEN_CAPS);
  #define get_cap(cap)	static_branch_likely(&lru_gen_caps[cap])
  #else
-@@ -5355,12 +5562,15 @@ static bool drain_evictable(struct lruvec *lruvec)
+@@ -5355,12 +5566,15 @@ static bool drain_evictable(struct lruvec *lruvec)
  	return true;
  }
  
@@ -10460,7 +11222,7 @@ index f11491ee9e..1eae4ba578 100644
  	cgroup_lock();
  	cpus_read_lock();
  	get_online_mems();
-@@ -5369,6 +5579,11 @@ static void lru_gen_change_state(bool enabled)
+@@ -5369,6 +5583,11 @@ static void lru_gen_change_state(bool enabled)
  	if (enabled == lru_gen_enabled())
  		goto unlock;
  
@@ -10472,7 +11234,7 @@ index f11491ee9e..1eae4ba578 100644
  	static_branch_enable_cpuslocked(&lru_switch);
  
  	if (enabled)
-@@ -5409,6 +5624,8 @@ static void lru_gen_change_state(bool enabled)
+@@ -5409,6 +5628,8 @@ static void lru_gen_change_state(bool enabled)
  	put_online_mems();
  	cpus_read_unlock();
  	cgroup_unlock();
@@ -10481,7 +11243,7 @@ index f11491ee9e..1eae4ba578 100644
  }
  
  /******************************************************************************
-@@ -5469,9 +5686,12 @@ static ssize_t enabled_store(struct kobject *kobj, struct kobj_attribute *attr,
+@@ -5469,9 +5690,12 @@ static ssize_t enabled_store(struct kobject *kobj, struct kobj_attribute *attr,
  	for (i = 0; i < NR_LRU_GEN_CAPS; i++) {
  		bool enabled = caps & BIT(i);
  
@@ -10497,7 +11259,7 @@ index f11491ee9e..1eae4ba578 100644
  			static_branch_enable(&lru_gen_caps[i]);
  		else
  			static_branch_disable(&lru_gen_caps[i]);
-@@ -5943,6 +6163,16 @@ static int __init init_lru_gen(void)
+@@ -5943,6 +6167,16 @@ static int __init init_lru_gen(void)
  	debugfs_create_file_aux_num("lru_gen_full", 0444, NULL, NULL, true,
  				    &lru_gen_ro_fops);
  
@@ -10514,7 +11276,7 @@ index f11491ee9e..1eae4ba578 100644
  	return 0;
  };
  late_initcall(init_lru_gen);
-@@ -6005,8 +6235,14 @@ static void shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
+@@ -6005,8 +6239,14 @@ static void shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
  				sc->priority == DEF_PRIORITY);
  
  	blk_start_plug(&plug);
@@ -10530,7 +11292,7 @@ index f11491ee9e..1eae4ba578 100644
  		unsigned long nr_anon, nr_file, percentage;
  		unsigned long nr_scanned;
  
-@@ -6079,9 +6315,10 @@ static void shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
+@@ -6079,9 +6319,10 @@ static void shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
  
  	/*
  	 * Even if we did not try to evict anon pages at all, we want to
@@ -10543,7 +11305,7 @@ index f11491ee9e..1eae4ba578 100644
  	    inactive_is_low(lruvec, LRU_INACTIVE_ANON))
  		shrink_active_list(SWAP_CLUSTER_MAX, lruvec,
  				   sc, LRU_ACTIVE_ANON);
-@@ -6916,6 +7153,10 @@ static void kswapd_age_node(struct pglist_data *pgdat, struct scan_control *sc)
+@@ -6916,6 +7157,10 @@ static void kswapd_age_node(struct pglist_data *pgdat, struct scan_control *sc)
  
  	}
  
@@ -10554,7 +11316,7 @@ index f11491ee9e..1eae4ba578 100644
  	lruvec = mem_cgroup_lruvec(NULL, pgdat);
  	if (!can_age_anon_pages(lruvec, sc))
  		return;
-@@ -7686,6 +7927,9 @@ unsigned long shrink_all_memory(unsigned long nr_to_reclaim)
+@@ -7686,6 +7931,9 @@ unsigned long shrink_all_memory(unsigned long nr_to_reclaim)
  void __meminit kswapd_run(int nid)
  {
  	pg_data_t *pgdat = NODE_DATA(nid);
@@ -10564,7 +11326,7 @@ index f11491ee9e..1eae4ba578 100644
  
  	pgdat_kswapd_lock(pgdat);
  	if (!pgdat->kswapd) {
-@@ -7699,7 +7943,32 @@ void __meminit kswapd_run(int nid)
+@@ -7699,7 +7947,32 @@ void __meminit kswapd_run(int nid)
  		} else {
  			wake_up_process(pgdat->kswapd);
  		}
@@ -10597,7 +11359,7 @@ index f11491ee9e..1eae4ba578 100644
  	pgdat_kswapd_unlock(pgdat);
  }
  
-@@ -7718,6 +7987,13 @@ void __meminit kswapd_stop(int nid)
+@@ -7718,6 +7991,13 @@ void __meminit kswapd_stop(int nid)
  		kthread_stop(kswapd);
  		pgdat->kswapd = NULL;
  	}
