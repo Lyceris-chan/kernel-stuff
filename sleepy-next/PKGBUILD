@@ -182,7 +182,7 @@ pkgbase="linux-$_pkgsuffix"
 # snapshot DATE rather than by whichever mainline rc it happened to be cut
 # from. `_srctag` is defined first because pkgver is derived from it — a bump
 # that moves the tag but not the version is not possible.
-_srctag=next-20261120
+_srctag=next-20261123
 _srcname=${_srctag}
 _snapdate=${_srctag#next-}                                            # 20261120
 # Dotted (2026.10.09), and that is NOT cosmetic. Both tools that consume the
@@ -280,7 +280,7 @@ _nv_ver=610.43.02
 _nv_pkg="NVIDIA-Linux-x86_64-${_nv_ver}"
 _nv_open_pkg="NVIDIA-kernel-module-source-${_nv_ver}"
 source=(
-  "https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261120.tar.gz"
+  "https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261123.tar.gz"
   "config"
   "patches/0001-0049/0001-drm-amd-pm-Fix-typo-in-smu_v14_0_set_irq_state.patch"
   "patches/0001-0049/0002-drm-amd-pm-Fix-memory-leaks-in-smu_v14_0_fini_smc_ta.patch"
@@ -398,7 +398,7 @@ source=(
   "patches/2000-2099/2069-block-return-early-when-the-elevator-doesnt-change.patch"
   "patches/2000-2099/2078-r8169-fix-rtnl-deadlock-in-runtime-suspend.patch"
   "patches/2100-2199/2100-zstd-7.3-merge-v1.6.0-into-kernel-tree.patch"
-  "patches/2100-2199/2102-mm-7.4-lru_cast-v0.2.11.patch"
+  "patches/2100-2199/2102-mm-7.4-lru_cast-v0.3.0.patch"
   # 2120-2127 (mm/gup batching) are rc-only for this snapshot: the revised
   # 2026-11-02 series applies cleanly to v7.3 but not to v7.4-rc1's mm/gup.c,
   # whose follow_page_mask() rework and `unsigned int flags` signatures the
@@ -1178,7 +1178,7 @@ for _p in "${pkgname[@]}"; do
     }"
 done
 
-b2sums=('1fec3bed19d183e20413686f829c6d1541006a19eea059f7fdd97fa108c55e7e05edd3508ceedbcad0063d62acceefff372ac11ccf3fd20abcc0b4b8ed158cd8'
+b2sums=('a274a9e120ad6b2e6149f93ce4df4bf728ddcc23b3acf078d01d3d36f1f239fd348eeae31314ec4f54c02101d1d1364dae8a3ebb97f39e5592001336376f747b'
         '7517360503c9da93f405b810c81a7f1f2c8ca21a704f8251f62c400723f99bd9c14b8cb851c8f36663f412f9865cde759a3a10313e605e6172322bdfa12f6f38'
         'ff25ac7c89880886b454064ba57bd1196fb747cb80c7663d7981006cc603151aee075ebe1b49b1a92866ad2a212d1e599ce622f63bfd140ad64d37b463c17aad'
         '0806d7b3b8e4e9044c14843fc53255ff92b12aaf3b8e0d0490bbf6266aaa6b01872476ce34a65c5b694cda9a1d82e84a38df16dbb9c798ae9aa6d1c9097b32aa'
@@ -1192,7 +1192,7 @@ b2sums=('1fec3bed19d183e20413686f829c6d1541006a19eea059f7fdd97fa108c55e7e05edd35
         '859ed1fe2f9db6742f1a377a9367669106768b0fe20c0d66220d2e5ce1ef49927977fc4362fbb3737d01131cbed9556e1bf6b35eb7d4ca85e400fce990104e0f'
         'f75b523e6c7c4f873eaf4ba1a8a560d8abfbdef614ee55034cc6e44e3e21d4af74288da03153ba968cf062fed329600ed30ce26b1d702679164eeb547926e796'
         '00e5b994e7839f3374dcafdcfa215f3e616ddbc0d5a17405653c17c85451d091fe160b66aaf4365aecfe569d37a9b4aab47ebdc7df40085fdefaa5123a921340'
-        'df338de17af3ac4e7df9e4d7d40f661e1de8f65c60ff28a6168e3fc8276ab46cb35f74ffd971c11b1e877341c22f95dd85449eb6c9830c0f960f6ffbd3437525'
+        'e81661f05ffd159a672fd8cff9b9e82168d2e2928cc1fded823ac7d1d7bddbbdd7123091926d4e27f5bef781b97c939a1aa4e4f378299fd09cf94cf58c6fd059'
         'ee5f2c4aead1f2fc8d8096ae2a953d4c45d4c79de29e0578da543767a2d96664f903f043af36cf481adc13f203e2eca8fb616c26257e6cce5b3cae26b1d46ddf'
         'fdc7fc1d942be4fe8dadcb228b7f9c02273eaec91631ff609a07722b74b1db64828e144856e01a8ffd039762d1970a7ec511a3d240481544c570592914573b69'
         '7246f1d3dcf36c1b663ba8456dddbee8eba4d1fba97d3ba4224c96dbdbfa0a51534cd2cfa403dc00a651e43473222243f74e57cafb3eb5700c8c253d5f0e3737'
@@ -1279,8 +1279,8 @@ b2sums=('1fec3bed19d183e20413686f829c6d1541006a19eea059f7fdd97fa108c55e7e05edd35
         '8a1621e5b92a75c00549b1e813456a26dc2785f90d2f6aa0437658c177bde6aa4a14f99b1e7fa7841e18c4fd3e12badcb6b4bc6df5f70a6f2bc9c98efec8c63c'
         'cfe1d73e27cff93e865e8c43b64e928791d8bbae8148c21e72acaedcbb9328952ff038dc36189241e0672916375dd50dd3f53ffc0e6b2b8fc8c9a81a9e44fcd8'
         '5334c48164de5989ed9e76ded7d7a5b105335d0f1df19ebcb4ee959e412667e67821cc54ecfb8213f9edb0ae238322aa1777e240b2f57d6736b0623110d36b63'
-        '4d284bfe6e97c06f8d036e55c4bf69f880ca13221059f2e9adb23c21cfae2148614a32bc2fda0dbfe7613aee822d7828301a61b47614416228b3594ba4d80daf'
-        'f51504dc045b640fcd95aa6f6a89d09dc7cc4b4f4bec3720b9d03030ae02ec80249505d1405aade72adf3b1e07ec43d29085533490bb2f5d7463af67a1a3ba3e'
+        '005744227cf559228c739f4c46eabee41020c193d83049d50d00caa3cbe3bab6189c9fa60da3332bd90c9dcdc1f418d3a8219c3897dee196d7e4cab7dadffcde'
+        'e23ba72556b3b8feb1be0321d31aba09113f16e569225411269d871c917169cbbc037cfe6c7c7946ff89b078514150daea2ffb0d14946f70b905e00001a54eec'
         '53d6bd1f45d8e1c26b78564964fd8d74fa30e40b399823d642f87b2e8360d1b8d1cb0ff5a0c9f4f32ecf2d4acf75d0847f922b84b0fc5a1c76ca3d4cbcf96995'
         'c31f8fc6db7e5776ffbbde976239a102e5ddb0c2a6214a094a26f364718a507ac7c1960a9a955bfd16a3182979e57a8eb9ffbbde62d26ddfb983076868d619f2'
         '1455fd65a42e9bba65673da473b99187acc2e25d6535c89d365eb925500f84e23e40bddca183e83bb8af641122254083cddd8bf26fbdbd413da6a20ccd73850f'
@@ -1289,7 +1289,7 @@ b2sums=('1fec3bed19d183e20413686f829c6d1541006a19eea059f7fdd97fa108c55e7e05edd35
         '01e80960f518edf1151f55608ab71396adeab97b8032bafd4b3e8b725a1520cb469c1b99f09bf9b605b7fe272ba8c730d33c040f7e74b62c096fb1ddcf39694f'
         '841154adbd751fae32ff110e5c38f76364003465c201e9fb65a3ea9b705fec9846cb63d4452c54f8a3c9c0cf331eec712978540f156ea4384935c294e188a897'
         '04fe6270d9e54b974ee745261575fd710e3af252c6e2b2788a082455c6eeccfd2ea944245f5f58a9f4de418eca3058aaae8a27f90173b254aac15036c7a95c49'
-        '9df4185bfc45ee4b26a044e8c48b8055a99ad2064df6ac6415bf7365b264510549eb1a6f1d91eba3e1ac9d64a50191965e32797ef854ebd357a875253c07e320'
+        '48ecf805dee40d0c07fa2c9d65fe660baaa0c276e38f418666e1147a21a327ee49fab1578304a0fed6228fd6aed0dcfe2f97c086b708a9d1f9e6b14c0ed1c896'
         'eb5b6994b1341e7c05c49ba79336febc87dffe40e5008a81a9afdf931c8d2c00fb69fcf4d70923ba999993dd2e8e9ebf768d5809ee219a22e94f632944553539'
         '5626968774bad1795494928621f43e19945a1ecbd26c4dccd432a329277c26f04fc4ae02fde5560c503aed0fcd9bfda219de5c47e29a226149723fa5a7dbb721'
         '147d5cd83a6b680ec8eb69ed93450e761bbac6c3b6ae0de6a9d946613f120cbbd022d33a94e78b06d49c491c5b2d82b78c1be8327c7d0523bef93644149f3abe'

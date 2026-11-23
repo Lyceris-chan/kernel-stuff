@@ -18,6 +18,53 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.11.23-1-sleepy-next]: 2026-11-23
+
+### Changed
+
+- **Base bump to `next-20261123`** (`3191063649db`, tag object
+  `1422acaa190f`). The range from `next-20261120` is 2,415 commits and carries
+  the net-next 7.4-rc4 window; the snapshot `Makefile` still names
+  `7.4.0-rc3`. The absorbed set is unchanged from the previous bump: the same
+  ten patches fail or skip, and `1320` stays listed but inert.
+- **`0101` regenerated.** The base gained `bytes_acked_syn:1;` in
+  `struct tcp_sock` (net-next `a25df726c715`), moving the `fast_ack_mode`
+  anchor; the bitfield was re-spliced at the patch's series position.
+- **CAKE `2054`/`2055` v9 → v12** (`442ba1dd9ded`, `d0424b2c947d`,
+  2026-11-21). `2054` reworks the accounted-backlog guards; `2055` compares
+  the batched length against `U32_MAX` instead of the removed
+  `QDISC_MAX_BACKLOG`. `2052`/`2053` are content-identical to v12 and stay as
+  carried. This closes the deferred “CAKE v11, corrupted archive copy” item.
+- **CAST `2102` v0.2.11 → v0.3.0** (`c2aed944f2b7`, 2026-11-23 17:48 UTC).
+  A redesign rather than a version bump: demand-driven PTE walks (at most one
+  per 250 ms), mapped newcomers weighed after four walks, unmapped file pages
+  on their own arrival-order list, a newcomer window that grows while memory
+  is free, and swap-write freeing from the window's tail. The preview copy is
+  the author's 7.4-rc3 patch ported to this snapshot (five hunks).
+
+The preview lists **179** patches and applies **169**. No reboot or shutdown
+was performed.
+
+## [7.3.0-32-sleepy-rc]: 2026-11-23
+
+### Changed
+
+- **CAST `2102` v0.2.11 → v0.3.0.** The rc copy is the author's
+  `0001-7.3-rc7-lru_cast-v0.3.0.patch`, byte-identical. See the preview entry
+  above for what changed; the series audits **398/398** on `v7.3`.
+- **`0101` bbr3 zero-MSS guard.** The rc squash matched CachyOS `7.3/bbr3`,
+  whose `bbr_tso_segs()` lacks the guard in the `7.4/bbr3` head
+  (`84f7d94553f6`): a BPF caller passing `mss_now == 0` would divide by it in
+  `bbr_tso_segs_generic()`. The rc copy now matches the 7.4 head exactly.
+
+### Checked and not adopted
+
+gup v6 (nine parts, posted today, under review), the salkim 2026-11-23 SVM
+series (7.3 branch only), CAKE v12 (preview-only), and the previously
+triaged non-functional deltas (`1183` v2, `1190` v2, `2044` v8, `2811` v2).
+NAP v0.6.6 is current; BORE 7.0.1 exists but BORE is dropped. No reboot or
+shutdown was performed.
+
 ## [2026.11.20-1-sleepy-next]: 2026-11-20
 
 ### Changed

@@ -15,11 +15,11 @@ moved, so the full ledger is not duplicated here.
 
 | | |
 |---|---|
-| Snapshot | `next-20261120`, commit `909ef7a9a30f` (tag object `2c0da72bad56`) |
-| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261120.tar.gz` |
+| Snapshot | `next-20261123`, commit `3191063649db` (tag object `1422acaa190f`) |
+| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261123.tar.gz` |
 | Snapshot tree `Makefile` | `7.4.0-rc3` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.11.20-1-sleepy-next` |
-| Package | `linux-sleepy-next-2026.11.20-1` |
+| Kernel release | `2026.11.23-1-sleepy-next` |
+| Package | `linux-sleepy-next-2026.11.23-1` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -2395,3 +2395,145 @@ removed with the VA-batch block on 2026-11-18; `7e56dcf10ab5` edits
 **179 listed / 169 applied** on `next-20261120`; the ten skips are
 `1192`, `1194`, `1317`, `1320`, `1355`, `2044`, `2068`, `2069`, `2426`
 and `2427`. The rc remains **398/398** on `v7.3`.
+
+## Bump 2026-11-23 — `next-20261123`; lru_cast v0.3.0, CAKE v12, rc bbr3 guard
+
+`next-20261123` (tag ref `1422acaa190f`, peeled commit `3191063649db`) is the
+new preview base. `_srctag` moves to `next-20261123`, `pkgrel` resets to `1`,
+and the release becomes **2026.11.23-1**. The range (`next-20261120` →
+`next-20261123`, 2,415 commits) carries the net-next 7.4-rc4 window; the
+snapshot `Makefile` still names `7.4.0-rc3`.
+
+### Series changes
+
+- **`0101` regenerated.** The base gained `bytes_acked_syn:1;` in
+  `struct tcp_sock` (net-next `a25df726c715`, “tcp: do not accept ACK of our
+  ISS on active opens”), which moved the `fast_ack_mode` anchor. The bitfield
+  was re-spliced at `0101`'s series position (after the twelve `0001`–`0034`
+  entries) and the squash regenerated. The regenerated patch differs from the
+  previous one by one added line: `fast_ack_mode:1,` replaces the previous
+  `recvmsg_inq : 1,` + `fast_ack_mode:1;` pair.
+- **`2102` → lru_cast v0.3.0** in both packages.
+- **`2054`/`2055` → CAKE v9 → v12** (preview only; the rc does not carry
+  CAKE).
+
+### CAST v0.3.0 (`2102`)
+
+The author's release `c2aed944f2b7` (“lru_cast v0.3.0”, 2026-11-24 02:48
++0900, i.e. 2026-11-23 17:48 UTC) replaces v0.2.11. It is a redesign, not a
+version bump: walks are demand-driven (at most one per 250 ms) instead of
+once a tick; an unmapped file page is known after its first read and waits on
+a separate arrival-order list; a mapped newcomer waits four walks before it
+is weighed; the newcomer window is allowed to grow past its share while
+memory is free and is trimmed by a worker; an ended swap write is freed from
+the window's tail first; and the reclaim entry points moved into
+`mm/page_io.c` and `mm/page_alloc.c`.
+
+- **rc:** `2102-mm-7.3-lru_cast-v0.3.0.patch`, byte-identical to the author's
+  `0001-7.3-rc7-lru_cast-v0.3.0.patch`. Verified at `2102`'s position (after
+  the 248 preceding patches): `patch -p1 --forward -F2 --dry-run` exits 0
+  with no fuzz and no rejects; the series then audits **398/398** on `v7.3`.
+- **preview:** `2102-mm-7.4-lru_cast-v0.3.0.patch`, the author's 7.4-rc3
+  patch ported to the `next-20261123` series state (position 110, after
+  `2101`). Five hunks needed the port:
+  - `include/linux/swap_ops.h` — this base's `struct swap_io_ctx` carries the
+    swap pressure-window fields, so `defer_sync_submit` is inserted after
+    `sis` rather than before the closing brace.
+  - `mm/vmscan.h` — `struct scan_control` moved out of `mm/vmscan.c` on this
+    base, so the `clean_below_min` bitfield is added to the header.
+  - `mm/memory.c` — `do_swap_page()` tests `swap_entry_synchronous()` here;
+    `lru_cast_wait_swapin()` is inserted at the same point in the swap-in
+    path.
+  - `mm/page_io.c` — the zero-filled branch keeps a local `entry`; the
+    `lru_cast_evict_cpu(t0, nr)` call is added after
+    `swap_zeromap_folio_set()`.
+  - `mm/vmscan.c` — the patch's
+    `trace_mm_vmscan_lru_isolate(sc->reclaim_idx, sc->order, …)` applied with
+    fuzz, but this base's tracepoint takes `(sc, nr_to_scan, …)`; the call is
+    adapted to the base's prototype.
+
+  The adapted patch differs from the author's by exactly that tracepoint
+  line; the changed-line sets otherwise match byte for byte. The round trip
+  was re-applied at the series position and reproduced the same diff. The
+  preview series audits **169/179**, unchanged.
+
+### CAKE v12 (`2054`, `2055`)
+
+`[PATCH net-next v12 3/4]` (`442ba1dd9ded`) and `4/4` (`d0424b2c947d`),
+2026-11-21. `2052` and `2053` are content-identical to v12 and stay as
+carried. `2054` reworks the accounted-backlog guards through v10–v12 review;
+`2055` compares the batched length against `U32_MAX` instead of the removed
+`QDISC_MAX_BACKLOG`. Both apply at their series positions with at most fuzz 1
+and no rejects. This closes the “CAKE v11, archive copy corrupted” item the
+2026-11-20 sweep deferred.
+
+### rc bbr3 zero-MSS guard (`0101`)
+
+The rc's `0101` was byte-identical to CachyOS `7.3/bbr3`, whose
+`bbr_tso_segs()` lacks the guard that the `7.4/bbr3` head
+(`84f7d94553f6`) carries: a BPF caller can pass `mss_now == 0` into
+`bbr_tso_segs_generic()`, which divides by it. The rc copy now matches the
+7.4 head exactly (`u32 mss_now`, the `unlikely(!mss_now)` early return of
+`sysctl_tcp_min_tso_segs`). Regenerated at `0101`'s position; the only
+changed lines are the guard and `unsigned int` → `u32`. The preview already
+had the guard.
+
+### Not adopted, recorded
+
+- **gup v6** — `[PATCH v6 0/9] mm/gup: walk and batch whole PTE tables in
+  slow GUP` (Rik van Riel, 2026-11-23). Our `2120`–`2127` are RFC v3; v6 adds
+  a ninth part (`unshare-check every page of a pte batch`) and is under
+  active review. A nine-part swap with renumbering is a dedicated pass, not a
+  bump add-on.
+- **drm/amd work items** (160 open and 28 closed issues updated in the
+  window): #6116's TBA/TMA revert is already carried as `1354` v2 and #6115
+  is `1198` v2. #6141 (uncleared VRAM after reset) and #6151 (zero-sized AUX
+  transactions) are attachments under review, not commits. #4773 (Chrontel
+  CH7218 VRR) is a specific adapter this machine does not have. #5988's
+  >255 Hz VRR fix is merged in this base but is not in `v7.3`.
+- **salkim 2026-11-23 SVM series** — six `kfd_svm.c`/`kfd_migrate.c` fixes
+  and one HDMI FRL line, authored today on `salkim-7.3`, none of them on
+  `salkim-7.4`. A new design area, deferred.
+- **CachyOS** `7.4/amd-pstate` hybrid CAS and `7.4/cachy` `ni_random` work are
+  hybrid-only or inert under scx. The `7.4/bbr3` guard is adopted for the rc
+  (above).
+- **sirlucjan** still has no `7.4` line; its newest refs are the 2026-10-20
+  `7.3` update.
+- **NAP** v0.6.6 (`5092cfd`, 2026-11-01) is current.
+- **BORE** 7.0.1 for 7.4-rc4 exists, but BORE is dropped from this stack.
+
+### Source sweep — trees, lists, tracker
+
+- **Trees** (torvalds `b6a9fa34`, linux-next `3191063649`, drm-next
+  `ce0b5a66`, agd5f `8dd68a79`, drm-misc `711f63bd`, linux-pm, akpm,
+  tip): no carried work was reverted in the window. The agd5f CWSR
+  user-queue reverts (2026-11-09) and the RLC SPM reverts target
+  infrastructure we do not carry; `1331` is a different GFXOFF/SPM change.
+  New upstream commits in `next-20261123` that are not in `v7.3` —
+  `654c2646522a` (GFX12 pipe reset with new CP firmware),
+  `6d8e70991275` (PSP firmware signing scheme), the ACPI CPPC EPP-width
+  fixes — are rc-backport candidates, not preview ones; the preview base
+  already has them.
+- **Mailing lists** (all 16 lore mirrors refreshed; freedesktop amd-gfx and
+  dri-devel cross-checked by Message-ID): new on-target postings are all
+  early-series work. Deferred with reasons: the RTL8125B RSS RFC (11-11),
+  the r8169 RxOverflow clear (11-21) and MDIO-lock v3 (11-17), the
+  x86/mm CPA robustness series (11-12), the CWSR/trap-handler v7
+  rework (11-20), the UserQ doorbell-range/gang UAPI (11-17/18), the
+  DCN401 DC2/BLS builders (already in the preview base), the zswap batching
+  and xswap phase-I series, and gup v6 (above). None is a merged fix at
+  this point.
+- **Work items**: 160 open and 28 closed issues updated in the window; the
+  on-target fix threads resolve to carries already present (`63e19ef3ddab`,
+  `1354`, `1198`) or to attachments still under review (#6141, #6151).
+- **Phoronix** 2026-11-10–23: the only in-window kernel story touching this
+  hardware is the Valve/Natalie Vock PRT explicit-sync v2 series, already
+  carried as `0900`–`0909` plus `9300`/`9301`.
+
+### Series state
+
+**179 listed / 169 applied** on `next-20261123`; the ten skips are
+`1192`, `1194`, `1317`, `1320`, `1355`, `2044`, `2068`, `2069`, `2426`
+and `2427`. `1320` is fully absorbed (the base carries the fix in its
+`in_task()` form); it stays listed until removal is approved. The rc is
+**398/398** on `v7.3`.
