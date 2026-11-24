@@ -13450,3 +13450,146 @@ at `0101`'s position; the only changed lines are the guard and
 **398 patches.** `audit_series.py`: **398/398** on `v7.3`. The package becomes
 `7.3.0-32` so the changed `0101` and `2102` are released rather than sitting
 unbuilt in the tree.
+
+## Sweep 2026-11-24 — `next-20261124`; no rc series change
+
+The preview moves to `next-20261124`. The rc base stays at `v7.3`, and the
+series is unchanged at **398/398**. This section records what the sweep
+queried, what it rejected, and what it deferred.
+
+### Sources and freshness
+
+- **Trees.** Every remote-tracking ref was verified against its remote and
+  refreshed with an explicit refspec. A plain `fetch origin <branch>` updates
+  only `FETCH_HEAD` and leaves `origin/<branch>` stale, which the first pass
+  hit. Current tips: `torvalds` `8d7fe988` (2026-11-23), `drm-next`
+  `ce0b5a66`, `agd5f` `8dd68a79`, `linux-pm` `b6a9fa34`, `akpm-mm` master
+  `4405c18c` (`mm-everything` 2026-11-24), `tip` `38239b8b` (2026-11-24).
+  `linux-next` `next-20261124` is `3dd8c790a7b7`; the range from
+  `next-20261123` is 1,442 non-merge commits. `amd-staging-drm-next` is not
+  a separate clone here; `agd5f-linux` covers it.
+- **Mailing lists.** All 15 lore mirrors refreshed. The amd-gfx and dri-devel
+  mirrors carry the freedesktop lists; the separate monthly archive was not
+  fetched. The `lore-stable` mirror is stale (last commit 2022-05-18) and is
+  reported unrefreshed; the stable queue was not used.
+
+### Trees, tip and reverts
+
+No new commit needed a *preview* carry: the on-target fixes are already in
+`next-20261124` or predate `v7.3`. Notables in the new base that are not in
+`v7.3`: `d734667216e3` (`x86/mce/amd` bank lookup, `Cc: stable`),
+`1a40c59e2292` (zsmalloc page batching), `452775e28bd8` (zswap dead length
+check), and the zsmalloc handle series (`16c45535a555`, `36d1764f3e4b`,
+`d473f5826fdc`, `fb7476214aa2`). `5785772fe9e6` (CPPC boost default) targets
+`cppc_cpufreq`, not this machine's `amd-pstate`.
+
+**No revert targets carried work.** The window's AMD reverts are the CWSR
+user-queue infrastructure and RLC SPM pair in `agd5f` (2026-11-09 and
+2026-11-12), both off-target, and the DCN32/1 DMUB revert (2026-10-27).
+`1354` remains the non-MI revert of `fe5966d4fdcb`. The ten preview skips
+are absorbed carries or the known inert context drift (`1317`), not upstream
+drops.
+
+### Version sweep
+
+The 398 carried subjects were matched against every lore mirror since
+2026-11-01: 31 normalized-subject hits. All but one are the already-triaged
+resends or non-functional deltas (`1190`/`1193` v2, `2068`/`2069` v3,
+`1349` v2, `1354` v2, `1355` v3, `2044` v8, `2423`/`2424` v2, `2806`,
+`2809`/`2811` v2, `2806`/`2812` v2, gup v5). Verified this pass: `1355` v3
+is content-identical to the carried file (0 changed-line delta), `1349` v2
+is a zero-delta resend, and `2044` v8 is content-identical to the carried
+v7.
+
+**The one real update is the kbuild build-speedups v6** (`[PATCH v6 0/7]`,
+Lorenzo Stoakes, 2026-11-24). It maps 1:1 onto carried `2309`, `2310`,
+`2313`, `2314`, `2315`, `2319` and `2320`; `2310` (depcheck), `2313`
+(mismatch cache) and `2314` (module descriptors) carry real changes. It
+applies as a 7/7 series on `next-20261124` and, substituted at the same
+series positions, keeps the preview at 169/179 with no new skip. It is
+preview-only: v6 is based on `v7.4-rc1`, so the rc keeps v3. Adoption
+replaces seven files and needs its own build; recorded as the next preview
+update.
+
+### Mailing lists — new postings
+
+- **amd-gfx, 2026-11-24:** `[PATCH v1 0/9] drm/amdgpu/amdkfd: fix MES queue
+  lifecycle on multi-GPU` (Armas Spann). A dual-R9700 RCCL report; v1, no
+  review yet. It overlaps the single-GPU `REMOVE_QUEUE` symptom in work item
+  #5759, so track it, but the scope is multi-GPU.
+- **amd-gfx, 2026-11-24:** `[PATCH v3] drm/amdgpu/userq: keep the restore
+  worker out of system sleep` and `[PATCH v2] … queue the restore worker on
+  a freezable workqueue` (Arisa Snowbell). A two-file, ~20-line suspend race
+  in the userq restore path; Sashiko flagged one potential issue. Relevant
+  to the preview's userq stack, but not merged.
+- **sched-ext, 2026-11-24:** the `for-7.4-fixes` batch — unlocked kfuncs
+  from `ops.dump()`/`ops.init_cids()`, private stacks the JIT cannot
+  provide, `KF_RCU_PROTECTED` RCU usage, oversized `exit_dump_len`, and
+  `scx_switched_all` blocked-load/PELT. Under review; not in the base.
+- **linux-mm, 2026-11-22–24:** batched `zswap_store()` v4 and the xswap v6
+  14-part series; both under review. The preview base already carries
+  `452775e28bd8`; no carry.
+- **linux-nvme / linux-block / io-uring:** the new postings are multipath,
+  nvme-tcp, bsg and io_uring hardening work. The one worth tracking is the
+  `IORING_REGISTER_CLONE_BUFFERS` page-level UAF report (2026-11-22); it is
+  not merged and no carried io_uring patch covers it.
+- **linux-pm, 2026-11-23:** amd-pstate hybrid CAS/HFI v2. Hybrid-only; this
+  machine's `1239`–`1243` are already the v2 correctness series.
+
+### drm/amd work items
+
+73 open and 26 closed issues moved since 2026-11-20. On-target threads:
+
+- **#5380** — the DCN4.0.1 ODM/minimal-transition blank-screen fix is
+  accepted into amd-staging (patchwork 768146) as `f2107d218ecb`, already in
+  `next-20261124`. It applies cleanly on top of this rc series (hunk offset
+  -114, no fuzz) and is **not** in `v7.3`; an rc backport candidate.
+- **#6141 / #6197** — uncleared VRAM after a reset; #6197 closed as a
+  duplicate. The attachment is under review, not a commit.
+- **#6154** — RX 9070 XT HDMI 4K120 blinking; FAMS2 is the cause and
+  `amdgpu.dcdebugmask=0x20000` is the reported workaround. No patch.
+- **#6199** — GFX user queues keep the GPU busy at idle; the comment says
+  the compute case is fixed on MES firmware 0x97 (`a6571045cf06`,
+  ROCm#5706), while the GFX-userq case is not. No fix.
+- **#5949** — Navi 48 HDMI audio FIFO underruns; GFXOFF is the reported
+  workaround, no patch. **#5759** — MES `REMOVE_QUEUE` on Navi 48, no fix.
+- **#5339** — RA24/RGBA8888: the proper RGBA8888 support patches are still
+  attachments, not upstream; the carried `1183` workaround remains correct.
+- Closed pageflip-timeout reports (#5059, #5647, #5800, #5900) are duplicate
+  or stale; none names a fix commit.
+
+### Third-party patchsets and Phoronix
+
+- **CAST** v0.3.0 (tip `c2aed94`, 2026-11-24 +0900) is current; **NAP**
+  v0.6.6 (`5092cfd`, 2026-11-01) is current. **BORE** 7.0.1 for 7.4-rc4
+  exists but BORE is dropped.
+- **CachyOS** — `kernel-patches` master gained only “7.4: Fix bore patch”
+  (2026-11-23); the 7.4 branches last moved 2026-11-15/16 and their deltas
+  remain hybrid-only or already in the base. **sirlucjan** still has no 7.4
+  line; the newest zstd merge is the v1.6.0 one already carried as `2100`.
+- **salkim** — `salkim-7.3` is `ed9c3d67` (2026-11-23: six SVM fixes plus
+  one HDMI FRL line, deferred on 2026-11-23); `salkim-7.4` is
+  `6d5962449a37` (2026-11-19, carried as `9242`); `linux-salkim` is the
+  7.3.6-1 packaging update. Nothing new on any branch.
+- **Phoronix** 2026-11-22–24 — the CachyOS November ISO, Zstd 1.6 (the
+  carried `2100` already identifies as 1.6.0) and the 7.4-rc5 HID pull.
+  None adds an on-target kernel patch; DCN6/Linux 7.5 is the wrong chip
+  family.
+
+### Candidates, settled
+
+- **rc backports:** `f2107d218ecb` (DCN4 ODM) and `d734667216e3` (AMD MCE
+  bank lookup). Both apply cleanly to the 398-patch series; adopting either
+  needs a new rc release and build.
+- **preview update:** kbuild v6 (seven files).
+- **preview follow-ups:** UserQ restore-worker v3, MES queue-lifecycle 9/9,
+  sched_ext 7.4 fixes. Track until merged.
+- **No action:** CAST, NAP, CachyOS, sirlucjan, salkim, zswap/xswap series,
+  nvme multipath/tcp, amd-pstate hybrid.
+
+### Series state
+
+**398 patches.** `audit_series.py`: **398/398** on `v7.3`, unchanged. The
+preview lists **179** and applies **169** on `next-20261124`; the installed
+package is `2026.11.24-1`, and the running kernel stays
+`2026.11.23-1-sleepy-next` until the next reboot.

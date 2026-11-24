@@ -18,6 +18,44 @@ Two earlier artifacts are summarised at the end under
 `wannabe-7.3` preview tree. Both were removed from the working tree, and their
 full entries remain in git history.
 
+## [2026.11.24-1-sleepy-next]: 2026-11-24
+
+### Changed
+
+- **Base bump to `next-20261124`** (`3dd8c790a7b7`, tag object
+  `ecfab21e114b`). The range from `next-20261123` is 1,442 non-merge
+  commits; the snapshot `Makefile` names `7.4.0-rc4`. No patch needed
+  regeneration: the preview still lists **179** and applies **169**, with
+  the same ten skips (`1192`, `1194`, `1317`, `1320`, `1355`, `2044`,
+  `2068`, `2069`, `2426`, `2427`). `pahole -F btf` verifies the built
+  `vmlinux`, and the package installs as `2026.11.24-1`.
+
+### Checked and not adopted
+
+- **kbuild build-speedups v6** — seven patches posted 2026-11-24, mapping
+  1:1 onto the carried `2309`, `2310`, `2313`, `2314`, `2315`, `2319` and
+  `2320` (v3). Substituted at the same series positions on
+  `next-20261124`, the series stays at 169/179 with no new skip. `2310`
+  (depcheck), `2313` (mismatch cache) and `2314` (module descriptors) carry
+  real changes. Deferred to a dedicated preview update because it replaces
+  seven carried files and needs its own build.
+- **UserQ restore-worker v3 and freezable-workqueue v2**, the **MES
+  queue-lifecycle 9/9** series (multi-GPU), the **sched_ext for-7.4-fixes**
+  batch, **zswap batching v4 / xswap v6**, and the io_uring
+  clone-buffer UAF report — all posted 2026-11-22–24 and still under review.
+  None is merged in this base.
+- **rc candidates:** `f2107d218ecb` (DCN4.0.1 ODM minimal-transition
+  blank-screen fix) and `d734667216e3` (`x86/mce/amd` bank lookup,
+  `Cc: stable`). Both are in this preview base and both apply cleanly on
+  top of the 398-patch rc series; neither is carried there. Adopting either
+  is a separate rc pass.
+- **CAST** v0.3.0 (`c2aed94`) and **NAP** v0.6.6 (`5092cfd`) are current.
+  **CachyOS** and **sirlucjan** have no new on-target carries; **salkim**
+  tips are unchanged (`ed9c3d67` on 7.3, `6d5962449a37` on 7.4). The
+  Phoronix items for 2026-11-22–24 add no on-target kernel patch.
+
+No reboot or shutdown was performed.
+
 ## [2026.11.23-1-sleepy-next]: 2026-11-23
 
 ### Changed

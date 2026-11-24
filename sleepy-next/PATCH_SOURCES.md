@@ -15,11 +15,11 @@ moved, so the full ledger is not duplicated here.
 
 | | |
 |---|---|
-| Snapshot | `next-20261123`, commit `3191063649db` (tag object `1422acaa190f`) |
-| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261123.tar.gz` |
-| Snapshot tree `Makefile` | `7.4.0-rc3` — the base release, **deliberately not used in the release name** |
-| Kernel release | `2026.11.23-1-sleepy-next` |
-| Package | `linux-sleepy-next-2026.11.23-1` |
+| Snapshot | `next-20261124`, commit `3dd8c790a7b7` (tag object `ecfab21e114b`) |
+| Source | `https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/next-20261124.tar.gz` |
+| Snapshot tree `Makefile` | `7.4.0-rc4` — the base release, **deliberately not used in the release name** |
+| Kernel release | `2026.11.24-1-sleepy-next` |
+| Package | `linux-sleepy-next-2026.11.24-1` |
 
 ### Versioning: the snapshot date, not the base rc
 
@@ -2537,3 +2537,50 @@ had the guard.
 and `2427`. `1320` is fully absorbed (the base carries the fix in its
 `in_task()` form); it stays listed until removal is approved. The rc is
 **398/398** on `v7.3`.
+
+## Bump 2026-11-24 — `next-20261124`; same ten skips
+
+`next-20261124` (tag object `ecfab21e114b`, peeled commit `3dd8c790a7b7`) is
+the new preview base. `_srctag` moves to `next-20261124`, `pkgrel` resets to
+`1`, and the release becomes **2026.11.24-1**. The range from
+`next-20261123` is 1,442 non-merge commits; the snapshot `Makefile` names
+`7.4.0-rc4`.
+
+### Series changes
+
+No patch needed regeneration or removal. The series still lists **179** and
+applies **169**; the same ten patches skip for the reasons recorded on
+2026-11-23: `1192`, `1194`, `1317`, `1320`, `1355`, `2044`, `2068`, `2069`,
+`2426` and `2427`. A normalized-subject match against the 1,442 new commits
+found only `2044` (already skipped) plus one false positive, so the range
+absorbed no new carry. The build produced
+`linux-sleepy-next-2026.11.24-1`; `pahole -F btf` decodes `task_struct` from
+the installed `build/vmlinux`.
+
+### Sweep findings
+
+The full report is in `sleepy-rc/PATCH_SOURCES.md` under *Sweep 2026-11-24*.
+Preview-relevant items:
+
+- **kbuild build-speedups v6** — seven patches posted 2026-11-24, mapping 1:1
+  to the carried `2309`, `2310`, `2313`, `2314`, `2315`, `2319` and `2320`
+  (v3). The v6 series applies cleanly at the same series positions on
+  `next-20261124`; `2310`, `2313` and `2314` carry substantive changes. It
+  replaces seven carried patch files and needs a dedicated preview rebuild,
+  so it is recorded as the next update, not adopted in this bump.
+- **New amd-gfx series** — the UserQ restore-worker v3 and freezable-workqueue
+  v2 postings, and the nine-part MES queue-lifecycle series (multi-GPU), all
+  posted 2026-11-24 and still under review. Not merged in this base.
+- **sched_ext for-7.4 fixes** — unlocked-kfunc, private-stack, RCU and
+  `exit_dump_len` fixes posted 2026-11-24; not merged here. Deferred until
+  they land.
+- **CAST** v0.3.0 (`c2aed94`) and **NAP** v0.6.6 (`5092cfd`) are current.
+  **CachyOS** and **sirlucjan** have no new on-target carries; **salkim** tips
+  are unchanged (`ed9c3d67` on 7.3, `6d5962449a37` on 7.4).
+- **Phoronix** 2026-11-22–24 — the CachyOS November ISO, Zstd 1.6 and the
+  7.4-rc5 HID pull add no on-target kernel patch.
+
+### Series state
+
+**179 listed / 169 applied** on `next-20261124`. The rc is **398/398** on
+`v7.3`.
